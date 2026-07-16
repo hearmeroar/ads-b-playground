@@ -22,13 +22,17 @@ Backend responsibilities:
    not because of CORS (it sends permissive CORS headers), but because it
    rejects requests without a descriptive User-Agent containing contact info,
    and browsers don't allow JS to set that header at all.
+8) Also proxy airport-data.com's photo lookup as a second photo source: the
+   frontend's gallery uses it to top up the remaining slots whenever
+   Planespotters didn't return enough photos to fill the gallery on its own.
 """
 import os
+import re
 import time
 from urllib.parse import quote
 
 import requests
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 try:
     from dotenv import load_dotenv
@@ -92,6 +96,34 @@ PLANESPOTTERS_USER_AGENT = os.environ.get(
 # Aircraft photos don't change, so cache indefinitely for the life of the
 # process rather than on a time interval like the live-data endpoints above.
 _photo_cache = {}  # "reg:<REGISTRATION>" or "hex:<icao24>" -> list of photo dicts
+
+# airport-data.com (https://airport-data.com/api/doc/): free, no key, used to
+# top up the gallery with however many extra photos it has beyond what
+# Planespotters returned. Note: the "www" subdomain's TLS cert doesn't cover
+# "www.airport-data.com", only the bare domain — always request the bare
+# domain, not www.
+AIRPORTDATA_BASE = "https://airport-data.com/api/ac_thumb.json"
+# `ac_thumb.json`'s own "image" field is always a small ~200px thumbnail
+# (.../thumbnails/XXX/YYY/<id>.jpg) — airport-data.com separately serves a
+# full-size (1200x800, watermarked) version of the same photo at this path,
+# keyed by the same numeric id. There's no documented way to get this URL
+# directly from the API response, so we extract the id from the thumbnail
+# (or link) URL and reconstruct it; the frontend falls back to the plain
+# thumbnail client-side if this guessed URL 404s (not every id resolves).
+AIRPORTDATA_FULLSIZE_BASE = "https://image.airport-data.com/aircraft/{photo_id}.jpg"
+_AIRPORTDATA_ID_RE = re.compile(r"(\d+)\.jpg(?:\?.*)?$")
+_airportdata_cache = {}  # "reg:<REGISTRATION>" or "hex:<icao24>" -> list of photo dicts
+
+
+def _airportdata_fullsize_url(raw_photo):
+    for field in ("image", "link"):
+        value = raw_photo.get(field)
+        if not value:
+            continue
+        match = _AIRPORTDATA_ID_RE.search(value)
+        if match:
+            return AIRPORTDATA_FULLSIZE_BASE.format(photo_id=match.group(1))
+    return None
 
 
 def get_access_token():
@@ -287,6 +319,80 @@ def api_photo_reg(registration):
 @app.route("/api/photo/hex/<icao24>")
 def api_photo_hex(icao24):
     return fetch_planespotters("hex", icao24)
+
+
+def fetch_airportdata(kind, value, count, registration=None):
+    """count is how many additional photos the frontend still needs to fill
+    the gallery — passed to airport-data.com as `n`, but per their own docs
+    ("Max number of results, default is 1") that's a ceiling, not a
+    guarantee: e.g. G-STBC with n=5 returns only 2. Callers must use however
+    many photos actually come back, not assume len() == count.
+    `registration`, when given alongside an ICAO24 hex lookup, is passed as
+    an extra `r` param for a more precise match per airport-data.com's docs.
+    Cached by aircraft only (not by count), since the photos themselves
+    don't change within a session regardless of how many were requested."""
+    cache_key = f"{kind}:{value}"
+    if cache_key in _airportdata_cache:
+        return jsonify({"photos": _airportdata_cache[cache_key]})
+
+    param_name = "r" if kind == "reg" else "m"
+    params = {param_name: value, "n": max(1, count)}
+    if kind == "hex" and registration:
+        params["r"] = registration
+
+    try:
+        resp = requests.get(AIRPORTDATA_BASE, params=params, timeout=10)
+
+        if resp.status_code == 404:
+            # Their own "no photo for this aircraft" response — a real,
+            # stable answer, so it's safe to cache like any other result.
+            _airportdata_cache[cache_key] = []
+            return jsonify({"photos": []})
+
+        if resp.status_code == 429 or resp.status_code >= 500:
+            # Rate-limited or the upstream service is having trouble — treat
+            # as "no top-up photos this time" without caching, so a later
+            # request (next card open) can retry instead of being stuck
+            # empty for the rest of the session.
+            return jsonify({"photos": []})
+
+        resp.raise_for_status()
+        raw_photos = resp.json().get("data", [])
+        # Normalized to the same {thumbnail_large, link, photographer} shape
+        # Planespotters uses, plus an extra `fallback_src` (see
+        # _airportdata_fullsize_url) so the frontend gallery can treat both
+        # sources identically while still knowing how to degrade gracefully
+        # if the reconstructed full-size URL turns out not to exist.
+        photos = []
+        for p in raw_photos:
+            thumb = p.get("image")
+            if not thumb:
+                continue
+            fullsize = _airportdata_fullsize_url(p)
+            photos.append({
+                "thumbnail_large": {"src": fullsize or thumb},
+                "fallback_src": thumb if fullsize else None,
+                "link": p.get("link"),
+                "photographer": p.get("photographer"),
+            })
+        _airportdata_cache[cache_key] = photos
+        return jsonify({"photos": photos})
+
+    except requests.RequestException as exc:
+        return jsonify({"photos": [], "error": str(exc)}), 502
+
+
+@app.route("/api/photo2/reg/<registration>")
+def api_photo2_reg(registration):
+    count = request.args.get("n", default=1, type=int)
+    return fetch_airportdata("reg", registration, count)
+
+
+@app.route("/api/photo2/hex/<icao24>")
+def api_photo2_hex(icao24):
+    count = request.args.get("n", default=1, type=int)
+    registration = request.args.get("reg") or None
+    return fetch_airportdata("hex", icao24, count, registration=registration)
 
 
 if __name__ == "__main__":
