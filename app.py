@@ -168,7 +168,10 @@ def fetch_opensky(url, params):
 
 
 def fetch_states():
-    return fetch_opensky(OPENSKY_URL, BBOX)
+    # extended=1 is required for OpenSky to include the "category" field at
+    # all (confirmed empirically: without it, /states/all returns 17-element
+    # state vectors, never 18 — category isn't merely null, it's absent).
+    return fetch_opensky(OPENSKY_URL, {**BBOX, "extended": 1})
 
 
 @app.route("/")
@@ -232,12 +235,23 @@ def api_track(icao24):
             return jsonify({"path": [], "error": "not_found"}), 404
 
         if resp.status_code == 429:
+            # Keep OpenSky's rate-limit diagnostics visible to the frontend
+            # (and to callers of this proxy). A 429 can mean exhausted daily
+            # credits or a shorter retry window, and the response headers are
+            # the only way to tell those cases apart.
+            remaining = resp.headers.get("X-Rate-Limit-Remaining")
+            retry_after = resp.headers.get("X-Rate-Limit-Retry-After-Seconds")
+            diagnostics = {
+                "rate_limit_remaining": int(remaining) if remaining is not None else None,
+                "retry_after_seconds": int(retry_after) if retry_after is not None else None,
+            }
             if cached:
                 stale = dict(cached["data"])
                 stale["stale"] = True
                 stale["error"] = "rate_limited"
+                stale.update(diagnostics)
                 return jsonify(stale)
-            return jsonify({"path": [], "error": "rate_limited"}), 429
+            return jsonify({"path": [], "error": "rate_limited", **diagnostics}), 429
 
         resp.raise_for_status()
         payload = resp.json()

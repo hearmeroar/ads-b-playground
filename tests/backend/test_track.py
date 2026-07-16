@@ -40,9 +40,18 @@ def test_rate_limited_falls_back_to_cache(client, mock_get):
 
 
 def test_rate_limited_no_cache_returns_429(client, mock_get):
-    mock_get.return_value = make_response(status_code=429)
+    mock_get.return_value = make_response(status_code=429, headers={
+        "X-Rate-Limit-Remaining": "3968",
+        "X-Rate-Limit-Retry-After-Seconds": "42",
+    })
     resp = client.get("/api/track/neverseen")
     assert resp.status_code == 429
+    assert resp.get_json() == {
+        "error": "rate_limited",
+        "path": [],
+        "rate_limit_remaining": 3968,
+        "retry_after_seconds": 42,
+    }
 
 
 def test_network_error_no_cache_returns_502(client, mock_get):

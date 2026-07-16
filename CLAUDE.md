@@ -49,12 +49,17 @@ adsb.fi/airplanes.live themselves may not need a CORS workaround.
   matter how many frontend polls land in that window, OpenSky is hit at most
   once. On a 429 or network error, the last good response is re-served with
   `stale`/`error` flags instead of failing the request.
-- `/api/track/<icao24>` → `/tracks/all?time=0`, giving an aircraft's actual
-  flight history (not just positions this page has polled). Has its own
-  per-icao24 cache (`TRACK_MIN_INTERVAL`, 15s) so repeated clicks don't spend
-  extra quota. Returns 404 passthrough when OpenSky has no track for that
-  aircraft. This also works for adsb.fi/airplanes.live markers, since all
-  three sources key aircraft by the same ICAO24/hex address.
+- `/api/track/<icao24>` → `/tracks/all?time=0`, giving an aircraft's current
+  or most-recent flight history (not an arbitrary historical timestamp). Has
+  its own per-icao24 cache (`TRACK_MIN_INTERVAL`, 15s) so repeated clicks
+  don't spend extra quota. Tracks use OpenSky's independent `/tracks/*`
+  credit bucket, separate from `/states/*`; a 429 response forwards
+  `rate_limit_remaining` and `retry_after_seconds` when OpenSky supplies
+  those headers. A live check on 2026-07-17 returned a 429 with a 54,789 s
+  retry window and no remaining-credit header. Returns 404 passthrough when
+  OpenSky has no track for that aircraft. This also works for adsb.fi/
+  airplanes.live markers, since all three sources key aircraft by the same
+  ICAO24/hex address.
 
 **Optional OAuth2 auth (`app.py`):** If `OPENSKY_CLIENT_ID` and
 `OPENSKY_CLIENT_SECRET` are set (via `.env`, loaded through `python-dotenv`),
@@ -162,37 +167,55 @@ because photographer name and photo URL come from an external API.
   `adsbfiMarkers`, `airplanesliveMarkers` — each synced from its source via
   the shared `syncMarkers()` helper (reuses/moves/rotates existing markers in
   place rather than recreating the layer every poll). Marker color is
-  source-specific (`SOURCE_COLORS`, whose keys are the canonical list of
-  source names used to generalize the HUD counts and toggle wiring). Each
+  source-specific (`SOURCE_COLORS`, whose key order is the canonical source
+  priority list used to generalize the HUD counts and toggle wiring). Each
   source can be hidden independently via its HUD checkbox, which clears its
   markers immediately and triggers an immediate `poll()` (rather than waiting
   up to `POLL_INTERVAL_MS` for the next tick) — both on and off toggles
   re-run `poll()` so counts/markers never sit stale after a toggle.
-- **Dedup + enrichment rule:** `poll()` fetches all three sources in
+  **OpenSky is on by default** (its HUD checkbox ships checked), alongside
+  the two free radius sources. Turning it off clears the quota line and any
+  pending OpenSky warning message.
+- **Dedup + enrichment rule:** `poll()` fetches all enabled sources in
   parallel, but defers rendering until they've all arrived, then renders in
   priority order — OpenSky, then adsb.fi, then airplanes.live — since each
   step depends on data or state from the others:
-  - OpenSky's sidebar data is enriched with everything it doesn't have
-    itself (registration, aircraft type, `emergency`, IAS/TAS/Mach, mag/true
-    heading, turn rate, roll, autopilot targets, wind, OAT/TAT) via
+  - OpenSky renders first (when enabled). Its sidebar data is enriched with
+    everything it doesn't have itself (registration, aircraft type,
+    `emergency`, IAS/TAS/Mach, mag/true heading, turn rate, roll, autopilot
+    targets, wind, OAT/TAT, operator, year, the DO-260B accuracy fields) via
     `enrichmentByHex`, a lookup merged from the adsb.fi and airplanes.live
     responses (adsb.fi's entry wins if both have one) — see
     `normalizeOpenSky(s, extra)`. Fields every source already provides
     (altitude, speed, position, squawk, position source, last-contact time)
     are never taken from `extra` — OpenSky's own values always win for those.
-  - adsb.fi renders next via `updateRadiusSourceMarkers(...)`, passing the
-    just-updated `openskyMarkers` keys as an exclusion set.
+  - adsb.fi renders next, excluding the just-updated `openskyMarkers` keys.
   - airplanes.live renders last, excluding the union of `openskyMarkers` and
-    `adsbfiMarkers` keys — so it only shows what neither of the
-    higher-priority sources already covers.
+    `adsbfiMarkers` keys.
   - What's uniquely visible as an adsb.fi/airplanes.live *marker* is
     therefore exactly what that source contributes beyond the sources above
-    it; what it uniquely contributes *data-wise* still surfaces through
+    it; what a source uniquely contributes *data-wise* still surfaces through
     enrichment even when the marker itself is deduped away.
+  - The generic `updated HH:MM:SS` status line is written by `poll()` itself
+    (not `fetchOpenSkyStates()`), so it keeps ticking with OpenSky disabled;
+    OpenSky's rate-limit/stale/unreachable warnings are stashed in
+    `openskyStatusMessage` and shown in its place only while the source is
+    enabled and struggling.
 - **Sidebar data model:** `parseOpenSkyState()`/`parseAdsbExchangeAircraft()`
   parse each source's raw shape; `normalizeOpenSky()`/`normalizeAdsbExchange()`
   then map both into one common field-name shape (`info` objects — altitude
   in meters, speed in km/h, airspeeds/wind in knots, absent fields `null`).
+  This shape is formally documented in `schema/aircraft.schema.json`
+  (47 fields, raw source field names/units per property), including a
+  7th sidebar group beyond the six above — **Signal & Data Quality**
+  (adsb.fi/airplanes.live-only: `operator`, `manufactureYear`, `dbFlags`,
+  `messageType`, `adsbVersion`, and the DO-260B NIC/NACp/NACv/SIL/GVA/SDA
+  accuracy fields — no OpenSky equivalents, confirmed against live API
+  responses). `trackDeg` falls back to adsb.fi/airplanes.live's
+  `calc_track` when `track` is absent (observed on military aircraft).
+  `fetch_states()` sends OpenSky's `extended=1` param so `category`
+  (state vector index 17) is actually populated, not just `categoryDisplay`
+  via adsb.fi/airplanes.live enrichment.
   `detailsById` (a `Map<icao24, {info, registration}>`, rebuilt every poll in
   `syncMarkers()`) stores these objects, not rendered HTML — `selectAircraft()`
   and the "keep the open sidebar live across polls" line in `syncMarkers()`
@@ -234,8 +257,13 @@ because photographer name and photo URL come from an external API.
   if this area needs touching again.) OpenSky may have no track for a given
   aircraft (`/api/track` 404s) — common for rotorcraft, whose short/local
   flights often aren't segmented into a continuous "flight" by OpenSky's
-  history system; the frontend just draws nothing in that case rather than
-  erroring.
+  history system. `loadTrack()` then falls back to the small in-browser
+  `liveTrailById` history collected from map polls (up to 40 distinct
+  positions per ICAO24); this only becomes drawable after at least two
+  observed positions and is discarded on page reload. A selected aircraft
+  does not re-request OpenSky history on every 12 s poll, preventing the old
+  behaviour that rapidly exhausted the separate track-credit bucket; while
+  using the fallback, its local path is refreshed from each poll instead.
 - **Track is colored by altitude**, like OpenSky's own web map:
   `drawTrack(waypoints)` builds a `trackLayerGroup` — an `L.featureGroup` of
   short two-point polyline segments, one per consecutive waypoint pair,
@@ -318,10 +346,15 @@ because photographer name and photo URL come from an external API.
   reliable than pixel-coordinate clicking, which can land on a different,
   overlapping marker at low zoom levels.
 - Runs on port 5050, not 5000 — see the Commands section above.
+- `test_track.spec.js` targets an adsb.fi marker for the successful track
+  path (OpenSky is nevertheless the first-priority source), asserts the
+  actual `trackLayerGroup` rather than a fixed stroke color, and covers
+  empty/404 tracks plus the local live-trail fallback.
 - **Known gap:** the frontend spec files predate the left sidebar (they were
   written against the old Leaflet-popup UI), the two-source photo-priority
-  gallery, the grouped/normalized sidebar data model, and the unit toggle —
-  they haven't been updated for any of that yet.
+  gallery, the grouped/normalized sidebar data model, the unit toggle, and
+  the source reordering and the default source-toggle state — they haven't
+  been updated for any of that yet.
 
 ## Conventions
 

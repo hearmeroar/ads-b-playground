@@ -335,6 +335,8 @@ const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
 // can in principle show up in more than one feed at once — see the dedup
 // rule in poll() below). OpenSky is the "primary" source; adsb.fi and
 // airplanes.live are ranked below it in that order.
+// Key order is the canonical source priority: OpenSky > adsb.fi >
+// airplanes.live. OpenSky remains quota-limited, but starts enabled.
 const SOURCE_COLORS = { opensky: '#1a73e8', adsbfi: '#e53935', airplaneslive: '#2e7d32' };
 const openskyMarkers = new Map(); // icao24 -> L.Marker
 const adsbfiMarkers = new Map(); // hex -> L.Marker
@@ -529,6 +531,39 @@ const detailsById = new Map(); // id -> { html, registration }
 let selectedIcao24 = null;
 let trackLayerGroup = null;
 let trackFetchToken = 0; // guards against a stale response overwriting a newer selection
+let trackUsesLiveFallback = false;
+
+// OpenSky is the only source that provides a full historical track, but its
+// track endpoint is quota-limited. Keep a small, in-browser trail from the
+// live feeds as a fallback when that endpoint is temporarily unavailable.
+const LIVE_TRAIL_MAX_POINTS = 40;
+const liveTrailById = new Map(); // icao24 -> [{lat, lon, altitude}]
+
+function recordLiveTrailPoint(icao24, lat, lon, altitude) {
+  if (!icao24 || lat == null || lon == null) return;
+  const trail = liveTrailById.get(icao24) || [];
+  const previous = trail[trail.length - 1];
+  // A poll can receive the same aircraft from several feeds. Repeated
+  // coordinates do not add information or make a visible track segment.
+  if (!previous || previous.lat !== lat || previous.lon !== lon) {
+    trail.push({ lat, lon, altitude });
+    if (trail.length > LIVE_TRAIL_MAX_POINTS) trail.shift();
+    liveTrailById.set(icao24, trail);
+  }
+}
+
+function recordLiveTrails(openskyStates, adsbfiAircraft, airplanesliveAircraft) {
+  for (const raw of openskyStates || []) {
+    const state = parseOpenSkyState(raw);
+    recordLiveTrailPoint(state.icao24, state.lat, state.lon, state.baro_altitude);
+  }
+  for (const list of [adsbfiAircraft, airplanesliveAircraft]) {
+    for (const raw of list || []) {
+      const aircraft = parseAdsbExchangeAircraft(raw);
+      recordLiveTrailPoint(aircraft.icao24, aircraft.lat, aircraft.lon, aircraft.altitudeM);
+    }
+  }
+}
 
 // Altitude legend for the track, in the spirit of OpenSky's own web map: grey
 // for unknown altitude, green near the ground, up through yellow/orange to
@@ -594,14 +629,27 @@ async function loadTrack(icao24) {
     const waypoints = (data.path || [])
       .filter((wp) => wp[1] != null && wp[2] != null)
       .map((wp) => ({ lat: wp[1], lon: wp[2], altitude: wp[3] }));
-    drawTrack(waypoints);
+    if (waypoints.length >= 2) {
+      trackUsesLiveFallback = false;
+      drawTrack(waypoints);
+    } else {
+      // 404/429 and a flight that OpenSky has not segmented yet all return no
+      // drawable path. Fall back to the positions this page has observed.
+      trackUsesLiveFallback = true;
+      drawTrack(liveTrailById.get(icao24));
+    }
   } catch (e) {
-    // keep whatever track is currently drawn; next poll cycle will retry
+    if (fetchId === trackFetchToken && selectedIcao24 === icao24) {
+      trackUsesLiveFallback = true;
+      drawTrack(liveTrailById.get(icao24));
+    }
   }
 }
 
 function selectAircraft(icao24) {
   selectedIcao24 = icao24;
+  trackUsesLiveFallback = false;
+  drawTrack(null); // never leave the previously selected aircraft's path visible
   loadTrack(icao24);
 
   const details = detailsById.get(icao24);
@@ -612,6 +660,7 @@ function selectAircraft(icao24) {
 
 function deselectAircraft() {
   selectedIcao24 = null;
+  trackUsesLiveFallback = false;
   drawTrack(null);
   sidebarEl.classList.remove('open');
 }
@@ -929,6 +978,18 @@ function formatSquawk(squawk) {
     : squawk;
 }
 
+// dbFlags is an adsb.fi/airplanes.live bitmask: 1=military, 2=interesting,
+// 4=PIA (privacy ICAO address), 8=LADD (limited-display aircraft).
+function formatDbFlags(flags) {
+  if (!flags) return null;
+  const labels = [];
+  if (flags & 1) labels.push('Military');
+  if (flags & 2) labels.push('Interesting');
+  if (flags & 4) labels.push('PIA');
+  if (flags & 8) labels.push('LADD');
+  return labels.length ? labels.join(', ') : null;
+}
+
 // --- Unit-aware formatters (metric ⇄ imperial, see currentUnitSystem) ---
 // Every value normalizeOpenSky()/normalizeAdsbExchange() produce is stored
 // in one canonical unit (meters, km/h, m/s, knots for airspeeds/wind — the
@@ -1023,8 +1084,10 @@ function renderDetailsHtml(info) {
     detailRow('Callsign', info.callsign || '—'),
     detailRow('Registration', info.registration),
     detailRow('Aircraft', info.aircraftType),
+    detailRow('Operator', info.operator),
     detailRow('Country', info.originCountry),
     detailRow('Category', info.categoryDisplay),
+    detailRow('Year built', info.manufactureYear),
   ]);
   const position = renderGroup('Position', [
     detailRow('Altitude', formatAltitude(info.altitudeM)),
@@ -1061,7 +1124,27 @@ function renderDetailsHtml(info) {
     info.hasAlert ? '<span class="emergency">Alert</span>' : null,
     detailRow('Last update', formatRelativeSeconds(info.secondsSinceContact)),
   ]);
-  return identity + position + speedHeading + autopilot + weather + status;
+  // adsb.fi/airplanes.live only — no OpenSky equivalent for any of these
+  // (DO-260B navigation accuracy/integrity categories, receiver-relative
+  // signal metadata). Absent entirely for an OpenSky-only aircraft, same as
+  // Autopilot/Weather above.
+  const signalQuality = renderGroup('Signal & Data Quality', [
+    detailRow('Data source flags', formatDbFlags(info.dbFlags)),
+    detailRow('Message type', info.messageType),
+    detailRow('ADS-B version', info.adsbVersion != null ? 'v' + info.adsbVersion : null),
+    detailRow('NIC', info.nic),
+    detailRow('NIC (baro)', info.nicBaro),
+    detailRow('NACp', info.nacP),
+    detailRow('NACv', info.nacV),
+    detailRow('SIL', info.sil != null ? info.sil + (info.silType ? ' (' + info.silType + ')' : '') : null),
+    detailRow('GVA', info.gva),
+    detailRow('SDA', info.sda),
+    detailRow('Radius of containment', info.radiusOfContainmentM != null ? Math.round(info.radiusOfContainmentM) + ' m' : null),
+    detailRow('Messages received', info.messageCount),
+    detailRow('Signal strength', info.signalStrengthDbm != null ? info.signalStrengthDbm.toFixed(1) + ' dBm' : null),
+    detailRow('Last position update', formatRelativeSeconds(info.secondsSincePositionUpdate)),
+  ]);
+  return identity + position + speedHeading + autopilot + weather + status + signalQuality;
 }
 
 // --- OpenSky (/states/all) ---
@@ -1113,6 +1196,25 @@ function normalizeOpenSky(s, extra) {
     positionSource: OPENSKY_POSITION_SOURCE_LABELS[s.position_source] || null,
     secondsSinceContact: s.last_contact != null
       ? Math.max(0, Math.floor(Date.now() / 1000) - s.last_contact) : null,
+    // No OpenSky equivalent for any of these — extra-derived only, same as
+    // ias/tas/mach/etc. above.
+    operator: (extra && extra.operator) || null,
+    manufactureYear: (extra && extra.manufactureYear) || null,
+    dbFlags: (extra && extra.dbFlags != null) ? extra.dbFlags : null,
+    messageType: (extra && extra.messageType) || null,
+    adsbVersion: (extra && extra.adsbVersion != null) ? extra.adsbVersion : null,
+    nic: (extra && extra.nic != null) ? extra.nic : null,
+    nicBaro: (extra && extra.nicBaro != null) ? extra.nicBaro : null,
+    nacP: (extra && extra.nacP != null) ? extra.nacP : null,
+    nacV: (extra && extra.nacV != null) ? extra.nacV : null,
+    sil: (extra && extra.sil != null) ? extra.sil : null,
+    silType: (extra && extra.silType) || null,
+    gva: (extra && extra.gva != null) ? extra.gva : null,
+    sda: (extra && extra.sda != null) ? extra.sda : null,
+    radiusOfContainmentM: (extra && extra.radiusOfContainmentM != null) ? extra.radiusOfContainmentM : null,
+    messageCount: (extra && extra.messageCount != null) ? extra.messageCount : null,
+    signalStrengthDbm: (extra && extra.signalStrengthDbm != null) ? extra.signalStrengthDbm : null,
+    secondsSincePositionUpdate: (extra && extra.secondsSincePositionUpdate != null) ? extra.secondsSincePositionUpdate : null,
   };
 }
 
@@ -1151,11 +1253,15 @@ function parseOpenSkyState(arr) {
 // enrichmentByHex: Map<icao24, parsed adsb.fi/airplanes.live aircraft>, used
 // to enrich the sidebar (see normalizeOpenSky) — including its registration,
 // which OpenSky's own data lacks but the photo gallery lookup needs.
-function updateOpenSkyMarkers(states, enrichmentByHex) {
+// excludeIds: aircraft already shown by the higher-priority sources
+// (adsb.fi/airplanes.live) — OpenSky renders last and only contributes what
+// they don't cover, since it's the only source that spends a daily quota.
+function updateOpenSkyMarkers(states, enrichmentByHex, excludeIds) {
   const items = [];
   for (const raw of states) {
     const s = parseOpenSkyState(raw);
     if (s.lat == null || s.lon == null) continue; // no position — skip this aircraft
+    if (excludeIds && excludeIds.has(s.icao24)) continue;
     if (!passesMotionFilter(s.on_ground)) continue;
     const extra = enrichmentByHex ? enrichmentByHex.get(s.icao24) : null;
     const isGroundVehicle = looksLikeGroundVehicle({
@@ -1208,6 +1314,12 @@ function normalizeAdsbExchange(a) {
     hasAlert: !!a.hasAlert,
     positionSource: a.positionSource || null,
     secondsSinceContact: a.secondsSinceContact,
+    operator: a.operator, manufactureYear: a.manufactureYear,
+    dbFlags: a.dbFlags, messageType: a.messageType, adsbVersion: a.adsbVersion,
+    nic: a.nic, nicBaro: a.nicBaro, nacP: a.nacP, nacV: a.nacV,
+    sil: a.sil, silType: a.silType, gva: a.gva, sda: a.sda,
+    radiusOfContainmentM: a.radiusOfContainmentM, messageCount: a.messageCount,
+    signalStrengthDbm: a.signalStrengthDbm, secondsSincePositionUpdate: a.secondsSincePositionUpdate,
   };
 }
 
@@ -1248,7 +1360,10 @@ function parseAdsbExchangeAircraft(ac) {
     squawk: ac.squawk || null,
     category: ac.category || null,
     emergency: (ac.emergency && ac.emergency !== 'none') ? ac.emergency : null,
-    track: ac.track,
+    // Some aircraft (observed live on a military UH-60) report no 'track' at
+    // all, only 'calc_track' (a computed fallback) — without this, they'd
+    // silently lose heading even though a usable value exists upstream.
+    track: typeof ac.track === 'number' ? ac.track : (typeof ac.calc_track === 'number' ? ac.calc_track : null),
     iasKt: typeof ac.ias === 'number' ? ac.ias : null,
     tasKt: typeof ac.tas === 'number' ? ac.tas : null,
     mach: typeof ac.mach === 'number' ? ac.mach : null,
@@ -1267,6 +1382,28 @@ function parseAdsbExchangeAircraft(ac) {
     hasAlert: !!ac.alert || !!ac.spi,
     positionSource: positionSource,
     secondsSinceContact: typeof ac.seen === 'number' ? ac.seen : null,
+    // The fields below have no OpenSky equivalent at all (confirmed against
+    // the official 18-field state vector) — enrichment-only, same as ias/
+    // tas/mach/etc. above. See schema/aircraft.schema.json for the full
+    // per-field rationale (DO-260B accuracy/integrity categories, dbFlags
+    // bitmask meaning, etc.).
+    operator: ac.ownOp || null,
+    manufactureYear: ac.year || null,
+    dbFlags: typeof ac.dbFlags === 'number' ? ac.dbFlags : null,
+    messageType: ac.type || null,
+    adsbVersion: typeof ac.version === 'number' ? ac.version : null,
+    nic: typeof ac.nic === 'number' ? ac.nic : null,
+    nicBaro: typeof ac.nic_baro === 'number' ? ac.nic_baro : null,
+    nacP: typeof ac.nac_p === 'number' ? ac.nac_p : null,
+    nacV: typeof ac.nac_v === 'number' ? ac.nac_v : null,
+    sil: typeof ac.sil === 'number' ? ac.sil : null,
+    silType: ac.sil_type || null,
+    gva: typeof ac.gva === 'number' ? ac.gva : null,
+    sda: typeof ac.sda === 'number' ? ac.sda : null,
+    radiusOfContainmentM: typeof ac.rc === 'number' ? ac.rc : null,
+    messageCount: typeof ac.messages === 'number' ? ac.messages : null,
+    signalStrengthDbm: typeof ac.rssi === 'number' ? ac.rssi : null,
+    secondsSincePositionUpdate: typeof ac.seen_pos === 'number' ? ac.seen_pos : null,
   };
 }
 
@@ -1297,7 +1434,15 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color) {
 
 for (const name of Object.keys(SOURCE_COLORS)) {
   sourceToggles[name].addEventListener('change', () => {
-    if (!sourceToggles[name].checked) clearAllMarkers(markerMapsBySource[name]);
+    if (!sourceToggles[name].checked) {
+      clearAllMarkers(markerMapsBySource[name]);
+      if (name === 'opensky') {
+        // Quota line and any pending warning describe a source that's no
+        // longer being polled — don't leave them frozen on screen.
+        document.getElementById('quota').textContent = '';
+        openskyStatusMessage = null;
+      }
+    }
     poll(); // refresh right away instead of waiting for the next 12s tick
   });
 }
@@ -1318,19 +1463,23 @@ function updateCounts(counts) {
 // sources have arrived, since OpenSky's popup enrichment needs adsb.fi/
 // airplanes.live's parsed data, and their dedup needs OpenSky's (and each
 // other's) rendered marker sets.
+// OpenSky's warning states are stashed here rather than written to #status
+// directly: poll() owns that line (it must keep ticking with OpenSky off,
+// the default) and shows this message instead of "updated" when set.
+let openskyStatusMessage = null;
+
 async function fetchOpenSkyStates() {
-  const statusEl = document.getElementById('status');
   const quotaEl = document.getElementById('quota');
   try {
     const resp = await fetch('/api/states');
     const data = await resp.json();
 
     if (data.error === 'rate_limited') {
-      statusEl.textContent = 'OpenSky: rate limited, showing cached data';
+      openskyStatusMessage = 'OpenSky: rate limited, showing cached data';
     } else if (data.stale) {
-      statusEl.textContent = 'OpenSky: unreachable, showing stale data';
+      openskyStatusMessage = 'OpenSky: unreachable, showing stale data';
     } else {
-      statusEl.textContent = 'updated ' + new Date().toLocaleTimeString('en-GB');
+      openskyStatusMessage = null;
     }
 
     // Remaining daily OpenSky quota (X-Rate-Limit-Remaining header, forwarded
@@ -1341,7 +1490,7 @@ async function fetchOpenSkyStates() {
 
     return data.states || [];
   } catch (e) {
-    statusEl.textContent = 'OpenSky: failed to load data';
+    openskyStatusMessage = 'OpenSky: failed to load data';
     return null; // signals failure — keep whatever markers are already shown
   }
 }
@@ -1363,7 +1512,19 @@ async function poll() {
     isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
   ]);
 
-  // Enrichment lookup for OpenSky's popup: adsb.fi takes priority over
+  recordLiveTrails(openskyStates, adsbfiAircraft, airplanesliveAircraft);
+
+  // The generic "updated" timestamp lives here, not in fetchOpenSkyStates()
+  // — an OpenSky warning (rate limit/stale/unreachable) takes its place for
+  // that cycle when the source is enabled and struggling.
+  if (isSourceEnabled('opensky') && openskyStatusMessage) {
+    document.getElementById('status').textContent = openskyStatusMessage;
+  } else if (adsbfiAircraft || airplanesliveAircraft || openskyStates) {
+    document.getElementById('status').textContent =
+      'updated ' + new Date().toLocaleTimeString('en-GB');
+  }
+
+  // Enrichment lookup for OpenSky's sidebar: adsb.fi takes priority over
   // airplanes.live when both have data for the same aircraft (arbitrary but
   // consistent — matches the same priority order used for marker dedup).
   const enrichmentByHex = new Map();
@@ -1375,12 +1536,13 @@ async function poll() {
     }
   }
 
+  // Render priority: OpenSky > adsb.fi > airplanes.live. Each later source
+  // only contributes aircraft the earlier source(s) do not cover.
   let openskyCount = openskyMarkers.size;
   if (isSourceEnabled('opensky') && openskyStates) {
     openskyCount = updateOpenSkyMarkers(openskyStates, enrichmentByHex);
   }
 
-  // Rendered after OpenSky so it can exclude aircraft OpenSky already shows.
   let adsbfiCount = adsbfiMarkers.size;
   if (isSourceEnabled('adsbfi') && adsbfiAircraft) {
     adsbfiCount = updateRadiusSourceMarkers(
@@ -1388,8 +1550,6 @@ async function poll() {
     );
   }
 
-  // Rendered last, excluding whatever OpenSky and adsb.fi already show —
-  // completes the OpenSky > adsb.fi > airplanes.live priority chain.
   let airplanesliveCount = airplanesliveMarkers.size;
   if (isSourceEnabled('airplaneslive') && airplanesliveAircraft) {
     const exclude = new Set([...openskyMarkers.keys(), ...adsbfiMarkers.keys()]);
@@ -1400,9 +1560,12 @@ async function poll() {
 
   updateCounts({ opensky: openskyCount, adsbfi: adsbfiCount, airplaneslive: airplanesliveCount });
 
-  // Refresh the selected aircraft's flight history each poll cycle, since
-  // more of it may have accumulated on OpenSky's side since the last fetch.
-  if (selectedIcao24) loadTrack(selectedIcao24);
+  // Do not spend OpenSky track credits every 12 seconds for an already-open
+  // sidebar. When its historical endpoint is unavailable, keep the local
+  // fallback path live from the positions collected by this poll instead.
+  if (selectedIcao24 && trackUsesLiveFallback) {
+    drawTrack(liveTrailById.get(selectedIcao24));
+  }
 }
 
 poll();

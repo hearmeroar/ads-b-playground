@@ -1,0 +1,435 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "aircraft.schema.json",
+  "title": "AircraftInfo",
+  "description": "Documentation artifact, not wired into any runtime validation. Describes the normalized aircraft object ('info') built by normalizeOpenSky() and normalizeAdsbExchange() in static/index.html, consumed by renderDetailsHtml() for the sidebar. Every property is a field the app actually populates on every aircraft today (its value may still be null, and several are enrichment-only — populated only when the same aircraft is also visible on adsb.fi/airplanes.live, since OpenSky's own state vector has no equivalent field). Field-by-field source: parseOpenSkyState() and normalizeOpenSky() (static/index.html:1083-1149), parseAdsbExchangeAircraft() and normalizeAdsbExchange() (static/index.html:1188-1271). Raw wire formats confirmed against live requests, not just documentation: OpenSky /states/all (with and without extended=1 — app.py's fetch_states() now sends it), adsb.fi opendata v3, airplanes.live v2 point lookup. Deliberately excluded from this schema: raw adsb.fi/airplanes.live fields 'dst'/'dir' (distance/bearing of the aircraft from the query's center point) — these describe the request, not the aircraft, and would change per-query rather than being a stable property of the aircraft itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "callsign",
+    "registration",
+    "aircraftType",
+    "originCountry",
+    "categoryDisplay",
+    "operator",
+    "manufactureYear",
+    "altitudeM",
+    "altGeomM",
+    "verticalRateMs",
+    "positionSource",
+    "speedKmh",
+    "iasKt",
+    "tasKt",
+    "mach",
+    "trackDeg",
+    "magHeadingDeg",
+    "trueHeadingDeg",
+    "turnRateDegPerSec",
+    "rollDeg",
+    "navAltitudeM",
+    "navHeadingDeg",
+    "navQnh",
+    "navModes",
+    "windDirDeg",
+    "windSpeedKt",
+    "oatC",
+    "tatC",
+    "squawk",
+    "emergency",
+    "hasAlert",
+    "secondsSinceContact",
+    "dbFlags",
+    "messageType",
+    "adsbVersion",
+    "nic",
+    "nicBaro",
+    "nacP",
+    "nacV",
+    "sil",
+    "silType",
+    "gva",
+    "sda",
+    "radiusOfContainmentM",
+    "messageCount",
+    "signalStrengthDbm",
+    "secondsSincePositionUpdate"
+  ],
+  "properties": {
+    "callsign": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity",
+      "description": "Flight callsign, trimmed; null if blank. OpenSky state vector index 1 (raw, untrimmed) / adsb.fi & airplanes.live 'flight' (raw, untrimmed)."
+    },
+    "registration": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity",
+      "description": "Tail number. Not present in OpenSky's own state vector at all — only ever populated via enrichment from adsb.fi/airplanes.live 'r' when the same ICAO24 is visible there too. Directly from 'r' when the aircraft's primary source is adsb.fi/airplanes.live."
+    },
+    "aircraftType": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity",
+      "description": "Human-readable aircraft type/model. Not present in OpenSky's state vector — enrichment-only for OpenSky-sourced aircraft. adsb.fi/airplanes.live: 'desc' (e.g. 'BOEING 767-300'), falling back to the short ICAO type code 't' (e.g. 'B763') if 'desc' is absent."
+    },
+    "originCountry": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity",
+      "description": "OpenSky state vector index 2. Always null for adsb.fi/airplanes.live-sourced aircraft — neither source reports a country field at all."
+    },
+    "categoryDisplay": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity",
+      "description": "Human-readable DO-260B emitter category label. adsb.fi/airplanes.live: mapped from 'category' (e.g. 'A3'). OpenSky: mapped from state vector index 17 ('category') via OPENSKY_CATEGORY_LABELS — confirmed by live request comparison that OpenSky only includes index 17 at all when the request carries 'extended=1'; app.py's fetch_states() now sends it, so this is populated for OpenSky-sourced aircraft too, not just via adsb.fi/airplanes.live enrichment."
+    },
+    "operator": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity",
+      "description": "Available as adsb.fi/airplanes.live raw field 'ownOp' (registered owner/operator name, e.g. 'FEDERAL EXPRESS CORP'), confirmed present on live traffic. No OpenSky equivalent (absent from the official 17/18-field state vector)."
+    },
+    "manufactureYear": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity",
+      "description": "Available as adsb.fi/airplanes.live raw field 'year' (e.g. '2014'), confirmed present on live traffic. No OpenSky equivalent."
+    },
+    "altitudeM": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Position",
+      "description": "Barometric altitude, meters. OpenSky state vector index 7 (already meters) / adsb.fi & airplanes.live 'alt_baro' (feet, converted × 0.3048; only when numeric — 'alt_baro' is the string 'ground' for a grounded aircraft, handled separately as onGround)."
+    },
+    "altGeomM": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Position",
+      "description": "Geometric (GNSS) altitude, meters. OpenSky state vector index 13 (already meters) / adsb.fi & airplanes.live 'alt_geom' (feet, converted × 0.3048)."
+    },
+    "verticalRateMs": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Position",
+      "description": "Vertical rate, m/s (positive = climbing). OpenSky state vector index 11 (already m/s) / adsb.fi & airplanes.live 'baro_rate', falling back to 'geom_rate' (ft/min, converted × 0.3048/60)."
+    },
+    "positionSource": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Position",
+      "description": "One of 'ADS-B' | 'ASTERIX' | 'MLAT' | 'FLARM' for OpenSky-sourced aircraft (mapped from state vector index 16, 0-3) or 'ADS-B' | 'MLAT' | 'TIS-B' for adsb.fi/airplanes.live-sourced aircraft (derived from non-emptiness of the raw 'mlat'/'tisb' arrays)."
+    },
+    "speedKmh": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Speed & Heading",
+      "description": "Ground speed, km/h. OpenSky state vector index 9 (m/s, converted × 3.6) / adsb.fi & airplanes.live 'gs' (knots, converted × 1.852)."
+    },
+    "iasKt": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Speed & Heading",
+      "description": "Indicated airspeed, knots. Not present in OpenSky's state vector — enrichment-only for OpenSky-sourced aircraft. adsb.fi/airplanes.live raw field 'ias'."
+    },
+    "tasKt": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Speed & Heading",
+      "description": "True airspeed, knots. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'tas'."
+    },
+    "mach": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Speed & Heading",
+      "description": "Mach number. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'mach'."
+    },
+    "trackDeg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Speed & Heading",
+      "description": "True ground track, degrees. OpenSky state vector index 10 ('true_track') / adsb.fi & airplanes.live raw field 'track', falling back to 'calc_track' (a computed value) when 'track' is absent — observed live on a military UH-60 (adsb.fi 'dbFlags': 1) that only reported 'calc_track'. Handled in parseAdsbExchangeAircraft()."
+    },
+    "magHeadingDeg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Speed & Heading",
+      "description": "Magnetic heading, degrees. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'mag_heading'."
+    },
+    "trueHeadingDeg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Speed & Heading",
+      "description": "True heading, degrees. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'true_heading'."
+    },
+    "turnRateDegPerSec": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Speed & Heading",
+      "description": "Turn rate, degrees/second. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'track_rate'."
+    },
+    "rollDeg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Speed & Heading",
+      "description": "Roll angle, degrees. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'roll'."
+    },
+    "navAltitudeM": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Autopilot",
+      "description": "Autopilot-selected altitude, meters. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live 'nav_altitude_mcp', falling back to 'nav_altitude_fms' (feet, converted × 0.3048)."
+    },
+    "navHeadingDeg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Autopilot",
+      "description": "Autopilot-selected heading, degrees. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'nav_heading'."
+    },
+    "navQnh": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Autopilot",
+      "description": "Selected barometric pressure setting, hPa. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'nav_qnh'."
+    },
+    "navModes": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "$comment": "Group: Autopilot",
+      "description": "Active autopilot modes (e.g. ['autopilot','althold','vnav']); null unless the raw array is non-empty. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'nav_modes'."
+    },
+    "windDirDeg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Weather",
+      "description": "Wind direction, degrees. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'wd'."
+    },
+    "windSpeedKt": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Weather",
+      "description": "Wind speed, knots. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'ws'."
+    },
+    "oatC": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Weather",
+      "description": "Outside air temperature, °C. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'oat'."
+    },
+    "tatC": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Weather",
+      "description": "Total air temperature, °C. Not present in OpenSky's state vector — enrichment-only. adsb.fi/airplanes.live raw field 'tat'."
+    },
+    "squawk": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Status",
+      "description": "Transponder squawk code. The universal ICAO emergency codes 7500/7600/7700 are highlighted specially by formatSquawk() regardless of source. OpenSky state vector index 14 / adsb.fi & airplanes.live raw field 'squawk'."
+    },
+    "emergency": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Status",
+      "description": "ADSBExchange-style emergency code (e.g. 'medical', 'fuel', 'nordo'); kept only when truthy and not the literal string 'none'. Not present in OpenSky's state vector — enrichment-only for OpenSky-sourced aircraft. adsb.fi/airplanes.live raw field 'emergency'."
+    },
+    "hasAlert": {
+      "type": "boolean",
+      "$comment": "Group: Status",
+      "description": "Never null (always boolean, unlike every other field here). OpenSky state vector index 15 ('spi') / adsb.fi & airplanes.live: true if either raw 'alert' or 'spi' is truthy."
+    },
+    "secondsSinceContact": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Status",
+      "description": "Seconds since the last message from this aircraft (any message, not just a position update — see secondsSincePositionUpdate for that distinction). OpenSky: derived as now − state vector index 4 ('last_contact', unix seconds). adsb.fi & airplanes.live: raw field 'seen' (already relative seconds), passed through only when numeric."
+    },
+    "dbFlags": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Available as adsb.fi/airplanes.live raw field 'dbFlags', a bitmask: 1=military, 2=interesting, 4=PIA (privacy ICAO address), 8=LADD (limited-display aircraft). Confirmed present on live military traffic (value 1) and other flagged aircraft (values 4, 8) during research. No OpenSky equivalent."
+    },
+    "messageType": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Available as adsb.fi/airplanes.live raw field 'type' — observed live values include 'adsb_icao', 'mlat', 'tisb_icao', 'adsr_icao', 'tisb_trackfile', 'tisb_other'. No OpenSky equivalent (OpenSky exposes an analogous concept only via positionSource, index 16)."
+    },
+    "adsbVersion": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Available as adsb.fi/airplanes.live raw field 'version' (ADS-B message version, observed values 0-2). No OpenSky equivalent."
+    },
+    "nic": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Navigation Integrity Category (DO-260B). Available as adsb.fi/airplanes.live raw field 'nic'. No OpenSky equivalent."
+    },
+    "nicBaro": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Barometric NIC. Available as adsb.fi/airplanes.live raw field 'nic_baro'. No OpenSky equivalent."
+    },
+    "nacP": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Navigation Accuracy Category — Position (DO-260B). Available as adsb.fi/airplanes.live raw field 'nac_p'. No OpenSky equivalent."
+    },
+    "nacV": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Navigation Accuracy Category — Velocity (DO-260B). Available as adsb.fi/airplanes.live raw field 'nac_v'. No OpenSky equivalent."
+    },
+    "sil": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Source Integrity Level (DO-260B). Available as adsb.fi/airplanes.live raw field 'sil'. No OpenSky equivalent."
+    },
+    "silType": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Basis for the SIL value (observed live value: 'perhour'). Available as adsb.fi/airplanes.live raw field 'sil_type'. No OpenSky equivalent."
+    },
+    "gva": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Geometric Vertical Accuracy (DO-260B). Available as adsb.fi/airplanes.live raw field 'gva'. No OpenSky equivalent."
+    },
+    "sda": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "System Design Assurance (DO-260B). Available as adsb.fi/airplanes.live raw field 'sda'. No OpenSky equivalent."
+    },
+    "radiusOfContainmentM": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Radius of Containment, meters — a position-integrity measure paired with nic. Available as adsb.fi/airplanes.live raw field 'rc'. No OpenSky equivalent."
+    },
+    "messageCount": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Total messages received from this aircraft this session, receiver-relative. Available as adsb.fi/airplanes.live raw field 'messages'. No OpenSky equivalent."
+    },
+    "signalStrengthDbm": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Last message signal strength, dBm, receiver-relative. Available as adsb.fi/airplanes.live raw field 'rssi'. No OpenSky equivalent."
+    },
+    "secondsSincePositionUpdate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "$comment": "Group: Signal & Data Quality, no UI group yet",
+      "description": "Seconds since the last *position* update specifically — distinct from secondsSinceContact, which counts since the last message of any kind. Available as adsb.fi/airplanes.live raw field 'seen_pos'. No OpenSky equivalent."
+    }
+  }
+}
