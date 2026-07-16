@@ -1,0 +1,11 @@
+{
+  "time": 1000,
+  "rate_limit_remaining": 3999,
+  "states": [
+    ["aaaaaa", "TES100  ", "Testland", 1000, 1000, 21.0, 44.0, 10000, false, 230, 90, 0, null, 10200, "2000", false, 0, 1],
+    ["bbbbbb", "HELI1   ", "Testland", 1000, 1000, 21.05, 44.05, 500, false, 40, 180, 0, null, 520, "1200", false, 0, 8],
+    ["cccccc", "EMG911  ", "Testland", 1000, 1000, 21.1, 44.1, 3000, false, 150, 270, -2, null, 3100, "7700", false, 0, 3],
+    ["dddddd", "DUP123  ", "Testland", 1000, 1000, 21.2, 44.2, 8000, false, 200, 45, 1, null, 8200, "3000", false, 0, 4],
+    ["gggggg", "GND1    ", "Testland", 1000, 1000, 21.25, 44.25, 0, true, 0, 0, 0, null, 0, "1000", false, 0, 3]
+  ]
+}

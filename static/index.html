@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Aircraft — Serbia & Neighboring Region</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --ink: #1c2128;
+    --muted: #6b7280;
+    --border: rgba(15, 23, 42, 0.08);
+    --card-bg: rgba(255, 255, 255, 0.86);
+  }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  #map { position: absolute; inset: 0; background: #eef1f4; }
+
+  #hud {
+    position: absolute; top: 14px; right: 14px; z-index: 1000;
+    width: 216px;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+    padding: 14px 16px;
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    color: var(--ink);
+  }
+
+  #hud .count-row { display: flex; align-items: baseline; gap: 7px; }
+  #hud .live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+    box-shadow: 0 0 0 rgba(34, 197, 94, 0.5);
+    animation: pulse 2s infinite; flex: none; margin-bottom: 2px;
+  }
+  #hud .count { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  #hud .label { font-size: 11px; color: var(--muted); margin: 1px 0 12px; }
+
+  #hud .sources { display: flex; flex-direction: column; gap: 8px; }
+  #hud .source-row { display: flex; align-items: center; gap: 8px; }
+  #hud .swatch {
+    width: 9px; height: 9px; border-radius: 50%; flex: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6) inset;
+  }
+  #hud .source-name { font-weight: 500; }
+  #hud .source-count { color: var(--muted); font-size: 12px; margin-left: 2px; }
+
+  #hud .switch { position: relative; width: 30px; height: 17px; flex: none; margin-left: auto; }
+  #hud .switch input {
+    position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1;
+  }
+  #hud .switch-track {
+    position: absolute; inset: 0; background: #d7dbe1; border-radius: 999px;
+    transition: background .15s ease;
+  }
+  #hud .switch-track::before {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
+    background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: transform .15s ease;
+  }
+  #hud .switch input:checked + .switch-track { background: var(--row-color, #1a73e8); }
+  #hud .switch input:checked + .switch-track::before { transform: translateX(13px); }
+
+  #hud .filter-block { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  #hud .filter-title { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  #hud .segmented {
+    display: flex; background: #eef0f3; border-radius: 9px; padding: 2px; gap: 2px;
+  }
+  #hud .seg-btn {
+    flex: 1; border: none; background: transparent; color: var(--muted);
+    font: inherit; font-size: 11px; font-weight: 500; padding: 5px 4px;
+    border-radius: 7px; cursor: pointer; transition: background .15s ease, color .15s ease;
+  }
+  #hud .seg-btn.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15); }
+  #hud .seg-btn:hover:not(.active) { color: var(--ink); }
+
+  #hud .dropdown { position: relative; }
+  #hud .dropdown-trigger {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    font: inherit; font-size: 12px; color: var(--ink);
+    background: #eef0f3; border: 1px solid var(--border); border-radius: 7px;
+    padding: 6px 9px; cursor: pointer; transition: background .15s ease;
+  }
+  #hud .dropdown-trigger:hover { background: #e5e8ec; }
+  #hud .dropdown-value-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  #hud .dropdown-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hud .dropdown-caret { color: var(--muted); flex: none; margin-left: 8px; transition: transform .15s ease; }
+  #hud .dropdown.open .dropdown-caret { transform: rotate(180deg); }
+  #hud .dropdown-menu {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 10;
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.2);
+    padding: 4px; max-height: 216px; overflow-y: auto;
+    display: none;
+  }
+  #hud .dropdown.open .dropdown-menu { display: block; }
+  #hud .dropdown-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 9px; font-size: 12px; border-radius: 6px; cursor: pointer;
+    color: var(--ink); line-height: 1.4;
+  }
+  #hud .dropdown-option:hover { background: #f2f4f6; }
+  #hud .dropdown-option.active { background: rgba(26, 115, 232, 0.1); color: #1a73e8; font-weight: 600; }
+  #hud .dropdown-icon { flex: none; color: var(--muted); }
+  #hud .dropdown-option.active .dropdown-icon { color: #1a73e8; }
+
+  #hud .hud-footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  #hud .status { font-size: 11px; color: var(--muted); }
+  #hud .status + .status { margin-top: 2px; }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
+    70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+  }
+
+  .plane-icon { transition: transform .4s linear; filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.35)); }
+
+  .leaflet-popup-content-wrapper {
+    border-radius: 12px; box-shadow: 0 14px 32px rgba(15, 23, 42, 0.22);
+  }
+  .leaflet-popup-content {
+    margin: 11px 15px; font: 13px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  }
+  .leaflet-popup-content b { display: inline-block; min-width: 96px; color: var(--muted); font-weight: 600; }
+  .leaflet-popup-content .emergency { color: #dc2626; font-weight: 700; }
+
+  .photo-box { margin-top: 10px; min-width: 220px; }
+  .photo-box .aircraft-photo { display: block; width: 100%; border-radius: 8px; }
+  .photo-box .photo-credit { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .photo-box .photo-credit a { color: inherit; }
+  .photo-box .photo-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    height: 90px; background: #f2f4f6; border-radius: 8px;
+    color: var(--muted); font-size: 12px;
+  }
+  .photo-box .photo-spinner {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 3px solid #e3e6ea; border-top-color: #1a73e8;
+    animation: photo-spin .8s linear infinite;
+    margin: 24px auto;
+  }
+  @keyframes photo-spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="hud">
+  <div class="count-row">
+    <span class="live-dot"></span>
+    <span class="count" id="count">–</span>
+  </div>
+  <div class="label">aircraft in view</div>
+
+  <div class="sources">
+    <div class="source-row">
+      <span class="swatch" style="background:#1a73e8"></span>
+      <span class="source-name">OpenSky</span>
+      <span class="source-count" id="count-opensky"></span>
+      <label class="switch" style="--row-color:#1a73e8">
+        <input type="checkbox" id="toggle-opensky" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Only shown where not already covered by OpenSky">
+      <span class="swatch" style="background:#e53935"></span>
+      <span class="source-name">adsb.fi</span>
+      <span class="source-count" id="count-adsbfi"></span>
+      <label class="switch" style="--row-color:#e53935">
+        <input type="checkbox" id="toggle-adsbfi" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Only shown where not already covered by OpenSky or adsb.fi">
+      <span class="swatch" style="background:#2e7d32"></span>
+      <span class="source-name">airplanes.live</span>
+      <span class="source-count" id="count-airplaneslive"></span>
+      <label class="switch" style="--row-color:#2e7d32">
+        <input type="checkbox" id="toggle-airplaneslive" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="filter-block">
+    <div class="filter-title">Show</div>
+    <div class="segmented" id="motion-filter">
+      <button type="button" class="seg-btn active" data-value="all">All</button>
+      <button type="button" class="seg-btn" data-value="airborne">Air</button>
+      <button type="button" class="seg-btn" data-value="ground">Ground</button>
+    </div>
+  </div>
+
+  <div class="filter-block">
+    <div class="filter-title">Category</div>
+    <div class="dropdown" id="category-filter">
+      <button type="button" class="dropdown-trigger">
+        <span class="dropdown-value-wrap">
+          <span class="dropdown-value">All categories</span>
+        </span>
+        <svg class="dropdown-caret" width="10" height="6" viewBox="0 0 10 6">
+          <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="dropdown-menu">
+        <div class="dropdown-option active" data-value="all">All categories</div>
+        <div class="dropdown-option" data-value="light">Light</div>
+        <div class="dropdown-option" data-value="small">Small</div>
+        <div class="dropdown-option" data-value="large">Large</div>
+        <div class="dropdown-option" data-value="high_vortex_large">High vortex large</div>
+        <div class="dropdown-option" data-value="heavy">Heavy</div>
+        <div class="dropdown-option" data-value="high_performance">High performance</div>
+        <div class="dropdown-option" data-value="rotorcraft">Rotorcraft</div>
+        <div class="dropdown-option" data-value="glider">Glider / sailplane</div>
+        <div class="dropdown-option" data-value="lighter_than_air">Lighter-than-air</div>
+        <div class="dropdown-option" data-value="parachutist">Parachutist / skydiver</div>
+        <div class="dropdown-option" data-value="ultralight">Ultralight / hang-glider</div>
+        <div class="dropdown-option" data-value="uav">UAV</div>
+        <div class="dropdown-option" data-value="space">Space vehicle</div>
+        <div class="dropdown-option" data-value="surface_obstacle">Surface vehicle / obstacle</div>
+        <div class="dropdown-option" data-value="unknown">Unknown / no info</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-block">
+    <div class="source-row" title="Filters out surface vehicles, obstacles, and reference/test beacons (e.g. tower transponders) that get reported alongside real aircraft">
+      <span class="source-name">Hide non-aircraft</span>
+      <label class="switch" style="--row-color:#6b7280">
+        <input type="checkbox" id="toggle-hide-junk" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="hud-footer">
+    <div class="status" id="status">loading…</div>
+    <div class="status" id="quota"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Map center — roughly the center of Serbia. The request areas are defined
+// on the backend (app.py: BBOX for OpenSky, ADSBFI_CENTER / AIRPLANESLIVE_CENTER
+// for the other two) and should all roughly match this view.
+const map = L.map('map', { zoomControl: true }).setView([44.0, 21.0], 7);
+
+// CARTO's free "Positron" basemap — monochrome/light grey, no API key
+// required (unlike Mapbox, which would need a signup + access token).
+// Attribution to both CARTO and OSM is required by CARTO's terms of use.
+L.tileLayer('https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+    '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+  maxZoom: 19,
+}).addTo(map);
+
+const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
+
+// Three independent data sources, each rendered as its own color-coded set of
+// markers, all keyed by the aircraft's ICAO24/hex address (the same aircraft
+// can in principle show up in more than one feed at once — see the dedup
+// rule in poll() below). OpenSky is the "primary" source; adsb.fi and
+// airplanes.live are ranked below it in that order.
+const SOURCE_COLORS = { opensky: '#1a73e8', adsbfi: '#e53935', airplaneslive: '#2e7d32' };
+const openskyMarkers = new Map(); // icao24 -> L.Marker
+const adsbfiMarkers = new Map(); // hex -> L.Marker
+const airplanesliveMarkers = new Map(); // hex -> L.Marker
+const markerMapsBySource = { opensky: openskyMarkers, adsbfi: adsbfiMarkers, airplaneslive: airplanesliveMarkers };
+
+const sourceToggles = {
+  opensky: document.getElementById('toggle-opensky'),
+  adsbfi: document.getElementById('toggle-adsbfi'),
+  airplaneslive: document.getElementById('toggle-airplaneslive'),
+};
+function isSourceEnabled(name) {
+  return sourceToggles[name].checked;
+}
+
+// Motion filter ('all' | 'airborne' | 'ground') is a filter, not a data
+// source. Unlike source toggles, it doesn't gate any fetch — it's applied
+// while each source builds its marker items, using OpenSky's own `on_ground`
+// field or adsb.fi/airplanes.live's `alt_baro === 'ground'` convention.
+let currentMotionFilter = 'all';
+const motionFilterButtons = document.querySelectorAll('#motion-filter .seg-btn');
+motionFilterButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.classList.contains('active')) return;
+    motionFilterButtons.forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMotionFilter = btn.dataset.value;
+    poll(); // apply right away instead of waiting for the next 12s tick
+  });
+});
+function passesMotionFilter(onGround) {
+  if (currentMotionFilter === 'airborne') return !onGround;
+  if (currentMotionFilter === 'ground') return !!onGround;
+  return true;
+}
+
+// "Hide non-aircraft" filters out ground vehicles, obstacles, and
+// reference/test beacons that some feeders report using the same message
+// types as real aircraft. Signals used (any one is enough):
+// - `category` in the ADS-B "surface vehicle / obstacle" range: numeric
+//   16-20 for OpenSky, or C1-C5 for adsb.fi/airplanes.live's letter+digit code.
+// - registration/aircraft-type equal to a known non-aircraft marker (so far
+//   just "TWR", seen on tower reference/test transponders).
+// - callsign matching an airport-ground-vehicle-style pattern: 4 letters
+//   (airport code + unit letter) followed by 2 digits, e.g. "TXLU01".
+const hideJunkToggle = document.getElementById('toggle-hide-junk');
+function hideNonAircraft() {
+  return hideJunkToggle.checked;
+}
+const GROUND_VEHICLE_MARKERS = new Set(['TWR']);
+const GROUND_VEHICLE_CALLSIGN_RE = /^[A-Z]{4}\d{2}$/;
+function looksLikeGroundVehicle({ category, registration, aircraftType, callsign }) {
+  if (registration && GROUND_VEHICLE_MARKERS.has(registration)) return true;
+  if (aircraftType && GROUND_VEHICLE_MARKERS.has(aircraftType)) return true;
+  const trimmedCallsign = (callsign || '').trim();
+  if (trimmedCallsign && GROUND_VEHICLE_CALLSIGN_RE.test(trimmedCallsign)) return true;
+  if (typeof category === 'number' && category >= 16 && category <= 20) return true;
+  if (typeof category === 'string' && /^C[1-5]$/.test(category)) return true;
+  return false;
+}
+
+// Category filter: OpenSky's numeric category and adsb.fi/airplanes.live's
+// letter+digit code are two encodings of the same underlying ADS-B emitter
+// category, so both are mapped to one shared set of group keys (matching the
+// <option> values in #category-filter) for a single filter to work across
+// all three sources.
+const OPENSKY_CATEGORY_GROUP = {
+  0: 'unknown', 1: 'unknown', 2: 'light', 3: 'small', 4: 'large',
+  5: 'high_vortex_large', 6: 'heavy', 7: 'high_performance', 8: 'rotorcraft',
+  9: 'glider', 10: 'lighter_than_air', 11: 'parachutist', 12: 'ultralight',
+  13: 'unknown', 14: 'uav', 15: 'space',
+  16: 'surface_obstacle', 17: 'surface_obstacle', 18: 'surface_obstacle',
+  19: 'surface_obstacle', 20: 'surface_obstacle',
+};
+const ADSBEXCHANGE_CATEGORY_GROUP = {
+  A0: 'unknown', A1: 'light', A2: 'small', A3: 'large', A4: 'high_vortex_large',
+  A5: 'heavy', A6: 'high_performance', A7: 'rotorcraft',
+  B0: 'unknown', B1: 'glider', B2: 'lighter_than_air', B3: 'parachutist',
+  B4: 'ultralight', B5: 'unknown', B6: 'uav', B7: 'space',
+  C0: 'unknown', C1: 'surface_obstacle', C2: 'surface_obstacle', C3: 'surface_obstacle',
+  C4: 'surface_obstacle', C5: 'surface_obstacle', C6: 'unknown', C7: 'unknown',
+};
+function categoryGroupFor({ openskyCategory, adsbExchangeCategory }) {
+  if (typeof openskyCategory === 'number') return OPENSKY_CATEGORY_GROUP[openskyCategory] || 'unknown';
+  if (typeof adsbExchangeCategory === 'string') return ADSBEXCHANGE_CATEGORY_GROUP[adsbExchangeCategory] || 'unknown';
+  return 'unknown';
+}
+// Small line-art SVG glyphs for the category dropdown (plain shapes, not an
+// icon font/library, to keep the page self-contained). Fixed-wing weight
+// classes all share the same paper-plane glyph (filled); the glider variant
+// reuses it unfilled to read as "unpowered" at a glance.
+const PLANE_GLYPH = '<path d="M14 1L1 6l6 2 2 6z"/>';
+const CATEGORY_ICON_SVGS = {
+  all: '<rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>' +
+       '<rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>',
+  light: '<path d="M14 1L1 6l6 2 2 6z" fill="currentColor" stroke="none"/>',
+  small: '<path d="M14 1L1 6l6 2 2 6z" fill="currentColor" stroke="none"/>',
+  large: '<path d="M14 1L1 6l6 2 2 6z" fill="currentColor" stroke="none"/>',
+  high_vortex_large: '<path d="M14 1L1 6l6 2 2 6z" fill="currentColor" stroke="none"/>',
+  heavy: '<path d="M14 1L1 6l6 2 2 6z" fill="currentColor" stroke="none"/>',
+  high_performance: '<path d="M14 1L1 6l6 2 2 6z" fill="currentColor" stroke="none"/>',
+  rotorcraft: '<circle cx="8" cy="10" r="3"/><path d="M2 4h12M8 1v3"/>',
+  glider: PLANE_GLYPH,
+  lighter_than_air: '<circle cx="8" cy="6" r="5"/><path d="M8 11v3"/>',
+  parachutist: '<path d="M2 7a6 6 0 0 1 12 0"/><path d="M8 7v6"/><circle cx="8" cy="14" r="1" fill="currentColor" stroke="none"/>',
+  ultralight: '<path d="M2 7a6 6 0 0 1 12 0"/><path d="M8 7v6"/><circle cx="8" cy="14" r="1" fill="currentColor" stroke="none"/>',
+  uav: '<rect x="5" y="5" width="6" height="6"/><path d="M5 5L2 2M11 5l3-3M5 11l-3 3M11 11l3 3"/>',
+  space: '<path d="M8 1l4 12H4z"/>',
+  surface_obstacle: '<path d="M8 2L15 14H1z"/><path d="M8 6v4"/>',
+  unknown: '<circle cx="8" cy="8" r="6"/>',
+};
+function categoryIconHtml(key) {
+  const inner = CATEGORY_ICON_SVGS[key] || CATEGORY_ICON_SVGS.unknown;
+  return '<svg class="dropdown-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" ' +
+    'stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+}
+
+// Custom dropdown (a styled <div>, not a native <select> — see #category-filter
+// markup) for the category filter. Its selected value is tracked here rather
+// than read from a form-element `.value`, since it's built from plain divs.
+const categoryDropdown = document.getElementById('category-filter');
+const categoryTrigger = categoryDropdown.querySelector('.dropdown-trigger');
+const categoryValueWrap = categoryDropdown.querySelector('.dropdown-value-wrap');
+const categoryOptions = categoryDropdown.querySelectorAll('.dropdown-option');
+let currentCategoryFilter = 'all';
+
+categoryOptions.forEach((opt) => {
+  opt.innerHTML = categoryIconHtml(opt.dataset.value) + '<span>' + opt.textContent + '</span>';
+});
+categoryValueWrap.innerHTML = categoryIconHtml('all') + '<span class="dropdown-value">All categories</span>';
+
+categoryTrigger.addEventListener('click', (e) => {
+  // Stop this click from reaching the document-level listener below, which
+  // would otherwise immediately close the menu this click just opened.
+  e.stopPropagation();
+  categoryDropdown.classList.toggle('open');
+});
+categoryOptions.forEach((opt) => {
+  opt.addEventListener('click', () => {
+    categoryOptions.forEach((o) => o.classList.remove('active'));
+    opt.classList.add('active');
+    currentCategoryFilter = opt.dataset.value;
+    categoryValueWrap.innerHTML = categoryIconHtml(currentCategoryFilter) +
+      '<span class="dropdown-value">' + opt.textContent + '</span>';
+    categoryDropdown.classList.remove('open');
+    poll(); // apply right away instead of waiting for the next 12s tick
+  });
+});
+document.addEventListener('click', () => categoryDropdown.classList.remove('open'));
+
+function passesCategoryFilter(group) {
+  return currentCategoryFilter === 'all' || currentCategoryFilter === group;
+}
+
+// Track trail state: the currently selected aircraft and its drawn polyline.
+// Positions come from OpenSky's /tracks/all (proxied via /api/track/<icao24>)
+// — i.e. the aircraft's actual flight history, not just what we've polled
+// since this page was opened. Works for any source's markers, since all
+// three key aircraft by the same ICAO24/hex address.
+let selectedIcao24 = null;
+let trackLayer = null;
+let trackFetchToken = 0; // guards against a stale response overwriting a newer selection
+
+function drawTrack(latlngs) {
+  if (trackLayer) {
+    map.removeLayer(trackLayer);
+    trackLayer = null;
+  }
+  if (!latlngs || latlngs.length < 2) return;
+  trackLayer = L.polyline(latlngs, { color: '#ff6f00', weight: 3, opacity: 0.85 }).addTo(map);
+}
+
+async function loadTrack(icao24) {
+  const fetchId = ++trackFetchToken;
+  try {
+    const resp = await fetch('/api/track/' + encodeURIComponent(icao24));
+    const data = await resp.json();
+    if (fetchId !== trackFetchToken || selectedIcao24 !== icao24) return; // selection changed meanwhile
+
+    // Waypoint format from OpenSky /tracks/all: [time, lat, lon, baro_altitude, true_track, on_ground]
+    const latlngs = (data.path || [])
+      .filter((wp) => wp[1] != null && wp[2] != null)
+      .map((wp) => [wp[1], wp[2]]);
+    drawTrack(latlngs);
+  } catch (e) {
+    // keep whatever track is currently drawn; next poll cycle will retry
+  }
+}
+
+function selectAircraft(icao24) {
+  selectedIcao24 = icao24;
+  loadTrack(icao24);
+}
+
+function deselectAircraft() {
+  selectedIcao24 = null;
+  drawTrack(null);
+}
+
+// Deselect when clicking empty map area (marker clicks don't bubble to the map)
+map.on('click', deselectAircraft);
+
+// --- Aircraft photo (Planespotters, proxied via /api/photo/reg|hex/<value>) ---
+// Popups are built as plain HTML strings ahead of time (see popupHtmlOpenSky/
+// popupHtmlAdsbExchange) and only ever contain a spinner placeholder for the
+// photo — the actual lookup happens here, on Leaflet's `popupopen` event,
+// which only fires when a popup is actually shown (a marker click), not on
+// every poll/pan/zoom. That's what satisfies "don't hit the photo API on map
+// movement, only on an explicit click" without any extra debounce logic.
+const photoCache = new Map(); // "reg:<REGISTRATION>" or "hex:<icao24>" -> photo array (possibly empty)
+
+function escapeAttr(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function photoBoxHtml(icao24, registration) {
+  return '<div class="photo-box" data-icao24="' + escapeAttr(icao24) + '" ' +
+    'data-registration="' + escapeAttr(registration || '') + '"><div class="photo-spinner"></div></div>';
+}
+
+async function fetchPhotosBy(kind, value) {
+  const key = kind + ':' + value;
+  if (photoCache.has(key)) return photoCache.get(key);
+  try {
+    const resp = await fetch('/api/photo/' + kind + '/' + encodeURIComponent(value));
+    const data = await resp.json();
+    const photos = data.photos || [];
+    photoCache.set(key, photos);
+    return photos;
+  } catch (e) {
+    return []; // treated the same as "no photo found" — no error surfaced to the user
+  }
+}
+
+// Renders into `photoBoxEl` using DOM properties (.src/.href/.textContent)
+// rather than HTML-string concatenation, since photographer name/link come
+// from an external API and shouldn't be trusted as raw markup.
+function renderPhotoBox(photoBoxEl, photos) {
+  photoBoxEl.innerHTML = '';
+  const photo = photos[0];
+  const src = photo && ((photo.thumbnail_large && photo.thumbnail_large.src) || (photo.thumbnail && photo.thumbnail.src));
+
+  if (!photo || !src) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'photo-placeholder';
+    placeholder.textContent = 'Photo unavailable';
+    photoBoxEl.appendChild(placeholder);
+    return;
+  }
+
+  const link = photo.link || '';
+  const anchor = document.createElement('a');
+  anchor.href = link;
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = 'Aircraft photo';
+  img.className = 'aircraft-photo';
+  anchor.appendChild(img);
+  photoBoxEl.appendChild(anchor);
+
+  // Attribution is required by Planespotters' API terms whenever a photo is shown.
+  const credit = document.createElement('div');
+  credit.className = 'photo-credit';
+  credit.append('Photo: ');
+  const creditLink = document.createElement('a');
+  creditLink.href = link;
+  creditLink.target = '_blank';
+  creditLink.rel = 'noopener noreferrer';
+  creditLink.textContent = photo.photographer || 'Unknown';
+  credit.appendChild(creditLink);
+  photoBoxEl.appendChild(credit);
+}
+
+async function loadAircraftPhoto(icao24, registration, photoBoxEl) {
+  let photos = registration ? await fetchPhotosBy('reg', registration) : [];
+  if (!photos.length && icao24) {
+    photos = await fetchPhotosBy('hex', icao24);
+  }
+  // The popup may have closed, or moved on to a different aircraft's content,
+  // by the time these (possibly two sequential) fetches resolve.
+  if (!document.body.contains(photoBoxEl)) return;
+  renderPhotoBox(photoBoxEl, photos);
+}
+
+map.on('popupopen', (e) => {
+  const popupEl = e.popup.getElement();
+  const photoBoxEl = popupEl && popupEl.querySelector('.photo-box');
+  if (!photoBoxEl) return;
+  loadAircraftPhoto(photoBoxEl.dataset.icao24, photoBoxEl.dataset.registration, photoBoxEl);
+});
+
+// Plane icon (Material Design "flight" glyph) rotated by heading (degrees
+// clockwise from north — matches what CSS rotate() expects, since the
+// glyph's nose already points up/north at 0deg). Color encodes the source.
+function planeIcon(headingDeg, color) {
+  const heading = Number.isFinite(headingDeg) ? headingDeg : 0;
+  const html =
+    '<div class="plane-icon" style="transform: rotate(' + heading + 'deg)">' +
+      '<svg width="28" height="28" viewBox="0 0 24 24">' +
+        '<path d="M21,16v-2l-8-5V3.5C13,2.67,12.33,2,11.5,2S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2.5,1.5V22l4-1l4,1v-1.5' +
+              'L13,19v-5.5L21,16z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>' +
+      '</svg>' +
+    '</div>';
+  return L.divIcon({ className: '', html: html, iconSize: [28, 28], iconAnchor: [14, 14] });
+}
+
+// Warning-triangle glyph for entries `looksLikeGroundVehicle()` flags —
+// used instead of the plane icon so they don't visually read as aircraft
+// when "Hide non-aircraft" is turned off to inspect them.
+function groundVehicleIcon(color) {
+  const html =
+    '<div class="plane-icon">' +
+      '<svg width="26" height="26" viewBox="0 0 24 24">' +
+        '<path d="M12,3L22,20H2L12,3z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>' +
+        '<path d="M12,8.5v5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>' +
+        '<circle cx="12" cy="16.5" r="1.1" fill="#fff"/>' +
+      '</svg>' +
+    '</div>';
+  return L.divIcon({ className: '', html: html, iconSize: [26, 26], iconAnchor: [13, 13] });
+}
+
+function iconFor(item, color) {
+  return item.isGroundVehicle ? groundVehicleIcon(color) : planeIcon(item.heading, color);
+}
+
+// Creates/moves/removes markers in `markerMap` to match `items`
+// ({id, lat, lon, heading, popupHtml, isGroundVehicle}[]), reusing existing
+// markers instead of recreating them each poll. Returns the number of
+// markers now shown.
+function syncMarkers(markerMap, items, color) {
+  const seen = new Set();
+
+  for (const item of items) {
+    seen.add(item.id);
+    const latlng = [item.lat, item.lon];
+    let marker = markerMap.get(item.id);
+
+    if (marker) {
+      marker.setLatLng(latlng);
+      marker.setIcon(iconFor(item, color));
+    } else {
+      marker = L.marker(latlng, { icon: iconFor(item, color) }).addTo(map);
+      // L.Marker defaults bubblingMouseEvents to false (unlike L.Path, which
+      // defaults to true), so this click never actually reaches the map's own
+      // click handler below — stopPropagation() here is a defensive no-op,
+      // kept in case that ever changes rather than because it's currently load-bearing.
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        selectAircraft(item.id);
+      });
+      markerMap.set(item.id, marker);
+    }
+    marker.bindPopup(item.popupHtml);
+
+    // bindPopup() replaces an already-open popup's DOM content immediately
+    // (Leaflet doesn't fire `popupopen` again for that) — including a fresh,
+    // un-loaded .photo-box. Without this, a photo that finished loading
+    // before the next 12s poll would get silently reset to a spinner that
+    // never resolves, since nothing else re-triggers the fetch. Re-kick it
+    // for the new element; a cache hit makes this effectively free.
+    if (marker.isPopupOpen()) {
+      const popupEl = marker.getPopup().getElement();
+      const photoBoxEl = popupEl && popupEl.querySelector('.photo-box');
+      if (photoBoxEl) loadAircraftPhoto(photoBoxEl.dataset.icao24, photoBoxEl.dataset.registration, photoBoxEl);
+    }
+  }
+
+  clearStaleMarkers(markerMap, seen);
+  return seen.size;
+}
+
+function clearStaleMarkers(markerMap, seen) {
+  for (const [id, marker] of markerMap) {
+    if (!seen.has(id)) {
+      map.removeLayer(marker);
+      markerMap.delete(id);
+      if (selectedIcao24 === id) deselectAircraft();
+    }
+  }
+}
+
+function clearAllMarkers(markerMap) {
+  for (const [id, marker] of markerMap) {
+    map.removeLayer(marker);
+    if (selectedIcao24 === id) deselectAircraft();
+  }
+  markerMap.clear();
+}
+
+// --- Shared popup formatting (squawk / emergency / vertical rate) ---
+
+// ICAO-universal emergency squawk codes: 7500 hijack, 7600 radio failure,
+// 7700 general emergency. Highlighted regardless of which source reports them.
+const EMERGENCY_SQUAWKS = new Set(['7500', '7600', '7700']);
+function formatSquawk(squawk) {
+  if (!squawk) return null;
+  return EMERGENCY_SQUAWKS.has(squawk)
+    ? '<span class="emergency">' + squawk + ' — EMERGENCY</span>'
+    : squawk;
+}
+
+// rateMs: vertical rate in meters/second (positive = climbing).
+function formatVerticalRate(rateMs) {
+  if (rateMs == null) return null;
+  if (rateMs > 0.5) return '+' + rateMs.toFixed(1) + ' m/s (climbing)';
+  if (rateMs < -0.5) return rateMs.toFixed(1) + ' m/s (descending)';
+  return 'level';
+}
+
+// OpenSky's `category` is a numeric ADS-B emitter category
+// (see https://opensky-network.org/apidoc/rest.html).
+const OPENSKY_CATEGORY_LABELS = {
+  0: 'No info', 1: 'No ADS-B category info', 2: 'Light (<15,500 lbs)',
+  3: 'Small (15,500–75,000 lbs)', 4: 'Large (75,000–300,000 lbs)',
+  5: 'High vortex large (e.g. B757)', 6: 'Heavy (>300,000 lbs)',
+  7: 'High performance (>5g, >400kt)', 8: 'Rotorcraft', 9: 'Glider / sailplane',
+  10: 'Lighter-than-air', 11: 'Parachutist / skydiver',
+  12: 'Ultralight / hang-glider / paraglider', 13: 'Reserved',
+  14: 'Unmanned aerial vehicle', 15: 'Space / trans-atmospheric vehicle',
+  16: 'Surface vehicle — emergency', 17: 'Surface vehicle — service',
+  18: 'Point obstacle', 19: 'Cluster obstacle', 20: 'Line obstacle',
+};
+
+// adsb.fi/airplanes.live report the same emitter-category concept as a
+// letter+digit DO-260B code (e.g. "A3") instead of OpenSky's plain number —
+// same underlying meanings, different encoding, so a separate lookup.
+const ADSBEXCHANGE_CATEGORY_LABELS = {
+  A0: 'No ADS-B category info', A1: 'Light (<15,500 lbs)', A2: 'Small (15,500–75,000 lbs)',
+  A3: 'Large (75,000–300,000 lbs)', A4: 'High vortex large (e.g. B757)', A5: 'Heavy (>300,000 lbs)',
+  A6: 'High performance (>5g, >400kt)', A7: 'Rotorcraft',
+  B0: 'No ADS-B category info', B1: 'Glider / sailplane', B2: 'Lighter-than-air',
+  B3: 'Parachutist / skydiver', B4: 'Ultralight / hang-glider / paraglider', B5: 'Reserved',
+  B6: 'Unmanned aerial vehicle', B7: 'Space / trans-atmospheric vehicle',
+  C0: 'No ADS-B category info', C1: 'Surface vehicle — emergency', C2: 'Surface vehicle — service',
+  C3: 'Point obstacle', C4: 'Cluster obstacle', C5: 'Line obstacle', C6: 'Reserved', C7: 'Reserved',
+};
+function formatAdsbExchangeCategory(category) {
+  if (!category) return null;
+  const label = ADSBEXCHANGE_CATEGORY_LABELS[category];
+  return label ? category + ' — ' + label : category;
+}
+
+// --- OpenSky (/states/all) ---
+
+// `extra` (a parsed adsb.fi/airplanes.live aircraft, if the same ICAO24 is
+// also visible there) enriches the popup with fields OpenSky's state vector
+// doesn't have at all — registration, aircraft type, and the ADSBExchange-
+// style `emergency` flag — without duplicating fields every source already
+// agrees on, like altitude or speed. Squawk/vertical rate come from
+// OpenSky's own data, since its state vector already has them.
+function popupHtmlOpenSky(s, extra) {
+  const callsign = (s.callsign || '').trim() || '—';
+  const alt = s.baro_altitude != null ? Math.round(s.baro_altitude) + ' m' : '—';
+  const speed = s.velocity != null ? Math.round(s.velocity * 3.6) + ' km/h' : '—';
+  const squawk = formatSquawk(s.squawk);
+  const vRate = formatVerticalRate(s.vertical_rate);
+  const category = OPENSKY_CATEGORY_LABELS[s.category];
+  let html =
+    '<b>Callsign:</b> ' + callsign + '<br>' +
+    '<b>Country:</b> ' + (s.origin_country || '—') + '<br>' +
+    '<b>Altitude:</b> ' + alt + '<br>' +
+    '<b>Speed:</b> ' + speed;
+  if (s.geo_altitude != null) html += '<br><b>Geo altitude:</b> ' + Math.round(s.geo_altitude) + ' m';
+  if (vRate) html += '<br><b>Vertical rate:</b> ' + vRate;
+  if (squawk) html += '<br><b>Squawk:</b> ' + squawk;
+  if (category) html += '<br><b>Category:</b> ' + category;
+  if (extra) {
+    if (extra.registration) html += '<br><b>Registration:</b> ' + extra.registration;
+    if (extra.aircraftType) html += '<br><b>Aircraft:</b> ' + extra.aircraftType;
+    if (extra.emergency) html += '<br><span class="emergency">Emergency: ' + extra.emergency + '</span>';
+  }
+  html += photoBoxHtml(s.icao24, extra && extra.registration);
+  return html;
+}
+
+// Parses a single "state vector" from the OpenSky /states/all response.
+// Field indices are fixed by the protocol (see https://opensky-network.org/apidoc/rest.html):
+// 0 icao24, 1 callsign, 2 origin_country, 5 longitude, 6 latitude,
+// 7 baro_altitude, 8 on_ground, 9 velocity, 10 true_track, 11 vertical_rate,
+// 13 geo_altitude, 14 squawk, 17 category.
+function parseOpenSkyState(arr) {
+  return {
+    icao24: arr[0],
+    callsign: arr[1],
+    origin_country: arr[2],
+    lon: arr[5],
+    lat: arr[6],
+    baro_altitude: arr[7],
+    on_ground: arr[8],
+    velocity: arr[9],
+    true_track: arr[10],
+    vertical_rate: arr[11],
+    geo_altitude: arr[13],
+    squawk: arr[14],
+    category: arr[17],
+  };
+}
+
+// enrichmentByHex: Map<icao24, parsed adsb.fi/airplanes.live aircraft>, used
+// to enrich popups (see popupHtmlOpenSky).
+function updateOpenSkyMarkers(states, enrichmentByHex) {
+  const items = [];
+  for (const raw of states) {
+    const s = parseOpenSkyState(raw);
+    if (s.lat == null || s.lon == null) continue; // no position — skip this aircraft
+    if (!passesMotionFilter(s.on_ground)) continue;
+    const extra = enrichmentByHex ? enrichmentByHex.get(s.icao24) : null;
+    const isGroundVehicle = looksLikeGroundVehicle({
+      category: s.category,
+      registration: extra && extra.registration,
+      aircraftType: extra && extra.aircraftType,
+      callsign: s.callsign,
+    });
+    if (hideNonAircraft() && isGroundVehicle) continue;
+    if (!passesCategoryFilter(categoryGroupFor({
+      openskyCategory: s.category,
+      adsbExchangeCategory: extra && extra.category,
+    }))) continue;
+    items.push({
+      id: s.icao24, lat: s.lat, lon: s.lon, heading: s.true_track,
+      popupHtml: popupHtmlOpenSky(s, extra), isGroundVehicle: isGroundVehicle,
+    });
+  }
+  return syncMarkers(openskyMarkers, items, SOURCE_COLORS.opensky);
+}
+
+// --- adsb.fi and airplanes.live ---
+// Both (https://github.com/adsbfi/opendata, https://airplanes.live/api-guide/)
+// are anonymous, no-quota radius sources returning the same
+// ADSBExchange-compatible JSON shape, so they share one parser/popup/renderer.
+
+function popupHtmlAdsbExchange(a) {
+  const callsign = (a.callsign || '').trim() || '—';
+  const alt = a.altitudeM != null ? Math.round(a.altitudeM) + ' m' : '—';
+  const speed = a.speedKmh != null ? Math.round(a.speedKmh) + ' km/h' : '—';
+  const squawk = formatSquawk(a.squawk);
+  const vRate = formatVerticalRate(a.verticalRateMs);
+  const category = formatAdsbExchangeCategory(a.category);
+  let html =
+    '<b>Callsign:</b> ' + callsign + '<br>' +
+    '<b>Registration:</b> ' + (a.registration || '—') + '<br>' +
+    '<b>Altitude:</b> ' + alt + '<br>' +
+    '<b>Speed:</b> ' + speed;
+  if (a.altGeomM != null) html += '<br><b>Geo altitude:</b> ' + Math.round(a.altGeomM) + ' m';
+  if (vRate) html += '<br><b>Vertical rate:</b> ' + vRate;
+  if (squawk) html += '<br><b>Squawk:</b> ' + squawk;
+  if (category) html += '<br><b>Category:</b> ' + category;
+  if (a.aircraftType) html += '<br><b>Aircraft:</b> ' + a.aircraftType;
+  if (a.emergency) html += '<br><span class="emergency">Emergency: ' + a.emergency + '</span>';
+  html += photoBoxHtml(a.icao24, a.registration);
+  return html;
+}
+
+// alt_baro/alt_geom are feet (alt_baro can also be the string "ground"), gs
+// (ground speed) is knots, and vertical rate (baro_rate, falling back to
+// geom_rate) is feet/minute — converted here to meters/km-per-hour/
+// meters-per-second to match the OpenSky popup's units. `category` here is
+// ADSBExchange's letter+digit emitter code (e.g. "A3"), left as-is rather
+// than mapped like OpenSky's numeric one — see OPENSKY_CATEGORY_LABELS.
+// `emergency` is only kept when it's an actual non-"none" value.
+function parseAdsbExchangeAircraft(ac) {
+  const onGround = ac.alt_baro === 'ground';
+  const altFt = typeof ac.alt_baro === 'number' ? ac.alt_baro : null;
+  const altGeomFt = typeof ac.alt_geom === 'number' ? ac.alt_geom : null;
+  const gsKt = typeof ac.gs === 'number' ? ac.gs : null;
+  const vRateFtMin = typeof ac.baro_rate === 'number' ? ac.baro_rate
+    : (typeof ac.geom_rate === 'number' ? ac.geom_rate : null);
+  return {
+    icao24: ac.hex,
+    callsign: ac.flight,
+    registration: ac.r,
+    aircraftType: ac.desc || ac.t || null,
+    lat: ac.lat,
+    lon: ac.lon,
+    onGround: onGround,
+    altitudeM: altFt != null ? altFt * 0.3048 : null,
+    altGeomM: altGeomFt != null ? altGeomFt * 0.3048 : null,
+    speedKmh: gsKt != null ? gsKt * 1.852 : null,
+    verticalRateMs: vRateFtMin != null ? vRateFtMin * 0.3048 / 60 : null,
+    squawk: ac.squawk || null,
+    category: ac.category || null,
+    emergency: (ac.emergency && ac.emergency !== 'none') ? ac.emergency : null,
+    track: ac.track,
+  };
+}
+
+// excludeIds lets the caller hide aircraft already shown by a higher-priority
+// source, so this source only renders what it uniquely contributes.
+function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color) {
+  const items = [];
+  for (const raw of aircraftList) {
+    const a = parseAdsbExchangeAircraft(raw);
+    if (a.lat == null || a.lon == null) continue;
+    if (!passesMotionFilter(a.onGround)) continue;
+    const isGroundVehicle = looksLikeGroundVehicle({
+      category: a.category, registration: a.registration, aircraftType: a.aircraftType, callsign: a.callsign,
+    });
+    if (hideNonAircraft() && isGroundVehicle) continue;
+    if (!passesCategoryFilter(categoryGroupFor({ adsbExchangeCategory: a.category }))) continue;
+    if (excludeIds && excludeIds.has(a.icao24)) continue;
+    items.push({
+      id: a.icao24, lat: a.lat, lon: a.lon, heading: a.track,
+      popupHtml: popupHtmlAdsbExchange(a), isGroundVehicle: isGroundVehicle,
+    });
+  }
+  return syncMarkers(markerMap, items, color);
+}
+
+// --- Polling ---
+
+for (const name of Object.keys(SOURCE_COLORS)) {
+  sourceToggles[name].addEventListener('change', () => {
+    if (!sourceToggles[name].checked) clearAllMarkers(markerMapsBySource[name]);
+    poll(); // refresh right away instead of waiting for the next 12s tick
+  });
+}
+hideJunkToggle.addEventListener('change', poll);
+
+function updateCounts(counts) {
+  let total = 0;
+  for (const name of Object.keys(SOURCE_COLORS)) {
+    const enabled = isSourceEnabled(name);
+    const n = enabled ? (counts[name] || 0) : 0;
+    total += n;
+    document.getElementById('count-' + name).textContent = enabled ? '(' + n + ')' : '';
+  }
+  document.getElementById('count').textContent = total;
+}
+
+// Fetches raw data only (no rendering) — rendering is deferred until all
+// sources have arrived, since OpenSky's popup enrichment needs adsb.fi/
+// airplanes.live's parsed data, and their dedup needs OpenSky's (and each
+// other's) rendered marker sets.
+async function fetchOpenSkyStates() {
+  const statusEl = document.getElementById('status');
+  const quotaEl = document.getElementById('quota');
+  try {
+    const resp = await fetch('/api/states');
+    const data = await resp.json();
+
+    if (data.error === 'rate_limited') {
+      statusEl.textContent = 'OpenSky: rate limited, showing cached data';
+    } else if (data.stale) {
+      statusEl.textContent = 'OpenSky: unreachable, showing stale data';
+    } else {
+      statusEl.textContent = 'updated ' + new Date().toLocaleTimeString('en-GB');
+    }
+
+    // Remaining daily OpenSky quota (X-Rate-Limit-Remaining header, forwarded
+    // by the backend as rate_limit_remaining).
+    quotaEl.textContent = data.rate_limit_remaining != null
+      ? 'requests left: ' + data.rate_limit_remaining
+      : '';
+
+    return data.states || [];
+  } catch (e) {
+    statusEl.textContent = 'OpenSky: failed to load data';
+    return null; // signals failure — keep whatever markers are already shown
+  }
+}
+
+async function fetchRadiusSourceAircraft(endpoint) {
+  try {
+    const resp = await fetch(endpoint);
+    const data = await resp.json();
+    return data.ac || [];
+  } catch (e) {
+    return null;
+  }
+}
+
+async function poll() {
+  const [openskyStates, adsbfiAircraft, airplanesliveAircraft] = await Promise.all([
+    isSourceEnabled('opensky') ? fetchOpenSkyStates() : Promise.resolve(null),
+    isSourceEnabled('adsbfi') ? fetchRadiusSourceAircraft('/api/adsbfi') : Promise.resolve(null),
+    isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
+  ]);
+
+  // Enrichment lookup for OpenSky's popup: adsb.fi takes priority over
+  // airplanes.live when both have data for the same aircraft (arbitrary but
+  // consistent — matches the same priority order used for marker dedup).
+  const enrichmentByHex = new Map();
+  for (const list of [airplanesliveAircraft, adsbfiAircraft]) {
+    if (!list) continue;
+    for (const raw of list) {
+      const a = parseAdsbExchangeAircraft(raw);
+      if (a.icao24) enrichmentByHex.set(a.icao24, a);
+    }
+  }
+
+  let openskyCount = openskyMarkers.size;
+  if (isSourceEnabled('opensky') && openskyStates) {
+    openskyCount = updateOpenSkyMarkers(openskyStates, enrichmentByHex);
+  }
+
+  // Rendered after OpenSky so it can exclude aircraft OpenSky already shows.
+  let adsbfiCount = adsbfiMarkers.size;
+  if (isSourceEnabled('adsbfi') && adsbfiAircraft) {
+    adsbfiCount = updateRadiusSourceMarkers(
+      adsbfiMarkers, adsbfiAircraft, new Set(openskyMarkers.keys()), SOURCE_COLORS.adsbfi
+    );
+  }
+
+  // Rendered last, excluding whatever OpenSky and adsb.fi already show —
+  // completes the OpenSky > adsb.fi > airplanes.live priority chain.
+  let airplanesliveCount = airplanesliveMarkers.size;
+  if (isSourceEnabled('airplaneslive') && airplanesliveAircraft) {
+    const exclude = new Set([...openskyMarkers.keys(), ...adsbfiMarkers.keys()]);
+    airplanesliveCount = updateRadiusSourceMarkers(
+      airplanesliveMarkers, airplanesliveAircraft, exclude, SOURCE_COLORS.airplaneslive
+    );
+  }
+
+  updateCounts({ opensky: openskyCount, adsbfi: adsbfiCount, airplaneslive: airplanesliveCount });
+
+  // Refresh the selected aircraft's flight history each poll cycle, since
+  // more of it may have accumulated on OpenSky's side since the last fetch.
+  if (selectedIcao24) loadTrack(selectedIcao24);
+}
+
+poll();
+setInterval(poll, POLL_INTERVAL_MS);
+</script>
+</body>
+</html>

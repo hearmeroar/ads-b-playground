@@ -1,0 +1,19 @@
+{
+  "ac": [
+    {
+      "hex": "dddddd", "flight": "DUP123  ", "r": "OO-DUP", "t": "A320", "desc": "AIRBUS A-320",
+      "alt_baro": 8000, "gs": 108, "track": 45, "category": "A3", "squawk": "3000",
+      "lat": 44.2, "lon": 21.2
+    },
+    {
+      "hex": "eeeeee", "flight": "UNIQ1   ", "r": "F-UNIQ", "t": "B738", "desc": "BOEING 737-800",
+      "alt_baro": 9000, "gs": 97, "track": 10, "category": "A3", "squawk": "4000",
+      "lat": 44.3, "lon": 21.3
+    },
+    {
+      "hex": "ffffff", "flight": "ALIV1   ", "r": "G-ALIV", "t": "C172", "desc": "CESSNA 172",
+      "alt_baro": 2000, "gs": 90, "track": 200, "category": "A1", "squawk": "5000",
+      "lat": 44.4, "lon": 21.4
+    }
+  ]
+}

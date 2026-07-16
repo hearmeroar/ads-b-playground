@@ -1,0 +1,11 @@
+{
+  "photos": [
+    {
+      "id": "1",
+      "thumbnail": { "src": "https://example.test/thumb.jpg", "size": { "width": 200, "height": 141 } },
+      "thumbnail_large": { "src": "https://example.test/thumb_large.jpg", "size": { "width": 395, "height": 280 } },
+      "link": "https://www.planespotters.net/photo/1/test",
+      "photographer": "Test Photographer"
+    }
+  ]
+}

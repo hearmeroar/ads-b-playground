@@ -1,0 +1,10 @@
+{
+  "name": "ads-b-playground-tests",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}
