@@ -52,6 +52,15 @@
   /* A disabled source renders an empty count — collapse the pill entirely
      rather than leave a bare rounded blob next to the toggle. */
   #hud .source-count:empty { display: none; }
+  /* Between enabling a source and its first numbers arriving, the slot holds a
+     spinner instead of the pill: an enabled source with no pill at all reads
+     as doing nothing for the second or two its first fetch takes. */
+  #hud .source-count.loading { background: none; padding: 0; }
+  #hud .count-spinner {
+    display: block; width: 10px; height: 10px; border-radius: 50%;
+    border: 1.5px solid rgba(15, 23, 42, 0.14); border-top-color: var(--muted);
+    animation: gallery-spin .7s linear infinite;
+  }
   #hud .source-help {
     display: inline-flex; align-items: center; justify-content: center;
     padding: 0; border: none; background: none; line-height: 0;
@@ -1648,11 +1657,26 @@ for (const name of Object.keys(SOURCE_COLORS)) {
         document.getElementById('quota').textContent = '';
         openskyStatusMessage = null;
       }
+    } else {
+      showSourceCountSpinner(name);
     }
     poll(); // refresh right away instead of waiting for the next 12s tick
   });
 }
 hideJunkToggle.addEventListener('change', poll);
+
+// Shown from the moment a source is enabled until the poll it triggers lands.
+// No "pending" state is tracked: updateCounts() runs at the end of every poll
+// and rewrites the slot, which is what clears the spinner — including when the
+// source failed and its real count turns out to be 0.
+function showSourceCountSpinner(name) {
+  const el = document.getElementById('count-' + name);
+  el.textContent = ''; // drops any previous number or spinner
+  el.classList.add('loading');
+  const spinner = document.createElement('span');
+  spinner.className = 'count-spinner';
+  el.appendChild(spinner);
+}
 
 function updateCounts(counts) {
   let total = 0;
@@ -1660,7 +1684,9 @@ function updateCounts(counts) {
     const enabled = isSourceEnabled(name);
     const n = enabled ? (counts[name] || 0) : 0;
     total += n;
-    document.getElementById('count-' + name).textContent = enabled ? String(n) : '';
+    const el = document.getElementById('count-' + name);
+    el.classList.remove('loading');
+    el.textContent = enabled ? String(n) : ''; // also removes the spinner child
   }
   document.getElementById('count').textContent = total;
 }
@@ -1780,6 +1806,7 @@ function clearOpenSkyQuotaLockout() {
   document.getElementById('source-opensky').classList.remove('locked');
   document.getElementById('opensky-help').style.display = 'none';
   document.getElementById('opensky-help-popover').setAttribute('hidden', '');
+  showSourceCountSpinner('opensky'); // re-enabled, numbers pending — as if toggled on
   poll(); // resume immediately now that the quota window should have reset
 }
 
@@ -1896,6 +1923,13 @@ async function poll() {
   if (selectedIcao24 && trackUsesLiveFallback) {
     drawTrack(liveTrailById.get(selectedIcao24));
   }
+}
+
+// The first poll is the same "enabled, no numbers yet" state as a toggle-on,
+// so the sources that ship enabled get the same spinner rather than an empty
+// slot (the #map-loader overlay covers the map, not the HUD).
+for (const name of Object.keys(SOURCE_COLORS)) {
+  if (isSourceEnabled(name)) showSourceCountSpinner(name);
 }
 
 // Hide the initial-load overlay once the first poll resolves (data in, or all

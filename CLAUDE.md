@@ -207,6 +207,15 @@ because photographer name and photo URL come from an external API.
   after a toggle. **OpenSky, adsb.fi and airplanes.live ship checked**;
   adsb.lol and adsb.one ship off (see above). Turning OpenSky off clears the
   quota line and any pending OpenSky warning message.
+- **HUD counts** (`updateCounts()`) render as a pill per source, collapsed via
+  `.source-count:empty` when the source is off. Between enabling a source and
+  the poll it triggers landing, the slot holds a `.count-spinner` instead
+  (`showSourceCountSpinner()`, called from the toggle handler, the
+  quota-lockout release, and once at startup for the sources that ship
+  enabled). Deliberately **no pending state is tracked**: `updateCounts()` runs
+  at the end of every poll and rewrites every slot, which is what clears the
+  spinner — including for a source that failed and whose real count is 0, so
+  there's no path where a spinner outlives its fetch.
 - **A `#map-loader` overlay** covers the first paint — without it the map
   opens visibly empty for a second or two and reads as broken rather than
   loading. It's hidden from the initial `poll().finally(...)`, deliberately
@@ -429,6 +438,11 @@ because photographer name and photo URL come from an external API.
   `rate_limited` `/api/states` auto-disables and locks the source, and a short
   `retry_after_seconds` proves the 1s ticker restores it (with polling and
   markers resuming) once the window elapses.
+- `test_source_count_spinner.spec.js` covers the count slot's three states
+  (off → spinner → pill). To observe the pending state at all it holds the
+  route's response open behind a promise it resolves by hand, rather than
+  racing a mock that answers instantly — the same trick works for any
+  "loading" UI here.
 - Assert countdown text with a regex (`/available in 3h \d+m/`), never a fixed
   string: both countdowns are live and tick between the page load that starts
   them and the click that reads them — a literal `3h 3m` passes locally and
