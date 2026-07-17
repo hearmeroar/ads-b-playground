@@ -99,12 +99,13 @@ npx playwright test
 
 ## Project layout
 
-Two files carry all the logic:
+A handful of plain files carry all the logic:
 
 - `app.py` — Flask backend; proxies every external API (mainly to work
   around CORS/User-Agent restrictions) with short-lived caching.
 - `static/index.html` — the entire frontend: Leaflet map, polling, marker
-  rendering, filters, and the photo/track features, all inline.
+  rendering, filters, and the photo/track features, all inline JS.
+- `static/style.css` — the frontend's styling, linked from `index.html`.
 
 Alongside them, `schema/aircraft.schema.json` documents the normalized
 aircraft shape the sidebar renders — every field, with the raw source field

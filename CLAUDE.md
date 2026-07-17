@@ -8,8 +8,9 @@ A single-page live aircraft tracker: a Flask backend proxies six
 independent data sources — OpenSky Network, adsb.fi, adsb.lol,
 adsb.one, airplanes.live, and FlightAware AeroAPI — and a static Leaflet
 page polls the enabled ones and renders aircraft as rotated, color-coded
-markers. Two files carry all the logic: `app.py` (backend) and
-`static/index.html` (frontend, inline CSS/JS, no build step).
+markers. Backend logic lives in `app.py`; the frontend is
+`static/index.html` (markup + inline JS) plus `static/style.css` — no
+framework, no build step, `style.css` is just a plain `<link>`ed stylesheet.
 
 ## Commands
 
@@ -561,6 +562,7 @@ because photographer name and photo URL come from an external API.
 
 - All UI text and code comments are in English, regardless of the language
   used in conversation.
-- Keep this to one or two files (backend + frontend) — no framework, no
-  build step, no database. This is an intentional MVP constraint, not an
-  oversight.
+- Keep this to a handful of plain files (backend, markup+JS, stylesheet) —
+  no framework, no build step, no database. This is an intentional MVP
+  constraint, not an oversight. `static/style.css` is a `<link>`ed
+  stylesheet, not a build artifact, so it doesn't violate "no build step."

@@ -71,7 +71,7 @@ test('categoryGroupFor maps the categories with dedicated marker icons', async (
 test('ICON_BUILDERS has exactly one dedicated icon per category with a distinct marker glyph', async ({ page }) => {
   const keys = await page.evaluate(() => Object.keys(ICON_BUILDERS).sort());
   expect(keys).toEqual(
-    ['glider', 'heavy', 'high_performance', 'high_vortex_large', 'large', 'light', 'lighter_than_air', 'parachutist', 'rotorcraft', 'small', 'ultralight', 'uav'].sort()
+    ['glider', 'heavy', 'high_performance', 'high_vortex_large', 'large', 'light', 'lighter_than_air', 'parachutist', 'rotorcraft', 'small', 'ultralight', 'uav', 'unknown'].sort()
   );
 });
 
