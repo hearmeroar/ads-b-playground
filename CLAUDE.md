@@ -355,6 +355,19 @@ because photographer name and photo URL come from an external API.
   listener rather than folded into `closeHelpPopovers()`, since that
   mechanism is built for a fixed set of statically-known popovers wired
   once at load, not one dynamic, differently-positioned tooltip.
+
+  The Dev mode row itself carries a `(?)` (`#dev-mode-help`/
+  `#dev-mode-help-popover`), wired through the same static
+  `wireHelpPopover()`/`helpPopovers` mechanism as the OpenSky-quota and
+  track-status ones (`refreshDevModeHelp()` just repaints static text —
+  there's no countdown to keep live here, unlike the other two). It
+  explains what the toggle does (every field shown, `—` for missing data,
+  colored per-source dots) and, since that alone doesn't explain *why* a
+  given field has the source it does, spells out the enrichment order in
+  the same terms as the priority chain above: OpenSky's own fields win
+  whenever OpenSky is on, gaps are filled from whichever single radius
+  source's response has that aircraft, and FlightAware's route fields are
+  merged in separately by callsign match rather than by ICAO24.
 - **Unit toggle** (`#unit-toggle`, `currentUnitSystem` = `'metric'` |
   `'imperial'`): purely a rendering concern. Internal data always stays in
   the units above; only the formatters used inside `renderDetailsHtml()`

@@ -156,12 +156,20 @@
   </div>
 
   <div class="filter-block">
-    <div class="source-row" title="Shows every field (dash for missing data) and which source populated it">
+    <div class="source-row">
       <span class="source-name">Dev mode</span>
+      <button type="button" class="source-help" id="dev-mode-help" aria-label="What does dev mode show?">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
       <label class="switch" style="--row-color:#6b7280">
         <input type="checkbox" id="toggle-dev-mode">
         <span class="switch-track"></span>
       </label>
+      <div class="source-help-popover up" id="dev-mode-help-popover" hidden></div>
     </div>
   </div>
 
@@ -1938,6 +1946,17 @@ function refreshOpenSkyQuotaHelp() {
     + 'The historical-track quota is separate and tracked per aircraft.';
 }
 
+function refreshDevModeHelp() {
+  document.getElementById('dev-mode-help-popover').textContent =
+    'Shows every sidebar field, even ones normally hidden because they’re empty '
+    + '(shown as —). A colored dot on a populated field shows which source supplied '
+    + 'it — click the dot for its name. Enrichment: OpenSky’s own fields (position, '
+    + 'speed, squawk, etc.) always win when OpenSky is on; gaps are filled from whichever '
+    + 'adsb.fi/adsb.lol/adsb.one/airplanes.live response has that aircraft (one radius '
+    + 'source per field, highest-priority match wins); FlightAware’s route data is '
+    + 'merged in separately by matching callsigns, not by ICAO24.';
+}
+
 // A "(?)" icon is click-to-toggle (works on touch, unlike a hover title): it
 // opens a small popover explaining a source/track quota state, and a click
 // anywhere else closes it — same pattern as the category dropdown. Both the
@@ -1963,6 +1982,7 @@ function closeHelpPopovers() {
 }
 wireHelpPopover('opensky-help', 'opensky-help-popover', refreshOpenSkyQuotaHelp);
 wireHelpPopover('track-help', 'track-help-popover', refreshTrackHelp);
+wireHelpPopover('dev-mode-help', 'dev-mode-help-popover', refreshDevModeHelp);
 document.addEventListener('click', closeHelpPopovers);
 
 // Dev-mode source badges (.source-badge) are freshly regenerated HTML every
