@@ -1325,10 +1325,9 @@ function syncMarkers(markerMap, items, color) {
       marker.setIcon(iconFor(item, color));
     } else {
       const isGround = item.isGroundVehicle || item.categoryGroup === 'surface_obstacle';
-      marker = L.marker(latlng, {
-        icon: iconFor(item, color),
-        pane: isGround ? 'groundPane' : undefined,
-      }).addTo(map);
+      const markerOptions = { icon: iconFor(item, color) };
+      if (isGround) markerOptions.pane = 'groundPane';
+      marker = L.marker(latlng, markerOptions).addTo(map);
       // L.Marker defaults bubblingMouseEvents to false (unlike L.Path, which
       // defaults to true), so this click never actually reaches the map's own
       // click handler below — stopPropagation() here is a defensive no-op,
