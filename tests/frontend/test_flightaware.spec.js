@@ -74,14 +74,14 @@ test('FlightAware toggle controls marker visibility', async ({ page }) => {
   expect(countRestored).toBeGreaterThan(0);
 });
 
-test('FlightAware never deduplicates against OpenSky/adsb.fi', async ({ page }) => {
-  // FlightAware renders independently: same aircraft (by position) from two
-  // sources should show twice, not deduplicated away.
+test('non-matching callsigns render as separate markers', async ({ page }) => {
+  // When a FlightAware callsign doesn't match any other source, the FlightAware
+  // marker renders independently (the old behavior for non-matches).
   await page.route('**/api/flightaware', (route) => {
     route.fulfill({ json: {
       flights: [{
-        fa_flight_id: 'FA-DUP',
-        ident: 'DUP123',
+        fa_flight_id: 'FA-NOMATCH',
+        ident: 'UNIQUE999',
         aircraft_type: 'A320',
         last_position: {
           latitude: 43.1,
@@ -99,9 +99,67 @@ test('FlightAware never deduplicates against OpenSky/adsb.fi', async ({ page }) 
   await page.waitForTimeout(500);
 
   const hasFlightAware = await page.evaluate(
-    () => flightawareMarkers.has('FA-DUP')
+    () => flightawareMarkers.has('FA-NOMATCH')
   );
   expect(hasFlightAware).toBe(true);
+});
+
+test('matching callsigns are deduplicated and enriched', async ({ page }) => {
+  // When a FlightAware callsign matches an OpenSky/adsb.fi aircraft's callsign,
+  // the FlightAware marker is suppressed and its route data enriches the main marker.
+  // OpenSky fixture has callsign "TES100  " (from states.json, aaaaaa icao24),
+  // which normalizes to "TES100", so FlightAware uses the same.
+  await page.route('**/api/flightaware', (route) => {
+    route.fulfill({ json: {
+      flights: [{
+        fa_flight_id: 'FA-MATCH',
+        ident: 'TES100',  // matches OpenSky fixture's callsign (normalized)
+        aircraft_type: 'A320',
+        origin: {
+          code: 'LICC',
+          code_iata: 'CTA',
+          name: 'Catania-Fontanarossa Airport',
+        },
+        destination: {
+          code: 'LYBE',
+          code_iata: 'BEG',
+          name: 'Belgrade Nikola Tesla Int\'l',
+        },
+        last_position: {
+          latitude: 44.0,
+          longitude: 21.0,
+          altitude: 150,
+          groundspeed: 300,
+          heading: 90,
+          timestamp: new Date().toISOString(),
+        },
+      }],
+    }});
+  });
+
+  await page.evaluate(() => poll());
+  await page.waitForTimeout(500);
+
+  // FlightAware marker should NOT be rendered (it was matched and suppressed)
+  const hasFlightAware = await page.evaluate(
+    () => flightawareMarkers.has('FA-MATCH')
+  );
+  expect(hasFlightAware).toBe(false);
+
+  // But the OpenSky marker should have the Route row enriched from FlightAware
+  const details = await page.evaluate(() => {
+    const marker = openskyMarkers.get('aaaaaa');
+    if (marker && marker._icon) {
+      marker._icon.click();
+      return document.querySelector('#sidebar-details')?.textContent || '';
+    }
+    return '';
+  });
+  await page.waitForTimeout(300);
+
+  expect(details).toContain('Route');
+  expect(details).toContain('Catania-Fontanarossa Airport (CTA)');
+  expect(details).toContain('Belgrade Nikola Tesla Int\'l (BEG)');
 });
 
 test('FlightAware sidebar shows Route row with origin/destination', async ({ page }) => {

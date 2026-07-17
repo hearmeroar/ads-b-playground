@@ -120,17 +120,21 @@ First, it's **authentication-required**: requests must carry an `x-apikey` heade
 FlightAware API key, and there's no anonymous fallback (returns `{"flights": [], "error": "not_configured"}`
 without one). Second, it's **flight-centric, not transponder-centric** — a `{flights: [...]}` array
 (real sample: one flight leg has an `ident`/`ident_icao` *callsign* like `"ASL439"`, but no
-ICAO24/hex field, so **cannot participate in the existing cross-source dedup chain**; it renders
-as a non-deduplicating overlay instead). Position/altitude/speed/heading live under a nested
-`last_position` object; altitude is in hundreds of feet (e.g., `8` = 800 ft). Origin/destination
-airports (`code_iata`/`name`) are unique to this source and are surfaced in the sidebar as new
-`originAirport`/`destinationAirport` fields. Third, it's **metered/paid** — the user
-deliberately chose to poll it at 10s (same as free sources) and ship it **enabled by default**,
-accepting the cost tradeoff; this is not an oversight and should not be "optimized" to
-off-by-default or slower intervals without explicit re-approval. Cached like the four radius
-sources (10s `FLIGHTAWARE_MIN_INTERVAL`), but remains completely independent from the dedup
-chain — the same aircraft may legitimately appear twice, once from FlightAware (by callsign)
-and once from another source (by ICAO24), with no way to merge them.
+ICAO24/hex field). Position/altitude/speed/heading live under a nested `last_position` object;
+altitude is in hundreds of feet (e.g., `8` = 800 ft). Origin/destination airports (`code_iata`/
+`name`) are unique to this source and are surfaced in the sidebar as new `originAirport`/
+`destinationAirport` fields. Third, it's **metered/paid** — the user deliberately chose to poll
+it at 10s (same as free sources) and ship it **enabled by default**, accepting the cost tradeoff;
+this is not an oversight and should not be "optimized" to off-by-default or slower intervals
+without explicit re-approval.
+**Dedup strategy:** Since FlightAware has no ICAO24, it uses **callsign-based dedup** against the
+other five sources. Every source already carries a callsign field; they are matched case-insensitively
+and whitespace-trimmed (`normalizeCallsignKey()`, in the dedup comparison). When a FlightAware flight's
+callsign matches an aircraft from OpenSky/adsb.fi/adsb.lol/adsb.one/airplanes.live, the FlightAware
+marker is suppressed and its `originAirport`/`destinationAirport` are merged into the matched
+aircraft's sidebar (similar to `enrichmentByHex` for radius sources). A non-match (formatting
+difference, missing callsign, or a FlightAware-only flight) simply leaves FlightAware's own marker
+showing — never causes a false merge. Cached like the four radius sources (10s `FLIGHTAWARE_MIN_INTERVAL`).
 
 **Area coupling:** `BBOX` and the four `*_CENTER` constants in `app.py`, plus
 the map's initial center/zoom in `static/index.html` (`map.setView(...)`),
@@ -241,14 +245,15 @@ because photographer name and photo URL come from an external API.
   go away and let the (empty) map and its error line show, rather than
   spinning forever over them.
 - **Dedup + enrichment rule:** `poll()` fetches all enabled sources in
-  parallel, but defers rendering until they've all arrived, then renders in
-  one fixed priority order — **OpenSky > adsb.fi > adsb.lol > adsb.one >
-  airplanes.live** — since each step depends on data or state from the
-  others. **FlightAware is rendered *after* all of these, completely outside
-  this chain** (see above) — it never participates in the `excludeIds` dedup
-  logic, so the same aircraft may legitimately appear twice. A source that fails
-  resolves to `null` for that cycle and is simply skipped (its existing markers
-  and count are kept), so one dead source never blocks the rest:
+  parallel, builds a `flightawareByCallsign` lookup (callsign-normalized for matching),
+  then defers rendering until all arrive. Rendering happens in one fixed priority order
+  — **OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live > FlightAware** — since
+  each step depends on data or state from the others. **FlightAware uses callsign-based dedup:**
+  after the ICAO24-keyed chain above, FlightAware flights matching any other source's
+  callsign (trimmed, case-insensitive) are suppressed, and their route data is merged
+  into that source's sidebar. A source that fails resolves to `null` for that cycle and
+  is simply skipped (its existing markers and count are kept), so one dead source never
+  blocks the rest:
   - OpenSky renders first (when enabled). Its sidebar data is enriched with
     everything it doesn't have itself (registration, aircraft type,
     `emergency`, IAS/TAS/Mach, mag/true heading, turn rate, roll, autopilot

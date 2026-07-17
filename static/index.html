@@ -1584,12 +1584,11 @@ function parseOpenSkyState(arr) {
 // excludeIds: aircraft already shown by the higher-priority sources
 // (adsb.fi/airplanes.live) — OpenSky renders last and only contributes what
 // they don't cover, since it's the only source that spends a daily quota.
-function updateOpenSkyMarkers(states, enrichmentByHex, excludeIds) {
+function updateOpenSkyMarkers(states, enrichmentByHex, flightawareByCallsign, matchedFlightawareCallsigns) {
   const items = [];
   for (const raw of states) {
     const s = parseOpenSkyState(raw);
     if (s.lat == null || s.lon == null) continue; // no position — skip this aircraft
-    if (excludeIds && excludeIds.has(s.icao24)) continue;
     if (!passesMotionFilter(s.on_ground)) continue;
     const extra = enrichmentByHex ? enrichmentByHex.get(s.icao24) : null;
     const isGroundVehicle = looksLikeGroundVehicle({
@@ -1604,9 +1603,18 @@ function updateOpenSkyMarkers(states, enrichmentByHex, excludeIds) {
       adsbExchangeCategory: extra && extra.category,
     });
     if (!passesCategoryFilter(categoryGroup)) continue;
+    const info = normalizeOpenSky(s, extra);
+    // Enrich with FlightAware's route data if callsign matches
+    const faKey = normalizeCallsignKey(info.callsign);
+    if (faKey && flightawareByCallsign && flightawareByCallsign.has(faKey)) {
+      const faMatch = flightawareByCallsign.get(faKey);
+      info.originAirport = faMatch.originAirport;
+      info.destinationAirport = faMatch.destinationAirport;
+      matchedFlightawareCallsigns.add(faKey);
+    }
     items.push({
       id: s.icao24, lat: s.lat, lon: s.lon, heading: s.true_track,
-      info: normalizeOpenSky(s, extra), registration: extra && extra.registration,
+      info: info, registration: extra && extra.registration,
       isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
     });
   }
@@ -1617,6 +1625,12 @@ function updateOpenSkyMarkers(states, enrichmentByHex, excludeIds) {
 // Both (https://github.com/adsbfi/opendata, https://airplanes.live/api-guide/)
 // are anonymous, no-quota radius sources returning the same
 // ADSBExchange-compatible JSON shape, so they share one parser/details-builder/renderer.
+
+// Normalize a callsign for dedup matching: trim and uppercase. Used to
+// match FlightAware flights (callsign-based) against other sources.
+function normalizeCallsignKey(callsign) {
+  return callsign ? callsign.trim().toUpperCase() : null;
+}
 
 // Returns the same unified shape as normalizeOpenSky() — see there for why
 // this is a plain data object rather than rendered HTML.
@@ -1806,7 +1820,7 @@ function normalizeFlightAware(f) {
 
 // excludeIds lets the caller hide aircraft already shown by a higher-priority
 // source, so this source only renders what it uniquely contributes.
-function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color) {
+function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, flightawareByCallsign, matchedFlightawareCallsigns) {
   const items = [];
   for (const raw of aircraftList) {
     const a = parseAdsbExchangeAircraft(raw);
@@ -1819,24 +1833,36 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color) {
     const categoryGroup = categoryGroupFor({ adsbExchangeCategory: a.category });
     if (!passesCategoryFilter(categoryGroup)) continue;
     if (excludeIds && excludeIds.has(a.icao24)) continue;
+    const info = normalizeAdsbExchange(a);
+    // Enrich with FlightAware's route data if callsign matches
+    const faKey = normalizeCallsignKey(info.callsign);
+    if (faKey && flightawareByCallsign && flightawareByCallsign.has(faKey)) {
+      const faMatch = flightawareByCallsign.get(faKey);
+      info.originAirport = faMatch.originAirport;
+      info.destinationAirport = faMatch.destinationAirport;
+      matchedFlightawareCallsigns.add(faKey);
+    }
     items.push({
       id: a.icao24, lat: a.lat, lon: a.lon, heading: a.track,
-      info: normalizeAdsbExchange(a), registration: a.registration,
+      info: info, registration: a.registration,
       isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
     });
   }
   return syncMarkers(markerMap, items, color);
 }
 
-// FlightAware is not part of the dedup chain (no ICAO24 field to key on),
-// so it renders independently without excludeIds. No looksLikeGroundVehicle
-// check (AeroAPI only returns real flights), but category filter still applies
-// (unknown category flows through passesCategoryFilter() like any other).
-function updateFlightAwareMarkers(flights) {
+// FlightAware dedup by callsign: if a flight's normalized callsign matches
+// an aircraft from another source, it was already enriched there and should
+// not render its own marker. No looksLikeGroundVehicle check (AeroAPI only
+// returns real flights), but category filter still applies (unknown category
+// flows through passesCategoryFilter() like any other).
+function updateFlightAwareMarkers(flights, excludedCallsigns) {
   const items = [];
   for (const raw of flights) {
     const f = parseFlightAware(raw);
     if (f.lat == null || f.lon == null) continue;
+    const faKey = normalizeCallsignKey(f.callsign);
+    if (excludedCallsigns && faKey && excludedCallsigns.has(faKey)) continue;
     if (!passesMotionFilter(f.onGround)) continue;
     if (!passesCategoryFilter('unknown')) continue;
     items.push({
@@ -2089,6 +2115,19 @@ async function poll() {
       'updated ' + new Date().toLocaleTimeString('en-GB');
   }
 
+  // FlightAware enrichment lookup: callsign → {originAirport, destinationAirport}.
+  // Used to enrich matching aircraft from other sources and to suppress
+  // FlightAware's own marker when a match is found.
+  const flightawareByCallsign = new Map();
+  const matchedFlightawareCallsigns = new Set();
+  if (flightawareFlights) {
+    for (const raw of flightawareFlights) {
+      const f = parseFlightAware(raw);
+      const key = normalizeCallsignKey(f.callsign);
+      if (key) flightawareByCallsign.set(key, f);
+    }
+  }
+
   // Enrichment lookup for OpenSky's sidebar: when several radius sources have
   // the same aircraft, the higher-priority one wins. Iterating lowest→highest
   // priority (so the highest writes last) keeps this consistent with the
@@ -2107,7 +2146,7 @@ async function poll() {
   // exclude set is the union of every higher-priority source's rendered keys.
   let openskyCount = openskyMarkers.size;
   if (isSourceEnabled('opensky') && openskyStates) {
-    openskyCount = updateOpenSkyMarkers(openskyStates, enrichmentByHex);
+    openskyCount = updateOpenSkyMarkers(openskyStates, enrichmentByHex, flightawareByCallsign, matchedFlightawareCallsigns);
   }
 
   const counts = { opensky: openskyCount };
@@ -2120,7 +2159,7 @@ async function poll() {
   const excludeIds = new Set(openskyMarkers.keys());
   for (const [name, markerMap, aircraft] of radiusSources) {
     if (isSourceEnabled(name) && aircraft) {
-      counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name]);
+      counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name], flightawareByCallsign, matchedFlightawareCallsigns);
     } else {
       counts[name] = markerMap.size;
     }
@@ -2128,9 +2167,11 @@ async function poll() {
     for (const key of markerMap.keys()) excludeIds.add(key);
   }
 
-  // FlightAware is rendered independently (no dedup chain), after all radius sources.
+  // FlightAware: after OpenSky/radius sources, render only those flights that
+  // weren't matched to another source's callsign (matched ones had their data
+  // merged into the other source's sidebar).
   if (isSourceEnabled('flightaware') && flightawareFlights) {
-    counts.flightaware = updateFlightAwareMarkers(flightawareFlights);
+    counts.flightaware = updateFlightAwareMarkers(flightawareFlights, matchedFlightawareCallsigns);
   } else {
     counts.flightaware = flightawareMarkers.size;
   }

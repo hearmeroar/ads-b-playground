@@ -9,8 +9,7 @@ renders aircraft as color-coded markers.
 
 - **Six independent live sources**: five ADS-B sources deduplicated against
   each other by ICAO24/hex address (each one only shows what the sources above it
-  don't already cover), plus FlightAware AeroAPI as a separate, non-deduplicating
-  overlay.
+  don't already cover), plus FlightAware AeroAPI deduplicated by callsign.
   - [OpenSky Network](https://opensky-network.org/) — blue
   - [adsb.fi](https://github.com/adsbfi/opendata) — red
   - [adsb.lol](https://adsb.lol/) — purple *(off by default: upstream is
@@ -19,8 +18,8 @@ renders aircraft as color-coded markers.
     behind a Cloudflare block)*
   - [airplanes.live](https://airplanes.live/api-guide/) — green
   - [FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/) —
-    teal *(requires API key; shown independently, never deduplicated against
-    the other five)*
+    teal *(requires API key; matched to other sources by callsign, when matched
+    its route data enriches the main marker)*
 
   Each source has its own toggle, and any of them failing degrades that one
   source for a cycle rather than breaking the map.
