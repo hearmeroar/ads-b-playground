@@ -432,9 +432,9 @@ because photographer name and photo URL come from an external API.
   fill="COLOR">` and outlined in white with `vector-effect="non-scaling-stroke"`
   to keep the outline a constant ~1px on-screen regardless of scale. Category
   groups absent from `ICON_BUILDERS` (`space`, `unknown`) fall through to the
-  plain default `planeIcon()` (Material Design "flight" icon, 24×24 viewBox).
-  `uav` is also kept as a generic glyph since the icon set has no dedicated
-  UAV artwork. `rotatedDivIcon()` is the shared builder every rotating icon
+  `largeIcon()` (large aircraft silhouette) as a sensible default when category
+  is unknown or unrecognized. `uav` is also kept as a generic glyph since the
+  icon set has no dedicated UAV artwork. `rotatedDivIcon()` is the shared builder every rotating icon
   goes through; it stamps a `data-color` attribute on the marker's wrapper
   `<div>` recording the source color regardless of how many colored `<path>`s
   the glyph itself uses — this is what lets tests count markers by source
