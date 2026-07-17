@@ -138,3 +138,9 @@ name and unit it came from.
 
 See [`CLAUDE.md`](CLAUDE.md) for the detailed architecture notes, non-obvious
 gotchas, and rationale behind specific decisions.
+
+## Attribution
+
+**Aircraft SVG icons** by [ADS-B Radar for macOS](https://adsb-radar.com) —
+[App Store](https://apps.apple.com/app/id1538149835). Free to use for personal
+and commercial projects.
