@@ -212,6 +212,21 @@ html, body { margin: 0; padding: 0; height: 100%; }
   color: var(--muted); margin-bottom: 5px;
 }
 
+/* Dev mode: per-field source provenance dots + their click-to-toggle tooltip */
+#sidebar-details .source-badge {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  margin-left: 4px; cursor: pointer; vertical-align: middle;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+}
+#source-tooltip {
+  position: absolute; z-index: 1200; padding: 4px 8px;
+  background: var(--card-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+  font-size: 11px; color: var(--ink); pointer-events: none;
+}
+#source-tooltip[hidden] { display: none; }
+
 /* Photo gallery */
 .gallery-image-wrap {
   position: relative; background: #e3e6ea;

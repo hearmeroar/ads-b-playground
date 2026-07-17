@@ -22,6 +22,8 @@
   </div>
 </div>
 
+<div id="source-tooltip" hidden></div>
+
 <div id="hud">
   <div class="count-row">
     <span class="live-dot"></span>
@@ -153,6 +155,16 @@
     </div>
   </div>
 
+  <div class="filter-block">
+    <div class="source-row" title="Shows every field (dash for missing data) and which source populated it">
+      <span class="source-name">Dev mode</span>
+      <label class="switch" style="--row-color:#6b7280">
+        <input type="checkbox" id="toggle-dev-mode">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+  </div>
+
   <div class="hud-footer">
     <div class="status" id="status">loading…</div>
     <div class="status" id="quota"></div>
@@ -211,6 +223,54 @@ const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
 const SOURCE_COLORS = {
   opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32', flightaware: '#00acc1',
 };
+const SOURCE_DISPLAY_NAMES = {
+  opensky: 'OpenSky', adsbfi: 'adsb.fi', adsblol: 'adsb.lol',
+  adsbone: 'adsb.one', airplaneslive: 'airplanes.live', flightaware: 'FlightAware',
+};
+// Dev-mode field provenance: which source populated a given `info` field.
+// OPENSKY_NATIVE_FIELDS are the only ones OpenSky's own state vector
+// supplies directly; every other field in the unified info shape (aside
+// from route) is enrichment-sourced from a single radius/FlightAware
+// source at a time — see fieldSourcesFor().
+const OPENSKY_NATIVE_FIELDS = new Set([
+  'callsign', 'originCountry', 'altitudeM', 'altGeomM', 'speedKmh',
+  'verticalRateMs', 'trackDeg', 'squawk', 'hasAlert', 'positionSource',
+  'secondsSinceContact',
+]);
+const ROUTE_FIELDS = new Set(['originAirport', 'destinationAirport']);
+
+// Builds a { fieldName: sourceKey } map for dev-mode source badges.
+// nativeFieldSet: fields always attributed to `primarySource` (OpenSky's
+// own state-vector fields; empty set for radius/FlightAware-only markers,
+// since every field on those already comes from a single source).
+// extraSource: the enrichment source for everything not in nativeFieldSet
+// (null when there was none). routeSource: 'flightaware' when route fields
+// were merged in, else null.
+function fieldSourcesFor(info, nativeFieldSet, primarySource, extraSource, routeSource) {
+  const out = {};
+  for (const key of Object.keys(info)) {
+    if (info[key] == null || info[key] === '') continue;
+    if (ROUTE_FIELDS.has(key)) { if (routeSource) out[key] = routeSource; continue; }
+    if (nativeFieldSet.has(key)) { out[key] = primarySource; continue; }
+    if (extraSource) out[key] = extraSource;
+  }
+  return out;
+}
+
+// Renders one small colored dot per distinct source that populated
+// fieldKey (a single field name, or an array for composite rows like
+// Route/Wind — in practice always resolves to exactly one source, since a
+// given aircraft's info is built from at most one enrichment source at a
+// time, but coded generically).
+function sourceBadgeHtml(fieldKey, fieldSources) {
+  if (!fieldKey) return '';
+  const keys = Array.isArray(fieldKey) ? fieldKey : [fieldKey];
+  const sources = [...new Set(keys.map((k) => fieldSources[k]).filter(Boolean))];
+  return sources.map((s) =>
+    '<span class="source-badge" style="background:' + SOURCE_COLORS[s] + '" data-source="' + s + '"></span>'
+  ).join('');
+}
+
 const openskyMarkers = new Map(); // icao24 -> L.Marker
 const adsbfiMarkers = new Map(); // hex -> L.Marker
 const adsblolMarkers = new Map(); // hex -> L.Marker
@@ -269,9 +329,24 @@ unitToggleButtons.forEach((btn) => {
     currentUnitSystem = btn.dataset.value;
     if (selectedIcao24 != null) {
       const details = detailsById.get(selectedIcao24);
-      if (details) sidebarDetailsEl.innerHTML = renderDetailsHtml(details.info);
+      if (details) sidebarDetailsEl.innerHTML = renderDetailsHtml(details.info, details.fieldSources);
     }
   });
+});
+
+// Dev mode only changes how renderDetailsHtml() renders an already-
+// normalized info/fieldSources pair (shows every field with a dash
+// placeholder when missing, plus a colored per-source dot when present) —
+// like currentUnitSystem, it doesn't touch fetching or parsing, so toggling
+// re-renders the open sidebar immediately rather than waiting for the next poll.
+let currentDevMode = false;
+const devModeToggle = document.getElementById('toggle-dev-mode');
+devModeToggle.addEventListener('change', () => {
+  currentDevMode = devModeToggle.checked;
+  if (selectedIcao24 != null) {
+    const details = detailsById.get(selectedIcao24);
+    if (details) sidebarDetailsEl.innerHTML = renderDetailsHtml(details.info, details.fieldSources);
+  }
 });
 
 // "Hide non-aircraft" filters out ground vehicles, obstacles, and
@@ -655,7 +730,7 @@ function selectAircraft(icao24) {
   loadTrack(icao24);
 
   const details = detailsById.get(icao24);
-  sidebarDetailsEl.innerHTML = details ? renderDetailsHtml(details.info) : '';
+  sidebarDetailsEl.innerHTML = details ? renderDetailsHtml(details.info, details.fieldSources) : '';
   sidebarEl.classList.add('open');
   loadGallery(icao24, details && details.registration);
 }
@@ -1114,12 +1189,12 @@ function syncMarkers(markerMap, items, color) {
       markerMap.set(item.id, marker);
     }
 
-    detailsById.set(item.id, { info: item.info, registration: item.registration });
+    detailsById.set(item.id, { info: item.info, registration: item.registration, fieldSources: item.fieldSources });
     // Keep the open sidebar's text live across polls. Unlike the old Leaflet
     // popup, this never touches the gallery (a separate element) — so an
     // already-loaded photo just keeps sitting there rather than needing to
     // be re-fetched or re-triggered.
-    if (selectedIcao24 === item.id) sidebarDetailsEl.innerHTML = renderDetailsHtml(item.info);
+    if (selectedIcao24 === item.id) sidebarDetailsEl.innerHTML = renderDetailsHtml(item.info, item.fieldSources);
   }
 
   clearStaleMarkers(markerMap, seen);
@@ -1248,82 +1323,104 @@ function formatAdsbExchangeCategory(category) {
 // OpenSky-only aircraft (no adsb.fi/airplanes.live enrichment) won't have an
 // Autopilot or Weather section at all, since those fields only ever come
 // from the ADSBExchange-format sources.
-function detailRow(label, value) {
-  return (value != null && value !== '') ? '<b>' + label + ':</b> ' + value : null;
-}
-function renderGroup(title, rows) {
-  const filtered = rows.filter((r) => r != null);
-  if (!filtered.length) return '';
-  return '<div class="detail-group"><div class="detail-group-title">' + title + '</div>' +
-    filtered.join('<br>') + '</div>';
-}
-function renderDetailsHtml(info) {
+// detailRow/renderGroup/specialRow are local closures (not module-scope)
+// so they can close over this specific render's `fieldSources` without
+// threading it through every one of the ~45 call sites below — unlike
+// currentDevMode (a persistent UI-mode toggle, module-scope like
+// currentUnitSystem), fieldSources changes per aircraft/per render, so it
+// can't live as a top-level closure var.
+function renderDetailsHtml(info, fieldSources) {
+  fieldSources = fieldSources || {};
+  const dash = '—';
+  // In normal mode, a row disappears when its value is empty (today's exact
+  // behavior). In dev mode every row always renders — a dash placeholder
+  // when empty, plus a colored per-source dot when populated.
+  function detailRow(label, value, fieldKey) {
+    const has = value != null && value !== '';
+    if (!has && !currentDevMode) return null;
+    const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources) : '';
+    return '<b>' + label + ':</b> ' + (has ? value : dash) + badge;
+  }
+  // Same "always render in dev mode" treatment for the two hardcoded
+  // emergency/alert rows, which carry special red styling instead of going
+  // through detailRow's generic '<b>label:</b> value' format.
+  function specialRow(label, isSet, htmlWhenSet, fieldKey) {
+    if (!isSet && !currentDevMode) return null;
+    if (!isSet) return '<b>' + label + ':</b> ' + dash;
+    return htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources) : '');
+  }
+  function renderGroup(title, rows) {
+    const filtered = rows.filter((r) => r != null);
+    if (!filtered.length) return '';
+    return '<div class="detail-group"><div class="detail-group-title">' + title + '</div>' +
+      filtered.join('<br>') + '</div>';
+  }
   const identity = renderGroup('Identity', [
-    detailRow('Callsign', info.callsign || '—'),
-    detailRow('Registration', info.registration),
-    detailRow('Aircraft', info.aircraftType),
-    detailRow('Operator', info.operator),
-    detailRow('Country', info.originCountry),
-    detailRow('Category', info.categoryDisplay),
-    detailRow('Year built', info.manufactureYear),
+    detailRow('Callsign', info.callsign || '—', 'callsign'),
+    detailRow('Registration', info.registration, 'registration'),
+    detailRow('Aircraft', info.aircraftType, 'aircraftType'),
+    detailRow('Operator', info.operator, 'operator'),
+    detailRow('Country', info.originCountry, 'originCountry'),
+    detailRow('Category', info.categoryDisplay, 'categoryDisplay'),
+    detailRow('Year built', info.manufactureYear, 'manufactureYear'),
     detailRow('Route', info.originAirport && info.destinationAirport
       ? info.originAirport + ' → ' + info.destinationAirport
-      : null),
+      : null, ['originAirport', 'destinationAirport']),
   ]);
   const position = renderGroup('Position', [
-    detailRow('Altitude', formatAltitude(info.altitudeM)),
-    detailRow('Geo altitude', formatAltitude(info.altGeomM)),
-    detailRow('Vertical rate', formatVerticalRateUnit(info.verticalRateMs)),
-    detailRow('Position source', info.positionSource),
+    detailRow('Altitude', formatAltitude(info.altitudeM), 'altitudeM'),
+    detailRow('Geo altitude', formatAltitude(info.altGeomM), 'altGeomM'),
+    detailRow('Vertical rate', formatVerticalRateUnit(info.verticalRateMs), 'verticalRateMs'),
+    detailRow('Position source', info.positionSource, 'positionSource'),
   ]);
   const speedHeading = renderGroup('Speed &amp; Heading', [
-    detailRow('Speed', formatSpeedKmh(info.speedKmh)),
-    detailRow('IAS', formatSpeedKt(info.iasKt)),
-    detailRow('TAS', formatSpeedKt(info.tasKt)),
-    detailRow('Mach', info.mach != null ? info.mach.toFixed(2) : null),
-    detailRow('Track', info.trackDeg != null ? Math.round(info.trackDeg) + '°' : null),
-    detailRow('Heading (mag)', info.magHeadingDeg != null ? Math.round(info.magHeadingDeg) + '°' : null),
-    detailRow('Heading (true)', info.trueHeadingDeg != null ? Math.round(info.trueHeadingDeg) + '°' : null),
-    detailRow('Turn rate', info.turnRateDegPerSec != null ? info.turnRateDegPerSec.toFixed(1) + '°/s' : null),
-    detailRow('Roll', info.rollDeg != null ? info.rollDeg.toFixed(1) + '°' : null),
+    detailRow('Speed', formatSpeedKmh(info.speedKmh), 'speedKmh'),
+    detailRow('IAS', formatSpeedKt(info.iasKt), 'iasKt'),
+    detailRow('TAS', formatSpeedKt(info.tasKt), 'tasKt'),
+    detailRow('Mach', info.mach != null ? info.mach.toFixed(2) : null, 'mach'),
+    detailRow('Track', info.trackDeg != null ? Math.round(info.trackDeg) + '°' : null, 'trackDeg'),
+    detailRow('Heading (mag)', info.magHeadingDeg != null ? Math.round(info.magHeadingDeg) + '°' : null, 'magHeadingDeg'),
+    detailRow('Heading (true)', info.trueHeadingDeg != null ? Math.round(info.trueHeadingDeg) + '°' : null, 'trueHeadingDeg'),
+    detailRow('Turn rate', info.turnRateDegPerSec != null ? info.turnRateDegPerSec.toFixed(1) + '°/s' : null, 'turnRateDegPerSec'),
+    detailRow('Roll', info.rollDeg != null ? info.rollDeg.toFixed(1) + '°' : null, 'rollDeg'),
   ]);
   const autopilot = renderGroup('Autopilot', [
-    detailRow('Selected altitude', formatAltitude(info.navAltitudeM)),
-    detailRow('Selected heading', info.navHeadingDeg != null ? Math.round(info.navHeadingDeg) + '°' : null),
-    detailRow('QNH', info.navQnh != null ? Math.round(info.navQnh) + ' hPa' : null),
-    detailRow('Modes', info.navModes ? info.navModes.join(', ') : null),
+    detailRow('Selected altitude', formatAltitude(info.navAltitudeM), 'navAltitudeM'),
+    detailRow('Selected heading', info.navHeadingDeg != null ? Math.round(info.navHeadingDeg) + '°' : null, 'navHeadingDeg'),
+    detailRow('QNH', info.navQnh != null ? Math.round(info.navQnh) + ' hPa' : null, 'navQnh'),
+    detailRow('Modes', info.navModes ? info.navModes.join(', ') : null, 'navModes'),
   ]);
   const weather = renderGroup('Weather', [
     detailRow('Wind', (info.windDirDeg != null && info.windSpeedKt != null)
-      ? Math.round(info.windDirDeg) + '° / ' + formatSpeedKt(info.windSpeedKt) : null),
-    detailRow('Outside air temp', info.oatC != null ? Math.round(info.oatC) + ' °C' : null),
-    detailRow('Total air temp', info.tatC != null ? Math.round(info.tatC) + ' °C' : null),
+      ? Math.round(info.windDirDeg) + '° / ' + formatSpeedKt(info.windSpeedKt) : null, ['windDirDeg', 'windSpeedKt']),
+    detailRow('Outside air temp', info.oatC != null ? Math.round(info.oatC) + ' °C' : null, 'oatC'),
+    detailRow('Total air temp', info.tatC != null ? Math.round(info.tatC) + ' °C' : null, 'tatC'),
   ]);
   const status = renderGroup('Status', [
-    detailRow('Squawk', formatSquawk(info.squawk)),
-    info.emergency ? '<span class="emergency">Emergency: ' + info.emergency + '</span>' : null,
-    info.hasAlert ? '<span class="emergency">Alert</span>' : null,
-    detailRow('Last update', formatRelativeSeconds(info.secondsSinceContact)),
+    detailRow('Squawk', formatSquawk(info.squawk), 'squawk'),
+    specialRow('Emergency', !!info.emergency, '<span class="emergency">Emergency: ' + info.emergency + '</span>', 'emergency'),
+    specialRow('Alert', !!info.hasAlert, '<span class="emergency">Alert</span>', 'hasAlert'),
+    detailRow('Last update', formatRelativeSeconds(info.secondsSinceContact), 'secondsSinceContact'),
   ]);
   // adsb.fi/airplanes.live only — no OpenSky equivalent for any of these
   // (DO-260B navigation accuracy/integrity categories, receiver-relative
   // signal metadata). Absent entirely for an OpenSky-only aircraft, same as
   // Autopilot/Weather above.
   const signalQuality = renderGroup('Signal & Data Quality', [
-    detailRow('Data source flags', formatDbFlags(info.dbFlags)),
-    detailRow('Message type', info.messageType),
-    detailRow('ADS-B version', info.adsbVersion != null ? 'v' + info.adsbVersion : null),
-    detailRow('NIC', info.nic),
-    detailRow('NIC (baro)', info.nicBaro),
-    detailRow('NACp', info.nacP),
-    detailRow('NACv', info.nacV),
-    detailRow('SIL', info.sil != null ? info.sil + (info.silType ? ' (' + info.silType + ')' : '') : null),
-    detailRow('GVA', info.gva),
-    detailRow('SDA', info.sda),
-    detailRow('Radius of containment', info.radiusOfContainmentM != null ? Math.round(info.radiusOfContainmentM) + ' m' : null),
-    detailRow('Messages received', info.messageCount),
-    detailRow('Signal strength', info.signalStrengthDbm != null ? info.signalStrengthDbm.toFixed(1) + ' dBm' : null),
-    detailRow('Last position update', formatRelativeSeconds(info.secondsSincePositionUpdate)),
+    detailRow('Data source flags', formatDbFlags(info.dbFlags), 'dbFlags'),
+    detailRow('Message type', info.messageType, 'messageType'),
+    detailRow('ADS-B version', info.adsbVersion != null ? 'v' + info.adsbVersion : null, 'adsbVersion'),
+    detailRow('NIC', info.nic, 'nic'),
+    detailRow('NIC (baro)', info.nicBaro, 'nicBaro'),
+    detailRow('NACp', info.nacP, 'nacP'),
+    detailRow('NACv', info.nacV, 'nacV'),
+    detailRow('SIL', info.sil != null ? info.sil + (info.silType ? ' (' + info.silType + ')' : '') : null, 'sil'),
+    detailRow('GVA', info.gva, 'gva'),
+    detailRow('SDA', info.sda, 'sda'),
+    detailRow('Radius of containment', info.radiusOfContainmentM != null ? Math.round(info.radiusOfContainmentM) + ' m' : null, 'radiusOfContainmentM'),
+    detailRow('Messages received', info.messageCount, 'messageCount'),
+    detailRow('Signal strength', info.signalStrengthDbm != null ? info.signalStrengthDbm.toFixed(1) + ' dBm' : null, 'signalStrengthDbm'),
+    detailRow('Last position update', formatRelativeSeconds(info.secondsSincePositionUpdate), 'secondsSincePositionUpdate'),
   ]);
   return identity + position + speedHeading + autopilot + weather + status + signalQuality;
 }
@@ -1431,9 +1528,11 @@ function parseOpenSkyState(arr) {
   };
 }
 
-// enrichmentByHex: Map<icao24, parsed adsb.fi/airplanes.live aircraft>, used
-// to enrich the sidebar (see normalizeOpenSky) — including its registration,
-// which OpenSky's own data lacks but the photo gallery lookup needs.
+// enrichmentByHex: Map<icao24, { data: parsed adsb.fi/airplanes.live
+// aircraft, source: which radius source won }>, used to enrich the sidebar
+// (see normalizeOpenSky) — including its registration, which OpenSky's own
+// data lacks but the photo gallery lookup needs. `source` feeds dev mode's
+// per-field provenance badges.
 // excludeIds: aircraft already shown by the higher-priority sources
 // (adsb.fi/airplanes.live) — OpenSky renders last and only contributes what
 // they don't cover, since it's the only source that spends a daily quota.
@@ -1443,7 +1542,9 @@ function updateOpenSkyMarkers(states, enrichmentByHex, flightawareByCallsign, ma
     const s = parseOpenSkyState(raw);
     if (s.lat == null || s.lon == null) continue; // no position — skip this aircraft
     if (!passesMotionFilter(s.on_ground)) continue;
-    const extra = enrichmentByHex ? enrichmentByHex.get(s.icao24) : null;
+    const entry = enrichmentByHex ? enrichmentByHex.get(s.icao24) : null;
+    const extra = entry ? entry.data : null;
+    const extraSource = entry ? entry.source : null;
     const isGroundVehicle = looksLikeGroundVehicle({
       category: s.category,
       registration: extra && extra.registration,
@@ -1457,17 +1558,20 @@ function updateOpenSkyMarkers(states, enrichmentByHex, flightawareByCallsign, ma
     });
     if (!passesCategoryFilter(categoryGroup)) continue;
     const info = normalizeOpenSky(s, extra);
+    const fieldSources = fieldSourcesFor(info, OPENSKY_NATIVE_FIELDS, 'opensky', extraSource, null);
     // Enrich with FlightAware's route data if callsign matches
     const faKey = normalizeCallsignKey(info.callsign);
     if (faKey && flightawareByCallsign && flightawareByCallsign.has(faKey)) {
       const faMatch = flightawareByCallsign.get(faKey);
       info.originAirport = faMatch.originAirport;
       info.destinationAirport = faMatch.destinationAirport;
+      fieldSources.originAirport = 'flightaware';
+      fieldSources.destinationAirport = 'flightaware';
       matchedFlightawareCallsigns.add(faKey);
     }
     items.push({
       id: s.icao24, lat: s.lat, lon: s.lon, heading: s.true_track,
-      info: info, registration: extra && extra.registration,
+      info: info, fieldSources: fieldSources, registration: extra && extra.registration,
       isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
     });
   }
@@ -1673,7 +1777,7 @@ function normalizeFlightAware(f) {
 
 // excludeIds lets the caller hide aircraft already shown by a higher-priority
 // source, so this source only renders what it uniquely contributes.
-function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, flightawareByCallsign, matchedFlightawareCallsigns) {
+function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, sourceName, flightawareByCallsign, matchedFlightawareCallsigns) {
   const items = [];
   for (const raw of aircraftList) {
     const a = parseAdsbExchangeAircraft(raw);
@@ -1687,17 +1791,22 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, f
     if (!passesCategoryFilter(categoryGroup)) continue;
     if (excludeIds && excludeIds.has(a.icao24)) continue;
     const info = normalizeAdsbExchange(a);
+    // Every non-null field on a radius-source marker already came from
+    // `sourceName` (a single raw record) — no OpenSky/extra split needed.
+    const fieldSources = fieldSourcesFor(info, new Set(), sourceName, sourceName, null);
     // Enrich with FlightAware's route data if callsign matches
     const faKey = normalizeCallsignKey(info.callsign);
     if (faKey && flightawareByCallsign && flightawareByCallsign.has(faKey)) {
       const faMatch = flightawareByCallsign.get(faKey);
       info.originAirport = faMatch.originAirport;
       info.destinationAirport = faMatch.destinationAirport;
+      fieldSources.originAirport = 'flightaware';
+      fieldSources.destinationAirport = 'flightaware';
       matchedFlightawareCallsigns.add(faKey);
     }
     items.push({
       id: a.icao24, lat: a.lat, lon: a.lon, heading: a.track,
-      info: info, registration: a.registration,
+      info: info, fieldSources: fieldSources, registration: a.registration,
       isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
     });
   }
@@ -1718,9 +1827,11 @@ function updateFlightAwareMarkers(flights, excludedCallsigns) {
     if (excludedCallsigns && faKey && excludedCallsigns.has(faKey)) continue;
     if (!passesMotionFilter(f.onGround)) continue;
     if (!passesCategoryFilter('unknown')) continue;
+    const info = normalizeFlightAware(f);
+    const fieldSources = fieldSourcesFor(info, new Set(), 'flightaware', 'flightaware', null);
     items.push({
       id: f.fa_flight_id, lat: f.lat, lon: f.lon, heading: f.track,
-      info: normalizeFlightAware(f), registration: null,
+      info: info, fieldSources: fieldSources, registration: null,
       isGroundVehicle: false, categoryGroup: 'unknown',
     });
   }
@@ -1854,6 +1965,28 @@ wireHelpPopover('opensky-help', 'opensky-help-popover', refreshOpenSkyQuotaHelp)
 wireHelpPopover('track-help', 'track-help-popover', refreshTrackHelp);
 document.addEventListener('click', closeHelpPopovers);
 
+// Dev-mode source badges (.source-badge) are freshly regenerated HTML every
+// time sidebarDetailsEl.innerHTML is rewritten (each render), so a
+// wireHelpPopover-style listener attached directly to a badge would be
+// destroyed on the next render. Event delegation on the stable
+// sidebarDetailsEl container, plus a single shared tooltip element
+// repositioned per click, avoids that — kept as its own listener rather
+// than folded into helpPopovers/closeHelpPopovers, since that mechanism is
+// built for a fixed set of statically-known popovers, not one dynamic,
+// differently-positioned tooltip.
+const sourceTooltipEl = document.getElementById('source-tooltip');
+sidebarDetailsEl.addEventListener('click', (e) => {
+  const badge = e.target.closest('.source-badge');
+  if (!badge) { sourceTooltipEl.setAttribute('hidden', ''); return; }
+  e.stopPropagation();
+  sourceTooltipEl.textContent = SOURCE_DISPLAY_NAMES[badge.dataset.source] || badge.dataset.source;
+  const r = badge.getBoundingClientRect();
+  sourceTooltipEl.style.left = (r.left + window.scrollX) + 'px';
+  sourceTooltipEl.style.top = (r.bottom + window.scrollY + 6) + 'px';
+  sourceTooltipEl.removeAttribute('hidden');
+});
+document.addEventListener('click', () => sourceTooltipEl.setAttribute('hidden', ''));
+
 function tickOpenSkyQuota() {
   if (!openskyQuotaLock) { clearInterval(openskyQuotaTimer); openskyQuotaTimer = null; return; }
   if (Date.now() >= openskyQuotaLock.resetAt) clearOpenSkyQuotaLockout();
@@ -1984,13 +2117,18 @@ async function poll() {
   // Enrichment lookup for OpenSky's sidebar: when several radius sources have
   // the same aircraft, the higher-priority one wins. Iterating lowest→highest
   // priority (so the highest writes last) keeps this consistent with the
-  // marker dedup order below.
-  const enrichmentByHex = new Map();
-  for (const list of [airplanesliveAircraft, adsboneAircraft, adsblolAircraft, adsbfiAircraft]) {
+  // marker dedup order below. Values carry `source` (which radius source
+  // won) alongside the parsed record, so dev mode can attribute each
+  // enrichment-derived field to the source that actually supplied it.
+  const enrichmentByHex = new Map(); // icao24 -> { data, source }
+  for (const [name, list] of [
+    ['airplaneslive', airplanesliveAircraft], ['adsbone', adsboneAircraft],
+    ['adsblol', adsblolAircraft], ['adsbfi', adsbfiAircraft],
+  ]) {
     if (!list) continue;
     for (const raw of list) {
       const a = parseAdsbExchangeAircraft(raw);
-      if (a.icao24) enrichmentByHex.set(a.icao24, a);
+      if (a.icao24) enrichmentByHex.set(a.icao24, { data: a, source: name });
     }
   }
 
@@ -2012,7 +2150,7 @@ async function poll() {
   const excludeIds = new Set(openskyMarkers.keys());
   for (const [name, markerMap, aircraft] of radiusSources) {
     if (isSourceEnabled(name) && aircraft) {
-      counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name], flightawareByCallsign, matchedFlightawareCallsigns);
+      counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name], name, flightawareByCallsign, matchedFlightawareCallsigns);
     } else {
       counts[name] = markerMap.size;
     }

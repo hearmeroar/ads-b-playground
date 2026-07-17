@@ -296,16 +296,65 @@ because photographer name and photo URL come from an external API.
   `fetch_states()` sends OpenSky's `extended=1` param so `category`
   (state vector index 17) is actually populated, not just `categoryDisplay`
   via adsb.fi/airplanes.live enrichment.
-  `detailsById` (a `Map<icao24, {info, registration}>`, rebuilt every poll in
-  `syncMarkers()`) stores these objects, not rendered HTML — `selectAircraft()`
-  and the "keep the open sidebar live across polls" line in `syncMarkers()`
-  both call `renderDetailsHtml(info)` on demand instead. This is what lets
-  the unit toggle (below) re-render instantly without waiting for a poll or
-  re-fetching anything. `renderDetailsHtml()` groups fields into labeled
-  sections (Identity, Position, Speed & Heading, Autopilot, Weather, Status)
-  via `renderGroup()`/`detailRow()`; a group renders only if at least one of
-  its fields is non-null, so an OpenSky-only aircraft with no adsb.fi/
-  airplanes.live enrichment simply has no Autopilot/Weather section.
+  `detailsById` (a `Map<icao24, {info, registration, fieldSources}>`,
+  rebuilt every poll in `syncMarkers()`) stores these objects, not rendered
+  HTML — `selectAircraft()` and the "keep the open sidebar live across
+  polls" line in `syncMarkers()` both call `renderDetailsHtml(info,
+  fieldSources)` on demand instead. This is what lets the unit toggle
+  (below) re-render instantly without waiting for a poll or re-fetching
+  anything. `renderDetailsHtml()` groups fields into labeled sections
+  (Identity, Position, Speed & Heading, Autopilot, Weather, Status) via
+  `renderGroup()`/`detailRow()` (local closures inside `renderDetailsHtml`,
+  not module-scope, so they can close over that render's `fieldSources`); a
+  group renders only if at least one of its fields is non-null, so an
+  OpenSky-only aircraft with no adsb.fi/airplanes.live enrichment simply has
+  no Autopilot/Weather section.
+- **Dev mode** (`#toggle-dev-mode`, `currentDevMode`): a sidebar-only
+  toggle, same closure-var pattern as `currentUnitSystem` below, that (1)
+  shows every field always — no group or row is hidden for being empty —
+  with a `—` dash placeholder in place of a missing value, and (2) shows a
+  small colored dot next to any populated field, indicating which source
+  supplied it, with a click-to-toggle tooltip (not hover — consistent with
+  this app's other "(?)" popovers, since hover doesn't work on touch)
+  naming the source. `detailRow`'s/`specialRow`'s dev-mode branch is purely
+  additive: with `currentDevMode` at its default `false`, their logic
+  reduces to exactly today's hide-when-empty behavior, so dev mode is
+  strictly opt-in with zero effect on the default view.
+
+  The hard part is that **no part of the pipeline otherwise tracks which
+  source populated a given field** — `normalizeOpenSky`/
+  `normalizeAdsbExchange`/`normalizeFlightAware` return plain flat objects,
+  and `enrichmentByHex` (the map that resolves which radius source wins for
+  a given aircraft) used to discard the winning source's name once it
+  picked a record. A parallel `fieldSources` object (`{fieldName:
+  sourceKey}`) is now threaded alongside `info` through the same call
+  paths, via `fieldSourcesFor(info, nativeFieldSet, primarySource,
+  extraSource, routeSource)`: `enrichmentByHex` values are now `{data,
+  source}` instead of a bare parsed record; `updateOpenSkyMarkers` tags its
+  OpenSky-native fields (`OPENSKY_NATIVE_FIELDS`) `'opensky'` and every
+  enrichment-derived field with whichever radius source won
+  `enrichmentByHex`; `updateRadiusSourceMarkers` (which now also takes a
+  `sourceName` parameter) and `updateFlightAwareMarkers` tag every field
+  with their own single source, since each of their markers' `info` is
+  built from exactly one raw record; the two FlightAware route-merge call
+  sites additionally tag `originAirport`/`destinationAirport` as
+  `'flightaware'` right after setting them. `sourceBadgeHtml(fieldKey,
+  fieldSources)` renders the dot(s) — `fieldKey` can be an array for
+  composite rows (Route, Wind) that read two raw fields at once. Since the
+  sidebar's `<b>label:</b> value<badge>` rows aren't individually wrapped
+  elements (just concatenated with `<br>` inside one `.detail-group` div),
+  anything that needs to target one specific row's badge (tests, mainly)
+  must match on the row's own text/HTML rather than DOM-parent traversal.
+
+  The tooltip itself (`#source-tooltip`, styled in `static/style.css`) is a
+  single shared element repositioned per click via event delegation on
+  `sidebarDetailsEl` — badges are regenerated HTML on every render (the
+  `.innerHTML` swap in `syncMarkers()`/`selectAircraft()`), so a
+  `wireHelpPopover()`-style per-element listener would be destroyed each
+  time; delegation on the stable container avoids that. Kept as its own
+  listener rather than folded into `closeHelpPopovers()`, since that
+  mechanism is built for a fixed set of statically-known popovers wired
+  once at load, not one dynamic, differently-positioned tooltip.
 - **Unit toggle** (`#unit-toggle`, `currentUnitSystem` = `'metric'` |
   `'imperial'`): purely a rendering concern. Internal data always stays in
   the units above; only the formatters used inside `renderDetailsHtml()`
@@ -527,6 +576,24 @@ because photographer name and photo URL come from an external API.
   string: both countdowns are live and tick between the page load that starts
   them and the click that reads them — a literal `3h 3m` passes locally and
   fails whenever the assertion lands a second late.
+- `test_dev_mode.spec.js` covers the dev-mode toggle: dev-mode-off is
+  byte-identical to today's default rendering (regression guard), dev-mode-on
+  shows a normally-hidden group as dashes, a populated field renders a
+  `.source-badge` with the correct `data-source`, clicking it reveals
+  `#source-tooltip` with the right display name and closes on an outside
+  click, and re-toggling off restores the exact non-dev-mode markup. Uses
+  `dddddd` (OpenSky's dedup-winning marker, enriched with adsb.fi's
+  registration/aircraft type) to exercise both an OpenSky-native field and
+  an adsb.fi-enrichment field in one sidebar. Since sidebar rows aren't
+  individually wrapped elements, the badge-scoping assertions match against
+  the group's `innerHTML` (or walk `nextSibling` from the row's own `<b>`
+  tag) rather than DOM-parent traversal, which would grab the *first* badge
+  in the whole group instead of the one for a specific field.
+- `test_opensky_quota.spec.js`'s "auto-restores once the retry window
+  elapses" test is occasionally flaky under full-suite parallel load (a 1s
+  ticker racing real wall-clock time) — passes reliably standalone or with
+  fewer parallel workers; not a sign of an actual regression if seen
+  failing only in a full `npx playwright test` run.
 
 ## SVG Icon Rendering
 
