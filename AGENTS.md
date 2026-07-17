@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## What this is
 
@@ -11,11 +11,6 @@ page polls the enabled ones and renders aircraft as rotated, color-coded
 markers. Backend logic lives in `app.py`; the frontend is
 `static/index.html` (markup + inline JS) plus `static/style.css` — no
 framework, no build step, `style.css` is just a plain `<link>`ed stylesheet.
-The `enrichment/` package (see Identity enrichment below) is the one
-exception to "`app.py` is the whole backend" — a small set of local static
-lookup modules, still no framework/database, just organized into their own
-directory since they're a genuinely different kind of logic (data lookup,
-not HTTP proxying) from everything else in `app.py`.
 
 ## Commands
 
@@ -107,22 +102,18 @@ interval, and a three-line route. None has a bbox query, only lat/lon/radius
 `BBOX`. All return the same ADSBExchange-compatible JSON shape (altitude in
 feet, speed in knots — converted client-side to match OpenSky's units), which
 is why one parser (`parseAdsbExchangeAircraft()`) serves all four.
-**adsb.one is off by default** in the HUD: its upstream is currently behind a
-Cloudflare block. adsb.lol shipped off for the same kind of reason (its
-upstream had intermittent multi-second hangs) but was switched to **on by
-default** (2026-07-17, explicit re-approval) despite that known instability —
-a failing/slow source degrades to `null` for that cycle rather than breaking
-the poll, so the occasional hang costs one cycle, not the map. Both are wired
-up and working either way; `*_MIN_INTERVAL`/`*_CENTER` and the shared
-`cached_radius_source()` plumbing don't distinguish "on by default" from
-"off by default" — it's purely a frontend checkbox default.
+**adsb.lol and adsb.one are off by default** in the HUD: adsb.lol's upstream
+is currently unstable (intermittent multi-second hangs) and adsb.one is
+behind a Cloudflare block. They're wired up and working, so this is a default,
+not a limitation — a failing source degrades to `null` for that cycle rather
+than breaking the poll.
 
 > **Shorthand:** the rest of this file often says "adsb.fi/airplanes.live"
 > where it means *any* radius source — they share one JSON shape, one parser,
 > and one set of extra fields, so a claim about one holds for all four.
-> adsb.fi and airplanes.live are named because they're two of the three that
-> ship enabled (alongside adsb.lol); adsb.one — the one still off by default —
-> behaves identically wherever the phrase appears.
+> adsb.fi and airplanes.live are named because they're the two that ship
+> enabled; adsb.lol and adsb.one behave identically wherever the phrase
+> appears.
 
 **FlightAware AeroAPI (`/api/flightaware` → `aeroapi.flightaware.com/aeroapi/flights/search`):**
 This sixth source is structurally unlike the four radius sources in three critical ways.
@@ -133,19 +124,16 @@ without one). Second, it's **flight-centric, not transponder-centric** — a `{f
 ICAO24/hex field). Position/altitude/speed/heading live under a nested `last_position` object;
 altitude is in hundreds of feet (e.g., `8` = 800 ft). Origin/destination airports (`code_iata`/
 `name`) are unique to this source and are surfaced in the sidebar as new `originAirport`/
-`destinationAirport` fields. Third, it's **metered/paid** — the user polls it at 10s (same as
-free sources) when enabled, accepting the cost tradeoff. It originally shipped **enabled by
-default**; the user later gave explicit re-approval (2026-07-17) to switch it to **off by
-default** instead, so it now ships unchecked like adsb.one — still fully wired up and
-working, just an opt-in toggle rather than a default one. Any further change to this default
-(or to its poll interval) needs the same kind of explicit re-approval, not a unilateral
-"optimization."
+`destinationAirport` fields. Third, it's **metered/paid** — the user deliberately chose to poll
+it at 10s (same as free sources) and ship it **enabled by default**, accepting the cost tradeoff;
+this is not an oversight and should not be "optimized" to off-by-default or slower intervals
+without explicit re-approval.
 **Dedup strategy:** Since FlightAware has no ICAO24, it uses **callsign-based dedup** against the
 other five sources. Every source already carries a callsign field; they are matched case-insensitively
 and whitespace-trimmed (`normalizeCallsignKey()`, in the dedup comparison). When a FlightAware flight's
 callsign matches an aircraft from OpenSky/adsb.fi/adsb.lol/adsb.one/airplanes.live, the FlightAware
 marker is suppressed and its `originAirport`/`destinationAirport` are merged into the matched
-aircraft's sidebar (similar to `radiusRecordsByHex` for radius sources). A non-match (formatting
+aircraft's sidebar (similar to `enrichmentByHex` for radius sources). A non-match (formatting
 difference, missing callsign, or a FlightAware-only flight) simply leaves FlightAware's own marker
 showing — never causes a false merge. Cached like the four radius sources (10s `FLIGHTAWARE_MIN_INTERVAL`).
 
@@ -239,9 +227,9 @@ because photographer name and photo URL come from an external API.
   HUD checkbox, which clears its markers immediately and triggers an immediate
   `poll()` (rather than waiting up to `POLL_INTERVAL_MS` for the next tick) —
   both on and off toggles re-run `poll()` so counts/markers never sit stale
-  after a toggle. **OpenSky, adsb.fi, adsb.lol and airplanes.live ship
-  checked**; adsb.one and FlightAware ship off (see above). Turning OpenSky
-  off clears the quota line and any pending OpenSky warning message.
+  after a toggle. **OpenSky, adsb.fi and airplanes.live ship checked**;
+  adsb.lol and adsb.one ship off (see above). Turning OpenSky off clears the
+  quota line and any pending OpenSky warning message.
 - **HUD counts** (`updateCounts()`) render as a pill per source, collapsed via
   `.source-count:empty` when the source is off. Between enabling a source and
   the poll it triggers landing, the slot holds a `.count-spinner` instead
@@ -271,11 +259,10 @@ because photographer name and photo URL come from an external API.
     everything it doesn't have itself (registration, aircraft type,
     `emergency`, IAS/TAS/Mach, mag/true heading, turn rate, roll, autopilot
     targets, wind, OAT/TAT, operator, year, the DO-260B accuracy fields) via
-    `radiusRecordsByHex`, a lookup merged from all four radius responses — see
-    `normalizeOpenSky(s, extra)` (`extra` is that lookup's highest-priority
-    entry for this aircraft). It's built by iterating the lists
-    *lowest→highest* priority so the highest-priority source is pushed last
-    and wins, matching the marker dedup order below. Fields every source already
+    `enrichmentByHex`, a lookup merged from all four radius responses — see
+    `normalizeOpenSky(s, extra)`. It's built by iterating the lists
+    *lowest→highest* priority so the highest-priority source writes last and
+    wins, matching the marker dedup order below. Fields every source already
     provides (altitude, speed, position, squawk, position source,
     last-contact time) are never taken from `extra` — OpenSky's own values
     always win for those.
@@ -306,247 +293,19 @@ because photographer name and photo URL come from an external API.
   and `destinationAirport` (displayed as "Route" in the Identity group,
   `"Catania-Fontanarossa Airport (CTA) → Belgrade Nikola Tesla Int'l (BEG)"`). `trackDeg` falls back to adsb.fi/airplanes.live's
   `calc_track` when `track` is absent (observed on military aircraft).
-  `icao24` (the transponder hex address — already the Map key every marker
-  is stored/looked up under, and the shared dedup key across all five
-  ICAO24-based sources) is now also carried in `info` itself and rendered
-  as the very first Identity row ("ICAO", uppercased for display). It's
-  tagged an OpenSky-native field (`OPENSKY_NATIVE_FIELDS`) since OpenSky's
-  own state vector reports it directly rather than via enrichment; it's
-  always `null` for FlightAware, which has no ICAO24/hex field at all
-  (flight-centric, identified by `fa_flight_id`/callsign instead — see the
-  FlightAware section above).
   `fetch_states()` sends OpenSky's `extended=1` param so `category`
   (state vector index 17) is actually populated, not just `categoryDisplay`
   via adsb.fi/airplanes.live enrichment.
-  `detailsById` (a `Map<icao24, {info, registration, fieldSources}>`,
-  rebuilt every poll in `syncMarkers()`) stores these objects, not rendered
-  HTML — `selectAircraft()` and the "keep the open sidebar live across
-  polls" line in `syncMarkers()` both call `renderDetailsHtml(info,
-  fieldSources)` on demand instead. This is what lets the unit toggle
-  (below) re-render instantly without waiting for a poll or re-fetching
-  anything. `renderDetailsHtml()` groups fields into labeled sections
-  (Identity, Position, Speed & Heading, Autopilot, Weather, Status) via
-  `renderGroup()`/`detailRow()` (local closures inside `renderDetailsHtml`,
-  not module-scope, so they can close over that render's `fieldSources`); a
-  group renders only if at least one of its fields is non-null, so an
-  OpenSky-only aircraft with no adsb.fi/airplanes.live enrichment simply has
-  no Autopilot/Weather section.
-- **Dev mode** (`#toggle-dev-mode`, `currentDevMode`): a sidebar-only
-  toggle, same closure-var pattern as `currentUnitSystem` below, that (1)
-  shows every field always — no group or row is hidden for being empty —
-  with a `—` dash placeholder in place of a missing value, and (2) shows a
-  small colored dot next to any populated field, indicating which source
-  supplied it, with a click-to-toggle tooltip (not hover — consistent with
-  this app's other "(?)" popovers, since hover doesn't work on touch)
-  naming the source. `detailRow`'s/`specialRow`'s dev-mode branch is purely
-  additive: with `currentDevMode` at its default `false`, their logic
-  reduces to exactly today's hide-when-empty behavior, so dev mode is
-  strictly opt-in with zero effect on the default view.
-
-  The hard part is that **no part of the pipeline otherwise tracks which
-  source populated a given field** — `normalizeOpenSky`/
-  `normalizeAdsbExchange`/`normalizeFlightAware` return plain flat objects,
-  and the old `enrichmentByHex` (the map that resolves which radius source
-  wins for a given aircraft) discarded every non-winning source's record
-  once it picked one. A parallel `fieldSources` object (`{fieldName:
-  [sourceKey, ...]}`, an *array* — see below) is now threaded alongside
-  `info` through the same call paths. `enrichmentByHex` was replaced by
-  `radiusRecordsByHex` (`Map<icao24, Array<{source, data}>>`, built in
-  `poll()`): instead of one `{data, source}` winner per aircraft, it keeps
-  every enabled radius source's own record, in priority order low→high
-  (`array[length-1]` is the same "highest-priority wins" entry used for
-  enrichment *values*, so that part of the behavior is unchanged).
-  `fieldSourcesFor(info, entries, routeSource)` — `entries` is that
-  aircraft's full `{source, data}` list, plus (in `updateOpenSkyMarkers`) a
-  synthetic `{source: 'opensky', data: pickFields(info,
-  OPENSKY_NATIVE_FIELDS)}` entry standing in for OpenSky's own state vector
-  — checks *every* entry for a non-empty value at each field key and
-  attributes a badge to each one that has it, not just whichever one's
-  value `info` ends up displaying: if three enabled sources all
-  independently report a registration for the same aircraft, three badges
-  show, even though only one value is ever rendered. `false` is treated as
-  "no value" rather than a real one, since the sidebar's only boolean field
-  (`hasAlert`) uses it to mean "no alert" — without that carve-out, a
-  source with no alert would still badge as if it had "reported" the
-  field. Raw parsed records mostly share `info`'s own key names 1:1 (a
-  radius record's `registration`/`iasKt`/`squawk`/etc. are literally the
-  same keys `normalizeAdsbExchange` copies them under), except two:
-  `category`→`categoryDisplay` and `track`→`trackDeg`, both computed by a
-  lookup/format function rather than copied — `RAW_FIELD_ALIASES` is the
-  (deliberately short) map of those exceptions, checked as a fallback only
-  when the direct key lookup comes back `undefined`, so it never masks a
-  genuine `null` from a source that has the field but no value for it.
-  `updateOpenSkyMarkers` builds `entries` from `radiusRecordsByHex.get(s.icao24)`
-  plus the synthetic OpenSky entry; `updateRadiusSourceMarkers` (which now
-  also takes a `radiusRecordsByHex` parameter) passes that same aircraft's
-  full entry list straight through — `sourceName` (the source whose list is
-  currently being rendered) is guaranteed to already be one of those
-  entries, so no separate single-source fallback is needed; `updateFlightAwareMarkers`
-  passes a one-element `entries` of just itself, since FlightAware never
-  joins `radiusRecordsByHex` (it dedupes by callsign, not ICAO24). The two
-  FlightAware route-merge call sites tag `originAirport`/`destinationAirport`
-  as `['flightaware']` directly (bypassing `entries`) right after setting them.
-  `sourceBadgeHtml(fieldKey, fieldSources)` renders one dot per distinct
-  source across all of `fieldKey`'s badge arrays — `fieldKey` can itself be
-  an array for composite rows (Route, Wind) that read two fields at once,
-  deduped so a composite row whose two fields came from the same source
-  doesn't double the dot. Since the sidebar's `<b>label:</b> value<badge>`
-  rows aren't individually wrapped elements (just concatenated with `<br>`
-  inside one `.detail-group` div), anything that needs to target one
-  specific row's badges (tests, mainly) must match on the row's own
-  text/HTML up to the next `<br>` rather than DOM-parent traversal.
-
-  The tooltip itself (`#source-tooltip`, styled in `static/style.css`) is a
-  single shared element repositioned per click via event delegation on
-  `sidebarDetailsEl` — badges are regenerated HTML on every render (the
-  `.innerHTML` swap in `syncMarkers()`/`selectAircraft()`), so a
-  `wireHelpPopover()`-style per-element listener would be destroyed each
-  time; delegation on the stable container avoids that. Kept as its own
-  listener rather than folded into `closeHelpPopovers()`, since that
-  mechanism is built for a fixed set of statically-known popovers wired
-  once at load, not one dynamic, differently-positioned tooltip.
-  `#source-tooltip` is a DOM sibling of `#sidebar`, not a child of it, so
-  it doesn't inherit `#sidebar`'s own `font-family` declaration and falls
-  back to the browser default serif font unless it sets its own — it does
-  (`static/style.css`), the same self-contained-font pattern `#hud` and
-  `#sidebar` each already use rather than relying on inheriting a
-  page-wide font from `body` (which sets none).
-
-  The Dev mode row itself carries a `(?)` (`#dev-mode-help`/
-  `#dev-mode-help-popover`), wired through the same static
-  `wireHelpPopover()`/`helpPopovers` mechanism as the OpenSky-quota and
-  track-status ones (`refreshDevModeHelp()` just repaints static text —
-  there's no countdown to keep live here, unlike the other two). It
-  explains what the toggle does (every field shown, `—` for missing data,
-  colored per-source dots) and, since that alone doesn't explain *why* a
-  given field has the source it does, spells out the enrichment order in
-  the same terms as the priority chain above: OpenSky's own fields win
-  whenever OpenSky is on, gaps are filled from whichever single radius
-  source's response has that aircraft, and FlightAware's route fields are
-  merged in separately by callsign match rather than by ICAO24.
-- **Identity enrichment** (`enrichment/` package, `app.py`'s
-  `/api/identity/<icao24>`, `static/index.html`'s `enrichmentById`/
-  `buildMergedDetails`): fills identity gaps (Country, Operator,
-  Manufacturer, Model, Year built) live feeds didn't cover, using small
-  local static lookup tables — no external API, no database (static dicts
-  loaded at import time aren't a database any more than `SOURCE_COLORS`/
-  `OPENSKY_CATEGORY_LABELS` are).
-  - **`enrichment/`** (new, root-level, sibling to `static/`/`tests/`/
-    `schema/` — the first backend module that isn't an HTTP-proxy):
-    `countries.py` is the Country entity (`{name, iso}` — this module never
-    renders a flag itself, only ever hands out the ISO code; see the
-    frontend `flagHtml()` note below for where the actual flag rendering
-    lives), covering essentially every ICAO member state (194 entries — it
-    started as a ~20-country placeholder set but had to grow to match
-    `registration.py`'s own coverage below, since a prefix resolving to an
-    ISO code missing from this table would silently resolve to nothing);
-    `registration.py` maps ICAO/ITU registration prefixes — a real,
-    standardized convention (ICAO Annex 7), not a placeholder guess — to a
-    country. Expanded from an initial ~20-entry placeholder subset to 192
-    entries covering essentially every nationality mark, after a real
-    aircraft (`SE-RTJ`, Sweden) came up with no country resolved simply
-    because `SE` wasn't in the table yet. Longest-prefix-match, with one
-    extra wrinkle: two ICAO territories share their sovereign's base mark
-    but get their own sub-block after the dash — Hong Kong (`B-H...`) and
-    Macau (`B-M...`) both fall under China's bare `B` — handled by trying
-    "prefix + first character after the dash" (`BH`, `BM`) as a more
-    specific candidate before falling back to the bare prefix; `callsign.py`
-    maps ICAO 3-letter airline designators to an operator
-    (confidence 0.8) and that operator's home country (confidence 0.6 —
-    two independently-confidenced facts from one lookup, since they feed
-    two different priority chains); `aircraft_database.py` holds a
-    swappable ICAO24→full-record lookup (`AircraftDatabaseLookup.lookup()`,
-    a small placeholder dataset behind an interface a real data source
-    could later implement with zero caller changes) plus a separate ICAO
-    type-code/free-text→manufacturer+model normalization table;
-    `aircraft_enrichment.py`'s `enrich_identity()` is the orchestrator,
-    resolving each field through its own priority chain that always tries
-    a live value first (`source: "live"`) before ever touching a local
-    table — enrichment only fills a gap the live feeds didn't cover, never
-    overrides one.
-  - **`/api/identity/<icao24>`** (`app.py`) is fetched lazily from
-    `selectAircraft()` — same lazy-on-click pattern as `loadTrack`/
-    `loadGallery`, never during the main poll, so the 50+ on-screen
-    aircraft nobody clicks never cost a request. Deliberately **uncached**,
-    unlike every other route: it makes zero I/O calls (pure sub-millisecond
-    dict lookups), and every existing cache here exists specifically to
-    protect a rate-limited *external* HTTP source, which doesn't apply.
-  - **Frontend merge**: `syncMarkers()` fully replaces each aircraft's
-    `detailsById` entry every poll, so enrichment can't be merged into it
-    directly — it would be silently discarded on the next poll. Enrichment
-    results live in their own `enrichmentById` Map (keyed by icao24,
-    session-cached like `galleryCache`) that polling never touches;
-    `buildMergedDetails(icao24)` recombines the two fresh at render time,
-    enforcing "live wins" client-side too (belt-and-suspenders with the
-    backend's own short-circuit) by only filling a field that's currently
-    null/empty. Every render path (`selectAircraft`, the poll resync in
-    `syncMarkers()`, the unit-toggle and dev-mode-toggle handlers) now goes
-    through one shared `renderSelectedDetails()` so none of them can drift
-    out of sync with each other.
-  - **"Flywme"** is a new, separate synthetic source in `SOURCE_COLORS`/
-    `SOURCE_DISPLAY_NAMES` (badged black), parallel to the six live sources
-    — not a stand-in for anything. It represents "this application" as the
-    source whenever `buildMergedDetails` filled a field from enrichment
-    rather than a live feed (tagged `fieldSources[key] = ['flywme']`). The
-    specific technique that computed it (`registration_prefix`/
-    `icao24_lookup`/`callsign_decode`/`aircraft_type_db`) is real metadata
-    too, but it's *how* Flywme computed the value, not a competing source —
-    so it drives the tooltip text via `ENRICHMENT_BASIS_LABELS` (e.g.
-    *"Flywme — computed from registration prefix, confidence 1.0"*), not a
-    separate badge color. `sourceBadgeHtml()` takes two more params
-    (`fieldConfidence`, `fieldComputationBasis`) to build that string, a
-    harmless no-op for the six live sources since both are only ever
-    populated for enrichment fields.
-  - **New Identity rows**: `Manufacturer`/`Model` (brand new — no existing
-    field). `Country`/`Operator`/`Year built` already existed and just gain
-    Flywme as an additional possible `fieldSources` entry. All five (plus
-    Country's own upgrade) use a new `identityRow()` closure inside
-    `renderDetailsHtml()` instead of `detailRow()` — unlike every other
-    field in this app, they show the literal word **"Unknown"** instead of
-    hiding the row (or, in dev mode, a dash) when nothing resolved,
-    regardless of `currentDevMode`. Registration is deliberately excluded
-    from this treatment (stays on plain `detailRow`) — the spec's
-    "Unknown" list names Country/Operator/Manufacturer/Model/Year built
-    only. Country's flag leads the country name, rendered by `flagHtml(iso2)`
-    (`static/index.html`) from `info.countryIso` — a small SVG via the
-    [flag-icons](https://github.com/lipis/flag-icons) library
-    (`<span class="fi fi-cz">`), vendored at `static/flag-icons/` (`css/` +
-    `flags/4x3/`, plus its `LICENSE`, copied from the npm package the same
-    way `static/ADS-B_Radar_Free_Aircraft_SVG_Icons/` is vendored — no
-    build step, just static files, `flag-icons/css/flag-icons.min.css`
-    linked in `<head>`). Only the `4x3` (rectangular) variant is vendored,
-    not `1x1` (square) — its CSS rules reference `../flags/1x1/*.svg` for
-    the unused `.fis` modifier class, but browsers only fetch a
-    `background-image` when the rule actually matches a rendered element,
-    so those never-applied rules never 404. `flagHtml()` accepts upper- or
-    lowercase and returns `''` for anything that isn't a plausible 2-letter
-    code, so a missing/invalid ISO degrades to no flag rather than a broken
-    element. **The flag shows regardless of which source supplied the
-    country** — not just enrichment-resolved ones. `enrich_identity()`'s
-    country tier always tries `country_iso_for_name()` (`enrichment/
-    countries.py`, an exact case-insensitive reverse lookup: name → ISO)
-    even for a `"live"`-sourced value, attaching `country_iso` alongside it
-    without touching its `source`/`confidence` — a flag is a presentation
-    add-on, never a sign the value itself was enriched. On the frontend,
-    `buildMergedDetails()` picks up `resolved.country_iso` unconditionally
-    (before the "value already resolved, skip" check that guards the
-    *value*, which does not gate the flag). First implementation only set
-    `info.countryIso` on the enrichment path, so a country already known
-    from a live feed (e.g. OpenSky's own `origin_country`) silently never
-    got a flag — fixed by moving the ISO lookup earlier on the backend and
-    decoupling it from the value-overwrite guard on the frontend. A country
-    string that matches nothing in `countries.py`'s placeholder set (not
-    exhaustive) still renders without a flag — a real, accepted limitation,
-    not a bug.
-  - **Pitfall hit once, worth remembering**: `Object.keys(SOURCE_COLORS)`
-    is iterated in a few places (the per-source toggle wiring, HUD count
-    updates, the startup spinner loop) under the assumption that every
-    `SOURCE_COLORS` key has a matching HUD checkbox in `sourceToggles`.
-    Adding `flywme` to `SOURCE_COLORS` broke all three until they were
-    switched to iterate `Object.keys(sourceToggles)` instead (the object
-    that actually only has the six live, toggleable sources) — any future
-    synthetic/non-toggleable source added to `SOURCE_COLORS` needs the same
-    check.
+  `detailsById` (a `Map<icao24, {info, registration}>`, rebuilt every poll in
+  `syncMarkers()`) stores these objects, not rendered HTML — `selectAircraft()`
+  and the "keep the open sidebar live across polls" line in `syncMarkers()`
+  both call `renderDetailsHtml(info)` on demand instead. This is what lets
+  the unit toggle (below) re-render instantly without waiting for a poll or
+  re-fetching anything. `renderDetailsHtml()` groups fields into labeled
+  sections (Identity, Position, Speed & Heading, Autopilot, Weather, Status)
+  via `renderGroup()`/`detailRow()`; a group renders only if at least one of
+  its fields is non-null, so an OpenSky-only aircraft with no adsb.fi/
+  airplanes.live enrichment simply has no Autopilot/Weather section.
 - **Unit toggle** (`#unit-toggle`, `currentUnitSystem` = `'metric'` |
   `'imperial'`): purely a rendering concern. Internal data always stays in
   the units above; only the formatters used inside `renderDetailsHtml()`
@@ -768,49 +527,6 @@ because photographer name and photo URL come from an external API.
   string: both countdowns are live and tick between the page load that starts
   them and the click that reads them — a literal `3h 3m` passes locally and
   fails whenever the assertion lands a second late.
-- `test_dev_mode.spec.js` covers the dev-mode toggle: dev-mode-off is
-  byte-identical to today's default rendering (regression guard), dev-mode-on
-  shows a normally-hidden group as dashes, a populated field renders a
-  `.source-badge` with the correct `data-source`, clicking it reveals
-  `#source-tooltip` with the right display name and closes on an outside
-  click, and re-toggling off restores the exact non-dev-mode markup. Uses
-  `dddddd` (OpenSky's dedup-winning marker, enriched with adsb.fi's
-  registration/aircraft type) to exercise both an OpenSky-native field and
-  an adsb.fi-enrichment field in one sidebar. Since sidebar rows aren't
-  individually wrapped elements, the badge-scoping assertions match against
-  the group's `innerHTML` (or walk `nextSibling` from the row's own `<b>`
-  tag) rather than DOM-parent traversal, which would grab the *first* badge
-  in the whole group instead of the one for a specific field.
-- `test_opensky_quota.spec.js`'s "auto-restores once the retry window
-  elapses" test is occasionally flaky under full-suite parallel load (a 1s
-  ticker racing real wall-clock time) — passes reliably standalone or with
-  fewer parallel workers; not a sign of an actual regression if seen
-  failing only in a full `npx playwright test` run.
-- `tests/backend/test_enrichment.py` covers both the `enrichment/` package's
-  pure lookup functions (no `mock_get`/`mock_post` needed at all — the
-  first backend test file with no HTTP mocking, since there's no HTTP call
-  to mock) and the `/api/identity/<icao24>` route via Flask's test client
-  directly. Verifies every worked example from the original spec exactly
-  (`OK-SWC`→Czech Republic, `49d3d3`→Smartwings/Boeing/737 MAX 8/2021,
-  `TVP7200`→Smartwings), each orchestrator priority tier in isolation, and
-  that `conftest.py`'s `reset_caches` needs no new entry (this route is
-  intentionally uncached).
-- `test_identity_enrichment.spec.js` covers: dev-mode-off shows resolved
-  enrichment values plainly and unresolved ones as literal "Unknown" with
-  zero badges; dev-mode-on shows exactly one black `flywme`-sourced badge
-  whose tooltip reads "Flywme — computed from `<technique>`, confidence
-  `<n>`"; a live value is never overwritten even by a deliberately
-  contradicting enrichment response, and gets no Flywme badge alongside its
-  real source's badge; Registration is excluded from the "Unknown"
-  treatment (shows/hides by the ordinary rule) while the other four
-  identity fields aren't. Uses `eeeeee` (adsb.fi+airplanes.live only, no
-  live country/operator/year — good for gap-filling) and `dddddd` (has live
-  `originCountry`/registration — good for "live wins"). Selects a marker
-  via `markerMapsBySource[sourceName].get(hex)` rather than the bare
-  `openskyMarkers`/`adsbfiMarkers` globals used elsewhere in this suite,
-  since the source name needs to be a runtime string here; waits for
-  `enrichmentById.has(hex)` before asserting, since the identity fetch is
-  async and lands after `selectAircraft()` returns.
 
 ## SVG Icon Rendering
 

@@ -41,6 +41,26 @@ def test_registration_prefix_unknown_returns_none():
     assert lookup_country_by_registration("") is None
 
 
+def test_registration_prefix_covers_essentially_every_icao_member_state():
+    # The table was expanded from a ~20-entry placeholder to essentially the
+    # full ICAO/ITU nationality-mark list (192 entries) — spot-check a few
+    # that were NOT in the original placeholder set, across regions.
+    assert lookup_country_by_registration("SE-RTJ")["country_iso"] == "SE"  # Sweden
+    assert lookup_country_by_registration("JA123A")["country_iso"] == "JP"  # Japan
+    assert lookup_country_by_registration("VH-ABC")["country_iso"] == "AU"  # Australia
+    assert lookup_country_by_registration("ZS-ABC")["country_iso"] == "ZA"  # South Africa
+    assert lookup_country_by_registration("PP-ABC")["country_iso"] == "BR"  # Brazil
+
+
+def test_registration_prefix_composite_marks_hong_kong_macau():
+    # Hong Kong ("B-H...") and Macau ("B-M...") both fall under China's bare
+    # "B" mark but get their own sub-block after the dash — the more specific
+    # "B"+first-char-after-dash candidate must win over the bare "B" (China).
+    assert lookup_country_by_registration("B-HAA")["country_iso"] == "HK"
+    assert lookup_country_by_registration("B-MAA")["country_iso"] == "MO"
+    assert lookup_country_by_registration("B-1234")["country_iso"] == "CN"
+
+
 # --- aircraft_database.py: ICAO24 lookup ---
 
 def test_icao24_lookup_matches_user_example():
