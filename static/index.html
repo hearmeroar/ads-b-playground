@@ -38,13 +38,40 @@
   #hud .label { font-size: 11px; color: var(--muted); margin: 1px 0 12px; }
 
   #hud .sources { display: flex; flex-direction: column; gap: 8px; }
-  #hud .source-row { display: flex; align-items: center; gap: 8px; }
+  #hud .source-row { display: flex; align-items: center; gap: 8px; position: relative; }
   #hud .swatch {
     width: 9px; height: 9px; border-radius: 50%; flex: none;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6) inset;
   }
   #hud .source-name { font-weight: 500; }
-  #hud .source-count { color: var(--muted); font-size: 12px; margin-left: 2px; }
+  #hud .source-count {
+    padding: 1px 7px; border-radius: 999px;
+    background: rgba(15, 23, 42, 0.06); color: var(--muted);
+    font-size: 11px; font-variant-numeric: tabular-nums;
+  }
+  /* A disabled source renders an empty count — collapse the pill entirely
+     rather than leave a bare rounded blob next to the toggle. */
+  #hud .source-count:empty { display: none; }
+  #hud .source-help {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; border: none; background: none; line-height: 0;
+    color: #aab0b9; cursor: pointer;
+  }
+  #hud .source-help:hover { color: var(--muted); }
+  #hud .source-help-popover {
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 1100;
+    width: 200px; padding: 8px 10px;
+    background: var(--card-bg); backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+    font-size: 11px; line-height: 1.35; color: var(--ink);
+  }
+  #hud .source-help-popover[hidden] { display: none; }
+  #hud .source-row.locked .source-name,
+  #hud .source-row.locked .source-count { opacity: 0.55; }
+  #hud .source-row.locked .switch { opacity: 0.5; }
+  #hud .switch input:disabled { cursor: not-allowed; }
 
   #hud .switch { position: relative; width: 30px; height: 17px; flex: none; margin-left: auto; }
   #hud .switch input {
@@ -108,6 +135,11 @@
   #hud .hud-footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
   #hud .status { font-size: 11px; color: var(--muted); }
   #hud .status + .status { margin-top: 2px; }
+  /* The track status carries its own "(?)", so it's a row rather than a bare
+     line — and the popover opens upward, since it sits at the HUD's bottom. */
+  #hud .status-row { display: flex; align-items: center; gap: 5px; position: relative; }
+  #hud .status-row .emergency { color: #dc2626; font-weight: 600; }
+  #hud .source-help-popover.up { top: auto; bottom: calc(100% + 6px); }
 
   @keyframes pulse {
     0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
@@ -235,14 +267,23 @@
   <div class="label">aircraft in view</div>
 
   <div class="sources">
-    <div class="source-row">
+    <div class="source-row" id="source-opensky">
       <span class="swatch" style="background:#1a73e8"></span>
       <span class="source-name">OpenSky</span>
       <span class="source-count" id="count-opensky"></span>
+      <button type="button" class="source-help" id="opensky-help" style="display:none"
+              aria-label="Why is OpenSky disabled?">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
       <label class="switch" style="--row-color:#1a73e8">
         <input type="checkbox" id="toggle-opensky" checked>
         <span class="switch-track"></span>
       </label>
+      <div class="source-help-popover" id="opensky-help-popover" hidden></div>
     </div>
     <div class="source-row" title="Only shown where not already covered by OpenSky">
       <span class="swatch" style="background:#e53935"></span>
@@ -344,7 +385,17 @@
   <div class="hud-footer">
     <div class="status" id="status">loading…</div>
     <div class="status" id="quota"></div>
-    <div class="status" id="track-status"></div>
+    <div class="status status-row" id="track-status-row" style="display:none">
+      <span id="track-status"></span>
+      <button type="button" class="source-help" id="track-help" aria-label="About this track">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
+      <div class="source-help-popover up" id="track-help-popover" hidden></div>
+    </div>
   </div>
  </div>
 
@@ -685,9 +736,64 @@ function formatRetryTime(seconds) {
   return parts.join(' ');
 }
 
+// The track status line stays a short label; everything that needs explaining
+// (why the path isn't OpenSky's own history, when the quota returns) lives
+// behind its "(?)" popover — the same affordance the OpenSky source lockout
+// uses, so both quota stories are told the same way. `detail` may be a
+// function, which is what lets the rate-limit countdown stay live while open.
+let trackHelpDetail = null;
+function refreshTrackHelp() {
+  const text = typeof trackHelpDetail === 'function' ? trackHelpDetail() : trackHelpDetail;
+  document.getElementById('track-help-popover').textContent = text || '';
+}
+function setTrackStatus(label, detail) {
+  const row = document.getElementById('track-status-row');
+  const statusEl = document.getElementById('track-status');
+  trackHelpDetail = detail || null;
+  if (!label) {
+    row.style.display = 'none';
+    statusEl.textContent = '';
+    document.getElementById('track-help-popover').setAttribute('hidden', '');
+    return;
+  }
+  row.style.display = '';
+  statusEl.textContent = label;
+  document.getElementById('track-help').style.display = trackHelpDetail ? '' : 'none';
+  refreshTrackHelp();
+}
+
+// The countdown until the (separate, per-aircraft) OpenSky track quota resets
+// re-attempts the fetch automatically once it elapses. Only one countdown runs
+// at a time; it stops when the selection changes.
+let trackRetryTimer = null;
+function stopTrackRetryTimer() {
+  if (trackRetryTimer) { clearInterval(trackRetryTimer); trackRetryTimer = null; }
+}
+function renderTrackRateLimited(icao24, resetAt) {
+  const detail = () => {
+    const secs = resetAt != null ? Math.max(0, Math.round((resetAt - Date.now()) / 1000)) : null;
+    const when = secs != null ? ' (available in ' + formatRetryTime(secs) + ')' : '';
+    return "OpenSky's historical-track quota is exhausted" + when
+      + '. It is a separate bucket from the map-data quota, spent per aircraft'
+      + ' whose history you open.';
+  };
+  const paint = () => {
+    if (selectedIcao24 !== icao24) { stopTrackRetryTimer(); return; }
+    if (resetAt != null && Date.now() >= resetAt) {
+      stopTrackRetryTimer();
+      loadTrack(icao24); // the window has passed — try for real history again
+      return;
+    }
+    setTrackStatus('Historical track unavailable', detail, true);
+  };
+  stopTrackRetryTimer();
+  paint();
+  if (resetAt != null) trackRetryTimer = setInterval(paint, 1000);
+}
+
 async function loadTrack(icao24) {
   const fetchId = ++trackFetchToken;
-  const trackStatusEl = document.getElementById('track-status');
+  stopTrackRetryTimer(); // a fresh load supersedes any running countdown
   try {
     const resp = await fetch('/api/track/' + encodeURIComponent(icao24));
     const data = await resp.json();
@@ -701,31 +807,45 @@ async function loadTrack(icao24) {
       trackUsesLiveFallback = false;
       drawTrack(waypoints);
       if (data.stale) {
-        trackStatusEl.textContent = 'Track: cached data';
+        setTrackStatus('Track: cached data',
+          "Showing this aircraft's last known flight history from the local cache:"
+          + " OpenSky's track quota is spent, so it can't be refreshed right now.");
       } else {
-        trackStatusEl.textContent = '';
+        setTrackStatus('');
       }
     } else {
       // 404/429 and a flight that OpenSky has not segmented yet all return no
       // drawable path. Fall back to the positions this page has observed.
       trackUsesLiveFallback = true;
       drawTrack(liveTrailById.get(icao24));
-      trackStatusEl.textContent = 'Track: live fallback';
+      setTrackStatus('Track: live fallback',
+        'OpenSky has no recorded flight history for this aircraft — common for'
+        + ' rotorcraft and short local flights. The path shown is collected in'
+        + ' this browser from map polls (up to 40 points) and is lost on reload.');
     }
     // Check both HTTP status and data.error (backend returns 429 for rate limit)
     // Only show error if there's no usable path (stale data with path already handled above)
     if ((data.error || resp.status === 429) && waypoints.length < 2) {
-      const retryAfter = data.retry_after_seconds;
-      const retryText = retryAfter != null
-        ? ' (available in ' + formatRetryTime(retryAfter) + ')'
-        : '';
-      trackStatusEl.innerHTML = '<span class="emergency">Historical track unavailable: ' + (data.error || 'rate_limited') + retryText + '</span>';
+      const rateLimited = data.error === 'rate_limited' || resp.status === 429;
+      if (rateLimited) {
+        // Distinct from the map-data quota: this is OpenSky's /tracks/* bucket.
+        // Render a live, self-updating countdown (see renderTrackRateLimited).
+        const resetAt = data.retry_after_seconds != null
+          ? Date.now() + data.retry_after_seconds * 1000
+          : null;
+        renderTrackRateLimited(icao24, resetAt);
+      } else {
+        setTrackStatus('Historical track unavailable',
+          'OpenSky returned an error for this aircraft: ' + data.error + '.', true);
+      }
     }
   } catch (e) {
     if (fetchId === trackFetchToken && selectedIcao24 === icao24) {
       trackUsesLiveFallback = true;
       drawTrack(liveTrailById.get(icao24));
-      trackStatusEl.textContent = 'Track: live fallback';
+      setTrackStatus('Track: live fallback',
+        "The track endpoint could not be reached, so the path shown is collected"
+        + ' in this browser from map polls (up to 40 points).');
     }
   }
 }
@@ -745,9 +865,10 @@ function selectAircraft(icao24) {
 function deselectAircraft() {
   selectedIcao24 = null;
   trackUsesLiveFallback = false;
+  stopTrackRetryTimer();
   drawTrack(null);
   sidebarEl.classList.remove('open');
-  document.getElementById('track-status').textContent = '';
+  setTrackStatus('');
 }
 
 // Deselect when clicking empty map area (marker clicks don't bubble to the
@@ -1539,7 +1660,7 @@ function updateCounts(counts) {
     const enabled = isSourceEnabled(name);
     const n = enabled ? (counts[name] || 0) : 0;
     total += n;
-    document.getElementById('count-' + name).textContent = enabled ? '(' + n + ')' : '';
+    document.getElementById('count-' + name).textContent = enabled ? String(n) : '';
   }
   document.getElementById('count').textContent = total;
 }
@@ -1570,14 +1691,111 @@ async function fetchJson(url) {
   }
 }
 
+// --- OpenSky daily-quota lockout ---------------------------------------------
+// When OpenSky's daily quota is fully spent it stops being useful (every
+// request just 429s and re-serves stale cache), so auto-disable the source:
+// uncheck AND disable its toggle so it can't be turned back on while dead,
+// clear its markers/quota line, and reveal a "(?)" whose tooltip says why and
+// when it returns — mirroring the track endpoint's "available in Xh Ym Zs". A
+// 1s ticker keeps the countdown live and auto-restores the source the moment
+// the reset time passes (we're not polling OpenSky while locked, so this timer
+// is the only thing that can lift the lock).
+let openskyQuotaLock = null;   // { resetAt: ms, precise: bool } while locked
+let openskyQuotaTimer = null;
+
+function nextUtcMidnight() {
+  const d = new Date();
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0);
+}
+
+function refreshOpenSkyQuotaHelp() {
+  if (!openskyQuotaLock) return;
+  const secs = Math.max(0, Math.round((openskyQuotaLock.resetAt - Date.now()) / 1000));
+  const when = openskyQuotaLock.precise
+    ? 'available in ' + formatRetryTime(secs)
+    : 'available after the daily quota resets';
+  document.getElementById('opensky-help-popover').textContent =
+    'OpenSky auto-disabled: daily map-data quota exhausted (' + when + '). '
+    + 'The historical-track quota is separate and tracked per aircraft.';
+}
+
+// A "(?)" icon is click-to-toggle (works on touch, unlike a hover title): it
+// opens a small popover explaining a source/track quota state, and a click
+// anywhere else closes it — same pattern as the category dropdown. Both the
+// OpenSky lockout and the track status use this, so the two quota stories are
+// told identically. `refresh` repaints the text just before opening, which is
+// what keeps a countdown correct even if the popover sat closed for minutes.
+const helpPopovers = [];
+function wireHelpPopover(btnId, popoverId, refresh) {
+  const popover = document.getElementById(popoverId);
+  helpPopovers.push(popover);
+  document.getElementById(btnId).addEventListener('click', (e) => {
+    e.stopPropagation();
+    const wasHidden = popover.hasAttribute('hidden');
+    closeHelpPopovers(); // only ever one open at a time
+    if (wasHidden) {
+      refresh();
+      popover.removeAttribute('hidden');
+    }
+  });
+}
+function closeHelpPopovers() {
+  for (const p of helpPopovers) p.setAttribute('hidden', '');
+}
+wireHelpPopover('opensky-help', 'opensky-help-popover', refreshOpenSkyQuotaHelp);
+wireHelpPopover('track-help', 'track-help-popover', refreshTrackHelp);
+document.addEventListener('click', closeHelpPopovers);
+
+function tickOpenSkyQuota() {
+  if (!openskyQuotaLock) { clearInterval(openskyQuotaTimer); openskyQuotaTimer = null; return; }
+  if (Date.now() >= openskyQuotaLock.resetAt) clearOpenSkyQuotaLockout();
+  else refreshOpenSkyQuotaHelp();
+}
+
+function applyOpenSkyQuotaLockout(retryAfterSeconds) {
+  const resetAt = retryAfterSeconds != null
+    ? Date.now() + retryAfterSeconds * 1000
+    : nextUtcMidnight();
+  openskyQuotaLock = { resetAt, precise: retryAfterSeconds != null };
+
+  const toggle = sourceToggles.opensky;
+  toggle.checked = false;
+  toggle.disabled = true;
+  clearAllMarkers(openskyMarkers);
+  document.getElementById('quota').textContent = '';
+  openskyStatusMessage = null;
+  document.getElementById('source-opensky').classList.add('locked');
+  document.getElementById('opensky-help').style.display = '';
+  refreshOpenSkyQuotaHelp();
+  if (!openskyQuotaTimer) openskyQuotaTimer = setInterval(tickOpenSkyQuota, 1000);
+}
+
+function clearOpenSkyQuotaLockout() {
+  if (!openskyQuotaLock) return;
+  openskyQuotaLock = null;
+  if (openskyQuotaTimer) { clearInterval(openskyQuotaTimer); openskyQuotaTimer = null; }
+  const toggle = sourceToggles.opensky;
+  toggle.disabled = false;
+  toggle.checked = true;
+  document.getElementById('source-opensky').classList.remove('locked');
+  document.getElementById('opensky-help').style.display = 'none';
+  document.getElementById('opensky-help-popover').setAttribute('hidden', '');
+  poll(); // resume immediately now that the quota window should have reset
+}
+
 async function fetchOpenSkyStates() {
   const quotaEl = document.getElementById('quota');
   try {
     const data = await fetchJson('/api/states');
 
-    if (data.error === 'rate_limited') {
-      openskyStatusMessage = 'OpenSky: rate limited, showing cached data';
-    } else if (data.stale) {
+    // Daily quota gone (429 rate-limited, or the last 200 hit zero remaining):
+    // lock the source out instead of polling a bucket that only returns stale.
+    if (data.error === 'rate_limited' || data.rate_limit_remaining === 0) {
+      applyOpenSkyQuotaLockout(data.retry_after_seconds != null ? data.retry_after_seconds : null);
+      return null;
+    }
+
+    if (data.stale) {
       openskyStatusMessage = 'OpenSky: unreachable, showing stale data';
     } else {
       openskyStatusMessage = null;

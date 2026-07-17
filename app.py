@@ -253,13 +253,21 @@ def api_states():
         resp = fetch_states()
 
         if resp.status_code == 429:
-            # Rate limit hit — serve the last known cache (if any), flagged as stale.
+            # Rate limit hit — serve the last known cache (if any), flagged as
+            # stale. Forward OpenSky's retry-after window (seconds until the
+            # daily quota resets) so the frontend can show when the source will
+            # be available again, the same way /api/track does for its bucket.
+            retry_after = resp.headers.get("X-Rate-Limit-Retry-After-Seconds")
+            diagnostics = {
+                "retry_after_seconds": int(retry_after) if retry_after is not None else None,
+            }
             if _cache["data"] is not None:
                 stale = dict(_cache["data"])
                 stale["stale"] = True
                 stale["error"] = "rate_limited"
+                stale.update(diagnostics)
                 return jsonify(stale)
-            return jsonify({"states": [], "error": "rate_limited"}), 429
+            return jsonify({"states": [], "error": "rate_limited", **diagnostics}), 429
 
         resp.raise_for_status()
         payload = resp.json()

@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single-page live aircraft tracker: a Flask backend proxies three
-independent ADS-B data sources — OpenSky Network, adsb.fi, and
-airplanes.live — and a static Leaflet page polls all three and renders
-aircraft as rotated, color-coded markers. Two files carry all the logic:
-`app.py` (backend) and `static/index.html` (frontend, inline CSS/JS, no
-build step).
+A single-page live aircraft tracker: a Flask backend proxies five
+independent ADS-B data sources — OpenSky Network, adsb.fi, adsb.lol,
+adsb.one, and airplanes.live — and a static Leaflet page polls the enabled
+ones and renders aircraft as rotated, color-coded markers. Two files carry
+all the logic: `app.py` (backend) and `static/index.html` (frontend, inline
+CSS/JS, no build step).
 
 ## Commands
 
@@ -39,27 +39,43 @@ npx playwright test
 **Why there's a backend at all:** OpenSky does not send CORS headers for
 arbitrary origins (verified: `Access-Control-Allow-Origin` is hardcoded to
 `https://opensky-network.org` regardless of the request's `Origin`), so the
-frontend cannot call it directly from the browser. `app.py` proxies all three
+frontend cannot call it directly from the browser. `app.py` proxies all five
 sources so the architecture (caching, error handling) is uniform, even though
-adsb.fi/airplanes.live themselves may not need a CORS workaround.
+the four radius sources themselves may not need a CORS workaround.
 
 **OpenSky endpoints proxied by `app.py`:**
 - `/api/states` → `/states/all`, bbox-filtered via `BBOX` (currently centered
   on Serbia, `41.5–46.5°N, 17–25°E`). Cached for `MIN_INTERVAL` (10s) — no
   matter how many frontend polls land in that window, OpenSky is hit at most
   once. On a 429 or network error, the last good response is re-served with
-  `stale`/`error` flags instead of failing the request.
+  `stale`/`error` flags instead of failing the request. A 429 also forwards
+  OpenSky's `X-Rate-Limit-Retry-After-Seconds` as `retry_after_seconds` (on
+  both the stale-cache and the empty-429 path), which is what drives the
+  frontend's source lockout countdown.
 - `/api/track/<icao24>` → `/tracks/all?time=0`, giving an aircraft's current
   or most-recent flight history (not an arbitrary historical timestamp). Has
-  its own per-icao24 cache (`TRACK_MIN_INTERVAL`, 15s) so repeated clicks
+  its own per-icao24 cache (`TRACK_MIN_INTERVAL`, 300s) so repeated clicks
   don't spend extra quota. Tracks use OpenSky's independent `/tracks/*`
-  credit bucket, separate from `/states/*`; a 429 response forwards
+  credit bucket, separate from `/states/*`, and far stingier: one charge per
+  aircraft per fetch, vs. one shared charge for the whole map — which is why
+  its TTL is 30× the states one. A 429 response forwards
   `rate_limit_remaining` and `retry_after_seconds` when OpenSky supplies
   those headers. A live check on 2026-07-17 returned a 429 with a 54,789 s
   retry window and no remaining-credit header. Returns 404 passthrough when
-  OpenSky has no track for that aircraft. This also works for adsb.fi/
-  airplanes.live markers, since all three sources key aircraft by the same
-  ICAO24/hex address.
+  OpenSky has no track for that aircraft. This also works for markers from
+  the radius sources, since all five key aircraft by the same ICAO24/hex
+  address.
+  - **The track cache is also persisted to disk** (`TRACK_CACHE_FILE`,
+    `.track_cache.json`) — otherwise every server restart, including Flask
+    debug's auto-reload on each file save, re-spends that stingy bucket from
+    scratch. `_load_track_cache()` runs at import; `_save_track_cache()`
+    rewrites the whole file (atomically, via `os.replace` on a `.tmp`) after
+    each fetch, which is cheap because track fetches are per-click and
+    TTL-throttled. Timestamps are absolute wall-clock, so the TTL holds
+    across restarts, and entries older than `TRACK_CACHE_MAX_AGE` (24h) are
+    dropped on load. Both halves are best-effort: a missing, corrupt, or
+    unwritable file is ignored rather than raised, since the cache is a quota
+    optimization, not a source of truth.
 
 **Optional OAuth2 auth (`app.py`):** If `OPENSKY_CLIENT_ID` and
 `OPENSKY_CLIENT_SECRET` are set (via `.env`, loaded through `python-dotenv`),
@@ -70,24 +86,38 @@ vars it silently falls back to anonymous requests. The remaining daily quota
 is read from the `X-Rate-Limit-Remaining` response header and forwarded to
 the frontend as `rate_limit_remaining`.
 
-**adsb.fi and airplanes.live** (`/api/adsbfi` →
+**The four radius sources** — adsb.fi (`/api/adsbfi` →
 `opendata.adsb.fi/api/v3/lat/.../lon/.../dist/...`, see
-https://github.com/adsbfi/opendata; `/api/airplaneslive` →
-`api.airplanes.live/v2/point/.../.../...`, see
-https://airplanes.live/api-guide/): both fully anonymous, no daily quota, so
-they need none of OpenSky's auth machinery — just `cached_radius_source()`,
-a short shared cache/retry helper (`ADSBFI_MIN_INTERVAL` /
-`AIRPLANESLIVE_MIN_INTERVAL`). Neither has a bbox query, only lat/lon/radius
-(nautical miles, max 250 for both), so `ADSBFI_CENTER` /
-`AIRPLANESLIVE_CENTER` approximate the same area as `BBOX`. Both return the
-same ADSBExchange-compatible JSON shape (altitude in feet, speed in knots —
-converted client-side to match OpenSky's units).
+https://github.com/adsbfi/opendata), adsb.lol (`/api/adsblol` →
+`api.adsb.lol/v2/lat/.../lon/.../dist/...`), adsb.one (`/api/adsbone` →
+`api.adsb.one/v2/point/.../.../...`), and airplanes.live
+(`/api/airplaneslive` → `api.airplanes.live/v2/point/.../.../...`, see
+https://airplanes.live/api-guide/) — are all fully anonymous with no daily
+quota, so they need none of OpenSky's auth machinery. All four go through
+`cached_radius_source()`, one shared cache/retry helper, each with its own
+`*_MIN_INTERVAL` (10s) and `*_CENTER`; adding a fifth is a URL, a center, an
+interval, and a three-line route. None has a bbox query, only lat/lon/radius
+(nautical miles, max 250), so each `*_CENTER` approximates the same area as
+`BBOX`. All return the same ADSBExchange-compatible JSON shape (altitude in
+feet, speed in knots — converted client-side to match OpenSky's units), which
+is why one parser (`parseAdsbExchangeAircraft()`) serves all four.
+**adsb.lol and adsb.one are off by default** in the HUD: adsb.lol's upstream
+is currently unstable (intermittent multi-second hangs) and adsb.one is
+behind a Cloudflare block. They're wired up and working, so this is a default,
+not a limitation — a failing source degrades to `null` for that cycle rather
+than breaking the poll.
 
-**Area coupling:** `BBOX`, `ADSBFI_CENTER`, `AIRPLANESLIVE_CENTER` in
-`app.py`, and the map's initial center/zoom in `static/index.html`
-(`map.setView(...)`), are four independent constants that must be kept
-roughly in sync manually — there's no shared config between backend and
-frontend.
+> **Shorthand:** the rest of this file often says "adsb.fi/airplanes.live"
+> where it means *any* radius source — they share one JSON shape, one parser,
+> and one set of extra fields, so a claim about one holds for all four.
+> adsb.fi and airplanes.live are named because they're the two that ship
+> enabled; adsb.lol and adsb.one behave identically wherever the phrase
+> appears.
+
+**Area coupling:** `BBOX` and the four `*_CENTER` constants in `app.py`, plus
+the map's initial center/zoom in `static/index.html` (`map.setView(...)`),
+are six independent constants that must be kept roughly in sync manually —
+there's no shared config between backend and frontend.
 
 **Aircraft photos, two sources, Planespotters primary + airport-data.com
 top-up** (`app.py`):
@@ -163,44 +193,57 @@ assignment rather than string-concatenated HTML matters here specifically
 because photographer name and photo URL come from an external API.
 
 **Frontend state (`static/index.html`, all in one inline `<script>`):**
-- Three independent `Map<icao24, L.Marker>` objects — `openskyMarkers`,
-  `adsbfiMarkers`, `airplanesliveMarkers` — each synced from its source via
-  the shared `syncMarkers()` helper (reuses/moves/rotates existing markers in
-  place rather than recreating the layer every poll). Marker color is
-  source-specific (`SOURCE_COLORS`, whose key order is the canonical source
-  priority list used to generalize the HUD counts and toggle wiring). Each
-  source can be hidden independently via its HUD checkbox, which clears its
-  markers immediately and triggers an immediate `poll()` (rather than waiting
-  up to `POLL_INTERVAL_MS` for the next tick) — both on and off toggles
-  re-run `poll()` so counts/markers never sit stale after a toggle.
-  **OpenSky is on by default** (its HUD checkbox ships checked), alongside
-  the two free radius sources. Turning it off clears the quota line and any
-  pending OpenSky warning message.
+- Five independent `Map<icao24, L.Marker>` objects — `openskyMarkers`,
+  `adsbfiMarkers`, `adsblolMarkers`, `adsboneMarkers`,
+  `airplanesliveMarkers`, reachable by name via `markerMapsBySource` — each
+  synced from its source via the shared `syncMarkers()` helper
+  (reuses/moves/rotates existing markers in place rather than recreating the
+  layer every poll). Marker color is source-specific (`SOURCE_COLORS`, whose
+  key order is the canonical source priority list used to generalize the HUD
+  counts and toggle wiring). Each source can be hidden independently via its
+  HUD checkbox, which clears its markers immediately and triggers an immediate
+  `poll()` (rather than waiting up to `POLL_INTERVAL_MS` for the next tick) —
+  both on and off toggles re-run `poll()` so counts/markers never sit stale
+  after a toggle. **OpenSky, adsb.fi and airplanes.live ship checked**;
+  adsb.lol and adsb.one ship off (see above). Turning OpenSky off clears the
+  quota line and any pending OpenSky warning message.
+- **A `#map-loader` overlay** covers the first paint — without it the map
+  opens visibly empty for a second or two and reads as broken rather than
+  loading. It's hidden from the initial `poll().finally(...)`, deliberately
+  `finally` and not `then`: if that first poll fails, the overlay must still
+  go away and let the (empty) map and its error line show, rather than
+  spinning forever over them.
 - **Dedup + enrichment rule:** `poll()` fetches all enabled sources in
   parallel, but defers rendering until they've all arrived, then renders in
-  priority order — OpenSky, then adsb.fi, then airplanes.live — since each
-  step depends on data or state from the others:
+  one fixed priority order — **OpenSky > adsb.fi > adsb.lol > adsb.one >
+  airplanes.live** — since each step depends on data or state from the
+  others. A source that fails resolves to `null` for that cycle and is simply
+  skipped (its existing markers and count are kept), so one dead source never
+  blocks the rest:
   - OpenSky renders first (when enabled). Its sidebar data is enriched with
     everything it doesn't have itself (registration, aircraft type,
     `emergency`, IAS/TAS/Mach, mag/true heading, turn rate, roll, autopilot
     targets, wind, OAT/TAT, operator, year, the DO-260B accuracy fields) via
-    `enrichmentByHex`, a lookup merged from the adsb.fi and airplanes.live
-    responses (adsb.fi's entry wins if both have one) — see
-    `normalizeOpenSky(s, extra)`. Fields every source already provides
-    (altitude, speed, position, squawk, position source, last-contact time)
-    are never taken from `extra` — OpenSky's own values always win for those.
-  - adsb.fi renders next, excluding the just-updated `openskyMarkers` keys.
-  - airplanes.live renders last, excluding the union of `openskyMarkers` and
-    `adsbfiMarkers` keys.
-  - What's uniquely visible as an adsb.fi/airplanes.live *marker* is
-    therefore exactly what that source contributes beyond the sources above
-    it; what a source uniquely contributes *data-wise* still surfaces through
-    enrichment even when the marker itself is deduped away.
+    `enrichmentByHex`, a lookup merged from all four radius responses — see
+    `normalizeOpenSky(s, extra)`. It's built by iterating the lists
+    *lowest→highest* priority so the highest-priority source writes last and
+    wins, matching the marker dedup order below. Fields every source already
+    provides (altitude, speed, position, squawk, position source,
+    last-contact time) are never taken from `extra` — OpenSky's own values
+    always win for those.
+  - Each radius source then renders in turn against a single growing
+    `excludeIds` set: it contributes only aircraft no higher-priority source
+    already claimed, and its own keys are added before the next one runs.
+  - What's uniquely visible as a lower-priority *marker* is therefore exactly
+    what that source contributes beyond every source above it; what a source
+    uniquely contributes *data-wise* still surfaces through enrichment even
+    when the marker itself is deduped away.
   - The generic `updated HH:MM:SS` status line is written by `poll()` itself
     (not `fetchOpenSkyStates()`), so it keeps ticking with OpenSky disabled;
-    OpenSky's rate-limit/stale/unreachable warnings are stashed in
+    OpenSky's stale/unreachable warnings are stashed in
     `openskyStatusMessage` and shown in its place only while the source is
-    enabled and struggling.
+    enabled and struggling. A *rate-limited* OpenSky no longer lands here at
+    all — it triggers the source lockout below instead.
 - **Sidebar data model:** `parseOpenSkyState()`/`parseAdsbExchangeAircraft()`
   parse each source's raw shape; `normalizeOpenSky()`/`normalizeAdsbExchange()`
   then map both into one common field-name shape (`info` objects — altitude
@@ -273,15 +316,39 @@ because photographer name and photo URL come from an external API.
   — rather than the single flat-colored polyline used before. Waypoints keep
   their per-point `altitude` (meters, from `/api/track`'s `baro_altitude`)
   all the way from `loadTrack()` through to this coloring step.
-- **Track status in HUD:** The right sidebar (`#hud`) shows track status in
-  `#track-status` when an aircraft is selected: empty when the historical
-  track loads successfully, "Track: cached data" when using stale cached data
-  (rate limited but cache exists), "Track: live fallback" when using the
-  in-browser trail (no historical data), or "Historical track unavailable:
-  rate_limited (available in Xh Ym Zs)" (in red) when the track endpoint is
-  rate-limited with no cache. The retry time is formatted by `formatRetryTime()`
-  to show hours/minutes/seconds. This was moved from the left sidebar to avoid
-  duplication.
+- **Quota states are told through a shared "(?)" popover.** OpenSky has two
+  independent quotas that fail in similar ways, so both are surfaced with the
+  same affordance: a small `(?)` button that click-toggles a popover
+  (`wireHelpPopover(btnId, popoverId, refresh)` wires both; only one opens at
+  a time, a click anywhere else closes them). Click-to-toggle rather than a
+  hover `title` so it works on touch. `refresh` repaints the text just before
+  opening, which is what keeps a countdown correct after the popover sat
+  closed. Countdowns are formatted by `formatRetryTime()` (Xh Ym Zs). Neither
+  state is red — both render in the footer's ordinary muted grey; red is
+  reserved for the sidebar's emergency fields.
+  - **Map-data quota (`/states/*`) → source lockout.** When `/api/states`
+    reports `rate_limited` (or a 200 with `rate_limit_remaining === 0`),
+    polling it only ever re-serves stale cache, so `applyOpenSkyQuotaLockout()`
+    auto-disables the source: unchecks *and* disables its toggle (it can't be
+    re-enabled while dead), clears its markers and quota line, adds `.locked`
+    to `#source-opensky`, and reveals `#opensky-help`. A 1s ticker
+    (`tickOpenSkyQuota`) keeps the countdown live and is the *only* thing that
+    can lift the lock (nothing polls OpenSky while locked) —
+    `clearOpenSkyQuotaLockout()` restores the toggle and calls `poll()` once
+    the reset time passes. The backend forwards OpenSky's
+    `X-Rate-Limit-Retry-After-Seconds` as `retry_after_seconds`; without it
+    the lock falls back to `nextUtcMidnight()` and the popover says "after the
+    daily quota resets" rather than a countdown.
+  - **Track quota (`/tracks/*`) → status line.** `#track-status-row` (hidden
+    entirely when the historical track loads fine) shows a short label —
+    "Track: cached data", "Track: live fallback", or "Historical track
+    unavailable" — via `setTrackStatus(label, detail)`, with the *whole*
+    explanation in its `(?)` popover, never inline. `detail` may be a function,
+    which is what lets the rate-limit countdown tick live while open;
+    `renderTrackRateLimited()` runs it on a 1s timer and re-attempts
+    `loadTrack()` the moment the window elapses. The popover text says
+    explicitly that this bucket is separate from the map-data one, since the
+    two lockouts otherwise look identical to a user.
 - State vector array indices from OpenSky's `/states/all` are fixed by the
   protocol and parsed positionally in `parseOpenSkyState()`: `0 icao24,
   1 callsign, 2 origin_country, 4 last_contact, 5 longitude, 6 latitude,
@@ -356,8 +423,16 @@ because photographer name and photo URL come from an external API.
 - `test_track.spec.js` targets an adsb.fi marker for the successful track
   path (OpenSky is nevertheless the first-priority source), asserts the
   actual `trackLayerGroup` rather than a fixed stroke color, and covers
-  empty/404 tracks plus the local live-trail fallback. Also tests track status
-  display in the HUD (`#track-status`).
+  empty/404 tracks plus the local live-trail fallback. Also tests the HUD
+  track status (`#track-status`) and its `(?)` popover.
+- `test_opensky_quota.spec.js` covers the map-data quota lockout: a
+  `rate_limited` `/api/states` auto-disables and locks the source, and a short
+  `retry_after_seconds` proves the 1s ticker restores it (with polling and
+  markers resuming) once the window elapses.
+- Assert countdown text with a regex (`/available in 3h \d+m/`), never a fixed
+  string: both countdowns are live and tick between the page load that starts
+  them and the click that reads them — a literal `3h 3m` passes locally and
+  fails whenever the assertion lands a second late.
 
 ## Conventions
 

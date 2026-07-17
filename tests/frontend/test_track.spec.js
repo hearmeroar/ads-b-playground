@@ -78,20 +78,36 @@ test('uses the collected live trail when OpenSky track history is rate limited',
   expect(await page.evaluate(() => trackUsesLiveFallback)).toBe(true);
 });
 
-test('track status is shown in HUD when track is unavailable', async ({ page }) => {
-  // Route returns 404 with error message (simulating rate limit or not found)
+test('track status is shown in HUD when track is unavailable, with the reason behind its (?)', async ({ page }) => {
   await page.route('**/api/track/eeeeee', (route) => route.fulfill({
     status: 429,
-    json: { error: 'rate_limited' }
+    json: { error: 'rate_limited', retry_after_seconds: 10980 }
   }));
 
   await clickMarker(page, 'adsbfiMarkers', 'eeeeee');
   await page.waitForTimeout(500);
 
-  // Track should show error in HUD
-  const trackStatus = await page.textContent('#track-status');
-  expect(trackStatus).toContain('Historical track unavailable');
-  expect(trackStatus).toContain('rate_limited');
+  // The line itself stays short; the explanation lives in the popover.
+  expect(await page.textContent('#track-status')).toBe('Historical track unavailable');
+  expect(await page.evaluate(
+    () => document.getElementById('track-help-popover').hasAttribute('hidden')
+  )).toBe(true);
+
+  await page.click('#track-help');
+  const popover = await page.evaluate(() => ({
+    hidden: document.getElementById('track-help-popover').hasAttribute('hidden'),
+    text: document.getElementById('track-help-popover').textContent,
+  }));
+  expect(popover.hidden).toBe(false);
+  expect(popover.text).toContain('historical-track quota'); // the separate /tracks/* bucket
+  // 10980s = 3h 3m, but the countdown is live and may have ticked by now.
+  expect(popover.text).toMatch(/available in 3h \d+m/);
+
+  // Clicking elsewhere closes it, same as the OpenSky source popover.
+  await page.click('#hud .label');
+  expect(await page.evaluate(
+    () => document.getElementById('track-help-popover').hasAttribute('hidden')
+  )).toBe(true);
 });
 
 test('track status shows live fallback when using live trail', async ({ page }) => {
