@@ -42,27 +42,39 @@ test('dev mode shows a dash for missing fields and never hides a group', async (
   expect(sidebarText).toContain('—'); // dash placeholder present somewhere
 });
 
-test('a populated field shows a colored source badge with a click-to-toggle tooltip', async ({ page }) => {
+// Rows aren't individually wrapped elements (just <b>label:</b>
+// value<badge><badge> concatenated with <br> inside one .detail-group div),
+// so this walks nextSibling from the row's own <b> label, collecting every
+// .source-badge up to the row-separating <br> — the same scoping trick the
+// row-badge assertions below rely on.
+function badgeSourcesForLabel(page, label) {
+  return page.evaluate((lbl) => {
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
+    if (!b) return null;
+    const sources = [];
+    let node = b.nextSibling;
+    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
+      if (node.nodeType === 1 && node.classList.contains('source-badge')) sources.push(node.dataset.source);
+      node = node.nextSibling;
+    }
+    return sources;
+  }, label);
+}
+
+test('a field reported by only one source shows exactly one badge, with a click-to-toggle tooltip', async ({ page }) => {
   await page.click('#toggle-dev-mode');
   await selectDddddd(page);
 
-  // Registration is an adsb.fi-enrichment-only field on this aircraft. Rows
-  // aren't individually wrapped elements (just <b>label:</b> value<badge>
-  // concatenated with <br> inside one .detail-group div), so scope by
-  // matching the badge that immediately follows the "Registration:" text
-  // in the group's innerHTML rather than DOM traversal from a shared parent.
-  const badgeSource = await page.evaluate(() => {
-    const html = document.querySelector('#sidebar-details').innerHTML;
-    const m = html.match(/<b>Registration:<\/b>[^<]*<span class="source-badge"[^>]*data-source="([^"]+)"/);
-    return m ? m[1] : null;
-  });
-  expect(badgeSource).toBe('adsbfi');
+  // Country (originCountry) has no equivalent field on adsb.fi/airplanes.live's
+  // own parsed record at all (normalizeAdsbExchange always sets it null) —
+  // OpenSky is the only possible source for it, a clean single-badge case.
+  expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky']);
 
   // Tooltip hidden until clicked.
   expect(await page.getAttribute('#source-tooltip', 'hidden')).not.toBeNull();
 
   await page.evaluate(() => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration:');
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Country:');
     let node = b.nextSibling;
     while (node && !(node.nodeType === 1 && node.classList.contains('source-badge'))) node = node.nextSibling;
     node.click();
@@ -70,12 +82,46 @@ test('a populated field shows a colored source badge with a click-to-toggle tool
   await page.waitForTimeout(100);
 
   expect(await page.getAttribute('#source-tooltip', 'hidden')).toBeNull();
-  expect(await page.textContent('#source-tooltip')).toBe('adsb.fi');
+  expect(await page.textContent('#source-tooltip')).toBe('OpenSky');
 
   // Clicking elsewhere closes it.
   await page.click('#map');
   await page.waitForTimeout(100);
   expect(await page.getAttribute('#source-tooltip', 'hidden')).not.toBeNull();
+});
+
+test('a field independently reported by several enabled sources shows one badge per source', async ({ page }) => {
+  await page.click('#toggle-dev-mode');
+  await selectDddddd(page);
+
+  // Fixture "dddddd" is reported by both adsb.fi and airplanes.live (both
+  // enabled by default), each with its own "OO-DUP" registration record —
+  // dev mode must show a badge for each, not just the one whose value won.
+  const sources = await badgeSourcesForLabel(page, 'Registration:');
+  expect(sources).toEqual(['airplaneslive', 'adsbfi']);
+
+  // Each badge opens its own tooltip independently.
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration:');
+    let node = b.nextSibling;
+    while (node && !(node.nodeType === 1 && node.classList.contains('source-badge'))) node = node.nextSibling;
+    node.click(); // first badge = airplanes.live
+  });
+  await page.waitForTimeout(100);
+  expect(await page.textContent('#source-tooltip')).toBe('airplanes.live');
+
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration:');
+    const badges = [];
+    let node = b.nextSibling;
+    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
+      if (node.nodeType === 1 && node.classList.contains('source-badge')) badges.push(node);
+      node = node.nextSibling;
+    }
+    badges[1].click(); // second badge = adsb.fi
+  });
+  await page.waitForTimeout(100);
+  expect(await page.textContent('#source-tooltip')).toBe('adsb.fi');
 });
 
 test('toggling dev mode off restores the exact non-dev-mode markup', async ({ page }) => {

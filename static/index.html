@@ -235,11 +235,12 @@ const SOURCE_DISPLAY_NAMES = {
   opensky: 'OpenSky', adsbfi: 'adsb.fi', adsblol: 'adsb.lol',
   adsbone: 'adsb.one', airplaneslive: 'airplanes.live', flightaware: 'FlightAware',
 };
-// Dev-mode field provenance: which source populated a given `info` field.
-// OPENSKY_NATIVE_FIELDS are the only ones OpenSky's own state vector
-// supplies directly; every other field in the unified info shape (aside
-// from route) is enrichment-sourced from a single radius/FlightAware
-// source at a time — see fieldSourcesFor().
+// Dev-mode field provenance: which source(s) populated a given `info`
+// field. OPENSKY_NATIVE_FIELDS are the ones OpenSky's own state vector
+// supplies directly (used only to build OpenSky's own provenance "entry"
+// below — see fieldSourcesFor()); every other source can independently
+// report any field, so provenance is computed generically per field rather
+// than assumed to be exactly one source.
 const OPENSKY_NATIVE_FIELDS = new Set([
   'icao24', 'callsign', 'originCountry', 'altitudeM', 'altGeomM', 'speedKmh',
   'verticalRateMs', 'trackDeg', 'squawk', 'hasAlert', 'positionSource',
@@ -247,33 +248,62 @@ const OPENSKY_NATIVE_FIELDS = new Set([
 ]);
 const ROUTE_FIELDS = new Set(['originAirport', 'destinationAirport']);
 
-// Builds a { fieldName: sourceKey } map for dev-mode source badges.
-// nativeFieldSet: fields always attributed to `primarySource` (OpenSky's
-// own state-vector fields; empty set for radius/FlightAware-only markers,
-// since every field on those already comes from a single source).
-// extraSource: the enrichment source for everything not in nativeFieldSet
-// (null when there was none). routeSource: 'flightaware' when route fields
-// were merged in, else null.
-function fieldSourcesFor(info, nativeFieldSet, primarySource, extraSource, routeSource) {
+// Projects a subset of an object's own keys — used to build OpenSky's
+// provenance "entry" (see fieldSourcesFor) from only its native fields,
+// since `info` itself also carries enrichment-derived values under the
+// same key names and those must not be misattributed to OpenSky.
+function pickFields(obj, keys) {
+  const out = {};
+  for (const k of keys) out[k] = obj[k];
+  return out;
+}
+
+// Two `info` keys are computed from a differently-named raw field on a
+// radius source's own parsed record (parseAdsbExchangeAircraft) — every
+// other key in the unified shape already matches its raw source field name
+// 1:1 (confirmed by diffing parseAdsbExchangeAircraft's and
+// normalizeAdsbExchange's own key lists), which is what lets
+// fieldSourcesFor do a direct property lookup for everything else instead
+// of needing a full per-field mapping table.
+const RAW_FIELD_ALIASES = { categoryDisplay: 'category', trackDeg: 'track' };
+
+// Builds a { fieldName: [sourceKey, ...] } map for dev-mode source badges.
+// `entries` is every currently-enabled source's own parsed record for this
+// aircraft, as { source, data } pairs — not just whichever one's value
+// `info` ends up displaying. A field gets one badge per entry that
+// independently reports a non-empty value for it, so three sources all
+// sending a registration shows three dots, not just the one that happened
+// to win. `false` doesn't count as "reported" here — the only boolean
+// field (`hasAlert`) uses false to mean "no alert", not "no data", so
+// treating it as a value would badge every source that merely has the
+// field at all, even ones reporting no alert. routeSource: 'flightaware'
+// when route fields were merged in from a callsign match, else null.
+function fieldSourcesFor(info, entries, routeSource) {
   const out = {};
   for (const key of Object.keys(info)) {
     if (info[key] == null || info[key] === '') continue;
-    if (ROUTE_FIELDS.has(key)) { if (routeSource) out[key] = routeSource; continue; }
-    if (nativeFieldSet.has(key)) { out[key] = primarySource; continue; }
-    if (extraSource) out[key] = extraSource;
+    if (ROUTE_FIELDS.has(key)) { if (routeSource) out[key] = [routeSource]; continue; }
+    const sources = [];
+    for (const e of entries) {
+      let v = e.data[key];
+      if (v === undefined && RAW_FIELD_ALIASES[key]) v = e.data[RAW_FIELD_ALIASES[key]];
+      if (v == null || v === '' || v === false) continue;
+      if (!sources.includes(e.source)) sources.push(e.source);
+    }
+    out[key] = sources;
   }
   return out;
 }
 
 // Renders one small colored dot per distinct source that populated
 // fieldKey (a single field name, or an array for composite rows like
-// Route/Wind — in practice always resolves to exactly one source, since a
-// given aircraft's info is built from at most one enrichment source at a
-// time, but coded generically).
+// Route/Wind — deduped in case a composite row's two fields came from the
+// same source, but a field genuinely reported by several enabled sources
+// at once renders one badge per source, by design).
 function sourceBadgeHtml(fieldKey, fieldSources) {
   if (!fieldKey) return '';
   const keys = Array.isArray(fieldKey) ? fieldKey : [fieldKey];
-  const sources = [...new Set(keys.map((k) => fieldSources[k]).filter(Boolean))];
+  const sources = [...new Set(keys.flatMap((k) => fieldSources[k] || []))];
   return sources.map((s) =>
     '<span class="source-badge" style="background:' + SOURCE_COLORS[s] + '" data-source="' + s + '"></span>'
   ).join('');
@@ -1538,23 +1568,25 @@ function parseOpenSkyState(arr) {
   };
 }
 
-// enrichmentByHex: Map<icao24, { data: parsed adsb.fi/airplanes.live
-// aircraft, source: which radius source won }>, used to enrich the sidebar
-// (see normalizeOpenSky) — including its registration, which OpenSky's own
-// data lacks but the photo gallery lookup needs. `source` feeds dev mode's
-// per-field provenance badges.
+// radiusRecordsByHex: Map<icao24, Array<{ source, data: parsed adsb.fi/
+// adsb.lol/adsb.one/airplanes.live aircraft }>>, every enabled radius
+// source's own record for this aircraft, in priority order low→high — used
+// both to enrich the sidebar (see normalizeOpenSky; the last/highest-
+// priority entry is the winner, same choice as the old single-entry map)
+// and to feed dev mode's per-field provenance badges, where EVERY entry
+// that reports a given field contributes a badge, not just the winner.
 // excludeIds: aircraft already shown by the higher-priority sources
 // (adsb.fi/airplanes.live) — OpenSky renders last and only contributes what
 // they don't cover, since it's the only source that spends a daily quota.
-function updateOpenSkyMarkers(states, enrichmentByHex, flightawareByCallsign, matchedFlightawareCallsigns) {
+function updateOpenSkyMarkers(states, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns) {
   const items = [];
   for (const raw of states) {
     const s = parseOpenSkyState(raw);
     if (s.lat == null || s.lon == null) continue; // no position — skip this aircraft
     if (!passesMotionFilter(s.on_ground)) continue;
-    const entry = enrichmentByHex ? enrichmentByHex.get(s.icao24) : null;
-    const extra = entry ? entry.data : null;
-    const extraSource = entry ? entry.source : null;
+    const radiusEntries = radiusRecordsByHex ? (radiusRecordsByHex.get(s.icao24) || []) : [];
+    const winner = radiusEntries.length ? radiusEntries[radiusEntries.length - 1] : null;
+    const extra = winner ? winner.data : null;
     const isGroundVehicle = looksLikeGroundVehicle({
       category: s.category,
       registration: extra && extra.registration,
@@ -1568,15 +1600,16 @@ function updateOpenSkyMarkers(states, enrichmentByHex, flightawareByCallsign, ma
     });
     if (!passesCategoryFilter(categoryGroup)) continue;
     const info = normalizeOpenSky(s, extra);
-    const fieldSources = fieldSourcesFor(info, OPENSKY_NATIVE_FIELDS, 'opensky', extraSource, null);
+    const entries = [{ source: 'opensky', data: pickFields(info, OPENSKY_NATIVE_FIELDS) }, ...radiusEntries];
+    const fieldSources = fieldSourcesFor(info, entries, null);
     // Enrich with FlightAware's route data if callsign matches
     const faKey = normalizeCallsignKey(info.callsign);
     if (faKey && flightawareByCallsign && flightawareByCallsign.has(faKey)) {
       const faMatch = flightawareByCallsign.get(faKey);
       info.originAirport = faMatch.originAirport;
       info.destinationAirport = faMatch.destinationAirport;
-      fieldSources.originAirport = 'flightaware';
-      fieldSources.destinationAirport = 'flightaware';
+      fieldSources.originAirport = ['flightaware'];
+      fieldSources.destinationAirport = ['flightaware'];
       matchedFlightawareCallsigns.add(faKey);
     }
     items.push({
@@ -1789,7 +1822,11 @@ function normalizeFlightAware(f) {
 
 // excludeIds lets the caller hide aircraft already shown by a higher-priority
 // source, so this source only renders what it uniquely contributes.
-function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, sourceName, flightawareByCallsign, matchedFlightawareCallsigns) {
+// radiusRecordsByHex (see updateOpenSkyMarkers) supplies every enabled
+// radius source's own record for this aircraft — sourceName won the marker,
+// but another radius source may independently report the same field, and
+// dev mode should show a badge for each of them, not just the winner.
+function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, sourceName, flightawareByCallsign, matchedFlightawareCallsigns, radiusRecordsByHex) {
   const items = [];
   for (const raw of aircraftList) {
     const a = parseAdsbExchangeAircraft(raw);
@@ -1803,17 +1840,16 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, s
     if (!passesCategoryFilter(categoryGroup)) continue;
     if (excludeIds && excludeIds.has(a.icao24)) continue;
     const info = normalizeAdsbExchange(a);
-    // Every non-null field on a radius-source marker already came from
-    // `sourceName` (a single raw record) — no OpenSky/extra split needed.
-    const fieldSources = fieldSourcesFor(info, new Set(), sourceName, sourceName, null);
+    const entries = (radiusRecordsByHex && radiusRecordsByHex.get(a.icao24)) || [{ source: sourceName, data: a }];
+    const fieldSources = fieldSourcesFor(info, entries, null);
     // Enrich with FlightAware's route data if callsign matches
     const faKey = normalizeCallsignKey(info.callsign);
     if (faKey && flightawareByCallsign && flightawareByCallsign.has(faKey)) {
       const faMatch = flightawareByCallsign.get(faKey);
       info.originAirport = faMatch.originAirport;
       info.destinationAirport = faMatch.destinationAirport;
-      fieldSources.originAirport = 'flightaware';
-      fieldSources.destinationAirport = 'flightaware';
+      fieldSources.originAirport = ['flightaware'];
+      fieldSources.destinationAirport = ['flightaware'];
       matchedFlightawareCallsigns.add(faKey);
     }
     items.push({
@@ -1840,7 +1876,7 @@ function updateFlightAwareMarkers(flights, excludedCallsigns) {
     if (!passesMotionFilter(f.onGround)) continue;
     if (!passesCategoryFilter('unknown')) continue;
     const info = normalizeFlightAware(f);
-    const fieldSources = fieldSourcesFor(info, new Set(), 'flightaware', 'flightaware', null);
+    const fieldSources = fieldSourcesFor(info, [{ source: 'flightaware', data: info }], null);
     items.push({
       id: f.fa_flight_id, lat: f.lat, lon: f.lon, heading: f.track,
       info: info, fieldSources: fieldSources, registration: null,
@@ -2138,13 +2174,14 @@ async function poll() {
     }
   }
 
-  // Enrichment lookup for OpenSky's sidebar: when several radius sources have
-  // the same aircraft, the higher-priority one wins. Iterating lowest→highest
-  // priority (so the highest writes last) keeps this consistent with the
-  // marker dedup order below. Values carry `source` (which radius source
-  // won) alongside the parsed record, so dev mode can attribute each
-  // enrichment-derived field to the source that actually supplied it.
-  const enrichmentByHex = new Map(); // icao24 -> { data, source }
+  // Enrichment lookup for OpenSky's sidebar, and dev mode's per-field
+  // provenance: when several radius sources have the same aircraft, the
+  // higher-priority one's value wins for display (iterating lowest→highest
+  // priority, so the highest is pushed last — array[length-1] is that
+  // winner, consistent with the marker dedup order below), but EVERY
+  // source that reported the aircraft is kept, not just the winner, so dev
+  // mode can show a badge per source that independently supplied a field.
+  const radiusRecordsByHex = new Map(); // icao24 -> Array<{ source, data }>
   for (const [name, list] of [
     ['airplaneslive', airplanesliveAircraft], ['adsbone', adsboneAircraft],
     ['adsblol', adsblolAircraft], ['adsbfi', adsbfiAircraft],
@@ -2152,7 +2189,10 @@ async function poll() {
     if (!list) continue;
     for (const raw of list) {
       const a = parseAdsbExchangeAircraft(raw);
-      if (a.icao24) enrichmentByHex.set(a.icao24, { data: a, source: name });
+      if (!a.icao24) continue;
+      const arr = radiusRecordsByHex.get(a.icao24) || [];
+      arr.push({ source: name, data: a });
+      radiusRecordsByHex.set(a.icao24, arr);
     }
   }
 
@@ -2161,7 +2201,7 @@ async function poll() {
   // exclude set is the union of every higher-priority source's rendered keys.
   let openskyCount = openskyMarkers.size;
   if (isSourceEnabled('opensky') && openskyStates) {
-    openskyCount = updateOpenSkyMarkers(openskyStates, enrichmentByHex, flightawareByCallsign, matchedFlightawareCallsigns);
+    openskyCount = updateOpenSkyMarkers(openskyStates, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns);
   }
 
   const counts = { opensky: openskyCount };
@@ -2174,7 +2214,7 @@ async function poll() {
   const excludeIds = new Set(openskyMarkers.keys());
   for (const [name, markerMap, aircraft] of radiusSources) {
     if (isSourceEnabled(name) && aircraft) {
-      counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name], name, flightawareByCallsign, matchedFlightawareCallsigns);
+      counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name], name, flightawareByCallsign, matchedFlightawareCallsigns, radiusRecordsByHex);
     } else {
       counts[name] = markerMap.size;
     }

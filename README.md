@@ -54,6 +54,13 @@ renders aircraft as color-coded markers.
   the source instead of polling a dead endpoint, and re-enables it once the
   window elapses. Flight-history responses are cached to disk, so a restart
   doesn't re-spend that much stingier quota.
+- **Dev mode** — a sidebar toggle for debugging data provenance: shows
+  every field (dash for missing data) with a small colored dot per source
+  that actually reported it. If several enabled sources independently send
+  a value for the same field, every one of them gets its own dot — not
+  just whichever value ended up displayed — so you can see at a glance how
+  many sources agree on an aircraft's data. Click a dot for a tooltip
+  naming its source.
 - Optional OAuth2 auth against OpenSky for a much higher daily quota than
   anonymous access.
 

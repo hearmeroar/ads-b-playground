@@ -140,7 +140,7 @@ other five sources. Every source already carries a callsign field; they are matc
 and whitespace-trimmed (`normalizeCallsignKey()`, in the dedup comparison). When a FlightAware flight's
 callsign matches an aircraft from OpenSky/adsb.fi/adsb.lol/adsb.one/airplanes.live, the FlightAware
 marker is suppressed and its `originAirport`/`destinationAirport` are merged into the matched
-aircraft's sidebar (similar to `enrichmentByHex` for radius sources). A non-match (formatting
+aircraft's sidebar (similar to `radiusRecordsByHex` for radius sources). A non-match (formatting
 difference, missing callsign, or a FlightAware-only flight) simply leaves FlightAware's own marker
 showing — never causes a false merge. Cached like the four radius sources (10s `FLIGHTAWARE_MIN_INTERVAL`).
 
@@ -266,10 +266,11 @@ because photographer name and photo URL come from an external API.
     everything it doesn't have itself (registration, aircraft type,
     `emergency`, IAS/TAS/Mach, mag/true heading, turn rate, roll, autopilot
     targets, wind, OAT/TAT, operator, year, the DO-260B accuracy fields) via
-    `enrichmentByHex`, a lookup merged from all four radius responses — see
-    `normalizeOpenSky(s, extra)`. It's built by iterating the lists
-    *lowest→highest* priority so the highest-priority source writes last and
-    wins, matching the marker dedup order below. Fields every source already
+    `radiusRecordsByHex`, a lookup merged from all four radius responses — see
+    `normalizeOpenSky(s, extra)` (`extra` is that lookup's highest-priority
+    entry for this aircraft). It's built by iterating the lists
+    *lowest→highest* priority so the highest-priority source is pushed last
+    and wins, matching the marker dedup order below. Fields every source already
     provides (altitude, speed, position, squawk, position source,
     last-contact time) are never taken from `extra` — OpenSky's own values
     always win for those.
@@ -340,27 +341,55 @@ because photographer name and photo URL come from an external API.
   The hard part is that **no part of the pipeline otherwise tracks which
   source populated a given field** — `normalizeOpenSky`/
   `normalizeAdsbExchange`/`normalizeFlightAware` return plain flat objects,
-  and `enrichmentByHex` (the map that resolves which radius source wins for
-  a given aircraft) used to discard the winning source's name once it
-  picked a record. A parallel `fieldSources` object (`{fieldName:
-  sourceKey}`) is now threaded alongside `info` through the same call
-  paths, via `fieldSourcesFor(info, nativeFieldSet, primarySource,
-  extraSource, routeSource)`: `enrichmentByHex` values are now `{data,
-  source}` instead of a bare parsed record; `updateOpenSkyMarkers` tags its
-  OpenSky-native fields (`OPENSKY_NATIVE_FIELDS`) `'opensky'` and every
-  enrichment-derived field with whichever radius source won
-  `enrichmentByHex`; `updateRadiusSourceMarkers` (which now also takes a
-  `sourceName` parameter) and `updateFlightAwareMarkers` tag every field
-  with their own single source, since each of their markers' `info` is
-  built from exactly one raw record; the two FlightAware route-merge call
-  sites additionally tag `originAirport`/`destinationAirport` as
-  `'flightaware'` right after setting them. `sourceBadgeHtml(fieldKey,
-  fieldSources)` renders the dot(s) — `fieldKey` can be an array for
-  composite rows (Route, Wind) that read two raw fields at once. Since the
-  sidebar's `<b>label:</b> value<badge>` rows aren't individually wrapped
-  elements (just concatenated with `<br>` inside one `.detail-group` div),
-  anything that needs to target one specific row's badge (tests, mainly)
-  must match on the row's own text/HTML rather than DOM-parent traversal.
+  and the old `enrichmentByHex` (the map that resolves which radius source
+  wins for a given aircraft) discarded every non-winning source's record
+  once it picked one. A parallel `fieldSources` object (`{fieldName:
+  [sourceKey, ...]}`, an *array* — see below) is now threaded alongside
+  `info` through the same call paths. `enrichmentByHex` was replaced by
+  `radiusRecordsByHex` (`Map<icao24, Array<{source, data}>>`, built in
+  `poll()`): instead of one `{data, source}` winner per aircraft, it keeps
+  every enabled radius source's own record, in priority order low→high
+  (`array[length-1]` is the same "highest-priority wins" entry used for
+  enrichment *values*, so that part of the behavior is unchanged).
+  `fieldSourcesFor(info, entries, routeSource)` — `entries` is that
+  aircraft's full `{source, data}` list, plus (in `updateOpenSkyMarkers`) a
+  synthetic `{source: 'opensky', data: pickFields(info,
+  OPENSKY_NATIVE_FIELDS)}` entry standing in for OpenSky's own state vector
+  — checks *every* entry for a non-empty value at each field key and
+  attributes a badge to each one that has it, not just whichever one's
+  value `info` ends up displaying: if three enabled sources all
+  independently report a registration for the same aircraft, three badges
+  show, even though only one value is ever rendered. `false` is treated as
+  "no value" rather than a real one, since the sidebar's only boolean field
+  (`hasAlert`) uses it to mean "no alert" — without that carve-out, a
+  source with no alert would still badge as if it had "reported" the
+  field. Raw parsed records mostly share `info`'s own key names 1:1 (a
+  radius record's `registration`/`iasKt`/`squawk`/etc. are literally the
+  same keys `normalizeAdsbExchange` copies them under), except two:
+  `category`→`categoryDisplay` and `track`→`trackDeg`, both computed by a
+  lookup/format function rather than copied — `RAW_FIELD_ALIASES` is the
+  (deliberately short) map of those exceptions, checked as a fallback only
+  when the direct key lookup comes back `undefined`, so it never masks a
+  genuine `null` from a source that has the field but no value for it.
+  `updateOpenSkyMarkers` builds `entries` from `radiusRecordsByHex.get(s.icao24)`
+  plus the synthetic OpenSky entry; `updateRadiusSourceMarkers` (which now
+  also takes a `radiusRecordsByHex` parameter) passes that same aircraft's
+  full entry list straight through — `sourceName` (the source whose list is
+  currently being rendered) is guaranteed to already be one of those
+  entries, so no separate single-source fallback is needed; `updateFlightAwareMarkers`
+  passes a one-element `entries` of just itself, since FlightAware never
+  joins `radiusRecordsByHex` (it dedupes by callsign, not ICAO24). The two
+  FlightAware route-merge call sites tag `originAirport`/`destinationAirport`
+  as `['flightaware']` directly (bypassing `entries`) right after setting them.
+  `sourceBadgeHtml(fieldKey, fieldSources)` renders one dot per distinct
+  source across all of `fieldKey`'s badge arrays — `fieldKey` can itself be
+  an array for composite rows (Route, Wind) that read two fields at once,
+  deduped so a composite row whose two fields came from the same source
+  doesn't double the dot. Since the sidebar's `<b>label:</b> value<badge>`
+  rows aren't individually wrapped elements (just concatenated with `<br>`
+  inside one `.detail-group` div), anything that needs to target one
+  specific row's badges (tests, mainly) must match on the row's own
+  text/HTML up to the next `<br>` rather than DOM-parent traversal.
 
   The tooltip itself (`#source-tooltip`, styled in `static/style.css`) is a
   single shared element repositioned per click via event delegation on
@@ -371,6 +400,12 @@ because photographer name and photo URL come from an external API.
   listener rather than folded into `closeHelpPopovers()`, since that
   mechanism is built for a fixed set of statically-known popovers wired
   once at load, not one dynamic, differently-positioned tooltip.
+  `#source-tooltip` is a DOM sibling of `#sidebar`, not a child of it, so
+  it doesn't inherit `#sidebar`'s own `font-family` declaration and falls
+  back to the browser default serif font unless it sets its own — it does
+  (`static/style.css`), the same self-contained-font pattern `#hud` and
+  `#sidebar` each already use rather than relying on inheriting a
+  page-wide font from `body` (which sets none).
 
   The Dev mode row itself carries a `(?)` (`#dev-mode-help`/
   `#dev-mode-help-popover`), wired through the same static
