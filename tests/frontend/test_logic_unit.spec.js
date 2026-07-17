@@ -53,6 +53,28 @@ test('categoryGroupFor unifies OpenSky numeric and ADSBExchange letter+digit cod
   expect(adsbExchangeGroup).toBe('heavy');
 });
 
+test('categoryGroupFor maps the categories with dedicated marker icons', async ({ page }) => {
+  const groups = await page.evaluate(() => ({
+    heavy: categoryGroupFor({ openskyCategory: 6 }),
+    highPerformance: categoryGroupFor({ openskyCategory: 7 }),
+    highVortexLarge: categoryGroupFor({ openskyCategory: 5 }),
+    uav: categoryGroupFor({ openskyCategory: 14 }),
+  }));
+  expect(groups).toEqual({
+    heavy: 'heavy',
+    highPerformance: 'high_performance',
+    highVortexLarge: 'high_vortex_large',
+    uav: 'uav',
+  });
+});
+
+test('ICON_BUILDERS has exactly one dedicated icon per category with a distinct marker glyph', async ({ page }) => {
+  const keys = await page.evaluate(() => Object.keys(ICON_BUILDERS).sort());
+  expect(keys).toEqual(
+    ['heavy', 'high_performance', 'high_vortex_large', 'large', 'light', 'rotorcraft', 'small', 'uav'].sort()
+  );
+});
+
 test('formatSquawk highlights only the universal ICAO emergency codes', async ({ page }) => {
   const emergency = await page.evaluate(() => formatSquawk('7700'));
   const normal = await page.evaluate(() => formatSquawk('2000'));

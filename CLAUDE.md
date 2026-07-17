@@ -389,7 +389,26 @@ because photographer name and photo URL come from an external API.
   `ADSBEXCHANGE_CATEGORY_GROUP` map both to one shared set of group keys
   (light/heavy/rotorcraft/glider/etc.) that the category dropdown filters on
   via `passesCategoryFilter()`/`categoryGroupFor()` — one filter works
-  uniformly across both encodings.
+  uniformly across both encodings. `categoryGroupFor()`'s result is also
+  stored on each render item as `categoryGroup` (computed once per item and
+  reused for both the filter check and icon selection below), rather than
+  discarded after filtering.
+- **Marker icon by category:** `iconFor(item, color)` dispatches on
+  `item.categoryGroup` via the `ICON_BUILDERS` lookup table — distinct
+  glyphs exist today for `light`, `small` (reuses the original default
+  "flight" glyph), `large`, `heavy`, `high_performance`, `high_vortex_large`
+  (deliberately reuses the `heavy` glyph — no separate silhouette was worth
+  inventing at marker size), `rotorcraft` (helicopter) and `uav` (drone).
+  Any category group absent from `ICON_BUILDERS` (`glider`,
+  `lighter_than_air`, `parachutist`, `ultralight`, `space`, `unknown`) falls
+  through to the plain default `planeIcon()`. `rotatedDivIcon()` is the
+  shared builder every rotating icon goes through; it stamps a `data-color`
+  attribute on the marker's wrapper `<div>` recording the source color
+  regardless of how many colored `<path>`s the glyph itself uses — this is
+  what lets tests count markers by source color (`colorCounts()` in
+  `tests/frontend/helpers.js`) without assuming "exactly one colored path
+  per icon," which broke in an earlier session when a multi-path icon was
+  introduced without this indirection.
 - **Hide non-aircraft filter:** `looksLikeGroundVehicle()` flags surface
   vehicles/obstacles/reference beacons reported alongside real aircraft —
   category in the surface-vehicle/obstacle range (OpenSky 16-20, ADSBExchange
@@ -397,10 +416,15 @@ because photographer name and photo URL come from an external API.
   currently just `"TWR"`), or a callsign matching the airport-ground-vehicle
   pattern `^[A-Z]{4}\d{2}$` (e.g. "TXLU01"). On by default; toggling re-runs
   `poll()` immediately like the other filters. Items it flags (whether shown
-  or hidden) carry `isGroundVehicle: true` on their render item, which
-  `iconFor()` uses to draw `groundVehicleIcon()` (a warning triangle) instead
-  of the plane glyph — so if the filter is turned off to inspect them, they
-  don't visually read as aircraft.
+  or hidden) carry `isGroundVehicle: true` on their render item; `iconFor()`
+  draws `towerIcon()` (a cell-tower glyph, fixed neutral grey — not
+  source-colored, since these aren't really an aircraft "source" reading in
+  the same sense) for any item with `isGroundVehicle: true` OR
+  `categoryGroup === 'surface_obstacle'` (the `isGroundVehicle` check on its
+  own still matters — it also catches registration/callsign heuristic
+  matches whose category is absent/unknown) instead of the plane glyph — so
+  if the filter is turned off to inspect them, they don't visually read as
+  aircraft.
 - **Category dropdown** (`#category-filter`) is a hand-built component (plain
   `<div>`s, not a native `<select>`) so it can be fully styled and carry a
   small inline-SVG icon per option (`CATEGORY_ICON_SVGS`/`categoryIconHtml()`).

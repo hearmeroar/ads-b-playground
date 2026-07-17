@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { mockAllSources, colorCounts } = require('./helpers');
+const { mockAllSources, colorCounts, iconClassCounts } = require('./helpers');
 
 test.beforeEach(async ({ page }) => {
   await mockAllSources(page);
@@ -37,7 +37,7 @@ test('category dropdown filters to an exact count', async ({ page }) => {
   expect(await page.evaluate(() => document.getElementById('count').textContent)).toBe('7');
 });
 
-test('Hide non-aircraft hides junk by default and reveals it with a triangle icon when disabled', async ({ page }) => {
+test('Hide non-aircraft hides junk by default and reveals it with a tower icon when disabled', async ({ page }) => {
   let counts = await colorCounts(page);
   expect(counts.red).toBe(1); // TWR + callsign-pattern entries hidden by default
 
@@ -46,8 +46,5 @@ test('Hide non-aircraft hides junk by default and reveals it with a triangle ico
   counts = await colorCounts(page);
   expect(counts.red).toBe(3); // both junk entries now shown alongside the real one
 
-  const triangleCount = await page.evaluate(
-    () => document.querySelectorAll('.plane-icon svg path[d^="M12,3L22,20H2L12,3z"]').length
-  );
-  expect(triangleCount).toBe(2); // the TWR and callsign-pattern entries specifically
+  expect(await iconClassCounts(page, 'ground-icon')).toBe(2); // the TWR and callsign-pattern entries specifically
 });

@@ -1089,44 +1089,150 @@ async function loadGallery(icao24, registration) {
   galleryCache.set(icao24, finalPhotos);
 }
 
-// Plane icon (Material Design "flight" glyph) rotated by heading (degrees
-// clockwise from north — matches what CSS rotate() expects, since the
-// glyph's nose already points up/north at 0deg). Color encodes the source.
-function planeIcon(headingDeg, color) {
+// Shared boilerplate for every rotating marker icon: wraps an inline SVG in
+// the div Leaflet's divIcon rotates via CSS transform. `data-color` records
+// the source color on the wrapper regardless of how many colored <path>s the
+// glyph itself has — this is what lets tests count markers by source color
+// without depending on each icon having exactly one colored path (see
+// colorCounts() in tests/frontend/helpers.js).
+function rotatedDivIcon(cssClass, size, anchor, headingDeg, color, svgInner) {
   const heading = Number.isFinite(headingDeg) ? headingDeg : 0;
   const html =
-    '<div class="plane-icon" style="transform: rotate(' + heading + 'deg)">' +
-      '<svg width="28" height="28" viewBox="0 0 24 24">' +
-        '<path d="M21,16v-2l-8-5V3.5C13,2.67,12.33,2,11.5,2S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2.5,1.5V22l4-1l4,1v-1.5' +
-              'L13,19v-5.5L21,16z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>' +
-      '</svg>' +
+    '<div class="plane-icon ' + cssClass + '" data-color="' + color + '" ' +
+         'style="transform: rotate(' + heading + 'deg)">' +
+      '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24">' + svgInner + '</svg>' +
     '</div>';
-  return L.divIcon({ className: '', html: html, iconSize: [28, 28], iconAnchor: [14, 14] });
+  return L.divIcon({ className: '', html: html, iconSize: [size, size], iconAnchor: [anchor, anchor] });
 }
 
-// Warning-triangle glyph for entries `looksLikeGroundVehicle()` flags —
-// used instead of the plane icon so they don't visually read as aircraft
-// when "Hide non-aircraft" is turned off to inspect them.
-function groundVehicleIcon(color) {
+// Default glyph (Material Design "flight" icon) — used for any category
+// group without its own dedicated icon below (glider, lighter_than_air,
+// parachutist, ultralight, space, unknown).
+function planeIcon(headingDeg, color) {
+  return rotatedDivIcon('', 28, 14, headingDeg, color,
+    '<path d="M21,16v-2l-8-5V3.5C13,2.67,12.33,2,11.5,2S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2.5,1.5V22l4-1l4,1v-1.5' +
+          'L13,19v-5.5L21,16z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
+}
+
+// Small stubby delta — light (OpenSky cat 2 / ADSBExchange A1).
+function lightIcon(headingDeg, color) {
+  return rotatedDivIcon('light-icon', 24, 12, headingDeg, color,
+    '<path d="M12,4L17,15L12,13L7,15z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
+}
+
+// Same silhouette as the pre-existing default glyph — already reads as a
+// small single-engine aircraft, a reasonable match for the "small" weight
+// class (OpenSky cat 3 / ADSBExchange A2).
+function smallIcon(headingDeg, color) {
+  return planeIcon(headingDeg, color);
+}
+
+// Fuller fuselage + tailplane, wider wingspan than light/small — large
+// (OpenSky cat 4 / ADSBExchange A3).
+function largeIcon(headingDeg, color) {
+  return rotatedDivIcon('large-icon', 28, 14, headingDeg, color,
+    '<path d="M12,2L13,9L22,13L22,15.2L13,12.5L12.5,19L15.5,21V22.5L12,21.5L8.5,22.5V21L11.5,19L11,12.5L2,15.2' +
+          'V13L11,9z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
+}
+
+// Bulkier fuselage/broader wing sweep than large — heavy (OpenSky cat 6 /
+// ADSBExchange A5).
+function heavyIcon(headingDeg, color) {
+  return rotatedDivIcon('heavy-icon', 30, 15, headingDeg, color,
+    '<path d="M12,1L13.2,8L23,12L23,14.5L13.3,11.5L12.7,19L16,21.5V23L12,21.7L8,23V21.5L11.3,19L10.7,11.5' +
+          'L1,14.5L1,12L10.8,8z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
+}
+
+// Sharp swept/delta silhouette, no distinct tailplane — high performance
+// (OpenSky cat 7 / ADSBExchange A6).
+function highPerformanceIcon(headingDeg, color) {
+  return rotatedDivIcon('high-performance-icon', 26, 13, headingDeg, color,
+    '<path d="M12,2L13,9L20,17L20,19L13,15.5L12,22L15,23.5V24L12,23L9,24V23.5L11,22L10,15.5L3,19L3,17L10,9z" ' +
+          'fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
+}
+
+// High vortex large (747/A380-class, OpenSky cat 5 / ADSBExchange A4)
+// deliberately reuses the "heavy" silhouette — visually both read as
+// "extra-heavy" fixed-wing at marker size, and no distinct glyph is worth
+// inventing at this scale.
+function highVortexLargeIcon(headingDeg, color) {
+  return heavyIcon(headingDeg, color);
+}
+
+// Helicopter: fuselage ellipse + top rotor bar + tail boom stub. Multiple
+// colored paths by design — exactly the case colorCounts() must stay robust
+// to (rotorcraft: OpenSky cat 8 / ADSBExchange A7).
+function rotorcraftIcon(headingDeg, color) {
+  return rotatedDivIcon('rotorcraft-icon', 26, 13, headingDeg, color,
+    '<ellipse cx="12" cy="15" rx="3.4" ry="6" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>' +
+    '<path d="M12,9V3M6,3H18" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" fill="none"/>' +
+    '<path d="M15,19.5L20,21.5" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round"/>');
+}
+
+// Quadcopter: center body + 4 diagonal arms with rotor dots. Also
+// multi-path by design (uav: OpenSky cat 14 / ADSBExchange B6).
+function uavIcon(headingDeg, color) {
+  return rotatedDivIcon('uav-icon', 24, 12, headingDeg, color,
+    '<path d="M6,6L18,18M18,6L6,18" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round"/>' +
+    '<circle cx="6" cy="6" r="2.4" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>' +
+    '<circle cx="18" cy="6" r="2.4" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>' +
+    '<circle cx="6" cy="18" r="2.4" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>' +
+    '<circle cx="18" cy="18" r="2.4" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>' +
+    '<rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>');
+}
+
+// Cell-tower glyph for ground stations/vehicles (`isGroundVehicle` or
+// categoryGroup "surface_obstacle") — deliberately neutral grey (matching
+// --muted) rather than source-colored, since these aren't really "sources"
+// of aircraft data in the same sense, and a fixed neutral color reads more
+// clearly as infrastructure than a moving aircraft would. Never rotated —
+// ground stations have no heading. `color` is still accepted and recorded
+// via `data-color`, unused for the glyph itself, purely so colorCounts()
+// (which counts by source color) keeps working unchanged for these entries.
+function towerIcon(color) {
   const html =
-    '<div class="plane-icon">' +
-      '<svg width="26" height="26" viewBox="0 0 24 24">' +
-        '<path d="M12,3L22,20H2L12,3z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>' +
-        '<path d="M12,8.5v5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>' +
-        '<circle cx="12" cy="16.5" r="1.1" fill="#fff"/>' +
+    '<div class="plane-icon ground-icon" data-color="' + color + '">' +
+      '<svg width="24" height="24" viewBox="0 0 24 24">' +
+        '<path d="M12,22V9M8,22L10,9M16,22L14,9M12,9L8,3M12,9L16,3M12,3V1" ' +
+              'stroke="#6b7280" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+        '<path d="M6.5,7A6,6 0 0 1 17.5,7" stroke="#6b7280" stroke-width="1" fill="none" opacity="0.6"/>' +
+        '<path d="M4,10.5A9,9 0 0 1 20,10.5" stroke="#6b7280" stroke-width="1" fill="none" opacity="0.4"/>' +
       '</svg>' +
     '</div>';
-  return L.divIcon({ className: '', html: html, iconSize: [26, 26], iconAnchor: [13, 13] });
+  return L.divIcon({ className: '', html: html, iconSize: [24, 24], iconAnchor: [12, 12] });
 }
 
+const ICON_BUILDERS = {
+  light: lightIcon,
+  small: smallIcon,
+  large: largeIcon,
+  heavy: heavyIcon,
+  high_performance: highPerformanceIcon,
+  high_vortex_large: highVortexLargeIcon,
+  rotorcraft: rotorcraftIcon,
+  uav: uavIcon,
+  // glider, lighter_than_air, parachutist, ultralight, space, unknown:
+  // intentionally absent — fall through to the default planeIcon below.
+};
+
+// Ground vehicles (either flagged by looksLikeGroundVehicle()'s heuristics,
+// which can fire even when category is absent/unknown, or by categoryGroup
+// itself being "surface_obstacle") always get the tower icon regardless of
+// category; every other item is dispatched by categoryGroup via
+// ICON_BUILDERS, falling back to the default plane glyph for groups with no
+// dedicated icon.
 function iconFor(item, color) {
-  return item.isGroundVehicle ? groundVehicleIcon(color) : planeIcon(item.heading, color);
+  if (item.isGroundVehicle || item.categoryGroup === 'surface_obstacle') {
+    return towerIcon(color);
+  }
+  const builder = ICON_BUILDERS[item.categoryGroup];
+  return builder ? builder(item.heading, color) : planeIcon(item.heading, color);
 }
 
 // Creates/moves/removes markers in `markerMap` to match `items`
-// ({id, lat, lon, heading, info, registration, isGroundVehicle}[]),
-// reusing existing markers instead of recreating them each poll. Returns the
-// number of markers now shown.
+// ({id, lat, lon, heading, info, registration, isGroundVehicle,
+// categoryGroup}[]), reusing existing markers instead of recreating them
+// each poll. Returns the number of markers now shown.
 function syncMarkers(markerMap, items, color) {
   const seen = new Set();
 
@@ -1486,14 +1592,15 @@ function updateOpenSkyMarkers(states, enrichmentByHex, excludeIds) {
       callsign: s.callsign,
     });
     if (hideNonAircraft() && isGroundVehicle) continue;
-    if (!passesCategoryFilter(categoryGroupFor({
+    const categoryGroup = categoryGroupFor({
       openskyCategory: s.category,
       adsbExchangeCategory: extra && extra.category,
-    }))) continue;
+    });
+    if (!passesCategoryFilter(categoryGroup)) continue;
     items.push({
       id: s.icao24, lat: s.lat, lon: s.lon, heading: s.true_track,
       info: normalizeOpenSky(s, extra), registration: extra && extra.registration,
-      isGroundVehicle: isGroundVehicle,
+      isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
     });
   }
   return syncMarkers(openskyMarkers, items, SOURCE_COLORS.opensky);
@@ -1634,12 +1741,13 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color) {
       category: a.category, registration: a.registration, aircraftType: a.aircraftType, callsign: a.callsign,
     });
     if (hideNonAircraft() && isGroundVehicle) continue;
-    if (!passesCategoryFilter(categoryGroupFor({ adsbExchangeCategory: a.category }))) continue;
+    const categoryGroup = categoryGroupFor({ adsbExchangeCategory: a.category });
+    if (!passesCategoryFilter(categoryGroup)) continue;
     if (excludeIds && excludeIds.has(a.icao24)) continue;
     items.push({
       id: a.icao24, lat: a.lat, lon: a.lon, heading: a.track,
       info: normalizeAdsbExchange(a), registration: a.registration,
-      isGroundVehicle: isGroundVehicle,
+      isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
     });
   }
   return syncMarkers(markerMap, items, color);

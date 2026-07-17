@@ -23,12 +23,24 @@ async function mockAllSources(page) {
   await page.route('**/api/track/**', (route) => route.fulfill({ status: 404, json: { path: [], error: 'not_found' } }));
 }
 
+// Counts markers by source color via the wrapper div's data-color attribute
+// (set by rotatedDivIcon()/towerIcon() regardless of icon shape) rather than
+// counting colored <path> elements inside the SVG — icons like rotorcraft/uav
+// have multiple colored paths per marker, which would otherwise inflate these
+// counts once such a shape appears in a fixture.
 function colorCounts(page) {
   return page.evaluate(() => ({
-    blue: document.querySelectorAll('.plane-icon svg path[fill="#1a73e8"]').length,
-    red: document.querySelectorAll('.plane-icon svg path[fill="#e53935"]').length,
-    green: document.querySelectorAll('.plane-icon svg path[fill="#2e7d32"]').length,
+    blue: document.querySelectorAll('.plane-icon[data-color="#1a73e8"]').length,
+    red: document.querySelectorAll('.plane-icon[data-color="#e53935"]').length,
+    green: document.querySelectorAll('.plane-icon[data-color="#2e7d32"]').length,
   }));
 }
 
-module.exports = { fixture, mockAllSources, colorCounts };
+// Counts markers by their shape-specific CSS class (e.g. "ground-icon",
+// "rotorcraft-icon") — a stable hook independent of each icon's internal
+// SVG structure.
+function iconClassCounts(page, cssClass) {
+  return page.evaluate((cls) => document.querySelectorAll('.plane-icon.' + cls).length, cssClass);
+}
+
+module.exports = { fixture, mockAllSources, colorCounts, iconClassCounts };
