@@ -420,7 +420,12 @@ because photographer name and photo URL come from an external API.
   uniformly across both encodings. `categoryGroupFor()`'s result is also
   stored on each render item as `categoryGroup` (computed once per item and
   reused for both the filter check and icon selection below), rather than
-  discarded after filtering.
+  discarded after filtering. **Category fallback:** OpenSky's category values
+  0 and 1 both map to "unknown" (no info). If OpenSky returns 0 or 1, the
+  category is taken from adsb.fi/airplanes.live if available, so an
+  aircraft with unknown OpenSky category but known radius-source category still
+  gets the correct icon and filter behavior. OpenSky's category takes
+  priority only when it's a meaningful value (2+).
 - **Marker icon by category:** `iconFor(item, color)` dispatches on
   `item.categoryGroup` via the `ICON_BUILDERS` lookup table. Each category
   group (`light`, `small`, `large`, `heavy`, `high_performance`,

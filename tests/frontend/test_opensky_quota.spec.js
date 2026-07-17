@@ -65,6 +65,8 @@ test('the source auto-restores once the retry window elapses', async ({ page }) 
   await page.route('**/api/states', (r) => r.fulfill({ json: fixture('states.json') }));
 
   await page.waitForFunction(() => !document.getElementById('toggle-opensky').disabled, { timeout: 5000 });
+  // Wait for the poll() triggered by clearOpenSkyQuotaLockout to complete
+  await page.waitForTimeout(600);
   const restored = await page.evaluate(() => ({
     checked: document.getElementById('toggle-opensky').checked,
     disabled: document.getElementById('toggle-opensky').disabled,

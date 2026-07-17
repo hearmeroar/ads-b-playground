@@ -454,8 +454,12 @@ const ADSBEXCHANGE_CATEGORY_GROUP = {
   C4: 'surface_obstacle', C5: 'surface_obstacle', C6: 'unknown', C7: 'unknown',
 };
 function categoryGroupFor({ openskyCategory, adsbExchangeCategory }) {
-  if (typeof openskyCategory === 'number') return OPENSKY_CATEGORY_GROUP[openskyCategory] || 'unknown';
-  if (typeof adsbExchangeCategory === 'string') return ADSBEXCHANGE_CATEGORY_GROUP[adsbExchangeCategory] || 'unknown';
+  const openskyGroup = typeof openskyCategory === 'number' ? OPENSKY_CATEGORY_GROUP[openskyCategory] : null;
+  const adsbGroup = typeof adsbExchangeCategory === 'string' ? ADSBEXCHANGE_CATEGORY_GROUP[adsbExchangeCategory] : null;
+  // OpenSky приоритетнее: если он дал значимую категорию, используем её
+  if (openskyGroup && openskyGroup !== 'unknown') return openskyGroup;
+  // Иначе используем категорию от adsb.fi/airplanes.live
+  if (adsbGroup) return adsbGroup;
   return 'unknown';
 }
 // Category dropdown icons — same glyphs as the marker icon set, scaled for compact display.
@@ -1631,13 +1635,17 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
 // re-render without re-fetching. The photo gallery is rendered separately
 // (see loadGallery()), not part of this.
 function normalizeOpenSky(s, extra) {
+  // Category: OpenSky takes priority, but only if it's a meaningful value (not 0 or 1 = "unknown")
+  const openskyCategoryLabel = s.category >= 2 ? OPENSKY_CATEGORY_LABELS[s.category] : null;
+  const extraCategoryLabel = extra && extra.category ? formatAdsbExchangeCategory(extra.category) : null;
+  const categoryDisplay = openskyCategoryLabel || extraCategoryLabel || null;
   return {
     icao24: s.icao24 || null,
     callsign: (s.callsign || '').trim() || null,
     registration: (extra && extra.registration) || null,
     aircraftType: (extra && extra.aircraftType) || null,
     originCountry: s.origin_country || null,
-    categoryDisplay: OPENSKY_CATEGORY_LABELS[s.category] || null,
+    categoryDisplay: categoryDisplay,
     altitudeM: s.baro_altitude,
     altGeomM: s.geo_altitude,
     speedKmh: s.velocity != null ? s.velocity * 3.6 : null,
