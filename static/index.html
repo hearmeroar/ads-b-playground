@@ -174,10 +174,6 @@
     height: 16px;
   }
 
-  .dropdown-icon-container svg {
-    display: block;
-  }
-
   #sidebar {
     position: absolute; top: 14px; left: 14px; bottom: 14px; z-index: 1150;
     width: 300px; max-width: 82vw;
@@ -622,7 +618,7 @@ const CATEGORY_ICON_SVGS = {
 function categoryIconHtml(key) {
   const inner = CATEGORY_ICON_SVGS[key] || CATEGORY_ICON_SVGS.unknown;
   return '<div class="dropdown-icon-container">' +
-    '<svg class="dropdown-icon" width="auto" height="auto">' +
+    '<svg class="dropdown-icon" viewBox="0 0 200 200">' +
     inner +
     '</svg></div>';
 }

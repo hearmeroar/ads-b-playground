@@ -508,6 +508,36 @@ because photographer name and photo URL come from an external API.
   them and the click that reads them — a literal `3h 3m` passes locally and
   fails whenever the assertion lands a second late.
 
+## SVG Icon Rendering
+
+**Problem:** Inline SVG paths with coordinates in the range -100 to 200 need to scale responsively in containers of varying sizes (16px dropdown, 80px–200px test sizes, etc.) while remaining centered and not clipped.
+
+**Solution:** Use `viewBox="0 0 200 200"` with `transform` on the containing `<g>` group, paired with `width="100%" height="100%"` and `display: flex; align-items/justify-content: center` on the container.
+
+**Why this works:**
+- `viewBox="0 0 200 200"` defines a 200×200 coordinate region (0 to 200 on both axes) for SVG rendering. The SVG engine automatically scales this region to fill the `<svg>` element's dimensions (set by the container's `width`/`height`).
+- The `<g>` group applies a transform like `transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)"` which rotates and repositions the paths within that 200×200 region. This happens *before* the viewBox scaling, so the transform coordinates stay stable regardless of container size.
+- Paths with coordinates -100 to 200 (e.g., aircraft silhouettes from the ADS-B Radar icon set) work because the viewBox captures the region they occupy; no clipping or off-canvas rendering occurs.
+- Container-level `flex` with `align-items: center; justify-content: center` ensures the SVG is centered within its parent, even if the parent is smaller than the SVG's natural size.
+
+**Example structure:**
+```html
+<div style="width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd;">
+  <svg width="100%" height="100%" viewBox="0 0 200 200">
+    <g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)">
+      <path d="M 137.678 -39.456 C ... Z" fill="currentColor"/>
+    </g>
+  </svg>
+</div>
+```
+
+**Do not use:**
+- `viewBox="-100 -100 200 200"` (larger viewBox than content region) — causes clipping or off-center rendering depending on browser/coordinates.
+- `transform="translate(...) scale(...)"` on the group without proper viewBox — transforms are applied in coordinate space, not pixels, making centering difficult and brittle.
+- `width/height` set as fixed pixel values on the SVG — breaks responsive scaling.
+
+**Testing:** [test-icon.html](static/test-icon.html) demonstrates Icon 2 and Icon 3 (from `a1.svg` and `a2.svg`) with this approach across three sizes (80px, 120px, 200px). Icon 1 (without viewBox) is included as a counter-example showing clipping/misalignment.
+
 ## Conventions
 
 - All UI text and code comments are in English, regardless of the language
