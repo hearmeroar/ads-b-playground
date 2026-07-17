@@ -52,7 +52,9 @@
     "radiusOfContainmentM",
     "messageCount",
     "signalStrengthDbm",
-    "secondsSincePositionUpdate"
+    "secondsSincePositionUpdate",
+    "originAirport",
+    "destinationAirport"
   ],
   "properties": {
     "callsign": {
@@ -430,6 +432,22 @@
       ],
       "$comment": "Group: Signal & Data Quality, no UI group yet",
       "description": "Seconds since the last *position* update specifically — distinct from secondsSinceContact, which counts since the last message of any kind. Available as adsb.fi/airplanes.live raw field 'seen_pos'. No OpenSky equivalent."
+    },
+    "originAirport": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity (displayed as 'Route')",
+      "description": "Formatted origin airport name and IATA code, e.g. 'Catania-Fontanarossa Airport (CTA)'. FlightAware AeroAPI-only: extracted from the 'origin' object's 'name' and 'code_iata' fields. No OpenSky or adsb.fi/airplanes.live equivalent."
+    },
+    "destinationAirport": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity (displayed as 'Route')",
+      "description": "Formatted destination airport name and IATA code, e.g. 'Belgrade Nikola Tesla Int'l (BEG)'. FlightAware AeroAPI-only: extracted from the 'destination' object's 'name' and 'code_iata' fields. No OpenSky or adsb.fi/airplanes.live equivalent."
     }
   }
 }

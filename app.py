@@ -148,6 +148,20 @@ ADSBONE_CENTER = {"lat": 44.0, "lon": 21.0, "radius": 220}
 ADSBONE_MIN_INTERVAL = 10
 _adsbone_cache = {"data": None, "ts": 0.0}
 
+# FlightAware AeroAPI (https://www.flightaware.com/commercial/aeroapi/):
+# unlike the four radius sources above, this is a paid/metered, API-key-
+# authenticated API with a flight-centric shape (one object per flight leg,
+# not one per transponder) — notably no ICAO24/hex field, only an ICAO
+# *callsign* (`ident`), so it cannot participate in the ICAO24-keyed dedup
+# chain the other five sources share; it renders as an independent,
+# non-deduplicating overlay instead. Polled on the same MIN_INTERVAL as the
+# free sources and on by default — a deliberate cost tradeoff.
+FLIGHTAWARE_URL = "https://aeroapi.flightaware.com/aeroapi/flights/search"
+FLIGHTAWARE_QUERY = '-latlong "{lamin} {lomin} {lamax} {lomax}"'.format(**BBOX)
+FLIGHTAWARE_API_KEY = os.environ.get("FLIGHTAWARE_API_KEY")
+FLIGHTAWARE_MIN_INTERVAL = 10
+_flightaware_cache = {"data": None, "ts": 0.0}
+
 # Planespotters (https://www.planespotters.net/photo/api): free, no key, but
 # requires a descriptive User-Agent with contact info or it 403s — override
 # via .env if you want your own contact reference in it (see .env.example).
@@ -339,17 +353,18 @@ def api_track(icao24):
         return jsonify({"path": [], "error": str(exc)}), 502
 
 
-def cached_radius_source(url, cache, min_interval):
+def cached_radius_source(url, cache, min_interval, headers=None, params=None, empty_payload=None):
     """Shared fetch+cache logic for the simple, anonymous, no-quota radius
     sources (adsb.fi, airplanes.live) — no auth, just a short cache and
-    stale-on-failure fallback, unlike OpenSky's endpoints above."""
+    stale-on-failure fallback, unlike OpenSky's endpoints above. Also used
+    by FlightAware (paid/metered but same cache+stale pattern)."""
     now = time.time()
 
     if cache["data"] is not None and now - cache["ts"] < min_interval:
         return jsonify(cache["data"])
 
     try:
-        resp = requests.get(url, timeout=10)
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
         resp.raise_for_status()
         payload = resp.json()
         cache["data"] = payload
@@ -362,7 +377,8 @@ def cached_radius_source(url, cache, min_interval):
             stale["stale"] = True
             stale["error"] = str(exc)
             return jsonify(stale)
-        return jsonify({"ac": [], "error": str(exc)}), 502
+        default_empty = empty_payload if empty_payload is not None else {"ac": []}
+        return jsonify(default_empty), 502
 
 
 @app.route("/api/adsbfi")
@@ -385,6 +401,18 @@ def api_adsblol():
 @app.route("/api/adsbone")
 def api_adsbone():
     return cached_radius_source(ADSBONE_URL.format(**ADSBONE_CENTER), _adsbone_cache, ADSBONE_MIN_INTERVAL)
+
+
+@app.route("/api/flightaware")
+def api_flightaware():
+    if not FLIGHTAWARE_API_KEY:
+        return jsonify({"flights": [], "error": "not_configured"})
+    return cached_radius_source(
+        FLIGHTAWARE_URL, _flightaware_cache, FLIGHTAWARE_MIN_INTERVAL,
+        headers={"x-apikey": FLIGHTAWARE_API_KEY},
+        params={"query": FLIGHTAWARE_QUERY},
+        empty_payload={"flights": []},
+    )
 
 
 def fetch_planespotters(kind, value):

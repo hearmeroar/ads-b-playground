@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single-page live aircraft tracker: a Flask backend proxies five
-independent ADS-B data sources — OpenSky Network, adsb.fi, adsb.lol,
-adsb.one, and airplanes.live — and a static Leaflet page polls the enabled
-ones and renders aircraft as rotated, color-coded markers. Two files carry
-all the logic: `app.py` (backend) and `static/index.html` (frontend, inline
-CSS/JS, no build step).
+A single-page live aircraft tracker: a Flask backend proxies six
+independent data sources — OpenSky Network, adsb.fi, adsb.lol,
+adsb.one, airplanes.live, and FlightAware AeroAPI — and a static Leaflet
+page polls the enabled ones and renders aircraft as rotated, color-coded
+markers. Two files carry all the logic: `app.py` (backend) and
+`static/index.html` (frontend, inline CSS/JS, no build step).
 
 ## Commands
 
@@ -39,9 +39,9 @@ npx playwright test
 **Why there's a backend at all:** OpenSky does not send CORS headers for
 arbitrary origins (verified: `Access-Control-Allow-Origin` is hardcoded to
 `https://opensky-network.org` regardless of the request's `Origin`), so the
-frontend cannot call it directly from the browser. `app.py` proxies all five
+frontend cannot call it directly from the browser. `app.py` proxies all six
 sources so the architecture (caching, error handling) is uniform, even though
-the four radius sources themselves may not need a CORS workaround.
+most of the radius sources and FlightAware itself may not need a CORS workaround.
 
 **OpenSky endpoints proxied by `app.py`:**
 - `/api/states` → `/states/all`, bbox-filtered via `BBOX` (currently centered
@@ -113,6 +113,24 @@ than breaking the poll.
 > adsb.fi and airplanes.live are named because they're the two that ship
 > enabled; adsb.lol and adsb.one behave identically wherever the phrase
 > appears.
+
+**FlightAware AeroAPI (`/api/flightaware` → `aeroapi.flightaware.com/aeroapi/flights/search`):**
+This sixth source is structurally unlike the four radius sources in three critical ways.
+First, it's **authentication-required**: requests must carry an `x-apikey` header with a
+FlightAware API key, and there's no anonymous fallback (returns `{"flights": [], "error": "not_configured"}`
+without one). Second, it's **flight-centric, not transponder-centric** — a `{flights: [...]}` array
+(real sample: one flight leg has an `ident`/`ident_icao` *callsign* like `"ASL439"`, but no
+ICAO24/hex field, so **cannot participate in the existing cross-source dedup chain**; it renders
+as a non-deduplicating overlay instead). Position/altitude/speed/heading live under a nested
+`last_position` object; altitude is in hundreds of feet (e.g., `8` = 800 ft). Origin/destination
+airports (`code_iata`/`name`) are unique to this source and are surfaced in the sidebar as new
+`originAirport`/`destinationAirport` fields. Third, it's **metered/paid** — the user
+deliberately chose to poll it at 10s (same as free sources) and ship it **enabled by default**,
+accepting the cost tradeoff; this is not an oversight and should not be "optimized" to
+off-by-default or slower intervals without explicit re-approval. Cached like the four radius
+sources (10s `FLIGHTAWARE_MIN_INTERVAL`), but remains completely independent from the dedup
+chain — the same aircraft may legitimately appear twice, once from FlightAware (by callsign)
+and once from another source (by ICAO24), with no way to merge them.
 
 **Area coupling:** `BBOX` and the four `*_CENTER` constants in `app.py`, plus
 the map's initial center/zoom in `static/index.html` (`map.setView(...)`),
@@ -226,9 +244,11 @@ because photographer name and photo URL come from an external API.
   parallel, but defers rendering until they've all arrived, then renders in
   one fixed priority order — **OpenSky > adsb.fi > adsb.lol > adsb.one >
   airplanes.live** — since each step depends on data or state from the
-  others. A source that fails resolves to `null` for that cycle and is simply
-  skipped (its existing markers and count are kept), so one dead source never
-  blocks the rest:
+  others. **FlightAware is rendered *after* all of these, completely outside
+  this chain** (see above) — it never participates in the `excludeIds` dedup
+  logic, so the same aircraft may legitimately appear twice. A source that fails
+  resolves to `null` for that cycle and is simply skipped (its existing markers
+  and count are kept), so one dead source never blocks the rest:
   - OpenSky renders first (when enabled). Its sidebar data is enriched with
     everything it doesn't have itself (registration, aircraft type,
     `emergency`, IAS/TAS/Mach, mag/true heading, turn rate, roll, autopilot
@@ -253,17 +273,19 @@ because photographer name and photo URL come from an external API.
     `openskyStatusMessage` and shown in its place only while the source is
     enabled and struggling. A *rate-limited* OpenSky no longer lands here at
     all — it triggers the source lockout below instead.
-- **Sidebar data model:** `parseOpenSkyState()`/`parseAdsbExchangeAircraft()`
-  parse each source's raw shape; `normalizeOpenSky()`/`normalizeAdsbExchange()`
-  then map both into one common field-name shape (`info` objects — altitude
+- **Sidebar data model:** `parseOpenSkyState()`/`parseAdsbExchangeAircraft()`/`parseFlightAware()`
+  parse each source's raw shape; `normalizeOpenSky()`/`normalizeAdsbExchange()`/`normalizeFlightAware()`
+  then map all into one common field-name shape (`info` objects — altitude
   in meters, speed in km/h, airspeeds/wind in knots, absent fields `null`).
   This shape is formally documented in `schema/aircraft.schema.json`
-  (47 fields, raw source field names/units per property), including a
+  (47+ fields, raw source field names/units per property), including a
   7th sidebar group beyond the six above — **Signal & Data Quality**
   (adsb.fi/airplanes.live-only: `operator`, `manufactureYear`, `dbFlags`,
   `messageType`, `adsbVersion`, and the DO-260B NIC/NACp/NACv/SIL/GVA/SDA
   accuracy fields — no OpenSky equivalents, confirmed against live API
-  responses). `trackDeg` falls back to adsb.fi/airplanes.live's
+  responses), plus **two new fields unique to FlightAware**: `originAirport`
+  and `destinationAirport` (displayed as "Route" in the Identity group,
+  `"Catania-Fontanarossa Airport (CTA) → Belgrade Nikola Tesla Int'l (BEG)"`). `trackDeg` falls back to adsb.fi/airplanes.live's
   `calc_track` when `track` is absent (observed on military aircraft).
   `fetch_states()` sends OpenSky's `extended=1` param so `category`
   (state vector index 17) is actually populated, not just `categoryDisplay`

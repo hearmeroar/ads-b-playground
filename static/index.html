@@ -330,6 +330,15 @@
         <span class="switch-track"></span>
       </label>
     </div>
+    <div class="source-row" title="Shown independently, not deduplicated against other sources (FlightAware is flight-centric with no ICAO24 field)">
+      <span class="swatch" style="background:#00acc1"></span>
+      <span class="source-name">FlightAware</span>
+      <span class="source-count" id="count-flightaware"></span>
+      <label class="switch" style="--row-color:#00acc1">
+        <input type="checkbox" id="toggle-flightaware" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
   </div>
 
   <div class="filter-block">
@@ -443,16 +452,17 @@ const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
 // between it and airplanes.live as a coverage/uptime fallback chain (not a
 // data-quality ranking).
 const SOURCE_COLORS = {
-  opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32',
+  opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32', flightaware: '#00acc1',
 };
 const openskyMarkers = new Map(); // icao24 -> L.Marker
 const adsbfiMarkers = new Map(); // hex -> L.Marker
 const adsblolMarkers = new Map(); // hex -> L.Marker
 const adsboneMarkers = new Map(); // hex -> L.Marker
 const airplanesliveMarkers = new Map(); // hex -> L.Marker
+const flightawareMarkers = new Map(); // fa_flight_id -> L.Marker
 const markerMapsBySource = {
   opensky: openskyMarkers, adsbfi: adsbfiMarkers, adsblol: adsblolMarkers,
-  adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers,
+  adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers, flightaware: flightawareMarkers,
 };
 
 const sourceToggles = {
@@ -461,6 +471,7 @@ const sourceToggles = {
   adsblol: document.getElementById('toggle-adsblol'),
   adsbone: document.getElementById('toggle-adsbone'),
   airplaneslive: document.getElementById('toggle-airplaneslive'),
+  flightaware: document.getElementById('toggle-flightaware'),
 };
 function isSourceEnabled(name) {
   return sourceToggles[name].checked;
@@ -1402,6 +1413,9 @@ function renderDetailsHtml(info) {
     detailRow('Country', info.originCountry),
     detailRow('Category', info.categoryDisplay),
     detailRow('Year built', info.manufactureYear),
+    detailRow('Route', info.originAirport && info.destinationAirport
+      ? info.originAirport + ' → ' + info.destinationAirport
+      : null),
   ]);
   const position = renderGroup('Position', [
     detailRow('Altitude', formatAltitude(info.altitudeM)),
@@ -1722,6 +1736,74 @@ function parseAdsbExchangeAircraft(ac) {
   };
 }
 
+// FlightAware AeroAPI shape: position/altitude/speed/heading live under
+// last_position (not top-level like other sources); altitude is in hundreds
+// of feet (e.g. 8 = 800 ft); origin/destination are objects with code_iata/name.
+// No on_ground boolean exists — approximate it as altitude === 0, a best-effort
+// heuristic since this is flight-centric data.
+function parseFlightAware(f) {
+  const lp = f.last_position || {};
+  const altHundredsFt = typeof lp.altitude === 'number' ? lp.altitude : null;
+  const altFt = altHundredsFt != null ? altHundredsFt * 100 : null;
+  const gsKt = typeof lp.groundspeed === 'number' ? lp.groundspeed : null;
+  const originAirport = f.origin
+    ? `${f.origin.name} (${f.origin.code_iata || f.origin.code})`
+    : null;
+  const destinationAirport = f.destination
+    ? `${f.destination.name} (${f.destination.code_iata || f.destination.code})`
+    : null;
+  return {
+    fa_flight_id: f.fa_flight_id,
+    callsign: f.ident || null,
+    aircraftType: f.aircraft_type || null,
+    lat: typeof lp.latitude === 'number' ? lp.latitude : null,
+    lon: typeof lp.longitude === 'number' ? lp.longitude : null,
+    onGround: altFt === 0,
+    altitudeM: altFt != null ? altFt * 0.3048 : null,
+    speedKmh: gsKt != null ? gsKt * 1.852 : null,
+    track: typeof lp.heading === 'number' ? lp.heading : null,
+    originAirport: originAirport,
+    destinationAirport: destinationAirport,
+    secondsSinceContact: typeof lp.timestamp === 'string'
+      ? Math.floor((Date.now() - new Date(lp.timestamp).getTime()) / 1000)
+      : null,
+  };
+}
+
+function normalizeFlightAware(f) {
+  return {
+    callsign: f.callsign || null,
+    registration: null,
+    aircraftType: f.aircraftType || null,
+    originCountry: null,
+    categoryDisplay: null,
+    altitudeM: f.altitudeM,
+    altGeomM: null,
+    speedKmh: f.speedKmh,
+    verticalRateMs: null,
+    trackDeg: f.track,
+    iasKt: null, tasKt: null, mach: null,
+    magHeadingDeg: null, trueHeadingDeg: null,
+    turnRateDegPerSec: null, rollDeg: null,
+    navAltitudeM: null, navHeadingDeg: null,
+    navQnh: null, navModes: null,
+    windDirDeg: null, windSpeedKt: null, oatC: null, tatC: null,
+    squawk: null,
+    emergency: null,
+    hasAlert: false,
+    positionSource: null,
+    secondsSinceContact: f.secondsSinceContact,
+    operator: null, manufactureYear: null,
+    dbFlags: null, messageType: null, adsbVersion: null,
+    nic: null, nicBaro: null, nacP: null, nacV: null,
+    sil: null, silType: null, gva: null, sda: null,
+    radiusOfContainmentM: null, messageCount: null,
+    signalStrengthDbm: null, secondsSincePositionUpdate: null,
+    originAirport: f.originAirport,
+    destinationAirport: f.destinationAirport,
+  };
+}
+
 // excludeIds lets the caller hide aircraft already shown by a higher-priority
 // source, so this source only renders what it uniquely contributes.
 function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color) {
@@ -1744,6 +1826,26 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color) {
     });
   }
   return syncMarkers(markerMap, items, color);
+}
+
+// FlightAware is not part of the dedup chain (no ICAO24 field to key on),
+// so it renders independently without excludeIds. No looksLikeGroundVehicle
+// check (AeroAPI only returns real flights), but category filter still applies
+// (unknown category flows through passesCategoryFilter() like any other).
+function updateFlightAwareMarkers(flights) {
+  const items = [];
+  for (const raw of flights) {
+    const f = parseFlightAware(raw);
+    if (f.lat == null || f.lon == null) continue;
+    if (!passesMotionFilter(f.onGround)) continue;
+    if (!passesCategoryFilter('unknown')) continue;
+    items.push({
+      id: f.fa_flight_id, lat: f.lat, lon: f.lon, heading: f.track,
+      info: normalizeFlightAware(f), registration: null,
+      isGroundVehicle: false, categoryGroup: 'unknown',
+    });
+  }
+  return syncMarkers(flightawareMarkers, items, SOURCE_COLORS.flightaware);
 }
 
 // --- Polling ---
@@ -1951,14 +2053,24 @@ async function fetchRadiusSourceAircraft(endpoint) {
   }
 }
 
+async function fetchFlightAwareFlights() {
+  try {
+    const data = await fetchJson('/api/flightaware');
+    return data.flights || [];
+  } catch (e) {
+    return null;
+  }
+}
+
 async function poll() {
-  const [openskyStates, adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft] =
+  const [openskyStates, adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft, flightawareFlights] =
     await Promise.all([
       isSourceEnabled('opensky') ? fetchOpenSkyStates() : Promise.resolve(null),
       isSourceEnabled('adsbfi') ? fetchRadiusSourceAircraft('/api/adsbfi') : Promise.resolve(null),
       isSourceEnabled('adsblol') ? fetchRadiusSourceAircraft('/api/adsblol') : Promise.resolve(null),
       isSourceEnabled('adsbone') ? fetchRadiusSourceAircraft('/api/adsbone') : Promise.resolve(null),
       isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
+      isSourceEnabled('flightaware') ? fetchFlightAwareFlights() : Promise.resolve(null),
     ]);
 
   // Each source fetches independently: fetchRadiusSourceAircraft swallows its
@@ -2014,6 +2126,13 @@ async function poll() {
     }
     // Later sources must not re-render what this one just claimed.
     for (const key of markerMap.keys()) excludeIds.add(key);
+  }
+
+  // FlightAware is rendered independently (no dedup chain), after all radius sources.
+  if (isSourceEnabled('flightaware') && flightawareFlights) {
+    counts.flightaware = updateFlightAwareMarkers(flightawareFlights);
+  } else {
+    counts.flightaware = flightawareMarkers.size;
   }
 
   updateCounts(counts);

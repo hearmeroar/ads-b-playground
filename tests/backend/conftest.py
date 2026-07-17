@@ -33,7 +33,10 @@ def reset_caches(monkeypatch, tmp_path):
     app._adsblol_cache.update({"data": None, "ts": 0.0})
     app._adsbone_cache.clear()
     app._adsbone_cache.update({"data": None, "ts": 0.0})
+    app._flightaware_cache.clear()
+    app._flightaware_cache.update({"data": None, "ts": 0.0})
     app._photo_cache.clear()
+    app._airportdata_cache.clear()
     yield
 
 
@@ -43,6 +46,13 @@ def no_oauth_by_default(monkeypatch):
     explicitly by overriding these within its own test functions."""
     monkeypatch.setattr(app, "CLIENT_ID", None)
     monkeypatch.setattr(app, "CLIENT_SECRET", None)
+
+
+@pytest.fixture(autouse=True)
+def no_flightaware_key_by_default(monkeypatch):
+    """Most tests exercise the not_configured path; test_flightaware.py opts
+    into a configured key explicitly by overriding it within its own tests."""
+    monkeypatch.setattr(app, "FLIGHTAWARE_API_KEY", None)
 
 
 @pytest.fixture

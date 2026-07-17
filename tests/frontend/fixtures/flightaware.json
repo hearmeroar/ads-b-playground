@@ -1,0 +1,74 @@
+{
+  "flights": [
+    {
+      "fa_flight_id": "ASL439-1784101971-airline-1171p",
+      "ident": "ASL439",
+      "ident_icao": "ASL439",
+      "ident_iata": "JU439",
+      "aircraft_type": "A320",
+      "origin": {
+        "code": "LICC",
+        "code_iata": "CTA",
+        "name": "Catania-Fontanarossa Airport"
+      },
+      "destination": {
+        "code": "LYBE",
+        "code_iata": "BEG",
+        "name": "Belgrade Nikola Tesla Int'l"
+      },
+      "last_position": {
+        "altitude": 8,
+        "altitude_change": "D",
+        "groundspeed": 147,
+        "heading": 122,
+        "latitude": 44.83791,
+        "longitude": 20.26539,
+        "timestamp": "2026-07-17T14:16:33Z",
+        "update_type": "A"
+      }
+    },
+    {
+      "fa_flight_id": "RYR8654-1784102000-airline-5a1f",
+      "ident": "RYR8654",
+      "ident_icao": "RYR8654",
+      "ident_iata": "FR8654",
+      "aircraft_type": "B738",
+      "origin": {
+        "code": "LDZA",
+        "code_iata": "ZAG",
+        "name": "Zagreb Franjo Tuđman Airport"
+      },
+      "destination": {
+        "code": "LEMD",
+        "code_iata": "MAD",
+        "name": "Adolfo Suárez Madrid-Barajas"
+      },
+      "last_position": {
+        "altitude": 35,
+        "altitude_change": "U",
+        "groundspeed": 450,
+        "heading": 245,
+        "latitude": 43.5,
+        "longitude": 18.5,
+        "timestamp": "2026-07-17T14:20:00Z",
+        "update_type": "A"
+      }
+    },
+    {
+      "fa_flight_id": "TUN456-1784103000-airline-2b3c",
+      "ident": "TUN456",
+      "ident_icao": "TUN456",
+      "aircraft_type": "A321",
+      "last_position": {
+        "altitude": 0,
+        "altitude_change": "D",
+        "groundspeed": 0,
+        "heading": 180,
+        "latitude": 43.1,
+        "longitude": 21.8,
+        "timestamp": "2026-07-17T14:25:00Z",
+        "update_type": "A"
+      }
+    }
+  ]
+}

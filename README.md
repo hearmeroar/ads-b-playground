@@ -2,14 +2,15 @@
 
 A single-page live aircraft tracker for Serbia and its neighboring region.
 No build step, no database — a Flask backend proxies five free ADS-B data
-sources, and a static Leaflet page polls them and renders aircraft as
-color-coded markers.
+sources plus FlightAware AeroAPI, and a static Leaflet page polls them and
+renders aircraft as color-coded markers.
 
 ## Features
 
-- **Five independent live sources**, deduplicated against each other by
-  ICAO24/hex address: each one only shows what the sources above it don't
-  already cover, in this priority order.
+- **Six independent live sources**: five ADS-B sources deduplicated against
+  each other by ICAO24/hex address (each one only shows what the sources above it
+  don't already cover), plus FlightAware AeroAPI as a separate, non-deduplicating
+  overlay.
   - [OpenSky Network](https://opensky-network.org/) — blue
   - [adsb.fi](https://github.com/adsbfi/opendata) — red
   - [adsb.lol](https://adsb.lol/) — purple *(off by default: upstream is
@@ -17,6 +18,9 @@ color-coded markers.
   - [adsb.one](https://adsb.one/) — amber *(off by default: currently
     behind a Cloudflare block)*
   - [airplanes.live](https://airplanes.live/api-guide/) — green
+  - [FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/) —
+    teal *(requires API key; shown independently, never deduplicated against
+    the other five)*
 
   Each source has its own toggle, and any of them failing degrades that one
   source for a cycle rather than breaking the map.
@@ -75,6 +79,10 @@ Copy `.env.example` to `.env` to enable:
 - `PLANESPOTTERS_USER_AGENT` — Planespotters requires a descriptive
   User-Agent with contact info; a working default is already set, but you
   can point it at your own contact per their terms.
+- `FLIGHTAWARE_API_KEY` — API key from [FlightAware
+  AeroAPI](https://www.flightaware.com/commercial/aeroapi/). Enables the
+  FlightAware source on the map; without it, the source shows empty. Optional.
+  Note: this is a paid, metered API; each poll costs quota.
 
 ## Tests
 
