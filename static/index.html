@@ -622,7 +622,7 @@ const CATEGORY_ICON_SVGS = {
 function categoryIconHtml(key) {
   const inner = CATEGORY_ICON_SVGS[key] || CATEGORY_ICON_SVGS.unknown;
   return '<div class="dropdown-icon-container">' +
-    '<svg class="dropdown-icon" width="auto" height="auto">' +
+    '<svg class="dropdown-icon" viewBox="-100 -100 300 300">' +
     inner +
     '</svg></div>';
 }
