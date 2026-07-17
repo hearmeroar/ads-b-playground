@@ -424,17 +424,24 @@ because photographer name and photo URL come from an external API.
   `item.categoryGroup` via the `ICON_BUILDERS` lookup table. Each category
   group (`light`, `small`, `large`, `heavy`, `high_performance`,
   `high_vortex_large`, `rotorcraft`, `glider`, `lighter_than_air`,
-  `parachutist`, `ultralight`, `uav`) has its own dedicated SVG glyph from
-  the ADS-B Radar free icon set (`static/ADS-B_Radar_Free_Aircraft_SVG_Icons/`,
-  mapped 1:1 by DO-260B code: `a1.svg`–`a7.svg`, `b1.svg`–`b4.svg`), rendered
-  inline at 200×200 viewBox and scaled down to 28×28 marker pixels. Glyphs
-  are colored per source (see `SOURCE_COLORS`) via a wrapping `<g
-  fill="COLOR">` and outlined in white with `vector-effect="non-scaling-stroke"`
-  to keep the outline a constant ~1px on-screen regardless of scale. Category
-  groups absent from `ICON_BUILDERS` (`space`, `unknown`) fall through to the
-  `largeIcon()` (large aircraft silhouette) as a sensible default when category
-  is unknown or unrecognized. `uav` is also kept as a generic glyph since the
-  icon set has no dedicated UAV artwork. `rotatedDivIcon()` is the shared builder every rotating icon
+  `parachutist`, `ultralight`, `uav`, `unknown`) has its own dedicated SVG
+  glyph from the ADS-B Radar free icon set
+  (`static/ADS-B_Radar_Free_Aircraft_SVG_Icons/`, mapped 1:1 by DO-260B code:
+  `a0.svg`–`a7.svg`, `b0.svg`–`b4.svg`), rendered inline at 200×200 viewBox
+  and scaled down to 28×28 marker pixels. Glyphs are colored per source (see
+  `SOURCE_COLORS`) via a wrapping `<g fill="COLOR">` and outlined in white
+  with `vector-effect="non-scaling-stroke"` to keep the outline a constant
+  ~1px on-screen regardless of scale. `unknown` uses `a0.svg` (the icon
+  set's "no ADS-B info" variant) via `unknownIcon()`/`UNKNOWN_GLYPH`; the
+  `space` category group (absent from `ICON_BUILDERS`, no dedicated icon in
+  the set, and removed from the category filter dropdown as not relevant to
+  this tracker's region) also falls through to `unknownIcon()` — `iconFor()`
+  uses it as the default whenever `ICON_BUILDERS` has no entry for a
+  category group, including when category is absent/unrecognized entirely.
+  `uav` is kept as a generic Material Design glyph even though the icon set
+  has a UAV-shaped file (`b0.svg`) — that file is used for the category
+  dropdown only (see below), not the map marker, since no re-approval was
+  given to change the on-map UAV glyph. `rotatedDivIcon()` is the shared builder every rotating icon
   goes through; it stamps a `data-color` attribute on the marker's wrapper
   `<div>` recording the source color regardless of how many colored `<path>`s
   the glyph itself uses — this is what lets tests count markers by source
@@ -464,11 +471,23 @@ because photographer name and photo URL come from an external API.
 - **Category dropdown** (`#category-filter`) is a hand-built component (plain
   `<div>`s, not a native `<select>`) so it can be fully styled and carry a
   small inline-SVG icon per option (`CATEGORY_ICON_SVGS`/`categoryIconHtml()`).
-  Its trigger's click handler calls `stopPropagation()` — here it's genuinely
-  load-bearing (unlike the marker one above): this is a plain native DOM
-  click on a `<button>`, which really does bubble to the `document`-level
-  "click outside closes the menu" listener, and would otherwise immediately
-  close what the same click just opened.
+  `CATEGORY_ICON_SVGS` stores `{viewBox, inner}` per category rather than a
+  single shared viewBox, since the underlying source geometry differs: most
+  entries are the actual ADS-B Radar icon-set paths at their native
+  `0 0 200 200` viewBox (verified against `static/test-icon.html`, a
+  scratch reference page kept in the repo for visually diffing every
+  category icon at 16×16 before touching this object), while `all` and
+  `space`'s dropdown-only equivalent are small hand-drawn glyphs at
+  `0 0 16 16`. All entries render via `fill="currentColor"` so `.dropdown-icon`'s
+  CSS `color` is the only thing controlling icon color — no per-category
+  color overrides. No `space` option exists in the dropdown itself (removed
+  as not relevant to this tracker's region), but its `CATEGORY_ICON_SVGS`
+  entry is harmless to keep since nothing references it. Its trigger's click
+  handler calls `stopPropagation()` — here it's genuinely load-bearing
+  (unlike the marker one above): this is a plain native DOM click on a
+  `<button>`, which really does bubble to the `document`-level "click
+  outside closes the menu" listener, and would otherwise immediately close
+  what the same click just opened.
 
 ## Tests
 
