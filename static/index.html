@@ -230,10 +230,23 @@ const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
 // data-quality ranking).
 const SOURCE_COLORS = {
   opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32', flightaware: '#00acc1',
+  // Flywme is a separate synthetic source — "this application" — used for
+  // identity fields it computed itself (registration prefix/ICAO24 lookup/
+  // callsign decode/aircraft-type db) rather than read from a live feed.
+  // Black, distinct from every live source above.
+  flywme: '#000000',
 };
 const SOURCE_DISPLAY_NAMES = {
   opensky: 'OpenSky', adsbfi: 'adsb.fi', adsblol: 'adsb.lol',
   adsbone: 'adsb.one', airplaneslive: 'airplanes.live', flightaware: 'FlightAware',
+  flywme: 'Flywme',
+};
+// Human labels for the *technique* Flywme used to compute a field — tooltip
+// text only, never a badge color (Flywme's badge is always uniformly black
+// regardless of which of these produced the value).
+const ENRICHMENT_BASIS_LABELS = {
+  registration_prefix: 'registration prefix', icao24_lookup: 'aircraft database lookup',
+  callsign_decode: 'callsign decode', aircraft_type_db: 'aircraft type database',
 };
 // Dev-mode field provenance: which source(s) populated a given `info`
 // field. OPENSKY_NATIVE_FIELDS are the ones OpenSky's own state vector
@@ -299,14 +312,26 @@ function fieldSourcesFor(info, entries, routeSource) {
 // fieldKey (a single field name, or an array for composite rows like
 // Route/Wind — deduped in case a composite row's two fields came from the
 // same source, but a field genuinely reported by several enabled sources
-// at once renders one badge per source, by design).
-function sourceBadgeHtml(fieldKey, fieldSources) {
+// at once renders one badge per source, by design). A 'flywme' badge (never
+// part of a composite fieldKey) additionally carries a data-detail
+// attribute naming the computation technique + confidence, read by the
+// tooltip click handler.
+function sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) {
+  fieldConfidence = fieldConfidence || {};
+  fieldComputationBasis = fieldComputationBasis || {};
   if (!fieldKey) return '';
   const keys = Array.isArray(fieldKey) ? fieldKey : [fieldKey];
   const sources = [...new Set(keys.flatMap((k) => fieldSources[k] || []))];
-  return sources.map((s) =>
-    '<span class="source-badge" style="background:' + SOURCE_COLORS[s] + '" data-source="' + s + '"></span>'
-  ).join('');
+  return sources.map((s) => {
+    let detailAttr = '';
+    if (s === 'flywme' && !Array.isArray(fieldKey)) {
+      const basis = ENRICHMENT_BASIS_LABELS[fieldComputationBasis[fieldKey]] || 'this application';
+      const conf = fieldConfidence[fieldKey];
+      const detail = 'computed from ' + basis + (conf != null ? ', confidence ' + conf.toFixed(1) : '');
+      detailAttr = ' data-detail="' + detail + '"';
+    }
+    return '<span class="source-badge" style="background:' + SOURCE_COLORS[s] + '" data-source="' + s + '"' + detailAttr + '></span>';
+  }).join('');
 }
 
 const openskyMarkers = new Map(); // icao24 -> L.Marker
@@ -365,10 +390,7 @@ unitToggleButtons.forEach((btn) => {
     unitToggleButtons.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     currentUnitSystem = btn.dataset.value;
-    if (selectedIcao24 != null) {
-      const details = detailsById.get(selectedIcao24);
-      if (details) sidebarDetailsEl.innerHTML = renderDetailsHtml(details.info, details.fieldSources);
-    }
+    if (selectedIcao24 != null) renderSelectedDetails();
   });
 });
 
@@ -381,10 +403,7 @@ let currentDevMode = false;
 const devModeToggle = document.getElementById('toggle-dev-mode');
 devModeToggle.addEventListener('change', () => {
   currentDevMode = devModeToggle.checked;
-  if (selectedIcao24 != null) {
-    const details = detailsById.get(selectedIcao24);
-    if (details) sidebarDetailsEl.innerHTML = renderDetailsHtml(details.info, details.fieldSources);
-  }
+  if (selectedIcao24 != null) renderSelectedDetails();
 });
 
 // "Hide non-aircraft" filters out ground vehicles, obstacles, and
@@ -543,6 +562,59 @@ const sidebarCloseBtn = document.getElementById('sidebar-close');
 // selection — so opening the sidebar (or refreshing it while open) never has
 // to wait on anything.
 const detailsById = new Map(); // id -> { html, registration }
+
+// Enrichment results persist independently of detailsById because
+// syncMarkers() fully replaces each aircraft's detailsById entry every
+// poll — merging enrichment directly into that map would be silently
+// discarded on the next poll. buildMergedDetails() recombines the two at
+// render time instead. Cached per icao24 for the session (like
+// galleryCache), so reselecting an aircraft costs no extra request.
+const enrichmentById = new Map(); // icao24 -> raw /api/identity response
+
+const ENRICHMENT_FIELD_MAP = {
+  country: 'originCountry', operator: 'operator', registration: 'registration',
+  manufacturer: 'manufacturer', model: 'model', year_built: 'manufactureYear',
+};
+
+// Combines a live-polled aircraft's { info, fieldSources } with any cached
+// /api/identity enrichment for the same icao24. Live values always win —
+// enrichment only fills a field that's currently null/empty, mirroring the
+// same rule the backend itself applies via its own known_* short-circuit.
+function buildMergedDetails(icao24) {
+  const live = detailsById.get(icao24) || { info: {}, fieldSources: {} };
+  const info = Object.assign({}, live.info);
+  const fieldSources = Object.assign({}, live.fieldSources);
+  const fieldConfidence = {};
+  const fieldComputationBasis = {};
+  const enrichment = enrichmentById.get(icao24);
+  if (enrichment) {
+    for (const [beKey, feKey] of Object.entries(ENRICHMENT_FIELD_MAP)) {
+      const already = info[feKey] != null && info[feKey] !== '';
+      const resolved = enrichment[beKey];
+      if (already || !resolved) continue;
+      info[feKey] = resolved.value;
+      fieldSources[feKey] = ['flywme'];
+      fieldConfidence[feKey] = resolved.confidence;
+      fieldComputationBasis[feKey] = resolved.source;
+      if (beKey === 'country') {
+        info.countryIso = resolved.country_iso;
+        info.countryFlag = resolved.flag;
+      }
+    }
+  }
+  return { info, fieldSources, fieldConfidence, fieldComputationBasis };
+}
+
+// Single place that (re)renders the sidebar for whichever aircraft is
+// currently selected, merging in any enrichment already resolved — used by
+// every render path (initial select, poll resync, unit/dev-mode toggles,
+// and the enrichment fetch landing) so none of them can drift out of sync
+// with each other.
+function renderSelectedDetails() {
+  if (selectedIcao24 == null || !detailsById.has(selectedIcao24)) return;
+  const m = buildMergedDetails(selectedIcao24);
+  sidebarDetailsEl.innerHTML = renderDetailsHtml(m.info, m.fieldSources, m.fieldConfidence, m.fieldComputationBasis);
+}
 
 let selectedIcao24 = null;
 let trackLayerGroup = null;
@@ -761,6 +833,38 @@ async function loadTrack(icao24) {
   }
 }
 
+let identityFetchToken = 0; // guards against a stale response overwriting a newer selection
+
+// Lazily fetches /api/identity for the selected aircraft, same lazy-on-click
+// pattern as loadTrack/loadGallery (never during the main poll). Passes
+// along whatever the live feeds already resolved so the backend's own
+// known_* short-circuit can skip its lookup tables for fields that don't
+// need them — buildMergedDetails() then applies that same "live wins" rule
+// again on the client, since a later poll can supersede what selectAircraft
+// saw at click time.
+async function loadIdentityEnrichment(icao24, info) {
+  if (enrichmentById.has(icao24)) return; // already resolved this session
+  const fetchId = ++identityFetchToken;
+  const params = new URLSearchParams();
+  if (info) {
+    if (info.registration) params.set('registration', info.registration);
+    if (info.callsign) params.set('callsign', info.callsign);
+    if (info.aircraftType) params.set('aircraft_type', info.aircraftType);
+    if (info.originCountry) params.set('known_country', info.originCountry);
+    if (info.operator) params.set('known_operator', info.operator);
+    if (info.manufactureYear) params.set('known_manufacture_year', info.manufactureYear);
+  }
+  try {
+    const resp = await fetch('/api/identity/' + encodeURIComponent(icao24) + '?' + params.toString());
+    const data = await resp.json();
+    if (fetchId !== identityFetchToken || selectedIcao24 !== icao24) return; // selection changed meanwhile
+    enrichmentById.set(icao24, data);
+    renderSelectedDetails();
+  } catch (e) {
+    // Best-effort: leave enrichmentById unset so a later reselect retries.
+  }
+}
+
 function selectAircraft(icao24) {
   selectedIcao24 = icao24;
   trackUsesLiveFallback = false;
@@ -768,9 +872,10 @@ function selectAircraft(icao24) {
   loadTrack(icao24);
 
   const details = detailsById.get(icao24);
-  sidebarDetailsEl.innerHTML = details ? renderDetailsHtml(details.info, details.fieldSources) : '';
+  if (details) renderSelectedDetails(); else sidebarDetailsEl.innerHTML = '';
   sidebarEl.classList.add('open');
   loadGallery(icao24, details && details.registration);
+  loadIdentityEnrichment(icao24, details && details.info);
 }
 
 function deselectAircraft() {
@@ -1232,7 +1337,7 @@ function syncMarkers(markerMap, items, color) {
     // popup, this never touches the gallery (a separate element) — so an
     // already-loaded photo just keeps sitting there rather than needing to
     // be re-fetched or re-triggered.
-    if (selectedIcao24 === item.id) sidebarDetailsEl.innerHTML = renderDetailsHtml(item.info, item.fieldSources);
+    if (selectedIcao24 === item.id) renderSelectedDetails();
   }
 
   clearStaleMarkers(markerMap, seen);
@@ -1367,8 +1472,10 @@ function formatAdsbExchangeCategory(category) {
 // currentDevMode (a persistent UI-mode toggle, module-scope like
 // currentUnitSystem), fieldSources changes per aircraft/per render, so it
 // can't live as a top-level closure var.
-function renderDetailsHtml(info, fieldSources) {
+function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputationBasis) {
   fieldSources = fieldSources || {};
+  fieldConfidence = fieldConfidence || {};
+  fieldComputationBasis = fieldComputationBasis || {};
   const dash = '—';
   // In normal mode, a row disappears when its value is empty (today's exact
   // behavior). In dev mode every row always renders — a dash placeholder
@@ -1376,7 +1483,7 @@ function renderDetailsHtml(info, fieldSources) {
   function detailRow(label, value, fieldKey) {
     const has = value != null && value !== '';
     if (!has && !currentDevMode) return null;
-    const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources) : '';
+    const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) : '';
     return '<b>' + label + ':</b> ' + (has ? value : dash) + badge;
   }
   // Same "always render in dev mode" treatment for the two hardcoded
@@ -1385,7 +1492,17 @@ function renderDetailsHtml(info, fieldSources) {
   function specialRow(label, isSet, htmlWhenSet, fieldKey) {
     if (!isSet && !currentDevMode) return null;
     if (!isSet) return '<b>' + label + ':</b> ' + dash;
-    return htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources) : '');
+    return htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) : '');
+  }
+  // Identity fields the enrichment pipeline can fill (Country/Operator/
+  // Manufacturer/Model/Year built): unlike detailRow, always renders — a
+  // missing value shows the literal word "Unknown" rather than hiding the
+  // row or falling back to dev-mode's dash, since these fields are
+  // specifically meant to always resolve to *something* meaningful.
+  function identityRow(label, value, fieldKey) {
+    const has = value != null && value !== '';
+    const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) : '';
+    return '<b>' + label + ':</b> ' + (has ? value : 'Unknown') + badge;
   }
   function renderGroup(title, rows) {
     const filtered = rows.filter((r) => r != null);
@@ -1393,15 +1510,26 @@ function renderDetailsHtml(info, fieldSources) {
     return '<div class="detail-group"><div class="detail-group-title">' + title + '</div>' +
       filtered.join('<br>') + '</div>';
   }
+  // Flag always leads the country name (see enrichment/countries.py — flag
+  // is part of the Country entity, computed alongside name/iso). Only ever
+  // present when country was resolved via enrichment; a raw live string
+  // (e.g. OpenSky's own origin_country) carries no ISO code to derive one
+  // from, so it renders without a flag — a known limitation, not solved
+  // here (would need fragile name-matching against countries.py).
+  const countryValue = info.originCountry
+    ? (info.countryFlag ? info.countryFlag + ' ' + info.originCountry : info.originCountry)
+    : null;
   const identity = renderGroup('Identity', [
     detailRow('ICAO', info.icao24 ? info.icao24.toUpperCase() : null, 'icao24'),
     detailRow('Callsign', info.callsign || '—', 'callsign'),
     detailRow('Registration', info.registration, 'registration'),
     detailRow('Aircraft', info.aircraftType, 'aircraftType'),
-    detailRow('Operator', info.operator, 'operator'),
-    detailRow('Country', info.originCountry, 'originCountry'),
+    identityRow('Manufacturer', info.manufacturer, 'manufacturer'),
+    identityRow('Model', info.model, 'model'),
+    identityRow('Operator', info.operator, 'operator'),
+    identityRow('Country', countryValue, 'originCountry'),
     detailRow('Category', info.categoryDisplay, 'categoryDisplay'),
-    detailRow('Year built', info.manufactureYear, 'manufactureYear'),
+    identityRow('Year built', info.manufactureYear, 'manufactureYear'),
     detailRow('Route', info.originAirport && info.destinationAirport
       ? info.originAirport + ' → ' + info.destinationAirport
       : null, ['originAirport', 'destinationAirport']),
@@ -1888,7 +2016,7 @@ function updateFlightAwareMarkers(flights, excludedCallsigns) {
 
 // --- Polling ---
 
-for (const name of Object.keys(SOURCE_COLORS)) {
+for (const name of Object.keys(sourceToggles)) {
   sourceToggles[name].addEventListener('change', () => {
     if (!sourceToggles[name].checked) {
       clearAllMarkers(markerMapsBySource[name]);
@@ -1921,7 +2049,7 @@ function showSourceCountSpinner(name) {
 
 function updateCounts(counts) {
   let total = 0;
-  for (const name of Object.keys(SOURCE_COLORS)) {
+  for (const name of Object.keys(sourceToggles)) {
     const enabled = isSourceEnabled(name);
     const n = enabled ? (counts[name] || 0) : 0;
     total += n;
@@ -2040,6 +2168,7 @@ sidebarDetailsEl.addEventListener('click', (e) => {
   if (!badge) { sourceTooltipEl.setAttribute('hidden', ''); return; }
   e.stopPropagation();
   sourceTooltipEl.textContent = SOURCE_DISPLAY_NAMES[badge.dataset.source] || badge.dataset.source;
+  if (badge.dataset.detail) sourceTooltipEl.textContent += ' — ' + badge.dataset.detail;
   const r = badge.getBoundingClientRect();
   sourceTooltipEl.style.left = (r.left + window.scrollX) + 'px';
   sourceTooltipEl.style.top = (r.bottom + window.scrollY + 6) + 'px';
@@ -2244,7 +2373,7 @@ async function poll() {
 // The first poll is the same "enabled, no numbers yet" state as a toggle-on,
 // so the sources that ship enabled get the same spinner rather than an empty
 // slot (the #map-loader overlay covers the map, not the HUD).
-for (const name of Object.keys(SOURCE_COLORS)) {
+for (const name of Object.keys(sourceToggles)) {
   if (isSourceEnabled(name)) showSourceCountSpinner(name);
 }
 

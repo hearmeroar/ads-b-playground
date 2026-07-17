@@ -61,6 +61,15 @@ renders aircraft as color-coded markers.
   just whichever value ended up displayed — so you can see at a glance how
   many sources agree on an aircraft's data. Click a dot for a tooltip
   naming its source.
+- **Identity enrichment** — fills gaps the live feeds leave (country,
+  operator, manufacturer/model, year built) from small local lookup tables
+  (registration-prefix nationality marks, a placeholder ICAO24 database,
+  ICAO airline callsign designators, aircraft-type normalization) — no
+  external API, no database, and never overrides a value a live feed
+  already supplied. Unresolved fields show "Unknown" rather than a blank
+  row. In dev mode, a computed value gets a black "Flywme" dot (this
+  application, as a data source in its own right) whose tooltip names the
+  technique and confidence behind it.
 - Optional OAuth2 auth against OpenSky for a much higher daily quota than
   anonymous access.
 
@@ -110,6 +119,10 @@ A handful of plain files carry all the logic:
 
 - `app.py` — Flask backend; proxies every external API (mainly to work
   around CORS/User-Agent restrictions) with short-lived caching.
+- `enrichment/` — local static lookup tables (registration prefix, ICAO24
+  placeholder database, callsign decoding, aircraft type normalization)
+  that fill identity gaps the live feeds don't cover, served via
+  `/api/identity/<icao24>`. No external API, no database.
 - `static/index.html` — the entire frontend: Leaflet map, polling, marker
   rendering, filters, and the photo/track features, all inline JS.
 - `static/style.css` — the frontend's styling, linked from `index.html`.

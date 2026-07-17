@@ -22,6 +22,12 @@ async function mockAllSources(page) {
   await page.route('**/api/flightaware', (route) => route.fulfill({ json: { flights: [] } }));
   await page.route('**/api/photo/**', (route) => route.fulfill({ json: { photos: [] } }));
   await page.route('**/api/track/**', (route) => route.fulfill({ status: 404, json: { path: [], error: 'not_found' } }));
+  // All-null default so existing tests (which don't care about enrichment)
+  // never see a resolved Flywme badge or a value other than "Unknown" —
+  // a test that wants to exercise enrichment overrides this route itself.
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null, operator: null, registration: null, manufacturer: null, model: null, year_built: null,
+  } }));
 }
 
 // Counts markers by source color via the wrapper div's data-color attribute

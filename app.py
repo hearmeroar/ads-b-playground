@@ -35,6 +35,8 @@ from urllib.parse import quote
 import requests
 from flask import Flask, jsonify, request, send_from_directory
 
+from enrichment.aircraft_enrichment import enrich_identity
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -517,6 +519,26 @@ def api_photo2_hex(icao24):
     count = request.args.get("n", default=1, type=int)
     registration = request.args.get("reg") or None
     return fetch_airportdata("hex", icao24, count, registration=registration)
+
+
+@app.route("/api/identity/<icao24>")
+def api_identity(icao24):
+    # Fetched lazily on marker select (static/index.html's
+    # loadIdentityEnrichment()), never during the main poll loop — unlike
+    # every other route above, this makes zero I/O calls (pure local dict
+    # lookups over a few dozen entries), so it's deliberately uncached: the
+    # caching machinery elsewhere exists to protect a rate-limited *external*
+    # HTTP source, which doesn't apply here.
+    result = enrich_identity(
+        icao24,
+        registration=request.args.get("registration") or None,
+        callsign=request.args.get("callsign") or None,
+        aircraft_type=request.args.get("aircraft_type") or None,
+        known_country=request.args.get("known_country") or None,
+        known_operator=request.args.get("known_operator") or None,
+        known_manufacture_year=request.args.get("known_manufacture_year", type=int),
+    )
+    return jsonify(result)
 
 
 if __name__ == "__main__":

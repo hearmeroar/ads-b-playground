@@ -11,6 +11,11 @@ page polls the enabled ones and renders aircraft as rotated, color-coded
 markers. Backend logic lives in `app.py`; the frontend is
 `static/index.html` (markup + inline JS) plus `static/style.css` — no
 framework, no build step, `style.css` is just a plain `<link>`ed stylesheet.
+The `enrichment/` package (see Identity enrichment below) is the one
+exception to "`app.py` is the whole backend" — a small set of local static
+lookup modules, still no framework/database, just organized into their own
+directory since they're a genuinely different kind of logic (data lookup,
+not HTTP proxying) from everything else in `app.py`.
 
 ## Commands
 
@@ -419,6 +424,92 @@ because photographer name and photo URL come from an external API.
   whenever OpenSky is on, gaps are filled from whichever single radius
   source's response has that aircraft, and FlightAware's route fields are
   merged in separately by callsign match rather than by ICAO24.
+- **Identity enrichment** (`enrichment/` package, `app.py`'s
+  `/api/identity/<icao24>`, `static/index.html`'s `enrichmentById`/
+  `buildMergedDetails`): fills identity gaps (Country, Operator,
+  Manufacturer, Model, Year built) live feeds didn't cover, using small
+  local static lookup tables — no external API, no database (static dicts
+  loaded at import time aren't a database any more than `SOURCE_COLORS`/
+  `OPENSKY_CATEGORY_LABELS` are).
+  - **`enrichment/`** (new, root-level, sibling to `static/`/`tests/`/
+    `schema/` — the first backend module that isn't an HTTP-proxy):
+    `countries.py` is the Country entity (`{name, iso, flag}`, flag a
+    Unicode regional-indicator emoji computed once at import from `iso` —
+    modeled as its own field specifically so it can later swap to an image
+    without touching country-name logic); `registration.py` maps ICAO/ITU
+    registration prefixes (real, stable nationality marks, e.g. `OK`→Czech
+    Republic, `N`→United States) to a country, longest-prefix-match;
+    `callsign.py` maps ICAO 3-letter airline designators to an operator
+    (confidence 0.8) and that operator's home country (confidence 0.6 —
+    two independently-confidenced facts from one lookup, since they feed
+    two different priority chains); `aircraft_database.py` holds a
+    swappable ICAO24→full-record lookup (`AircraftDatabaseLookup.lookup()`,
+    a small placeholder dataset behind an interface a real data source
+    could later implement with zero caller changes) plus a separate ICAO
+    type-code/free-text→manufacturer+model normalization table;
+    `aircraft_enrichment.py`'s `enrich_identity()` is the orchestrator,
+    resolving each field through its own priority chain that always tries
+    a live value first (`source: "live"`) before ever touching a local
+    table — enrichment only fills a gap the live feeds didn't cover, never
+    overrides one.
+  - **`/api/identity/<icao24>`** (`app.py`) is fetched lazily from
+    `selectAircraft()` — same lazy-on-click pattern as `loadTrack`/
+    `loadGallery`, never during the main poll, so the 50+ on-screen
+    aircraft nobody clicks never cost a request. Deliberately **uncached**,
+    unlike every other route: it makes zero I/O calls (pure sub-millisecond
+    dict lookups), and every existing cache here exists specifically to
+    protect a rate-limited *external* HTTP source, which doesn't apply.
+  - **Frontend merge**: `syncMarkers()` fully replaces each aircraft's
+    `detailsById` entry every poll, so enrichment can't be merged into it
+    directly — it would be silently discarded on the next poll. Enrichment
+    results live in their own `enrichmentById` Map (keyed by icao24,
+    session-cached like `galleryCache`) that polling never touches;
+    `buildMergedDetails(icao24)` recombines the two fresh at render time,
+    enforcing "live wins" client-side too (belt-and-suspenders with the
+    backend's own short-circuit) by only filling a field that's currently
+    null/empty. Every render path (`selectAircraft`, the poll resync in
+    `syncMarkers()`, the unit-toggle and dev-mode-toggle handlers) now goes
+    through one shared `renderSelectedDetails()` so none of them can drift
+    out of sync with each other.
+  - **"Flywme"** is a new, separate synthetic source in `SOURCE_COLORS`/
+    `SOURCE_DISPLAY_NAMES` (badged black), parallel to the six live sources
+    — not a stand-in for anything. It represents "this application" as the
+    source whenever `buildMergedDetails` filled a field from enrichment
+    rather than a live feed (tagged `fieldSources[key] = ['flywme']`). The
+    specific technique that computed it (`registration_prefix`/
+    `icao24_lookup`/`callsign_decode`/`aircraft_type_db`) is real metadata
+    too, but it's *how* Flywme computed the value, not a competing source —
+    so it drives the tooltip text via `ENRICHMENT_BASIS_LABELS` (e.g.
+    *"Flywme — computed from registration prefix, confidence 1.0"*), not a
+    separate badge color. `sourceBadgeHtml()` takes two more params
+    (`fieldConfidence`, `fieldComputationBasis`) to build that string, a
+    harmless no-op for the six live sources since both are only ever
+    populated for enrichment fields.
+  - **New Identity rows**: `Manufacturer`/`Model` (brand new — no existing
+    field). `Country`/`Operator`/`Year built` already existed and just gain
+    Flywme as an additional possible `fieldSources` entry. All five (plus
+    Country's own upgrade) use a new `identityRow()` closure inside
+    `renderDetailsHtml()` instead of `detailRow()` — unlike every other
+    field in this app, they show the literal word **"Unknown"** instead of
+    hiding the row (or, in dev mode, a dash) when nothing resolved,
+    regardless of `currentDevMode`. Registration is deliberately excluded
+    from this treatment (stays on plain `detailRow`) — the spec's
+    "Unknown" list names Country/Operator/Manufacturer/Model/Year built
+    only. Country's flag (`info.countryFlag`, only ever set when country
+    came through enrichment, which always carries one) leads the country
+    name; a raw live string like OpenSky's own `origin_country` has no ISO
+    code to derive a flag from, so it renders without one — a known,
+    accepted limitation rather than something solved via fragile name-
+    matching against `countries.py`.
+  - **Pitfall hit once, worth remembering**: `Object.keys(SOURCE_COLORS)`
+    is iterated in a few places (the per-source toggle wiring, HUD count
+    updates, the startup spinner loop) under the assumption that every
+    `SOURCE_COLORS` key has a matching HUD checkbox in `sourceToggles`.
+    Adding `flywme` to `SOURCE_COLORS` broke all three until they were
+    switched to iterate `Object.keys(sourceToggles)` instead (the object
+    that actually only has the six live, toggleable sources) — any future
+    synthetic/non-toggleable source added to `SOURCE_COLORS` needs the same
+    check.
 - **Unit toggle** (`#unit-toggle`, `currentUnitSystem` = `'metric'` |
   `'imperial'`): purely a rendering concern. Internal data always stays in
   the units above; only the formatters used inside `renderDetailsHtml()`
@@ -658,6 +749,31 @@ because photographer name and photo URL come from an external API.
   ticker racing real wall-clock time) — passes reliably standalone or with
   fewer parallel workers; not a sign of an actual regression if seen
   failing only in a full `npx playwright test` run.
+- `tests/backend/test_enrichment.py` covers both the `enrichment/` package's
+  pure lookup functions (no `mock_get`/`mock_post` needed at all — the
+  first backend test file with no HTTP mocking, since there's no HTTP call
+  to mock) and the `/api/identity/<icao24>` route via Flask's test client
+  directly. Verifies every worked example from the original spec exactly
+  (`OK-SWC`→Czech Republic, `49d3d3`→Smartwings/Boeing/737 MAX 8/2021,
+  `TVP7200`→Smartwings), each orchestrator priority tier in isolation, and
+  that `conftest.py`'s `reset_caches` needs no new entry (this route is
+  intentionally uncached).
+- `test_identity_enrichment.spec.js` covers: dev-mode-off shows resolved
+  enrichment values plainly and unresolved ones as literal "Unknown" with
+  zero badges; dev-mode-on shows exactly one black `flywme`-sourced badge
+  whose tooltip reads "Flywme — computed from `<technique>`, confidence
+  `<n>`"; a live value is never overwritten even by a deliberately
+  contradicting enrichment response, and gets no Flywme badge alongside its
+  real source's badge; Registration is excluded from the "Unknown"
+  treatment (shows/hides by the ordinary rule) while the other four
+  identity fields aren't. Uses `eeeeee` (adsb.fi+airplanes.live only, no
+  live country/operator/year — good for gap-filling) and `dddddd` (has live
+  `originCountry`/registration — good for "live wins"). Selects a marker
+  via `markerMapsBySource[sourceName].get(hex)` rather than the bare
+  `openskyMarkers`/`adsbfiMarkers` globals used elsewhere in this suite,
+  since the source name needs to be a runtime string here; waits for
+  `enrichmentById.has(hex)` before asserting, since the identity fetch is
+  async and lands after `selectAircraft()` returns.
 
 ## SVG Icon Rendering
 

@@ -1,0 +1,264 @@
+"""Covers both the enrichment/ package's pure lookup functions (no HTTP
+involved at all, so no mock_get/mock_post needed) and the /api/identity/
+<icao24> route, which is a thin, literal pass-through of the orchestrator.
+Kept in one file since the route shares the exact same vocabulary/fixtures
+(e.g. the "49d3d3" record) as the unit tests — splitting would duplicate
+those constants for no isolation benefit.
+
+Note: conftest.py's reset_caches fixture needs no new entry for this route.
+Every other route's cache exists to protect a rate-limited *external* HTTP
+call; this route makes none — it's pure, sub-millisecond dict lookups over a
+few dozen entries, so there's nothing here to cache or reset.
+"""
+
+from enrichment.aircraft_database import normalize_aircraft_type
+from enrichment.aircraft_enrichment import enrich_identity
+from enrichment.callsign import decode_callsign
+from enrichment.registration import lookup_country_by_registration
+
+
+# --- registration.py ---
+
+def test_registration_prefix_examples():
+    assert lookup_country_by_registration("OK-SWC")["country_iso"] == "CZ"
+    assert lookup_country_by_registration("N123AB")["country_iso"] == "US"
+    assert lookup_country_by_registration("G-ABCD")["country_iso"] == "GB"
+    assert lookup_country_by_registration("D-ABCD")["country_iso"] == "DE"
+    assert lookup_country_by_registration("YU-ABC")["country_iso"] == "RS"
+
+
+def test_registration_prefix_result_shape():
+    result = lookup_country_by_registration("OK-SWC")
+    assert result["country"] == "Czech Republic"
+    assert result["flag"] == "🇨🇿"
+    assert result["source"] == "registration_prefix"
+    assert result["confidence"] == 1.0
+
+
+def test_registration_prefix_unknown_returns_none():
+    assert lookup_country_by_registration("ZZ-999") is None
+    assert lookup_country_by_registration(None) is None
+    assert lookup_country_by_registration("") is None
+
+
+# --- aircraft_database.py: ICAO24 lookup ---
+
+def test_icao24_lookup_matches_user_example():
+    from enrichment.aircraft_database import DEFAULT_AIRCRAFT_DATABASE
+    record = DEFAULT_AIRCRAFT_DATABASE.lookup("49d3d3")
+    assert record["registration"] == "OK-SWC"
+    assert record["operator"] == "Smartwings"
+    assert record["country"] == "Czech Republic"
+    assert record["manufacturer"] == "Boeing"
+    assert record["model"] == "737 MAX 8"
+    assert record["year_built"] == 2021
+    assert record["source"] == "icao24_lookup"
+    assert record["confidence"] == 1.0
+
+
+def test_icao24_lookup_case_insensitive():
+    from enrichment.aircraft_database import DEFAULT_AIRCRAFT_DATABASE
+    assert DEFAULT_AIRCRAFT_DATABASE.lookup("49D3D3")["registration"] == "OK-SWC"
+
+
+def test_icao24_lookup_unknown_hex_returns_none():
+    from enrichment.aircraft_database import DEFAULT_AIRCRAFT_DATABASE
+    assert DEFAULT_AIRCRAFT_DATABASE.lookup("ffffff") is None
+    assert DEFAULT_AIRCRAFT_DATABASE.lookup(None) is None
+
+
+# --- callsign.py ---
+
+def test_decode_callsign_example():
+    result = decode_callsign("TVP7200")
+    assert result["operator"] == "Smartwings"
+    assert result["source"] == "callsign_decode"
+    assert result["confidence"] == 0.8
+
+
+def test_decode_callsign_also_yields_country():
+    result = decode_callsign("TVP7200")
+    assert result["country"] == "Czech Republic"
+    assert result["country_confidence"] == 0.6
+
+
+def test_decode_callsign_lowercase_and_unknown():
+    assert decode_callsign("ryr123")["operator"] == "Ryanair"
+    assert decode_callsign("ZZZ999") is None
+    assert decode_callsign(None) is None
+
+
+# --- aircraft_database.py: type normalization ---
+
+def test_normalize_aircraft_type_by_code():
+    assert normalize_aircraft_type("B38M") == {
+        "manufacturer": "Boeing", "model": "737 MAX 8",
+        "icao_type": "B38M", "source": "aircraft_type_db", "confidence": 1.0,
+    }
+    result = normalize_aircraft_type("A20N")
+    assert result["manufacturer"] == "Airbus"
+    assert result["model"] == "A320neo"
+
+
+def test_normalize_aircraft_type_by_free_text_case_insensitive():
+    result = normalize_aircraft_type("b737 max 8")
+    assert result["manufacturer"] == "Boeing"
+    assert result["model"] == "737 MAX 8"
+    assert result["icao_type"] is None  # matched via free text, not a code
+
+
+def test_normalize_aircraft_type_unknown_returns_none():
+    assert normalize_aircraft_type("NOTREAL") is None
+    assert normalize_aircraft_type(None) is None
+
+
+# --- aircraft_enrichment.py: orchestrator priority chains ---
+
+def test_enrich_identity_country_live_wins():
+    result = enrich_identity("49d3d3", registration="OK-SWC", known_country="Elsewhere")
+    assert result["country"]["value"] == "Elsewhere"
+    assert result["country"]["source"] == "live"
+
+
+def test_enrich_identity_country_registration_prefix_tier():
+    result = enrich_identity("ffffff", registration="OK-SWC")
+    assert result["country"]["value"] == "Czech Republic"
+    assert result["country"]["source"] == "registration_prefix"
+
+
+def test_enrich_identity_country_icao24_tier():
+    result = enrich_identity("49d3d3")
+    assert result["country"]["value"] == "Czech Republic"
+    assert result["country"]["source"] == "icao24_lookup"
+
+
+def test_enrich_identity_country_callsign_tier():
+    result = enrich_identity("ffffff", callsign="TVP7200")
+    assert result["country"]["value"] == "Czech Republic"
+    assert result["country"]["source"] == "callsign_decode"
+    assert result["country"]["confidence"] == 0.6
+
+
+def test_enrich_identity_country_unknown():
+    assert enrich_identity("ffffff")["country"] is None
+
+
+def test_enrich_identity_operator_live_wins():
+    result = enrich_identity("49d3d3", known_operator="Some Other Airline")
+    assert result["operator"]["value"] == "Some Other Airline"
+    assert result["operator"]["source"] == "live"
+
+
+def test_enrich_identity_operator_icao24_tier():
+    result = enrich_identity("49d3d3")
+    assert result["operator"]["value"] == "Smartwings"
+    assert result["operator"]["source"] == "icao24_lookup"
+
+
+def test_enrich_identity_operator_callsign_tier():
+    result = enrich_identity("ffffff", callsign="RYR123")
+    assert result["operator"]["value"] == "Ryanair"
+    assert result["operator"]["source"] == "callsign_decode"
+
+
+def test_enrich_identity_operator_unknown():
+    assert enrich_identity("ffffff")["operator"] is None
+
+
+def test_enrich_identity_registration_live_wins():
+    result = enrich_identity("49d3d3", registration="X-DECOY")
+    assert result["registration"]["value"] == "X-DECOY"
+    assert result["registration"]["source"] == "live"
+
+
+def test_enrich_identity_registration_icao24_tier():
+    result = enrich_identity("49d3d3")
+    assert result["registration"]["value"] == "OK-SWC"
+    assert result["registration"]["source"] == "icao24_lookup"
+
+
+def test_enrich_identity_registration_unknown():
+    assert enrich_identity("ffffff")["registration"] is None
+
+
+def test_enrich_identity_manufacturer_model_icao24_tier():
+    result = enrich_identity("49d3d3")
+    assert result["manufacturer"]["value"] == "Boeing"
+    assert result["model"]["value"] == "737 MAX 8"
+    assert result["manufacturer"]["source"] == "icao24_lookup"
+
+
+def test_enrich_identity_manufacturer_model_aircraft_type_tier():
+    result = enrich_identity("ffffff", aircraft_type="B38M")
+    assert result["manufacturer"]["value"] == "Boeing"
+    assert result["model"]["value"] == "737 MAX 8"
+    assert result["manufacturer"]["source"] == "aircraft_type_db"
+
+
+def test_enrich_identity_manufacturer_model_unknown():
+    result = enrich_identity("ffffff")
+    assert result["manufacturer"] is None
+    assert result["model"] is None
+
+
+def test_enrich_identity_year_built_live_wins():
+    result = enrich_identity("49d3d3", known_manufacture_year=1999)
+    assert result["year_built"]["value"] == 1999
+    assert result["year_built"]["source"] == "live"
+
+
+def test_enrich_identity_year_built_icao24_tier():
+    result = enrich_identity("49d3d3")
+    assert result["year_built"]["value"] == 2021
+    assert result["year_built"]["source"] == "icao24_lookup"
+
+
+def test_enrich_identity_year_built_unknown():
+    assert enrich_identity("ffffff")["year_built"] is None
+
+
+def test_enrich_identity_all_fields_unknown_when_nothing_resolves():
+    result = enrich_identity("ffffff")
+    assert all(result[key] is None for key in
+               ("country", "operator", "registration", "manufacturer", "model", "year_built"))
+
+
+# --- /api/identity/<icao24> route ---
+
+def test_route_full_known_aircraft(client):
+    resp = client.get("/api/identity/49d3d3")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["country"]["value"] == "Czech Republic"
+    assert data["operator"]["value"] == "Smartwings"
+    assert data["registration"]["value"] == "OK-SWC"
+    assert data["manufacturer"]["value"] == "Boeing"
+    assert data["model"]["value"] == "737 MAX 8"
+    assert data["year_built"]["value"] == 2021
+
+
+def test_route_uppercase_icao24_same_result(client):
+    resp = client.get("/api/identity/49D3D3")
+    assert resp.get_json()["registration"]["value"] == "OK-SWC"
+
+
+def test_route_unresolvable_aircraft_all_none(client):
+    resp = client.get("/api/identity/ffffff")
+    data = resp.get_json()
+    assert all(data[key] is None for key in
+               ("country", "operator", "registration", "manufacturer", "model", "year_built"))
+
+
+def test_route_known_country_short_circuits(client):
+    resp = client.get("/api/identity/49d3d3?known_country=Somewhere+Else")
+    data = resp.get_json()
+    assert data["country"]["value"] == "Somewhere Else"
+    assert data["country"]["source"] == "live"
+
+
+def test_route_query_params_feed_the_fallback_tiers(client):
+    resp = client.get("/api/identity/ffffff?registration=OK-SWC&callsign=TVP7200&aircraft_type=B38M")
+    data = resp.get_json()
+    assert data["country"]["source"] == "registration_prefix"  # outranks callsign_decode
+    assert data["operator"]["value"] == "Smartwings"  # from callsign_decode, no icao24 record here
+    assert data["manufacturer"]["value"] == "Boeing"  # from aircraft_type_db, no icao24 record here
