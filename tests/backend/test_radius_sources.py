@@ -7,6 +7,8 @@ from conftest import make_response
 RADIUS_SOURCES = [
     ("/api/adsbfi", "_adsbfi_cache"),
     ("/api/airplaneslive", "_airplaneslive_cache"),
+    ("/api/adsblol", "_adsblol_cache"),
+    ("/api/adsbone", "_adsbone_cache"),
 ]
 
 

@@ -13,7 +13,7 @@ def client():
 
 
 @pytest.fixture(autouse=True)
-def reset_caches():
+def reset_caches(monkeypatch, tmp_path):
     """app.py keeps caches as module-level dicts, so tests must reset them
     before each run or results leak between test cases (and order starts to
     matter, which pytest explicitly doesn't guarantee)."""
@@ -22,10 +22,17 @@ def reset_caches():
     app._token.clear()
     app._token.update({"value": None, "expires_at": 0.0})
     app._track_cache.clear()
+    # Redirect the persistent track cache to a throwaway file so tests never
+    # touch (or accumulate into) the repo's real .track_cache.json.
+    monkeypatch.setattr(app, "TRACK_CACHE_FILE", str(tmp_path / "track_cache.json"))
     app._adsbfi_cache.clear()
     app._adsbfi_cache.update({"data": None, "ts": 0.0})
     app._airplaneslive_cache.clear()
     app._airplaneslive_cache.update({"data": None, "ts": 0.0})
+    app._adsblol_cache.clear()
+    app._adsblol_cache.update({"data": None, "ts": 0.0})
+    app._adsbone_cache.clear()
+    app._adsbone_cache.update({"data": None, "ts": 0.0})
     app._photo_cache.clear()
     yield
 

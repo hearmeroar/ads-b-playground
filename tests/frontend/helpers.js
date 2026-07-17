@@ -15,6 +15,10 @@ async function mockAllSources(page) {
   await page.route('**/api/states', (route) => route.fulfill({ json: fixture('states.json') }));
   await page.route('**/api/adsbfi', (route) => route.fulfill({ json: fixture('adsbfi.json') }));
   await page.route('**/api/airplaneslive', (route) => route.fulfill({ json: fixture('airplaneslive.json') }));
+  // adsb.lol / adsb.one default to empty so existing tests' marker/color counts
+  // are unaffected; a dedup test overrides these with its own aircraft.
+  await page.route('**/api/adsblol', (route) => route.fulfill({ json: { ac: [] } }));
+  await page.route('**/api/adsbone', (route) => route.fulfill({ json: { ac: [] } }));
   await page.route('**/api/photo/**', (route) => route.fulfill({ json: { photos: [] } }));
   await page.route('**/api/track/**', (route) => route.fulfill({ status: 404, json: { path: [], error: 'not_found' } }));
 }

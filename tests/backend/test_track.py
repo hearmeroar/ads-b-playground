@@ -1,3 +1,6 @@
+import json
+import time
+
 import requests
 
 import app
@@ -58,3 +61,47 @@ def test_network_error_no_cache_returns_502(client, mock_get):
     mock_get.side_effect = requests.ConnectionError("boom")
     resp = client.get("/api/track/xyz")
     assert resp.status_code == 502
+
+
+def test_successful_fetch_persists_to_disk(client, mock_get):
+    mock_get.return_value = make_response(json_data={"path": [[1, 2, 3]]})
+    client.get("/api/track/abc123")
+
+    with open(app.TRACK_CACHE_FILE) as f:
+        stored = json.load(f)
+    assert "abc123" in stored
+    assert stored["abc123"]["data"]["path"] == [[1, 2, 3]]
+
+
+def test_cache_survives_restart_via_disk(client, mock_get):
+    mock_get.return_value = make_response(json_data={"path": [[1, 2, 3]]})
+    client.get("/api/track/abc123")
+    assert mock_get.call_count == 1
+
+    # Simulate a server restart: the in-memory dict is gone, but the file
+    # remains and _load_track_cache() repopulates from it.
+    app._track_cache.clear()
+    app._load_track_cache()
+    assert "abc123" in app._track_cache
+
+    resp = client.get("/api/track/abc123")
+    assert resp.status_code == 200
+    assert resp.get_json()["path"] == [[1, 2, 3]]
+    # Served from the restored cache — OpenSky was not hit a second time.
+    assert mock_get.call_count == 1
+
+
+def test_load_drops_entries_older_than_max_age(client, mock_get):
+    mock_get.return_value = make_response(json_data={"path": [[1, 2, 3]]})
+    client.get("/api/track/abc123")
+
+    # Age the persisted entry past TRACK_CACHE_MAX_AGE, then reload.
+    with open(app.TRACK_CACHE_FILE) as f:
+        stored = json.load(f)
+    stored["abc123"]["ts"] = time.time() - app.TRACK_CACHE_MAX_AGE - 1
+    with open(app.TRACK_CACHE_FILE, "w") as f:
+        json.dump(stored, f)
+
+    app._track_cache.clear()
+    app._load_track_cache()
+    assert "abc123" not in app._track_cache

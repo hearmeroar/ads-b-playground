@@ -178,6 +178,24 @@
   }
   .gallery-placeholder.loading { background: none; }
   @keyframes gallery-spin { to { transform: rotate(360deg); } }
+  /* Initial-load overlay: shown until the first poll resolves, then fades out. */
+  #map-loader {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: 900; display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding: 20px 26px;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border); border-radius: 16px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    color: var(--muted); transition: opacity .4s ease;
+  }
+  #map-loader.hidden { opacity: 0; pointer-events: none; }
+  #map-loader .loader-spinner {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid #e3e6ea; border-top-color: #1a73e8;
+    animation: gallery-spin .8s linear infinite;
+  }
   .gallery-nav {
     position: absolute; top: 50%; transform: translateY(-50%);
     width: 30px; height: 30px; border-radius: 50%; border: none;
@@ -198,6 +216,10 @@
 </head>
 <body>
 <div id="map"></div>
+<div id="map-loader">
+  <div class="loader-spinner"></div>
+  <div>Loading aircraft…</div>
+</div>
 
 <div id="sidebar">
   <button type="button" id="sidebar-close" aria-label="Close">&times;</button>
@@ -231,7 +253,25 @@
         <span class="switch-track"></span>
       </label>
     </div>
-    <div class="source-row" title="Only shown where not already covered by OpenSky or adsb.fi">
+    <div class="source-row" title="Off by default — its api.adsb.lol upstream is currently unstable (intermittent multi-second hangs). Only shown where not already covered by OpenSky or adsb.fi">
+      <span class="swatch" style="background:#8e24aa"></span>
+      <span class="source-name">adsb.lol</span>
+      <span class="source-count" id="count-adsblol"></span>
+      <label class="switch" style="--row-color:#8e24aa">
+        <input type="checkbox" id="toggle-adsblol">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Off by default — its api.adsb.one is currently behind a Cloudflare block. Only shown where not already covered by OpenSky, adsb.fi or adsb.lol">
+      <span class="swatch" style="background:#f9a825"></span>
+      <span class="source-name">adsb.one</span>
+      <span class="source-count" id="count-adsbone"></span>
+      <label class="switch" style="--row-color:#f9a825">
+        <input type="checkbox" id="toggle-adsbone">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Only shown where not already covered by OpenSky, adsb.fi, adsb.lol or adsb.one">
       <span class="swatch" style="background:#2e7d32"></span>
       <span class="source-name">airplanes.live</span>
       <span class="source-count" id="count-airplaneslive"></span>
@@ -315,7 +355,7 @@
 // for the other two) and should all roughly match this view.
 // Zoom control moved to bottom-left: the sidebar (see #sidebar) docks to the
 // top-left corner and would otherwise sit on top of it.
-const map = L.map('map', { zoomControl: false }).setView([44.0, 21.0], 7);
+const map = L.map('map', { zoomControl: false }).setView([44.0, 21.0], 8);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
 // CARTO's free "Positron" basemap — monochrome/light grey, no API key
@@ -337,15 +377,29 @@ const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
 // airplanes.live are ranked below it in that order.
 // Key order is the canonical source priority: OpenSky > adsb.fi >
 // airplanes.live. OpenSky remains quota-limited, but starts enabled.
-const SOURCE_COLORS = { opensky: '#1a73e8', adsbfi: '#e53935', airplaneslive: '#2e7d32' };
+// Key order is the canonical source priority (highest first): it drives the
+// HUD count/toggle loops and the dedup chain in poll(). adsb.lol and adsb.one
+// are independent instances of the same aggregator family as adsb.fi, ordered
+// between it and airplanes.live as a coverage/uptime fallback chain (not a
+// data-quality ranking).
+const SOURCE_COLORS = {
+  opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32',
+};
 const openskyMarkers = new Map(); // icao24 -> L.Marker
 const adsbfiMarkers = new Map(); // hex -> L.Marker
+const adsblolMarkers = new Map(); // hex -> L.Marker
+const adsboneMarkers = new Map(); // hex -> L.Marker
 const airplanesliveMarkers = new Map(); // hex -> L.Marker
-const markerMapsBySource = { opensky: openskyMarkers, adsbfi: adsbfiMarkers, airplaneslive: airplanesliveMarkers };
+const markerMapsBySource = {
+  opensky: openskyMarkers, adsbfi: adsbfiMarkers, adsblol: adsblolMarkers,
+  adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers,
+};
 
 const sourceToggles = {
   opensky: document.getElementById('toggle-opensky'),
   adsbfi: document.getElementById('toggle-adsbfi'),
+  adsblol: document.getElementById('toggle-adsblol'),
+  adsbone: document.getElementById('toggle-adsbone'),
   airplaneslive: document.getElementById('toggle-airplaneslive'),
 };
 function isSourceEnabled(name) {
@@ -552,12 +606,12 @@ function recordLiveTrailPoint(icao24, lat, lon, altitude) {
   }
 }
 
-function recordLiveTrails(openskyStates, adsbfiAircraft, airplanesliveAircraft) {
+function recordLiveTrails(openskyStates, radiusLists) {
   for (const raw of openskyStates || []) {
     const state = parseOpenSkyState(raw);
     recordLiveTrailPoint(state.icao24, state.lat, state.lon, state.baro_altitude);
   }
-  for (const list of [adsbfiAircraft, airplanesliveAircraft]) {
+  for (const list of radiusLists) {
     for (const raw of list || []) {
       const aircraft = parseAdsbExchangeAircraft(raw);
       recordLiveTrailPoint(aircraft.icao24, aircraft.lat, aircraft.lon, aircraft.altitudeM);
@@ -1499,11 +1553,27 @@ function updateCounts(counts) {
 // the default) and shows this message instead of "updated" when set.
 let openskyStatusMessage = null;
 
+// A single stalled upstream (observed: adsb.lol occasionally hanging for tens
+// of seconds) must never block the other sources or leave the app on the
+// loading state forever. fetch() has no built-in timeout, so bound every source
+// request with an AbortController — a source that doesn't answer in time is
+// treated as failed (null), exactly like an error, and the rest render anyway.
+const SOURCE_FETCH_TIMEOUT_MS = 8000; // under POLL_INTERVAL_MS so polls never overlap on a hang
+async function fetchJson(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SOURCE_FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    return await resp.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchOpenSkyStates() {
   const quotaEl = document.getElementById('quota');
   try {
-    const resp = await fetch('/api/states');
-    const data = await resp.json();
+    const data = await fetchJson('/api/states');
 
     if (data.error === 'rate_limited') {
       openskyStatusMessage = 'OpenSky: rate limited, showing cached data';
@@ -1528,8 +1598,7 @@ async function fetchOpenSkyStates() {
 
 async function fetchRadiusSourceAircraft(endpoint) {
   try {
-    const resp = await fetch(endpoint);
-    const data = await resp.json();
+    const data = await fetchJson(endpoint);
     return data.ac || [];
   } catch (e) {
     return null;
@@ -1537,29 +1606,37 @@ async function fetchRadiusSourceAircraft(endpoint) {
 }
 
 async function poll() {
-  const [openskyStates, adsbfiAircraft, airplanesliveAircraft] = await Promise.all([
-    isSourceEnabled('opensky') ? fetchOpenSkyStates() : Promise.resolve(null),
-    isSourceEnabled('adsbfi') ? fetchRadiusSourceAircraft('/api/adsbfi') : Promise.resolve(null),
-    isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
-  ]);
+  const [openskyStates, adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft] =
+    await Promise.all([
+      isSourceEnabled('opensky') ? fetchOpenSkyStates() : Promise.resolve(null),
+      isSourceEnabled('adsbfi') ? fetchRadiusSourceAircraft('/api/adsbfi') : Promise.resolve(null),
+      isSourceEnabled('adsblol') ? fetchRadiusSourceAircraft('/api/adsblol') : Promise.resolve(null),
+      isSourceEnabled('adsbone') ? fetchRadiusSourceAircraft('/api/adsbone') : Promise.resolve(null),
+      isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
+    ]);
 
-  recordLiveTrails(openskyStates, adsbfiAircraft, airplanesliveAircraft);
+  // Each source fetches independently: fetchRadiusSourceAircraft swallows its
+  // own failure into null, so one source erroring out (e.g. adsb.one's
+  // Cloudflare block) never blocks the others from rendering this cycle.
+  const radiusLists = [adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft];
+  recordLiveTrails(openskyStates, radiusLists);
 
   // The generic "updated" timestamp lives here, not in fetchOpenSkyStates()
   // — an OpenSky warning (rate limit/stale/unreachable) takes its place for
   // that cycle when the source is enabled and struggling.
   if (isSourceEnabled('opensky') && openskyStatusMessage) {
     document.getElementById('status').textContent = openskyStatusMessage;
-  } else if (adsbfiAircraft || airplanesliveAircraft || openskyStates) {
+  } else if (openskyStates || radiusLists.some((l) => l)) {
     document.getElementById('status').textContent =
       'updated ' + new Date().toLocaleTimeString('en-GB');
   }
 
-  // Enrichment lookup for OpenSky's sidebar: adsb.fi takes priority over
-  // airplanes.live when both have data for the same aircraft (arbitrary but
-  // consistent — matches the same priority order used for marker dedup).
+  // Enrichment lookup for OpenSky's sidebar: when several radius sources have
+  // the same aircraft, the higher-priority one wins. Iterating lowest→highest
+  // priority (so the highest writes last) keeps this consistent with the
+  // marker dedup order below.
   const enrichmentByHex = new Map();
-  for (const list of [airplanesliveAircraft, adsbfiAircraft]) {
+  for (const list of [airplanesliveAircraft, adsboneAircraft, adsblolAircraft, adsbfiAircraft]) {
     if (!list) continue;
     for (const raw of list) {
       const a = parseAdsbExchangeAircraft(raw);
@@ -1567,29 +1644,33 @@ async function poll() {
     }
   }
 
-  // Render priority: OpenSky > adsb.fi > airplanes.live. Each later source
-  // only contributes aircraft the earlier source(s) do not cover.
+  // Render priority: OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live.
+  // Each later source only contributes aircraft no earlier source covers — its
+  // exclude set is the union of every higher-priority source's rendered keys.
   let openskyCount = openskyMarkers.size;
   if (isSourceEnabled('opensky') && openskyStates) {
     openskyCount = updateOpenSkyMarkers(openskyStates, enrichmentByHex);
   }
 
-  let adsbfiCount = adsbfiMarkers.size;
-  if (isSourceEnabled('adsbfi') && adsbfiAircraft) {
-    adsbfiCount = updateRadiusSourceMarkers(
-      adsbfiMarkers, adsbfiAircraft, new Set(openskyMarkers.keys()), SOURCE_COLORS.adsbfi
-    );
+  const counts = { opensky: openskyCount };
+  const radiusSources = [
+    ['adsbfi', adsbfiMarkers, adsbfiAircraft],
+    ['adsblol', adsblolMarkers, adsblolAircraft],
+    ['adsbone', adsboneMarkers, adsboneAircraft],
+    ['airplaneslive', airplanesliveMarkers, airplanesliveAircraft],
+  ];
+  const excludeIds = new Set(openskyMarkers.keys());
+  for (const [name, markerMap, aircraft] of radiusSources) {
+    if (isSourceEnabled(name) && aircraft) {
+      counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name]);
+    } else {
+      counts[name] = markerMap.size;
+    }
+    // Later sources must not re-render what this one just claimed.
+    for (const key of markerMap.keys()) excludeIds.add(key);
   }
 
-  let airplanesliveCount = airplanesliveMarkers.size;
-  if (isSourceEnabled('airplaneslive') && airplanesliveAircraft) {
-    const exclude = new Set([...openskyMarkers.keys(), ...adsbfiMarkers.keys()]);
-    airplanesliveCount = updateRadiusSourceMarkers(
-      airplanesliveMarkers, airplanesliveAircraft, exclude, SOURCE_COLORS.airplaneslive
-    );
-  }
-
-  updateCounts({ opensky: openskyCount, adsbfi: adsbfiCount, airplaneslive: airplanesliveCount });
+  updateCounts(counts);
 
   // Do not spend OpenSky track credits every 12 seconds for an already-open
   // sidebar. When its historical endpoint is unavailable, keep the local
@@ -1599,7 +1680,9 @@ async function poll() {
   }
 }
 
-poll();
+// Hide the initial-load overlay once the first poll resolves (data in, or all
+// sources failed — either way there's nothing more to wait for).
+poll().finally(() => document.getElementById('map-loader').classList.add('hidden'));
 setInterval(poll, POLL_INTERVAL_MS);
 </script>
 </body>

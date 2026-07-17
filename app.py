@@ -26,6 +26,7 @@ Backend responsibilities:
    frontend's gallery uses it to top up the remaining slots whenever
    Planespotters didn't return enough photos to fill the gallery on its own.
 """
+import json
 import os
 import re
 import time
@@ -63,10 +64,54 @@ MIN_INTERVAL = 10
 _cache = {"data": None, "ts": 0.0}
 _token = {"value": None, "expires_at": 0.0}
 
-# Per-aircraft cache for /api/track/<icao24>, so repeated clicks on the same
-# aircraft within TRACK_MIN_INTERVAL seconds don't spend extra quota.
-TRACK_MIN_INTERVAL = 15
+# Per-aircraft cache for /api/track/<icao24>. OpenSky's /tracks/* endpoint has
+# its own, far stingier credit bucket than /states/* (one charge per aircraft
+# per fetch, vs. one shared charge for the whole map), so the track quota drains
+# much faster. A generous TTL means repeatedly opening the same aircraft costs
+# no extra quota — a track's history barely changes over a few minutes.
+TRACK_MIN_INTERVAL = 300
 _track_cache = {}  # icao24 -> {"data": ..., "ts": ...}
+
+# The track cache is also persisted to disk so a server restart (including
+# Flask's debug auto-reload on every file save) doesn't wipe it and force the
+# stingy /tracks/* bucket to be re-spent from scratch. Timestamps are absolute
+# wall-clock seconds, so TTL still holds across restarts. Entries older than
+# TRACK_CACHE_MAX_AGE are dropped on load to bound the file's growth.
+TRACK_CACHE_FILE = os.environ.get("TRACK_CACHE_FILE", ".track_cache.json")
+TRACK_CACHE_MAX_AGE = 86400  # 24h
+
+
+def _load_track_cache():
+    """Best-effort: populate _track_cache from disk, skipping entries older than
+    TRACK_CACHE_MAX_AGE. A missing or corrupt file is ignored — the cache is a
+    quota optimization, not a source of truth."""
+    try:
+        with open(TRACK_CACHE_FILE, "r") as f:
+            stored = json.load(f)
+    except (OSError, ValueError):
+        return
+    if not isinstance(stored, dict):
+        return
+    cutoff = time.time() - TRACK_CACHE_MAX_AGE
+    for icao24, entry in stored.items():
+        if isinstance(entry, dict) and entry.get("ts", 0) >= cutoff:
+            _track_cache[icao24] = entry
+
+
+def _save_track_cache():
+    """Best-effort atomic write of the whole cache. Track fetches are infrequent
+    (per user click, throttled by TRACK_MIN_INTERVAL), so rewriting the file each
+    time is cheap. Write errors are ignored for the same reason as above."""
+    tmp = TRACK_CACHE_FILE + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(_track_cache, f)
+        os.replace(tmp, TRACK_CACHE_FILE)
+    except OSError:
+        pass
+
+
+_load_track_cache()
 
 # adsb.fi (https://github.com/adsbfi/opendata) and airplanes.live
 # (https://airplanes.live/api-guide/): both open, anonymous, no daily quota,
@@ -84,6 +129,24 @@ AIRPLANESLIVE_URL = "https://api.airplanes.live/v2/point/{lat}/{lon}/{radius}"
 AIRPLANESLIVE_CENTER = {"lat": 44.0, "lon": 21.0, "radius": 220}
 AIRPLANESLIVE_MIN_INTERVAL = 10
 _airplaneslive_cache = {"data": None, "ts": 0.0}
+
+# adsb.lol (https://api.adsb.lol/docs) and adsb.one (https://api.adsb.one):
+# two more independent instances of the same aggregator family as adsb.fi —
+# same open, anonymous, no-quota access and the same ADSBExchange-compatible
+# JSON shape, so they reuse cached_radius_source() and the frontend's shared
+# parseAdsbExchangeAircraft() exactly like adsb.fi/airplanes.live. Both cap the
+# radius at 250 nm. NOTE: as of 2026-07-17 api.adsb.one sits behind a Cloudflare
+# WAF that 403s server-side requests, so its proxy will return an empty list
+# until that's lifted; the pipeline tolerates a dataless source by design.
+ADSBLOL_URL = "https://api.adsb.lol/v2/lat/{lat}/lon/{lon}/dist/{dist}"
+ADSBLOL_CENTER = {"lat": 44.0, "lon": 21.0, "dist": 220}
+ADSBLOL_MIN_INTERVAL = 10
+_adsblol_cache = {"data": None, "ts": 0.0}
+
+ADSBONE_URL = "https://api.adsb.one/v2/point/{lat}/{lon}/{radius}"
+ADSBONE_CENTER = {"lat": 44.0, "lon": 21.0, "radius": 220}
+ADSBONE_MIN_INTERVAL = 10
+_adsbone_cache = {"data": None, "ts": 0.0}
 
 # Planespotters (https://www.planespotters.net/photo/api): free, no key, but
 # requires a descriptive User-Agent with contact info or it 403s — override
@@ -256,6 +319,7 @@ def api_track(icao24):
         resp.raise_for_status()
         payload = resp.json()
         _track_cache[icao24] = {"data": payload, "ts": now}
+        _save_track_cache()
         return jsonify(payload)
 
     except requests.RequestException as exc:
@@ -303,6 +367,16 @@ def api_airplaneslive():
     return cached_radius_source(
         AIRPLANESLIVE_URL.format(**AIRPLANESLIVE_CENTER), _airplaneslive_cache, AIRPLANESLIVE_MIN_INTERVAL
     )
+
+
+@app.route("/api/adsblol")
+def api_adsblol():
+    return cached_radius_source(ADSBLOL_URL.format(**ADSBLOL_CENTER), _adsblol_cache, ADSBLOL_MIN_INTERVAL)
+
+
+@app.route("/api/adsbone")
+def api_adsbone():
+    return cached_radius_source(ADSBONE_URL.format(**ADSBONE_CENTER), _adsbone_cache, ADSBONE_MIN_INTERVAL)
 
 
 def fetch_planespotters(kind, value):
