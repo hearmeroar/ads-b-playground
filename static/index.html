@@ -618,6 +618,19 @@ function drawTrack(waypoints) {
   trackLayerGroup = L.featureGroup(segments).addTo(map);
 }
 
+// Format retry time in human-readable format (hours, minutes, seconds)
+function formatRetryTime(seconds) {
+  if (seconds == null) return '';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const parts = [];
+  if (h > 0) parts.push(h + 'h');
+  if (m > 0) parts.push(m + 'm');
+  if (s > 0 || parts.length === 0) parts.push(s + 's');
+  return parts.join(' ');
+}
+
 async function loadTrack(icao24) {
   const fetchId = ++trackFetchToken;
   const trackStatusEl = document.getElementById('track-status');
@@ -633,7 +646,11 @@ async function loadTrack(icao24) {
     if (waypoints.length >= 2) {
       trackUsesLiveFallback = false;
       drawTrack(waypoints);
-      trackStatusEl.textContent = '';
+      if (data.stale) {
+        trackStatusEl.textContent = 'Track: cached data';
+      } else {
+        trackStatusEl.textContent = '';
+      }
     } else {
       // 404/429 and a flight that OpenSky has not segmented yet all return no
       // drawable path. Fall back to the positions this page has observed.
@@ -642,8 +659,13 @@ async function loadTrack(icao24) {
       trackStatusEl.textContent = 'Track: live fallback';
     }
     // Check both HTTP status and data.error (backend returns 429 for rate limit)
-    if (data.error || resp.status === 429) {
-      trackStatusEl.innerHTML = '<span class="emergency">Historical track unavailable: ' + (data.error || 'rate_limited') + '</span>';
+    // Only show error if there's no usable path (stale data with path already handled above)
+    if ((data.error || resp.status === 429) && waypoints.length < 2) {
+      const retryAfter = data.retry_after_seconds;
+      const retryText = retryAfter != null
+        ? ' (available in ' + formatRetryTime(retryAfter) + ')'
+        : '';
+      trackStatusEl.innerHTML = '<span class="emergency">Historical track unavailable: ' + (data.error || 'rate_limited') + retryText + '</span>';
     }
   } catch (e) {
     if (fetchId === trackFetchToken && selectedIcao24 === icao24) {

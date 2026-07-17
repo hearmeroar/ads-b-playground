@@ -275,10 +275,13 @@ because photographer name and photo URL come from an external API.
   all the way from `loadTrack()` through to this coloring step.
 - **Track status in HUD:** The right sidebar (`#hud`) shows track status in
   `#track-status` when an aircraft is selected: empty when the historical
-  track loads successfully, "Track: live fallback" when using the in-browser
-  trail (no historical data or rate limited), or "Historical track unavailable:
-  rate_limited" (in red) when the track endpoint is rate-limited. This was
-  moved from the left sidebar to avoid duplication.
+  track loads successfully, "Track: cached data" when using stale cached data
+  (rate limited but cache exists), "Track: live fallback" when using the
+  in-browser trail (no historical data), or "Historical track unavailable:
+  rate_limited (available in Xh Ym Zs)" (in red) when the track endpoint is
+  rate-limited with no cache. The retry time is formatted by `formatRetryTime()`
+  to show hours/minutes/seconds. This was moved from the left sidebar to avoid
+  duplication.
 - State vector array indices from OpenSky's `/states/all` are fixed by the
   protocol and parsed positionally in `parseOpenSkyState()`: `0 icao24,
   1 callsign, 2 origin_country, 4 last_contact, 5 longitude, 6 latitude,

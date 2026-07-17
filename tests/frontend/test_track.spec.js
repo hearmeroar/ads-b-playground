@@ -114,6 +114,22 @@ test('track status shows live fallback when using live trail', async ({ page }) 
   expect(trackStatus).toBe('Track: live fallback');
 });
 
+test('track status shows cached data when rate limited but cache exists', async ({ page }) => {
+  // Return stale cached data with error flag (simulating rate limit with cache)
+  await page.route('**/api/track/dddddd', (route) => route.fulfill({
+    status: 429,
+    json: { path: [[1000, 44.0, 21.0, 10000, 90, false], [1300, 44.05, 21.05, 10000, 90, false]], stale: true, error: 'rate_limited' }
+  }));
+
+  await clickMarker(page, 'openskyMarkers', 'dddddd');
+  await page.waitForTimeout(500);
+
+  // Track should show with cached data indicator
+  const trackStatus = await page.textContent('#track-status');
+  expect(trackStatus).toBe('Track: cached data');
+  expect(await trackSegmentCount(page)).toBe(1);
+});
+
 test('track status clears when deselecting aircraft', async ({ page }) => {
   await page.route('**/api/track/eeeeee', (route) => route.fulfill({
     status: 429,
