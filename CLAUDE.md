@@ -102,18 +102,22 @@ interval, and a three-line route. None has a bbox query, only lat/lon/radius
 `BBOX`. All return the same ADSBExchange-compatible JSON shape (altitude in
 feet, speed in knots — converted client-side to match OpenSky's units), which
 is why one parser (`parseAdsbExchangeAircraft()`) serves all four.
-**adsb.lol and adsb.one are off by default** in the HUD: adsb.lol's upstream
-is currently unstable (intermittent multi-second hangs) and adsb.one is
-behind a Cloudflare block. They're wired up and working, so this is a default,
-not a limitation — a failing source degrades to `null` for that cycle rather
-than breaking the poll.
+**adsb.one is off by default** in the HUD: its upstream is currently behind a
+Cloudflare block. adsb.lol shipped off for the same kind of reason (its
+upstream had intermittent multi-second hangs) but was switched to **on by
+default** (2026-07-17, explicit re-approval) despite that known instability —
+a failing/slow source degrades to `null` for that cycle rather than breaking
+the poll, so the occasional hang costs one cycle, not the map. Both are wired
+up and working either way; `*_MIN_INTERVAL`/`*_CENTER` and the shared
+`cached_radius_source()` plumbing don't distinguish "on by default" from
+"off by default" — it's purely a frontend checkbox default.
 
 > **Shorthand:** the rest of this file often says "adsb.fi/airplanes.live"
 > where it means *any* radius source — they share one JSON shape, one parser,
 > and one set of extra fields, so a claim about one holds for all four.
-> adsb.fi and airplanes.live are named because they're the two that ship
-> enabled; adsb.lol and adsb.one behave identically wherever the phrase
-> appears.
+> adsb.fi and airplanes.live are named because they're two of the three that
+> ship enabled (alongside adsb.lol); adsb.one — the one still off by default —
+> behaves identically wherever the phrase appears.
 
 **FlightAware AeroAPI (`/api/flightaware` → `aeroapi.flightaware.com/aeroapi/flights/search`):**
 This sixth source is structurally unlike the four radius sources in three critical ways.
@@ -127,7 +131,7 @@ altitude is in hundreds of feet (e.g., `8` = 800 ft). Origin/destination airport
 `destinationAirport` fields. Third, it's **metered/paid** — the user polls it at 10s (same as
 free sources) when enabled, accepting the cost tradeoff. It originally shipped **enabled by
 default**; the user later gave explicit re-approval (2026-07-17) to switch it to **off by
-default** instead, so it now ships unchecked like adsb.lol/adsb.one — still fully wired up and
+default** instead, so it now ships unchecked like adsb.one — still fully wired up and
 working, just an opt-in toggle rather than a default one. Any further change to this default
 (or to its poll interval) needs the same kind of explicit re-approval, not a unilateral
 "optimization."
@@ -230,8 +234,8 @@ because photographer name and photo URL come from an external API.
   HUD checkbox, which clears its markers immediately and triggers an immediate
   `poll()` (rather than waiting up to `POLL_INTERVAL_MS` for the next tick) —
   both on and off toggles re-run `poll()` so counts/markers never sit stale
-  after a toggle. **OpenSky, adsb.fi and airplanes.live ship checked**;
-  adsb.lol, adsb.one, and FlightAware ship off (see above). Turning OpenSky
+  after a toggle. **OpenSky, adsb.fi, adsb.lol and airplanes.live ship
+  checked**; adsb.one and FlightAware ship off (see above). Turning OpenSky
   off clears the quota line and any pending OpenSky warning message.
 - **HUD counts** (`updateCounts()`) render as a pill per source, collapsed via
   `.source-count:empty` when the source is off. Between enabling a source and

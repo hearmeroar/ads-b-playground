@@ -21,9 +21,8 @@ test('same ICAO24 from 4 radius sources renders one marker, from the highest-pri
 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  // adsb.lol and adsb.one ship off by default (unstable upstreams) — enable
-  // them so all four radius sources are live for this dedup check.
-  await page.click('#toggle-adsblol');
+  // adsb.one ships off by default (Cloudflare block) — enable it so all four
+  // radius sources are live for this dedup check (adsb.lol ships on already).
   await page.click('#toggle-adsbone');
   await page.waitForTimeout(600);
 
@@ -58,9 +57,7 @@ test('enrichment from a lower-priority source disappears when that source is tog
 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  // adsb.lol is off by default — turn it on so it can enrich the OpenSky aircraft.
-  await page.click('#toggle-adsblol');
-  await page.waitForTimeout(600);
+  // adsb.lol ships on by default, so it's already enriching the OpenSky aircraft.
 
   await page.evaluate(() => {
     const m = openskyMarkers.get('aaaaaa');

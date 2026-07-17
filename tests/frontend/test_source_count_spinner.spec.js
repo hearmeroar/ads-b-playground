@@ -17,11 +17,11 @@ function slotState(page, name) {
 test('enabling a source shows a spinner until its first count lands, then the pill', async ({ page }) => {
   await mockAllSources(page);
 
-  // adsb.lol ships off. Hold its response open so the pending state is
+  // adsb.one ships off. Hold its response open so the pending state is
   // observable rather than a race against a fast mock.
   let release;
   const held = new Promise((resolve) => { release = resolve; });
-  await page.route('**/api/adsblol', async (r) => {
+  await page.route('**/api/adsbone', async (r) => {
     await held;
     r.fulfill({ json: fixture('adsbfi.json') });
   });
@@ -30,13 +30,13 @@ test('enabling a source shows a spinner until its first count lands, then the pi
   await page.waitForSelector('.leaflet-marker-icon');
 
   // Off: no pill, no spinner.
-  expect(await slotState(page, 'adsblol')).toEqual({ text: '', spinning: false, loading: false });
+  expect(await slotState(page, 'adsbone')).toEqual({ text: '', spinning: false, loading: false });
 
-  await page.click('#toggle-adsblol');
+  await page.click('#toggle-adsbone');
 
   // On, data still in flight: spinner stands in for the pill.
-  await page.waitForFunction(() => !!document.querySelector('#count-adsblol .count-spinner'));
-  const pending = await slotState(page, 'adsblol');
+  await page.waitForFunction(() => !!document.querySelector('#count-adsbone .count-spinner'));
+  const pending = await slotState(page, 'adsbone');
   expect(pending.spinning).toBe(true);
   expect(pending.loading).toBe(true);
   expect(pending.text).toBe(''); // no stale number behind the spinner
@@ -45,10 +45,10 @@ test('enabling a source shows a spinner until its first count lands, then the pi
 
   // Data in: spinner gives way to the pill.
   await page.waitForFunction(() => {
-    const el = document.getElementById('count-adsblol');
+    const el = document.getElementById('count-adsbone');
     return !el.querySelector('.count-spinner') && el.textContent !== '';
   });
-  const settled = await slotState(page, 'adsblol');
+  const settled = await slotState(page, 'adsbone');
   expect(settled.spinning).toBe(false);
   expect(settled.loading).toBe(false);
   expect(settled.text).toMatch(/^\d+$/);
@@ -56,17 +56,17 @@ test('enabling a source shows a spinner until its first count lands, then the pi
 
 test('a source that returns nothing settles on 0 rather than spinning forever', async ({ page }) => {
   await mockAllSources(page);
-  await page.route('**/api/adsblol', (r) => r.fulfill({ status: 500, body: 'nope' }));
+  await page.route('**/api/adsbone', (r) => r.fulfill({ status: 500, body: 'nope' }));
 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  await page.click('#toggle-adsblol');
+  await page.click('#toggle-adsbone');
 
   await page.waitForFunction(
-    () => document.getElementById('count-adsblol').textContent === '0',
+    () => document.getElementById('count-adsbone').textContent === '0',
     { timeout: 5000 }
   );
-  expect(await slotState(page, 'adsblol')).toEqual({ text: '0', spinning: false, loading: false });
+  expect(await slotState(page, 'adsbone')).toEqual({ text: '0', spinning: false, loading: false });
 });
 
 test('turning a source back off clears the slot entirely', async ({ page }) => {

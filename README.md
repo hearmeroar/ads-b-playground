@@ -12,8 +12,8 @@ renders aircraft as color-coded markers.
   don't already cover), plus FlightAware AeroAPI deduplicated by callsign.
   - [OpenSky Network](https://opensky-network.org/) — blue
   - [adsb.fi](https://github.com/adsbfi/opendata) — red
-  - [adsb.lol](https://adsb.lol/) — purple *(off by default: upstream is
-    currently unstable)*
+  - [adsb.lol](https://adsb.lol/) — purple *(upstream is occasionally
+    unstable, but a failing cycle just degrades rather than breaking the map)*
   - [adsb.one](https://adsb.one/) — amber *(off by default: currently
     behind a Cloudflare block)*
   - [airplanes.live](https://airplanes.live/api-guide/) — green
