@@ -28,15 +28,19 @@ test('clicking a marker shows the photo and required attribution', async ({ page
   await page.waitForSelector('.leaflet-marker-icon');
   await page.waitForTimeout(500);
 
-  await page.evaluate(() => openskyMarkers.get('aaaaaa')._icon.click());
+  await page.evaluate(() => {
+    const marker = openskyMarkers.get('aaaaaa');
+    if (marker && marker._icon) marker._icon.click();
+  });
   await page.waitForTimeout(600);
 
   const state = await page.evaluate(() => {
-    const box = document.querySelector('.photo-box');
-    const creditLink = box.querySelector('.photo-credit a');
+    const box = document.querySelector('#sidebar-gallery .gallery-image-wrap');
+    const credit = document.querySelector('#sidebar-gallery .gallery-credit');
+    const creditLink = credit.querySelector('a');
     return {
-      hasImg: !!box.querySelector('img.aircraft-photo'),
-      creditText: box.querySelector('.photo-credit').textContent,
+      hasImg: !!box.querySelector('img'),
+      creditText: credit ? credit.textContent : '',
       creditHref: creditLink ? creditLink.href : null,
     };
   });
@@ -53,14 +57,17 @@ test('shows a neutral placeholder when no photo is found, with no console error'
   await page.waitForSelector('.leaflet-marker-icon');
   await page.waitForTimeout(500);
 
-  await page.evaluate(() => openskyMarkers.get('aaaaaa')._icon.click());
+  await page.evaluate(() => {
+    const marker = openskyMarkers.get('aaaaaa');
+    if (marker && marker._icon) marker._icon.click();
+  });
   await page.waitForTimeout(600);
 
-  expect(await page.evaluate(() => !!document.querySelector('.photo-box .photo-placeholder'))).toBe(true);
+  expect(await page.evaluate(() => !!document.querySelector('#sidebar-gallery .gallery-placeholder'))).toBe(true);
   expect(errors).toEqual([]);
 });
 
-test('reopening the same popup does not refetch (client-side cache)', async ({ page }) => {
+test('reopening the same sidebar does not refetch (client-side cache)', async ({ page }) => {
   let requestCount = 0;
   await page.route('**/api/photo/**', (route) => {
     requestCount++;
@@ -70,18 +77,26 @@ test('reopening the same popup does not refetch (client-side cache)', async ({ p
   await page.waitForSelector('.leaflet-marker-icon');
   await page.waitForTimeout(500);
 
-  await page.evaluate(() => openskyMarkers.get('aaaaaa')._icon.click());
+  await page.evaluate(() => {
+    const marker = openskyMarkers.get('aaaaaa');
+    if (marker && marker._icon) marker._icon.click();
+  });
   await page.waitForTimeout(600);
   expect(requestCount).toBe(1);
 
-  await page.evaluate(() => map.closePopup());
+  // Close sidebar
+  await page.click('#sidebar-close');
   await page.waitForTimeout(200);
-  await page.evaluate(() => openskyMarkers.get('aaaaaa')._icon.click());
+  // Reopen same aircraft
+  await page.evaluate(() => {
+    const marker = openskyMarkers.get('aaaaaa');
+    if (marker && marker._icon) marker._icon.click();
+  });
   await page.waitForTimeout(400);
   expect(requestCount).toBe(1);
 });
 
-test('photo survives a poll cycle while the popup stays open (regression guard)', async ({ page }) => {
+test('photo survives a poll cycle while the sidebar stays open (regression guard)', async ({ page }) => {
   let requestCount = 0;
   await page.route('**/api/photo/**', (route) => {
     requestCount++;
@@ -91,17 +106,19 @@ test('photo survives a poll cycle while the popup stays open (regression guard)'
   await page.waitForSelector('.leaflet-marker-icon');
   await page.waitForTimeout(500);
 
-  await page.evaluate(() => openskyMarkers.get('aaaaaa')._icon.click());
+  await page.evaluate(() => {
+    const marker = openskyMarkers.get('aaaaaa');
+    if (marker && marker._icon) marker._icon.click();
+  });
   await page.waitForTimeout(600);
-  expect(await page.evaluate(() => !!document.querySelector('.photo-box img.aircraft-photo'))).toBe(true);
+  expect(await page.evaluate(() => !!document.querySelector('#sidebar-gallery img'))).toBe(true);
 
-  // bindPopup() re-runs every poll for every marker and replaces an
-  // already-open popup's DOM immediately (see the CLAUDE.md gotcha) — this
-  // simulates that 12s tick happening while the popup is still open.
+  // poll() re-runs every 12s and could replace an already-open sidebar's DOM
+  // (see the CLAUDE.md gotcha) — this simulates that tick happening while open.
   await page.evaluate(() => poll());
   await page.waitForTimeout(500);
 
-  expect(await page.evaluate(() => !!document.querySelector('.photo-box img.aircraft-photo'))).toBe(true);
-  expect(await page.evaluate(() => !!document.querySelector('.photo-box .photo-spinner'))).toBe(false);
+  expect(await page.evaluate(() => !!document.querySelector('#sidebar-gallery img'))).toBe(true);
+  expect(await page.evaluate(() => !!document.querySelector('#sidebar-gallery .gallery-spinner'))).toBe(false);
   expect(requestCount).toBe(1); // cache hit, no re-fetch
 });

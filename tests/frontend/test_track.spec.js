@@ -77,3 +77,61 @@ test('uses the collected live trail when OpenSky track history is rate limited',
   expect(await trackSegmentCount(page)).toBe(1);
   expect(await page.evaluate(() => trackUsesLiveFallback)).toBe(true);
 });
+
+test('track status is shown in HUD when track is unavailable', async ({ page }) => {
+  // Route returns 404 with error message (simulating rate limit or not found)
+  await page.route('**/api/track/eeeeee', (route) => route.fulfill({
+    status: 429,
+    json: { error: 'rate_limited' }
+  }));
+
+  await clickMarker(page, 'adsbfiMarkers', 'eeeeee');
+  await page.waitForTimeout(500);
+
+  // Track should show error in HUD
+  const trackStatus = await page.textContent('#track-status');
+  expect(trackStatus).toContain('Historical track unavailable');
+  expect(trackStatus).toContain('rate_limited');
+});
+
+test('track status shows live fallback when using live trail', async ({ page }) => {
+  // Override the default 404 mock to return empty path without error
+  // (simulating a flight that OpenSky has not segmented yet)
+  await page.route('**/api/track/ffffff', (route) => route.fulfill({
+    json: { path: [] }
+  }));
+
+  await page.evaluate(() => {
+    recordLiveTrailPoint('ffffff', 44.4, 21.4, 600);
+    recordLiveTrailPoint('ffffff', 44.45, 21.45, 650);
+  });
+
+  // Should fall back to live trail
+  await clickMarker(page, 'airplanesliveMarkers', 'ffffff');
+  await page.waitForTimeout(500);
+
+  const trackStatus = await page.textContent('#track-status');
+  expect(trackStatus).toBe('Track: live fallback');
+});
+
+test('track status clears when deselecting aircraft', async ({ page }) => {
+  await page.route('**/api/track/eeeeee', (route) => route.fulfill({
+    status: 429,
+    json: { error: 'rate_limited' }
+  }));
+
+  await clickMarker(page, 'adsbfiMarkers', 'eeeeee');
+  await page.waitForTimeout(500);
+
+  // Track status should show error
+  let trackStatus = await page.textContent('#track-status');
+  expect(trackStatus).toContain('Historical track unavailable');
+
+  // Click empty map to deselect
+  await page.mouse.click(640, 450);
+  await page.waitForTimeout(300);
+
+  // Track status should be cleared
+  trackStatus = await page.textContent('#track-status');
+  expect(trackStatus).toBe('');
+});

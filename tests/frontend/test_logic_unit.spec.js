@@ -62,10 +62,10 @@ test('formatSquawk highlights only the universal ICAO emergency codes', async ({
   expect(none).toBeNull();
 });
 
-test('formatVerticalRate reports climbing/descending/level thresholds', async ({ page }) => {
-  const climbing = await page.evaluate(() => formatVerticalRate(5.2));
-  const descending = await page.evaluate(() => formatVerticalRate(-6.1));
-  const level = await page.evaluate(() => formatVerticalRate(0.1));
+test('formatVerticalRateUnit reports climbing/descending/level thresholds', async ({ page }) => {
+  const climbing = await page.evaluate(() => formatVerticalRateUnit(5.2));
+  const descending = await page.evaluate(() => formatVerticalRateUnit(-6.1));
+  const level = await page.evaluate(() => formatVerticalRateUnit(0.1));
   expect(climbing).toContain('climbing');
   expect(descending).toContain('descending');
   expect(level).toBe('level');

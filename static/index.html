@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Live Aircraft — Serbia & Neighboring Region</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
@@ -305,8 +304,9 @@
   <div class="hud-footer">
     <div class="status" id="status">loading…</div>
     <div class="status" id="quota"></div>
+    <div class="status" id="track-status"></div>
   </div>
-</div>
+ </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -620,6 +620,7 @@ function drawTrack(waypoints) {
 
 async function loadTrack(icao24) {
   const fetchId = ++trackFetchToken;
+  const trackStatusEl = document.getElementById('track-status');
   try {
     const resp = await fetch('/api/track/' + encodeURIComponent(icao24));
     const data = await resp.json();
@@ -632,16 +633,23 @@ async function loadTrack(icao24) {
     if (waypoints.length >= 2) {
       trackUsesLiveFallback = false;
       drawTrack(waypoints);
+      trackStatusEl.textContent = '';
     } else {
       // 404/429 and a flight that OpenSky has not segmented yet all return no
       // drawable path. Fall back to the positions this page has observed.
       trackUsesLiveFallback = true;
       drawTrack(liveTrailById.get(icao24));
+      trackStatusEl.textContent = 'Track: live fallback';
+    }
+    // Check both HTTP status and data.error (backend returns 429 for rate limit)
+    if (data.error || resp.status === 429) {
+      trackStatusEl.innerHTML = '<span class="emergency">Historical track unavailable: ' + (data.error || 'rate_limited') + '</span>';
     }
   } catch (e) {
     if (fetchId === trackFetchToken && selectedIcao24 === icao24) {
       trackUsesLiveFallback = true;
       drawTrack(liveTrailById.get(icao24));
+      trackStatusEl.textContent = 'Track: live fallback';
     }
   }
 }
@@ -663,6 +671,7 @@ function deselectAircraft() {
   trackUsesLiveFallback = false;
   drawTrack(null);
   sidebarEl.classList.remove('open');
+  document.getElementById('track-status').textContent = '';
 }
 
 // Deselect when clicking empty map area (marker clicks don't bubble to the

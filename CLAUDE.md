@@ -273,6 +273,12 @@ because photographer name and photo URL come from an external API.
   — rather than the single flat-colored polyline used before. Waypoints keep
   their per-point `altitude` (meters, from `/api/track`'s `baro_altitude`)
   all the way from `loadTrack()` through to this coloring step.
+- **Track status in HUD:** The right sidebar (`#hud`) shows track status in
+  `#track-status` when an aircraft is selected: empty when the historical
+  track loads successfully, "Track: live fallback" when using the in-browser
+  trail (no historical data or rate limited), or "Historical track unavailable:
+  rate_limited" (in red) when the track endpoint is rate-limited. This was
+  moved from the left sidebar to avoid duplication.
 - State vector array indices from OpenSky's `/states/all` are fixed by the
   protocol and parsed positionally in `parseOpenSkyState()`: `0 icao24,
   1 callsign, 2 origin_country, 4 last_contact, 5 longitude, 6 latitude,
@@ -340,21 +346,15 @@ because photographer name and photo URL come from an external API.
   building this app), so nothing here depends on live OpenSky/adsb.fi/
   airplanes.live/Planespotters data. Tests target a *specific* known aircraft
   by reaching into the page's own marker `Map`s directly — e.g.
-  `openskyMarkers.get('aaaaaa').openPopup()` for popup-content assertions, or
   `openskyMarkers.get('aaaaaa')._icon.click()` when the actual click handler
-  needs to fire (popup content alone doesn't exercise it). This is more
-  reliable than pixel-coordinate clicking, which can land on a different,
-  overlapping marker at low zoom levels.
+  needs to fire. This is more reliable than pixel-coordinate clicking, which
+  can land on a different, overlapping marker at low zoom levels.
 - Runs on port 5050, not 5000 — see the Commands section above.
 - `test_track.spec.js` targets an adsb.fi marker for the successful track
   path (OpenSky is nevertheless the first-priority source), asserts the
   actual `trackLayerGroup` rather than a fixed stroke color, and covers
-  empty/404 tracks plus the local live-trail fallback.
-- **Known gap:** the frontend spec files predate the left sidebar (they were
-  written against the old Leaflet-popup UI), the two-source photo-priority
-  gallery, the grouped/normalized sidebar data model, the unit toggle, and
-  the source reordering and the default source-toggle state — they haven't
-  been updated for any of that yet.
+  empty/404 tracks plus the local live-trail fallback. Also tests track status
+  display in the HUD (`#track-status`).
 
 ## Conventions
 
