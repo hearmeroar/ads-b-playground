@@ -241,7 +241,7 @@ const SOURCE_DISPLAY_NAMES = {
 // from route) is enrichment-sourced from a single radius/FlightAware
 // source at a time — see fieldSourcesFor().
 const OPENSKY_NATIVE_FIELDS = new Set([
-  'callsign', 'originCountry', 'altitudeM', 'altGeomM', 'speedKmh',
+  'icao24', 'callsign', 'originCountry', 'altitudeM', 'altGeomM', 'speedKmh',
   'verticalRateMs', 'trackDeg', 'squawk', 'hasAlert', 'positionSource',
   'secondsSinceContact',
 ]);
@@ -1364,6 +1364,7 @@ function renderDetailsHtml(info, fieldSources) {
       filtered.join('<br>') + '</div>';
   }
   const identity = renderGroup('Identity', [
+    detailRow('ICAO', info.icao24 ? info.icao24.toUpperCase() : null, 'icao24'),
     detailRow('Callsign', info.callsign || '—', 'callsign'),
     detailRow('Registration', info.registration, 'registration'),
     detailRow('Aircraft', info.aircraftType, 'aircraftType'),
@@ -1451,6 +1452,7 @@ function renderDetailsHtml(info, fieldSources) {
 // (see loadGallery()), not part of this.
 function normalizeOpenSky(s, extra) {
   return {
+    icao24: s.icao24 || null,
     callsign: (s.callsign || '').trim() || null,
     registration: (extra && extra.registration) || null,
     aircraftType: (extra && extra.aircraftType) || null,
@@ -1601,6 +1603,7 @@ function normalizeCallsignKey(callsign) {
 // this is a plain data object rather than rendered HTML.
 function normalizeAdsbExchange(a) {
   return {
+    icao24: a.icao24 || null,
     callsign: (a.callsign || '').trim() || null,
     registration: a.registration || null,
     aircraftType: a.aircraftType || null,
@@ -1751,6 +1754,7 @@ function parseFlightAware(f) {
 
 function normalizeFlightAware(f) {
   return {
+    icao24: null, // FlightAware is flight-centric, not transponder-centric — no ICAO24/hex field exists
     callsign: f.callsign || null,
     registration: null,
     aircraftType: f.aircraftType || null,

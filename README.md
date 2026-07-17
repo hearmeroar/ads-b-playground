@@ -24,7 +24,7 @@ renders aircraft as color-coded markers.
   Each source has its own toggle, and any of them failing degrades that one
   source for a cycle rather than breaking the map.
 - **Sidebar enrichment** — clicking a marker opens a details sidebar with
-  47 fields grouped into sections (identity, position, speed & heading,
+  48 fields grouped into sections (identity, position, speed & heading,
   autopilot, weather, status, signal quality). OpenSky's own data has no
   registration/aircraft type; the other sources fill that in automatically
   when they see the same aircraft, without duplicating fields every source

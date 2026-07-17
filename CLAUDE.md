@@ -300,6 +300,15 @@ because photographer name and photo URL come from an external API.
   and `destinationAirport` (displayed as "Route" in the Identity group,
   `"Catania-Fontanarossa Airport (CTA) → Belgrade Nikola Tesla Int'l (BEG)"`). `trackDeg` falls back to adsb.fi/airplanes.live's
   `calc_track` when `track` is absent (observed on military aircraft).
+  `icao24` (the transponder hex address — already the Map key every marker
+  is stored/looked up under, and the shared dedup key across all five
+  ICAO24-based sources) is now also carried in `info` itself and rendered
+  as the very first Identity row ("ICAO", uppercased for display). It's
+  tagged an OpenSky-native field (`OPENSKY_NATIVE_FIELDS`) since OpenSky's
+  own state vector reports it directly rather than via enrichment; it's
+  always `null` for FlightAware, which has no ICAO24/hex field at all
+  (flight-centric, identified by `fa_flight_id`/callsign instead — see the
+  FlightAware section above).
   `fetch_states()` sends OpenSky's `extended=1` param so `category`
   (state vector index 17) is actually populated, not just `categoryDisplay`
   via adsb.fi/airplanes.live enrichment.

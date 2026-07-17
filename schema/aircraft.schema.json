@@ -6,6 +6,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "icao24",
     "callsign",
     "registration",
     "aircraftType",
@@ -57,6 +58,14 @@
     "destinationAirport"
   ],
   "properties": {
+    "icao24": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "$comment": "Group: Identity",
+      "description": "24-bit ICAO transponder address (hex), lowercase as reported by the source and uppercased only for sidebar display. OpenSky state vector index 0 / adsb.fi & airplanes.live 'hex' (also the shared dedup/enrichment key across all five ICAO24-based sources, and the Map key in openskyMarkers/adsbfiMarkers/etc.). Always null for FlightAware, which is flight-centric (identifies by fa_flight_id/callsign) and has no ICAO24/hex field at all."
+    },
     "callsign": {
       "type": [
         "string",
