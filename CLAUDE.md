@@ -124,10 +124,13 @@ without one). Second, it's **flight-centric, not transponder-centric** — a `{f
 ICAO24/hex field). Position/altitude/speed/heading live under a nested `last_position` object;
 altitude is in hundreds of feet (e.g., `8` = 800 ft). Origin/destination airports (`code_iata`/
 `name`) are unique to this source and are surfaced in the sidebar as new `originAirport`/
-`destinationAirport` fields. Third, it's **metered/paid** — the user deliberately chose to poll
-it at 10s (same as free sources) and ship it **enabled by default**, accepting the cost tradeoff;
-this is not an oversight and should not be "optimized" to off-by-default or slower intervals
-without explicit re-approval.
+`destinationAirport` fields. Third, it's **metered/paid** — the user polls it at 10s (same as
+free sources) when enabled, accepting the cost tradeoff. It originally shipped **enabled by
+default**; the user later gave explicit re-approval (2026-07-17) to switch it to **off by
+default** instead, so it now ships unchecked like adsb.lol/adsb.one — still fully wired up and
+working, just an opt-in toggle rather than a default one. Any further change to this default
+(or to its poll interval) needs the same kind of explicit re-approval, not a unilateral
+"optimization."
 **Dedup strategy:** Since FlightAware has no ICAO24, it uses **callsign-based dedup** against the
 other five sources. Every source already carries a callsign field; they are matched case-insensitively
 and whitespace-trimmed (`normalizeCallsignKey()`, in the dedup comparison). When a FlightAware flight's
@@ -228,8 +231,8 @@ because photographer name and photo URL come from an external API.
   `poll()` (rather than waiting up to `POLL_INTERVAL_MS` for the next tick) —
   both on and off toggles re-run `poll()` so counts/markers never sit stale
   after a toggle. **OpenSky, adsb.fi and airplanes.live ship checked**;
-  adsb.lol and adsb.one ship off (see above). Turning OpenSky off clears the
-  quota line and any pending OpenSky warning message.
+  adsb.lol, adsb.one, and FlightAware ship off (see above). Turning OpenSky
+  off clears the quota line and any pending OpenSky warning message.
 - **HUD counts** (`updateCounts()`) render as a pill per source, collapsed via
   `.source-count:empty` when the source is off. Between enabling a source and
   the poll it triggers landing, the slot holds a `.count-spinner` instead

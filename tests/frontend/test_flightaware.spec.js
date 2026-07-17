@@ -4,6 +4,9 @@ const { mockAllSources } = require('./helpers');
 test.beforeEach(async ({ page }) => {
   await mockAllSources(page);
   await page.goto('/');
+  // FlightAware ships off by default (paid/metered) — enable it for these tests.
+  await page.click('#toggle-flightaware');
+  await page.waitForTimeout(300);
 });
 
 test('FlightAware markers render from fixture data', async ({ page }) => {

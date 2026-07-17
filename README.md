@@ -18,8 +18,8 @@ renders aircraft as color-coded markers.
     behind a Cloudflare block)*
   - [airplanes.live](https://airplanes.live/api-guide/) — green
   - [FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/) —
-    teal *(requires API key; matched to other sources by callsign, when matched
-    its route data enriches the main marker)*
+    teal *(requires API key, paid/metered so off by default; matched to other
+    sources by callsign, when matched its route data enriches the main marker)*
 
   Each source has its own toggle, and any of them failing degrades that one
   source for a cycle rather than breaking the map.
