@@ -424,8 +424,11 @@ because photographer name and photo URL come from an external API.
   category in the surface-vehicle/obstacle range (OpenSky 16-20, ADSBExchange
   C1-C5), a known non-aircraft registration/type marker (`GROUND_VEHICLE_MARKERS`,
   currently just `"TWR"`), or a callsign matching the airport-ground-vehicle
-  pattern `^[A-Z]{4}\d{2}$` (e.g. "TXLU01"). On by default; toggling re-runs
-  `poll()` immediately like the other filters. Items it flags (whether shown
+  pattern `^[A-Z]{4}\d{2}$` (e.g. "TXLU01"). **Off by default** — ground
+  stations render as their own recognizable tower icon (see below) rather
+  than being filtered away, so there's no need to hide them by default the
+  way the old warning-triangle rendering arguably warranted; toggling it on
+  re-runs `poll()` immediately like the other filters. Items it flags (whether shown
   or hidden) carry `isGroundVehicle: true` on their render item; `iconFor()`
   draws `towerIcon()` (a cell-tower glyph, fixed neutral grey — not
   source-colored, since these aren't really an aircraft "source" reading in

@@ -11,14 +11,15 @@ test.beforeEach(async ({ page }) => {
 test('renders exact marker counts per source with the 3-way dedup chain applied', async ({ page }) => {
   // states.json: 5 OpenSky entries, all rendered (none are junk/filtered by default).
   // adsbfi.json: "dddddd" duplicates an OpenSky entry (hidden), "eeeeee" is unique
-  //   (shown), the TWR + callsign-pattern entries are hidden by the default junk filter.
+  //   (shown); the TWR + callsign-pattern entries are also shown, since "Hide
+  //   non-aircraft" ships off by default.
   // airplaneslive.json: "dddddd" duplicates OpenSky and "eeeeee" duplicates adsb.fi's
   //   unique entry (both hidden), only "ffffff" is uniquely its own (shown).
   const counts = await colorCounts(page);
-  expect(counts).toEqual({ blue: 5, red: 1, green: 1 });
+  expect(counts).toEqual({ blue: 5, red: 3, green: 1 });
 
   const total = await page.evaluate(() => document.getElementById('count').textContent);
-  expect(total).toBe('7');
+  expect(total).toBe('9');
 });
 
 test('overlapping aircraft is deduped (not drawn twice) and its OpenSky sidebar is enriched', async ({ page }) => {
@@ -59,5 +60,5 @@ test('disabling then re-enabling a source restores its markers immediately (no 1
 
   await page.click('#toggle-adsbfi');
   await page.waitForTimeout(600); // well under the 12s poll interval
-  expect((await colorCounts(page)).red).toBe(1);
+  expect((await colorCounts(page)).red).toBe(3);
 });

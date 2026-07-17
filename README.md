@@ -37,9 +37,9 @@ color-coded markers.
   click, and is cached client-side.
 - **Filters**: airborne/on-ground, aircraft category (unified across
   OpenSky's numeric codes and the other sources' letter+digit codes), a
-  metric/imperial unit toggle, and a "hide non-aircraft" toggle that flags
-  ground vehicles and reference beacons (e.g. tower test transponders)
-  misreported alongside real traffic.
+  metric/imperial unit toggle, and a "hide non-aircraft" toggle (off by
+  default) that flags ground vehicles and reference beacons (e.g. tower
+  test transponders) misreported alongside real traffic.
 - **Icons by category** — marker glyph selection is wired up per aircraft
   category (fixed-wing weight classes, rotorcraft, UAV); most currently
   share one placeholder glyph pending better-looking artwork, but ground

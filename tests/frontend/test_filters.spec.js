@@ -34,17 +34,19 @@ test('category dropdown filters to an exact count', async ({ page }) => {
   await page.click('#category-filter .dropdown-trigger');
   await page.click('#category-filter .dropdown-option[data-value="all"]');
   await page.waitForTimeout(500);
-  expect(await page.evaluate(() => document.getElementById('count').textContent)).toBe('7');
+  // 7 real aircraft + 2 non-aircraft entries, shown by default now that
+  // "Hide non-aircraft" ships off.
+  expect(await page.evaluate(() => document.getElementById('count').textContent)).toBe('9');
 });
 
-test('Hide non-aircraft hides junk by default and reveals it with a tower icon when disabled', async ({ page }) => {
+test('non-aircraft entries are shown with a tower icon by default and hidden when the filter is enabled', async ({ page }) => {
   let counts = await colorCounts(page);
-  expect(counts.red).toBe(1); // TWR + callsign-pattern entries hidden by default
+  expect(counts.red).toBe(3); // both junk entries shown by default alongside the real one
+  expect(await iconClassCounts(page, 'ground-icon')).toBe(2); // the TWR and callsign-pattern entries specifically
 
   await page.click('#toggle-hide-junk');
   await page.waitForTimeout(600);
   counts = await colorCounts(page);
-  expect(counts.red).toBe(3); // both junk entries now shown alongside the real one
-
-  expect(await iconClassCounts(page, 'ground-icon')).toBe(2); // the TWR and callsign-pattern entries specifically
+  expect(counts.red).toBe(1); // TWR + callsign-pattern entries now hidden
+  expect(await iconClassCounts(page, 'ground-icon')).toBe(0);
 });
