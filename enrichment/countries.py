@@ -1,21 +1,12 @@
-"""The Country entity: name + ISO code + flag, all in one place.
+"""The Country entity: name + ISO code, all in one place.
 
 Every other enrichment module (registration.py, callsign.py,
 aircraft_database.py) stores only an ISO code and resolves the display name
-and flag through country_by_iso() — so "Czech Republic" and its flag are
-spelled exactly once, here.
+through country_by_iso() — so "Czech Republic" is spelled exactly once,
+here. Flag rendering is a frontend presentation concern (static/index.html's
+flagHtml(), via the flag-icons SVG library) — this module only ever hands
+out the ISO code, never a rendered flag.
 """
-
-
-def _flag_emoji(iso_code):
-    """2-letter ISO code -> Unicode regional-indicator flag emoji.
-
-    Modeled as its own function (not inlined into each country record by
-    hand) so the emoji rendering can later be swapped for something else
-    (e.g. an image asset) without touching any of the country data itself.
-    """
-    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in iso_code.upper())
-
 
 COUNTRIES = [
     {"name": "United States", "iso": "US"},
@@ -41,14 +32,27 @@ COUNTRIES = [
     {"name": "United Arab Emirates", "iso": "AE"},
 ]
 # Extendable placeholder set, not exhaustive — add more entries as needed.
-for _c in COUNTRIES:
-    _c["flag"] = _flag_emoji(_c["iso"])
-
 COUNTRIES_BY_ISO = {c["iso"]: c for c in COUNTRIES}
+COUNTRIES_BY_NAME = {c["name"].lower(): c["iso"] for c in COUNTRIES}
 
 
 def country_by_iso(iso_code):
-    """Returns {"name", "iso", "flag"} for a 2-letter ISO code, or None."""
+    """Returns {"name", "iso"} for a 2-letter ISO code, or None."""
     if not iso_code:
         return None
     return COUNTRIES_BY_ISO.get(iso_code.upper())
+
+
+def country_iso_for_name(name):
+    """Reverse lookup: country name -> ISO code, or None.
+
+    Lets a live-sourced country string (e.g. OpenSky's own origin_country)
+    still get a flag when its exact name happens to match this table — the
+    flag is then a presentation add-on for a value whose source/confidence
+    stay exactly as they were, not an enrichment result in its own right.
+    Exact case-insensitive match only; no fuzzy matching, since a wrong
+    match would show the wrong flag rather than just no flag.
+    """
+    if not name:
+        return None
+    return COUNTRIES_BY_NAME.get(name.strip().lower())

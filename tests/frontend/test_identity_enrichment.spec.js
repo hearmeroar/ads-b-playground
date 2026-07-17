@@ -108,6 +108,37 @@ test('live values are never overwritten by enrichment, even a contradicting one'
   expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky']);
 });
 
+test('a live-sourced country still gets a flag when the backend recognizes its name, without becoming a Flywme field', async ({ page }) => {
+  // "dddddd"'s live country is fixture-only ("Testland", not a real
+  // country), so this simulates what the real backend computes when a
+  // live country's name *does* match countries.py: country_iso present
+  // alongside source "live" — see enrich_identity()'s country_iso_for_name.
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: { value: 'Testland', source: 'live', confidence: 1.0, country_iso: 'CZ' },
+    operator: null, registration: null, manufacturer: null, model: null, year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await page.click('#toggle-dev-mode');
+  await selectAircraft(page, 'dddddd', 'opensky');
+
+  const flagPresent = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Country:');
+    let node = b.nextSibling;
+    while (node) {
+      if (node.nodeType === 1 && node.classList.contains('fi')) return node.className;
+      if (node.nodeType === 1 && node.tagName === 'BR') break;
+      node = node.nextSibling;
+    }
+    return null;
+  });
+  expect(flagPresent).toBe('fi fi-cz');
+
+  // Still attributed to OpenSky, not Flywme — the flag is a presentation
+  // add-on, not a sign the value itself was enriched.
+  expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky']);
+});
+
 test('Registration is excluded from the Unknown-treatment: hidden/shown by the normal rule, not forced', async ({ page }) => {
   // Default all-null identity mock from beforeEach/mockAllSources.
   await page.goto('/');

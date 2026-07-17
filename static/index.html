@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>Live Aircraft — Serbia & Neighboring Region</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="flag-icons/css/flag-icons.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -589,17 +590,22 @@ function buildMergedDetails(icao24) {
   const enrichment = enrichmentById.get(icao24);
   if (enrichment) {
     for (const [beKey, feKey] of Object.entries(ENRICHMENT_FIELD_MAP)) {
-      const already = info[feKey] != null && info[feKey] !== '';
       const resolved = enrichment[beKey];
+      // A flag can attach to the country's ISO regardless of which source
+      // supplied the country text itself — the backend resolves country_iso
+      // for a "live" value too when its name matches a known country, so
+      // this must run even when the value itself is already live (i.e.
+      // before the "already resolved, skip" check below, which only guards
+      // the *value*, not the flag).
+      if (beKey === 'country' && resolved && resolved.country_iso && !info.countryIso) {
+        info.countryIso = resolved.country_iso;
+      }
+      const already = info[feKey] != null && info[feKey] !== '';
       if (already || !resolved) continue;
       info[feKey] = resolved.value;
       fieldSources[feKey] = ['flywme'];
       fieldConfidence[feKey] = resolved.confidence;
       fieldComputationBasis[feKey] = resolved.source;
-      if (beKey === 'country') {
-        info.countryIso = resolved.country_iso;
-        info.countryFlag = resolved.flag;
-      }
     }
   }
   return { info, fieldSources, fieldConfidence, fieldComputationBasis };
@@ -1386,6 +1392,20 @@ function formatDbFlags(flags) {
   return labels.length ? labels.join(', ') : null;
 }
 
+// Renders a small SVG flag for a 2-letter ISO 3166-1 alpha-2 country code,
+// via the flag-icons library (vendored at static/flag-icons/, linked in
+// <head> — see https://github.com/lipis/flag-icons). Accepts upper- or
+// lowercase; anything missing or not a plausible 2-letter code renders
+// nothing rather than a broken/half-built element. flag-icons' own CSS
+// sizes the flag relative to font-size (~1.33em wide), which lands in the
+// 16–24px range at this sidebar's text size without any extra sizing here.
+function flagHtml(iso2) {
+  if (!iso2 || typeof iso2 !== 'string') return '';
+  const code = iso2.trim().toLowerCase();
+  if (!/^[a-z]{2}$/.test(code)) return '';
+  return '<span class="fi fi-' + code + '" aria-hidden="true"></span>';
+}
+
 // --- Unit-aware formatters (metric ⇄ imperial, see currentUnitSystem) ---
 // Every value normalizeOpenSky()/normalizeAdsbExchange() produce is stored
 // in one canonical unit (meters, km/h, m/s, knots for airspeeds/wind — the
@@ -1510,14 +1530,16 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     return '<div class="detail-group"><div class="detail-group-title">' + title + '</div>' +
       filtered.join('<br>') + '</div>';
   }
-  // Flag always leads the country name (see enrichment/countries.py — flag
-  // is part of the Country entity, computed alongside name/iso). Only ever
-  // present when country was resolved via enrichment; a raw live string
-  // (e.g. OpenSky's own origin_country) carries no ISO code to derive one
-  // from, so it renders without a flag — a known limitation, not solved
-  // here (would need fragile name-matching against countries.py).
+  // Flag always leads the country name, rendered via flagHtml() from
+  // info.countryIso. Only ever present when country was resolved via
+  // enrichment (enrich_identity() always resolves country_iso alongside
+  // the name); a raw live string (e.g. OpenSky's own origin_country)
+  // carries no ISO code to derive one from, so it renders without a flag —
+  // a known limitation, not solved here (would need fragile name-matching
+  // against enrichment/countries.py).
+  const countryFlagHtml = flagHtml(info.countryIso);
   const countryValue = info.originCountry
-    ? (info.countryFlag ? info.countryFlag + ' ' + info.originCountry : info.originCountry)
+    ? (countryFlagHtml ? countryFlagHtml + ' ' + info.originCountry : info.originCountry)
     : null;
   const identity = renderGroup('Identity', [
     detailRow('ICAO', info.icao24 ? info.icao24.toUpperCase() : null, 'icao24'),

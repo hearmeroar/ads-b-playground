@@ -212,6 +212,21 @@ html, body { margin: 0; padding: 0; height: 100%; }
   color: var(--muted); margin-bottom: 5px;
 }
 
+/* Country flag (flag-icons SVG library, see static/flag-icons/) inline
+   before the country name in the sidebar's Identity group. flag-icons
+   sizes .fi via line-height + a ":before{content:' '}" trick, which Safari
+   and Chromium compute differently against this sidebar's own line-height
+   (1.7) — Safari lands the flag a few px below the text (confirmed via
+   WebKit's own engine, not just Chromium, which looked fine on its own).
+   Pinning an explicit height and switching to vertical-align: middle
+   (relative to the whole line box, not a hand-tuned baseline offset) fixes
+   it consistently across engines instead of chasing another magic number. */
+#sidebar-details .fi {
+  width: 18px; height: 13px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
 /* Dev mode: per-field source provenance dots + their click-to-toggle tooltip */
 #sidebar-details .source-badge {
   display: inline-block; width: 7px; height: 7px; border-radius: 50%;

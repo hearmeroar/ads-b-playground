@@ -32,7 +32,7 @@ PREFIX_TO_ISO = {
 
 
 def lookup_country_by_registration(registration):
-    """Registration string -> {"country", "country_iso", "flag", "source",
+    """Registration string -> {"country", "country_iso", "source",
     "confidence"} or None.
 
     Handles both dash-separated marks ("OK-SWC" -> prefix "OK") and
@@ -57,7 +57,6 @@ def lookup_country_by_registration(registration):
                 return {
                     "country": country["name"],
                     "country_iso": country["iso"],
-                    "flag": country["flag"],
                     "source": "registration_prefix",
                     "confidence": 1.0,
                 }

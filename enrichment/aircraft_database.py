@@ -22,7 +22,7 @@ class AircraftDatabaseLookup:
 
 
 # Keyed by lowercase hex. country_iso resolved through countries.py so the
-# country name/flag stay in sync with every other module.
+# country name stays in sync with every other module.
 _PLACEHOLDER_RECORDS = {
     "49d3d3": {
         "registration": "OK-SWC", "operator": "Smartwings", "country_iso": "CZ",
@@ -71,7 +71,6 @@ class StaticAircraftDatabaseLookup(AircraftDatabaseLookup):
             "operator": record.get("operator"),
             "country": country["name"] if country else None,
             "country_iso": country["iso"] if country else None,
-            "flag": country["flag"] if country else None,
             "manufacturer": record.get("manufacturer"),
             "model": record.get("model"),
             "year_built": record.get("year_built"),

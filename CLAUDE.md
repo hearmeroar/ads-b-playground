@@ -433,10 +433,10 @@ because photographer name and photo URL come from an external API.
   `OPENSKY_CATEGORY_LABELS` are).
   - **`enrichment/`** (new, root-level, sibling to `static/`/`tests/`/
     `schema/` — the first backend module that isn't an HTTP-proxy):
-    `countries.py` is the Country entity (`{name, iso, flag}`, flag a
-    Unicode regional-indicator emoji computed once at import from `iso` —
-    modeled as its own field specifically so it can later swap to an image
-    without touching country-name logic); `registration.py` maps ICAO/ITU
+    `countries.py` is the Country entity (`{name, iso}` — this module never
+    renders a flag itself, only ever hands out the ISO code; see the
+    frontend `flagHtml()` note below for where the actual flag rendering
+    lives); `registration.py` maps ICAO/ITU
     registration prefixes (real, stable nationality marks, e.g. `OK`→Czech
     Republic, `N`→United States) to a country, longest-prefix-match;
     `callsign.py` maps ICAO 3-letter airline designators to an operator
@@ -495,12 +495,37 @@ because photographer name and photo URL come from an external API.
     regardless of `currentDevMode`. Registration is deliberately excluded
     from this treatment (stays on plain `detailRow`) — the spec's
     "Unknown" list names Country/Operator/Manufacturer/Model/Year built
-    only. Country's flag (`info.countryFlag`, only ever set when country
-    came through enrichment, which always carries one) leads the country
-    name; a raw live string like OpenSky's own `origin_country` has no ISO
-    code to derive a flag from, so it renders without one — a known,
-    accepted limitation rather than something solved via fragile name-
-    matching against `countries.py`.
+    only. Country's flag leads the country name, rendered by `flagHtml(iso2)`
+    (`static/index.html`) from `info.countryIso` — a small SVG via the
+    [flag-icons](https://github.com/lipis/flag-icons) library
+    (`<span class="fi fi-cz">`), vendored at `static/flag-icons/` (`css/` +
+    `flags/4x3/`, plus its `LICENSE`, copied from the npm package the same
+    way `static/ADS-B_Radar_Free_Aircraft_SVG_Icons/` is vendored — no
+    build step, just static files, `flag-icons/css/flag-icons.min.css`
+    linked in `<head>`). Only the `4x3` (rectangular) variant is vendored,
+    not `1x1` (square) — its CSS rules reference `../flags/1x1/*.svg` for
+    the unused `.fis` modifier class, but browsers only fetch a
+    `background-image` when the rule actually matches a rendered element,
+    so those never-applied rules never 404. `flagHtml()` accepts upper- or
+    lowercase and returns `''` for anything that isn't a plausible 2-letter
+    code, so a missing/invalid ISO degrades to no flag rather than a broken
+    element. **The flag shows regardless of which source supplied the
+    country** — not just enrichment-resolved ones. `enrich_identity()`'s
+    country tier always tries `country_iso_for_name()` (`enrichment/
+    countries.py`, an exact case-insensitive reverse lookup: name → ISO)
+    even for a `"live"`-sourced value, attaching `country_iso` alongside it
+    without touching its `source`/`confidence` — a flag is a presentation
+    add-on, never a sign the value itself was enriched. On the frontend,
+    `buildMergedDetails()` picks up `resolved.country_iso` unconditionally
+    (before the "value already resolved, skip" check that guards the
+    *value*, which does not gate the flag). First implementation only set
+    `info.countryIso` on the enrichment path, so a country already known
+    from a live feed (e.g. OpenSky's own `origin_country`) silently never
+    got a flag — fixed by moving the ISO lookup earlier on the backend and
+    decoupling it from the value-overwrite guard on the frontend. A country
+    string that matches nothing in `countries.py`'s placeholder set (not
+    exhaustive) still renders without a flag — a real, accepted limitation,
+    not a bug.
   - **Pitfall hit once, worth remembering**: `Object.keys(SOURCE_COLORS)`
     is iterated in a few places (the per-source toggle wiring, HUD count
     updates, the startup spinner loop) under the assumption that every

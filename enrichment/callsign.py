@@ -35,10 +35,10 @@ COUNTRY_CONFIDENCE = 0.6
 
 def decode_callsign(callsign):
     """Callsign string -> {"operator", "source", "confidence", "country",
-    "country_iso", "flag", "country_confidence"} or None.
+    "country_iso", "country_confidence"} or None.
 
-    "country"/"country_iso"/"flag"/"country_confidence" are only present
-    when the designator's home country is in countries.py.
+    "country"/"country_iso"/"country_confidence" are only present when the
+    designator's home country is in countries.py.
     """
     if not callsign:
         return None
@@ -56,6 +56,5 @@ def decode_callsign(callsign):
     if country:
         result["country"] = country["name"]
         result["country_iso"] = country["iso"]
-        result["flag"] = country["flag"]
         result["country_confidence"] = COUNTRY_CONFIDENCE
     return result

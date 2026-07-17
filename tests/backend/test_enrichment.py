@@ -30,7 +30,7 @@ def test_registration_prefix_examples():
 def test_registration_prefix_result_shape():
     result = lookup_country_by_registration("OK-SWC")
     assert result["country"] == "Czech Republic"
-    assert result["flag"] == "🇨🇿"
+    assert result["country_iso"] == "CZ"
     assert result["source"] == "registration_prefix"
     assert result["confidence"] == 1.0
 
@@ -118,6 +118,22 @@ def test_enrich_identity_country_live_wins():
     result = enrich_identity("49d3d3", registration="OK-SWC", known_country="Elsewhere")
     assert result["country"]["value"] == "Elsewhere"
     assert result["country"]["source"] == "live"
+
+
+def test_enrich_identity_country_live_still_gets_a_flag_when_name_matches():
+    # A flag can attach to a live-sourced country without changing its
+    # source/confidence — a presentation add-on, not enrichment.
+    result = enrich_identity("ffffff", known_country="Czech Republic")
+    assert result["country"]["value"] == "Czech Republic"
+    assert result["country"]["source"] == "live"
+    assert result["country"]["country_iso"] == "CZ"
+
+
+def test_enrich_identity_country_live_unrecognized_name_has_no_iso():
+    result = enrich_identity("ffffff", known_country="Not A Real Country")
+    assert result["country"]["value"] == "Not A Real Country"
+    assert result["country"]["source"] == "live"
+    assert "country_iso" not in result["country"]
 
 
 def test_enrich_identity_country_registration_prefix_tier():

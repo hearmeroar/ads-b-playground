@@ -67,9 +67,11 @@ renders aircraft as color-coded markers.
   ICAO airline callsign designators, aircraft-type normalization) — no
   external API, no database, and never overrides a value a live feed
   already supplied. Unresolved fields show "Unknown" rather than a blank
-  row. In dev mode, a computed value gets a black "Flywme" dot (this
-  application, as a data source in its own right) whose tooltip names the
-  technique and confidence behind it.
+  row. Country renders with a small SVG flag (the
+  [flag-icons](https://github.com/lipis/flag-icons) library, vendored
+  locally — no build step). In dev mode, a computed value gets a black
+  "Flywme" dot (this application, as a data source in its own right) whose
+  tooltip names the technique and confidence behind it.
 - Optional OAuth2 auth against OpenSky for a much higher daily quota than
   anonymous access.
 
@@ -126,6 +128,9 @@ A handful of plain files carry all the logic:
 - `static/index.html` — the entire frontend: Leaflet map, polling, marker
   rendering, filters, and the photo/track features, all inline JS.
 - `static/style.css` — the frontend's styling, linked from `index.html`.
+- `static/flag-icons/` — the [flag-icons](https://github.com/lipis/flag-icons)
+  SVG library (CSS + `flags/4x3/`), vendored as plain files (via `npm install
+  flag-icons` then a one-time copy — no runtime npm dependency, no build step).
 
 Alongside them, `schema/aircraft.schema.json` documents the normalized
 aircraft shape the sidebar renders — every field, with the raw source field
