@@ -12,15 +12,25 @@ function ac(hex, category) {
   };
 }
 
-test('heavy, high performance, high vortex large and UAV categories render their dedicated icons', async ({ page }) => {
+test('dedicated category icons render with their distinct CSS classes', async ({ page }) => {
   await mockAllSources(page);
+  // Empty all sources except airplaneslive so we only count our test data.
   await page.route('**/api/states', (r) => r.fulfill({ json: { states: [] } }));
-  await page.route('**/api/adsbfi', (r) => r.fulfill({
+  await page.route('**/api/adsbfi', (r) => r.fulfill({ json: { ac: [] } }));
+  await page.route('**/api/airplaneslive', (r) => r.fulfill({
     json: {
       ac: [
+        ac('light01', 'A1'),
+        ac('small01', 'A2'),
+        ac('large01', 'A3'),
+        ac('hvort01', 'A4'),
         ac('heavy01', 'A5'),
         ac('hperf01', 'A6'),
-        ac('hvort01', 'A4'),
+        ac('rotor01', 'A7'),
+        ac('glider01', 'B1'),
+        ac('lta0001', 'B2'),
+        ac('para0001', 'B3'),
+        ac('ultra01', 'B4'),
         ac('uav0001', 'B6'),
       ],
     },
@@ -30,9 +40,16 @@ test('heavy, high performance, high vortex large and UAV categories render their
   await page.waitForSelector('.leaflet-marker-icon');
   await page.waitForTimeout(500);
 
+  expect(await iconClassCounts(page, 'light-icon')).toBe(1);
+  expect(await iconClassCounts(page, 'small-icon')).toBe(1);
+  expect(await iconClassCounts(page, 'large-icon')).toBe(1);
+  expect(await iconClassCounts(page, 'high-vortex-large-icon')).toBe(1);
+  expect(await iconClassCounts(page, 'heavy-icon')).toBe(1);
   expect(await iconClassCounts(page, 'high-performance-icon')).toBe(1);
+  expect(await iconClassCounts(page, 'rotorcraft-icon')).toBe(1);
+  expect(await iconClassCounts(page, 'glider-icon')).toBe(1);
+  expect(await iconClassCounts(page, 'lighter-than-air-icon')).toBe(1);
+  expect(await iconClassCounts(page, 'parachutist-icon')).toBe(1);
+  expect(await iconClassCounts(page, 'ultralight-icon')).toBe(1);
   expect(await iconClassCounts(page, 'uav-icon')).toBe(1);
-  // high_vortex_large deliberately reuses the "heavy" glyph/class, so both
-  // aircraft above count together here.
-  expect(await iconClassCounts(page, 'heavy-icon')).toBe(2);
 });

@@ -421,31 +421,27 @@ because photographer name and photo URL come from an external API.
   reused for both the filter check and icon selection below), rather than
   discarded after filtering.
 - **Marker icon by category:** `iconFor(item, color)` dispatches on
-  `item.categoryGroup` via the `ICON_BUILDERS` lookup table, one builder
-  per group (`light`, `small`, `large`, `heavy`, `high_performance`,
-  `high_vortex_large`, `rotorcraft`, `uav`) — the dispatch table, per-group
-  builder functions, and per-group CSS classes (`light-icon`, `heavy-icon`,
-  `rotorcraft-icon`, etc.) all exist for real. **Their drawn glyph is
-  currently a shared placeholder**, though: distinct hand-drawn silhouettes
-  for each group were tried and didn't look good, so every builder except
-  `smallIcon`/`towerIcon` currently renders `GENERIC_AIRCRAFT_GLYPH` (the
-  original default "flight" icon) via `genericGlyph()` — a deliberate, called
-  -out-in-code temporary state, not an oversight. Swapping in a better look
-  later is just replacing a given builder's `genericGlyph(color)` call with
-  its own `svgInner` markup — no change to `iconFor()`, `ICON_BUILDERS`, or
-  the CSS classes is needed. `high_vortex_large` separately reuses the
-  `heavy` builder specifically (rather than the shared placeholder
-  directly), since conceptually the two should probably always look alike
-  even once real glyphs exist. Any category group absent from `ICON_BUILDERS` (`glider`,
-  `lighter_than_air`, `parachutist`, `ultralight`, `space`, `unknown`) falls
-  through to the plain default `planeIcon()`. `rotatedDivIcon()` is the
-  shared builder every rotating icon goes through; it stamps a `data-color`
-  attribute on the marker's wrapper `<div>` recording the source color
-  regardless of how many colored `<path>`s the glyph itself uses — this is
-  what lets tests count markers by source color (`colorCounts()` in
-  `tests/frontend/helpers.js`) without assuming "exactly one colored path
-  per icon," which broke in an earlier session when a multi-path icon was
-  introduced without this indirection.
+  `item.categoryGroup` via the `ICON_BUILDERS` lookup table. Each category
+  group (`light`, `small`, `large`, `heavy`, `high_performance`,
+  `high_vortex_large`, `rotorcraft`, `glider`, `lighter_than_air`,
+  `parachutist`, `ultralight`, `uav`) has its own dedicated SVG glyph from
+  the ADS-B Radar free icon set (`static/ADS-B_Radar_Free_Aircraft_SVG_Icons/`,
+  mapped 1:1 by DO-260B code: `a1.svg`–`a7.svg`, `b1.svg`–`b4.svg`), rendered
+  inline at 200×200 viewBox and scaled down to 28×28 marker pixels. Glyphs
+  are colored per source (see `SOURCE_COLORS`) via a wrapping `<g
+  fill="COLOR">` and outlined in white with `vector-effect="non-scaling-stroke"`
+  to keep the outline a constant ~1px on-screen regardless of scale. Category
+  groups absent from `ICON_BUILDERS` (`space`, `unknown`) fall through to the
+  plain default `planeIcon()` (Material Design "flight" icon, 24×24 viewBox).
+  `uav` is also kept as a generic glyph since the icon set has no dedicated
+  UAV artwork. `rotatedDivIcon()` is the shared builder every rotating icon
+  goes through; it stamps a `data-color` attribute on the marker's wrapper
+  `<div>` recording the source color regardless of how many colored `<path>`s
+  the glyph itself uses — this is what lets tests count markers by source
+  color (`colorCounts()` in `tests/frontend/helpers.js`) without assuming
+  "exactly one colored path per icon." The required attribution for the ADS-B
+  Radar icon set is shown in the sidebar footer (visible when any aircraft
+  details are open).
 - **Hide non-aircraft filter:** `looksLikeGroundVehicle()` flags surface
   vehicles/obstacles/reference beacons reported alongside real aircraft —
   category in the surface-vehicle/obstacle range (OpenSky 16-20, ADSBExchange

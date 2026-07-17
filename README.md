@@ -43,11 +43,11 @@ renders aircraft as color-coded markers.
   metric/imperial unit toggle, and a "hide non-aircraft" toggle (off by
   default) that flags ground vehicles and reference beacons (e.g. tower
   test transponders) misreported alongside real traffic.
-- **Icons by category** — marker glyph selection is wired up per aircraft
-  category (fixed-wing weight classes, rotorcraft, UAV); most currently
-  share one placeholder glyph pending better-looking artwork, but ground
-  vehicles/reference beacons already get their own neutral-grey cell-tower
-  icon instead of an aircraft glyph.
+- **Icons by category** — each aircraft category (fixed-wing weight classes,
+  rotorcraft, glider, lighter-than-air, parachutist, ultralight, UAV) renders
+  with its own distinct SVG silhouette from the
+  [ADS-B Radar free icon set](https://adsb-radar.com/). Ground vehicles and
+  reference beacons get their own neutral-grey cell-tower icon.
 - **Quota-aware** — OpenSky's two independent daily quotas (map data and
   flight history) are each surfaced with a `(?)` explaining what ran out and
   counting down to when it returns. An exhausted map-data quota auto-disables

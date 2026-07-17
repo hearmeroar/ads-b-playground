@@ -253,6 +253,9 @@
   .gallery-dot.active { background: #1a73e8; }
   .gallery-credit { font-size: 11px; color: var(--muted); padding: 0 18px 14px; }
   .gallery-credit a { color: inherit; }
+  #sidebar-icon-credit { font-size: 11px; color: var(--muted); padding: 10px 18px 14px; border-top: 1px solid var(--border); text-align: center; }
+  #sidebar-icon-credit a { color: var(--muted); text-decoration: underline; }
+  #sidebar-icon-credit a:hover { color: var(--ink); }
 </style>
 </head>
 <body>
@@ -266,6 +269,10 @@
   <button type="button" id="sidebar-close" aria-label="Close">&times;</button>
   <div id="sidebar-gallery"></div>
   <div id="sidebar-details"></div>
+  <div id="sidebar-icon-credit">
+    Aircraft icons by <a href="https://adsb-radar.com" target="_blank" rel="noopener">ADS-B Radar</a>
+    for <a href="https://apps.apple.com/app/id1538149835" target="_blank" rel="noopener">macOS</a>
+  </div>
 </div>
 
 <div id="hud">
@@ -1106,12 +1113,13 @@ async function loadGallery(icao24, registration) {
 // glyph itself has — this is what lets tests count markers by source color
 // without depending on each icon having exactly one colored path (see
 // colorCounts() in tests/frontend/helpers.js).
-function rotatedDivIcon(cssClass, size, anchor, headingDeg, color, svgInner) {
+function rotatedDivIcon(cssClass, size, anchor, headingDeg, color, svgInner, viewBox) {
   const heading = Number.isFinite(headingDeg) ? headingDeg : 0;
+  const vb = viewBox || '0 0 24 24';
   const html =
     '<div class="plane-icon ' + cssClass + '" data-color="' + color + '" ' +
          'style="transform: rotate(' + heading + 'deg)">' +
-      '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24">' + svgInner + '</svg>' +
+      '<svg width="' + size + '" height="' + size + '" viewBox="' + vb + '">' + svgInner + '</svg>' +
     '</div>';
   return L.divIcon({ className: '', html: html, iconSize: [size, size], iconAnchor: [anchor, anchor] });
 }
@@ -1125,13 +1133,10 @@ function planeIcon(headingDeg, color) {
           'L13,19v-5.5L21,16z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
 }
 
-// TEMPORARY: the distinct per-category silhouettes below (light/large/heavy/
-// high_performance/rotorcraft/uav) didn't look good, so every aircraft
-// category is drawn with the plain "small"/default glyph for now, until
-// better-looking replacements exist. The categoryGroup dispatch table and
-// per-category CSS classes are kept as-is on purpose — swapping the look
-// back in later is just editing each function's svgInner, nothing
-// structural. Only the ground/tower icon keeps its real glyph.
+// Default glyph (Material Design "flight" icon, 24×24 viewBox) — used for
+// aircraft categories without dedicated per-category artwork: uav (no icon
+// available in source set), space (no icon available), and as the fallback
+// for unknown categories.
 const GENERIC_AIRCRAFT_GLYPH =
   '<path d="M21,16v-2l-8-5V3.5C13,2.67,12.33,2,11.5,2S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2.5,1.5V22l4-1l4,1v-1.5' +
         'L13,19v-5.5L21,16z" fill="COLOR" stroke="#fff" stroke-width="0.8"/>';
@@ -1140,44 +1145,108 @@ function genericGlyph(color) {
   return GENERIC_AIRCRAFT_GLYPH.replace(/COLOR/g, color);
 }
 
-// Light (OpenSky cat 2 / ADSBExchange A1).
-function lightIcon(headingDeg, color) {
-  return rotatedDivIcon('light-icon', 28, 14, headingDeg, color, genericGlyph(color));
+// Per-category glyphs from ADS-B Radar icon set, mapped by DO-260B category
+// code (200×200 viewBox). Each wrapped in <g> with source color and
+// vector-effect="non-scaling-stroke" for constant outline thickness.
+const LIGHT_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 137.678 -39.456 C 137.678 -41.883 134.94 -44.391 133.645 -44.391 C 130.326 -44.391 135.025 -44.391 128.237 -44.391 L 109.354 -44.391 C 106.278 -44.391 101.866 -46.186 99.913 -48.286 L 99.913 -91.597 C 98.693 -92.916 94.12 -96.731 90.472 -96.731 C 86.824 -96.731 80.299 -93.16 81.031 -91.597 L 71.59 -44.391 L 62.149 -44.391 L 33.822 -39.639 C 33.825 -40.147 33.825 -57.191 33.825 -63.273 C 33.825 -67.493 21.167 -63.273 21.167 -63.273 C 19.703 -63.273 20.894 -55.345 20.979 -53.858 C 20.894 -53.832 16.125 -41.44 16.143 -34.95 C 16.161 -28.451 21.006 -16.068 21.006 -16.068 C 21.006 -14.506 19.141 -6.626 21.176 -6.6129999999999995 C 20.605 -6.626 33.825 -2.219 33.825 -6.626 C 33.825 -13.832 33.825 -30.235 33.825 -30.235 L 62.149 -25.509 L 71.59 -25.509 L 81.031 21.697 C 80.299 23.21 86.998 25.911 90.472 25.911 C 93.946 25.911 98.693 23.015 99.913 21.697 L 99.913 -20.794 C 101.866 -22.943 106.278 -25.509 109.354 -25.509 L 128.237 -25.509 C 135.418 -25.509 130.239 -25.509 133.62 -25.485 C 135.593 -25.509 137.678 -28.025 137.678 -30.396 C 137.678 -30.396 146.133 -33.618 146.135 -34.95 C 146.137 -36.315 137.678 -39.456 137.678 -39.456 Z"/></g>';
+const SMALL_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 147.119 -34.95 C 147.119 -41.542 138.979 -44.391 128.237 -44.391 L 109.354 -44.391 C 106.278 -44.391 101.866 -46.186 99.913 -48.286 L 90.472 -91.597 C 89.252 -92.916 84.679 -97.135 81.031 -97.135 C 77.383 -97.135 70.858 -93.16 71.59 -91.597 L 73.978 -44.391 L 62.149 -44.391 C 62.149 -44.391 64.374 -51.607 62.149 -53.832 C 57.698 -58.283 47.717 -58.283 43.266 -53.832 C 41.041 -51.607 43.266 -44.391 43.266 -44.391 L 34.912 -43.555 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 19.737 -34.95 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 34.912 -26.953 L 43.451 -26.66 C 43.451 -26.66 40.791 -18.587 43.266 -16.068 C 47.678 -11.579 57.698 -11.617 62.149 -16.068 C 64.374 -18.293 62.149 -25.509 62.149 -25.509 L 73.978 -25.509 L 71.59 21.697 C 70.858 23.21 77.557 26.113 81.031 26.113 C 84.505 26.113 89.252 23.015 90.472 21.697 L 99.913 -20.794 C 101.866 -22.943 106.278 -25.509 109.354 -25.509 L 128.237 -25.509 C 138.979 -25.509 147.119 -28.358 147.119 -35.511 L 147.119 -34.95 Z"/></g>';
+const LARGE_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.254 C 147.119 -41.846000000000004 138.086 -46.68 127.344 -46.68 L 103.125 -46.68 C 100.049 -46.68 98.877 -47.168 96.924 -49.268 L 90.503 -56.217 L 90.503 -66.571 L 81.002 -66.571 L 59.277 -90.478 C 58.057 -91.797 56.592 -92.529 55.029 -92.529 L 48.438 -92.529 C 46.973 -92.529 46.143 -91.211 46.875 -89.648 L 66.26 -46.68 L 34.912 -43.555 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 34.912 -26.953 L 66.26 -23.877 L 46.875 19.141 C 46.143 20.654 46.973 21.973 48.438 21.973 L 55.029 21.973 C 56.592 21.973 58.057 21.24 59.277 19.922 L 81.069 -3.904 L 90.503 -3.927 L 90.503 -14.345 L 96.924 -21.24 C 98.877 -23.389 100.049 -23.877 103.125 -23.877 L 127.344 -23.877 C 138.086 -23.877 147.119 -28.662 147.119 -35.254 Z"/></g>';
+const HIGH_VORTEX_LARGE_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.254 C 147.119 -41.846000000000004 138.086 -46.68 127.344 -46.68 L 103.125 -46.68 C 100.049 -46.68 98.877 -47.168 96.924 -49.268 L 90.503 -56.217 L 90.503 -66.571 L 81.002 -66.571 L 59.277 -90.478 C 58.057 -91.797 56.592 -92.529 55.029 -92.529 L 48.438 -92.529 C 46.973 -92.529 46.143 -91.211 46.875 -89.648 L 66.26 -46.68 L 34.912 -43.555 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 24.384 -34.95 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 34.912 -26.953 L 66.26 -23.877 L 46.875 19.141 C 46.143 20.654 46.973 21.973 48.438 21.973 L 55.029 21.973 C 56.592 21.973 58.057 21.24 59.277 19.922 L 80.805 -3.927 L 90.503 -3.927 L 90.503 -14.345 L 96.924 -21.24 C 98.877 -23.389 100.049 -23.877 103.125 -23.877 L 127.344 -23.877 C 138.086 -23.877 147.119 -28.662 147.119 -35.254 Z"/></g>';
+const HEAVY_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.254 C 147.119 -41.846000000000004 138.086 -46.68 127.344 -46.68 L 103.125 -46.68 C 100.049 -46.68 98.877 -47.168 96.924 -49.268 L 90.503 -56.217 L 90.503 -66.571 L 81.002 -66.571 L 81.031 -82.156 L 66.863 -82.156 L 59.277 -90.478 C 58.057 -91.797 56.592 -92.529 55.029 -92.529 L 48.438 -92.529 C 46.973 -92.529 46.143 -91.211 46.875 -89.648 L 66.26 -46.68 L 34.912 -43.555 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 34.912 -26.953 L 66.26 -23.877 L 46.875 19.141 C 46.143 20.654 46.973 21.973 48.438 21.973 L 55.029 21.973 C 56.592 21.973 58.057 21.24 59.277 19.922 L 66.848 12.193 L 81.031 12.256 L 81.002 -3.927 L 90.503 -3.927 L 90.503 -14.345 L 96.924 -21.24 C 98.877 -23.389 100.049 -23.877 103.125 -23.877 L 127.344 -23.877 C 138.086 -23.877 147.119 -28.662 147.119 -35.254 Z"/></g>';
+const HIGH_PERFORMANCE_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 17.718 -10.644 L 24.384 -34.95 L 17.718 -59.193 L 22.376 -63.188 L 42.042 -45.053 L 46.445 -45.053 L 42.042 -78.667 L 53.954 -79.462 L 99.913 -44.391 C 99.913 -44.391 119.05 -46.566 128.237 -44.391 C 135.089 -42.769 147.119 -34.918 147.119 -34.918 C 147.119 -34.918 135.081 -27.123 128.237 -25.509 C 119.056 -23.344 99.939 -25.485 99.939 -25.485 L 53.954 9.636 L 42.042 8.831 L 46.445 -24.784 L 42.042 -24.784 L 22.376 -6.638 L 17.718 -10.644 Z"/></g>';
+const ROTORCRAFT_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 142.944 -44.391 C 139.538 -52.615 135.405 -50.329 128.237 -53.832 C 116.927 -59.359 102.102 -58.649 90.472 -53.832 C 82.248 -50.426 71.59 -40.893 71.59 -40.893 L 33.825 -40.893 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 24.384 -44.391 L 24.384 -25.509 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 33.822 -30.006 L 71.59 -29.975 C 71.59 -29.975 82.248 -19.474 90.472 -16.068 C 102.102 -11.25 116.937 -10.521 128.237 -16.068 C 135.379 -19.574 139.429 -17.285 142.835 -25.509 C 145.244 -31.324 145.353 -38.576 142.86 -44.422 L 142.944 -44.391 Z"/></g>';
+const GLIDER_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.509 C 147.119 -42.101 128.247 -40.196 128.247 -40.196 C 128.247 -40.196 121.869 -39.494 118.811 -40.229 C 115.479 -41.03 109.637 -44.871 109.637 -44.871 C 109.637 -44.871 109.637 -82.316 109.637 -97.762 C 109.637 -101.182 99.913 -101.038 99.913 -101.038 C 98.849 -102.188 99.913 -59.556 97.974 -44.881 C 96.725 -42.05 90.503 -40.229 90.503 -40.229 L 24.386 -38.787 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 14.943 -34.95 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 24.386 -32.234 L 90.503 -30.858 C 90.503 -30.858 96.893 -28.325 97.974 -26.14 C 100.715 -9.365 99.913 28.489 99.939 30.016 C 99.181 30.002 109.637 30.048 109.637 26.756 C 109.637 11.297 109.637 -26.148 109.637 -26.148 C 111.59 -28.297 115.471 -30.44 119.008 -30.858 C 122.368 -30.977 128.247 -30.826 128.247 -30.826 C 128.247 -30.826 147.119 -28.917 147.119 -35.509 Z"/></g>';
+const LIGHTER_THAN_AIR_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><ellipse cx="100" cy="100.1" rx="46.209" ry="85.8"/></g>';
+const PARACHUTIST_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 142.86 28.6 L 171.432 57.2 L 185.718 100.1 L 171.432 143 L 142.86 171.6 L 100.002 185.9 L 57.144 171.6 L 28.572 143 L 14.286 100.1 L 28.572 57.2 L 57.144 28.6 L 100.002 14.3 L 142.86 28.6 Z"/><circle cx="100" cy="100" r="12.48" style="fill: rgb(255, 255, 255);"/></g>';
+const ULTRALIGHT_GLYPH = '<g fill="COLOR" stroke="#fff" stroke-width="6" vector-effect="non-scaling-stroke"><path d="M 147.64 -35.505 C 147.64 -42.097 91.064 -101.03 91.064 -101.03 C 90.511 -101.627 91.418 -78.099 91.418 -78.099 L 82.048 -63.585 C 82.048 -63.585 98.395 -44.866 91.418 -44.866 C 72.677 -44.866 72.677 -44.866 63.306 -44.866 C 60.254 -44.866 72.744 -40.081 72.677 -35.505 C 72.606 -30.724 60.117 -26.143 63.306 -26.143 C 72.677 -26.143 78.924 -26.143 91.418 -26.143 C 100.788 -26.143 82.048 -7.418 82.048 -7.418 L 91.418 7.087 L 91.09 30.024 C 91.09 30.024 147.64 -28.913 147.64 -35.505 Z"/></g>';
+
+function lightGlyph(color) {
+  return LIGHT_GLYPH.replace(/COLOR/g, color);
+}
+function smallGlyph(color) {
+  return SMALL_GLYPH.replace(/COLOR/g, color);
+}
+function largeGlyph(color) {
+  return LARGE_GLYPH.replace(/COLOR/g, color);
+}
+function highVortexLargeGlyph(color) {
+  return HIGH_VORTEX_LARGE_GLYPH.replace(/COLOR/g, color);
+}
+function heavyGlyph(color) {
+  return HEAVY_GLYPH.replace(/COLOR/g, color);
+}
+function highPerformanceGlyph(color) {
+  return HIGH_PERFORMANCE_GLYPH.replace(/COLOR/g, color);
+}
+function rotorcraftGlyph(color) {
+  return ROTORCRAFT_GLYPH.replace(/COLOR/g, color);
+}
+function gliderGlyph(color) {
+  return GLIDER_GLYPH.replace(/COLOR/g, color);
+}
+function lighterThanAirGlyph(color) {
+  return LIGHTER_THAN_AIR_GLYPH.replace(/COLOR/g, color);
+}
+function parachutistGlyph(color) {
+  return PARACHUTIST_GLYPH.replace(/COLOR/g, color);
+}
+function ultralightGlyph(color) {
+  return ULTRALIGHT_GLYPH.replace(/COLOR/g, color);
 }
 
-// Same silhouette as the pre-existing default glyph — already reads as a
-// small single-engine aircraft, a reasonable match for the "small" weight
-// class (OpenSky cat 3 / ADSBExchange A2).
+// Light (OpenSky cat 2 / ADSBExchange A1).
+function lightIcon(headingDeg, color) {
+  return rotatedDivIcon('light-icon', 28, 14, headingDeg, color, lightGlyph(color), '0 0 200 200');
+}
+
+// Small (OpenSky cat 3 / ADSBExchange A2).
 function smallIcon(headingDeg, color) {
-  return planeIcon(headingDeg, color);
+  return rotatedDivIcon('small-icon', 28, 14, headingDeg, color, smallGlyph(color), '0 0 200 200');
 }
 
 // Large (OpenSky cat 4 / ADSBExchange A3).
 function largeIcon(headingDeg, color) {
-  return rotatedDivIcon('large-icon', 28, 14, headingDeg, color, genericGlyph(color));
+  return rotatedDivIcon('large-icon', 28, 14, headingDeg, color, largeGlyph(color), '0 0 200 200');
 }
 
 // Heavy (OpenSky cat 6 / ADSBExchange A5).
 function heavyIcon(headingDeg, color) {
-  return rotatedDivIcon('heavy-icon', 28, 14, headingDeg, color, genericGlyph(color));
+  return rotatedDivIcon('heavy-icon', 28, 14, headingDeg, color, heavyGlyph(color), '0 0 200 200');
 }
 
 // High performance (OpenSky cat 7 / ADSBExchange A6).
 function highPerformanceIcon(headingDeg, color) {
-  return rotatedDivIcon('high-performance-icon', 28, 14, headingDeg, color, genericGlyph(color));
+  return rotatedDivIcon('high-performance-icon', 28, 14, headingDeg, color, highPerformanceGlyph(color), '0 0 200 200');
 }
 
-// High vortex large (747/A380-class, OpenSky cat 5 / ADSBExchange A4)
-// deliberately reuses the "heavy" builder — visually both read as
-// "extra-heavy" fixed-wing at marker size, and no distinct glyph is worth
-// inventing at this scale.
+// High vortex large (747/A380-class, OpenSky cat 5 / ADSBExchange A4).
 function highVortexLargeIcon(headingDeg, color) {
-  return heavyIcon(headingDeg, color);
+  return rotatedDivIcon('high-vortex-large-icon', 28, 14, headingDeg, color, highVortexLargeGlyph(color), '0 0 200 200');
 }
 
 // Rotorcraft (OpenSky cat 8 / ADSBExchange A7).
 function rotorcraftIcon(headingDeg, color) {
-  return rotatedDivIcon('rotorcraft-icon', 28, 14, headingDeg, color, genericGlyph(color));
+  return rotatedDivIcon('rotorcraft-icon', 28, 14, headingDeg, color, rotorcraftGlyph(color), '0 0 200 200');
+}
+
+// Glider (OpenSky cat 9 / ADSBExchange B1).
+function gliderIcon(headingDeg, color) {
+  return rotatedDivIcon('glider-icon', 28, 14, headingDeg, color, gliderGlyph(color), '0 0 200 200');
+}
+
+// Lighter than air (OpenSky cat 10 / ADSBExchange B2).
+function lighterThanAirIcon(headingDeg, color) {
+  return rotatedDivIcon('lighter-than-air-icon', 28, 14, headingDeg, color, lighterThanAirGlyph(color), '0 0 200 200');
+}
+
+// Parachutist (OpenSky cat 11 / ADSBExchange B3).
+function parachutistIcon(headingDeg, color) {
+  return rotatedDivIcon('parachutist-icon', 28, 14, headingDeg, color, parachutistGlyph(color), '0 0 200 200');
+}
+
+// Ultralight (OpenSky cat 12 / ADSBExchange B4).
+function ultralightIcon(headingDeg, color) {
+  return rotatedDivIcon('ultralight-icon', 28, 14, headingDeg, color, ultralightGlyph(color), '0 0 200 200');
 }
 
 // UAV (OpenSky cat 14 / ADSBExchange B6).
@@ -1214,9 +1283,12 @@ const ICON_BUILDERS = {
   high_performance: highPerformanceIcon,
   high_vortex_large: highVortexLargeIcon,
   rotorcraft: rotorcraftIcon,
+  glider: gliderIcon,
+  lighter_than_air: lighterThanAirIcon,
+  parachutist: parachutistIcon,
+  ultralight: ultralightIcon,
   uav: uavIcon,
-  // glider, lighter_than_air, parachutist, ultralight, space, unknown:
-  // intentionally absent — fall through to the default planeIcon below.
+  // space, unknown: intentionally absent — fall through to the default planeIcon below.
 };
 
 // Ground vehicles (either flagged by looksLikeGroundVehicle()'s heuristics,
