@@ -1114,10 +1114,24 @@ function planeIcon(headingDeg, color) {
           'L13,19v-5.5L21,16z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
 }
 
-// Small stubby delta — light (OpenSky cat 2 / ADSBExchange A1).
+// TEMPORARY: the distinct per-category silhouettes below (light/large/heavy/
+// high_performance/rotorcraft/uav) didn't look good, so every aircraft
+// category is drawn with the plain "small"/default glyph for now, until
+// better-looking replacements exist. The categoryGroup dispatch table and
+// per-category CSS classes are kept as-is on purpose — swapping the look
+// back in later is just editing each function's svgInner, nothing
+// structural. Only the ground/tower icon keeps its real glyph.
+const GENERIC_AIRCRAFT_GLYPH =
+  '<path d="M21,16v-2l-8-5V3.5C13,2.67,12.33,2,11.5,2S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2.5,1.5V22l4-1l4,1v-1.5' +
+        'L13,19v-5.5L21,16z" fill="COLOR" stroke="#fff" stroke-width="0.8"/>';
+
+function genericGlyph(color) {
+  return GENERIC_AIRCRAFT_GLYPH.replace(/COLOR/g, color);
+}
+
+// Light (OpenSky cat 2 / ADSBExchange A1).
 function lightIcon(headingDeg, color) {
-  return rotatedDivIcon('light-icon', 24, 12, headingDeg, color,
-    '<path d="M12,4L17,15L12,13L7,15z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
+  return rotatedDivIcon('light-icon', 28, 14, headingDeg, color, genericGlyph(color));
 }
 
 // Same silhouette as the pre-existing default glyph — already reads as a
@@ -1127,58 +1141,37 @@ function smallIcon(headingDeg, color) {
   return planeIcon(headingDeg, color);
 }
 
-// Fuller fuselage + tailplane, wider wingspan than light/small — large
-// (OpenSky cat 4 / ADSBExchange A3).
+// Large (OpenSky cat 4 / ADSBExchange A3).
 function largeIcon(headingDeg, color) {
-  return rotatedDivIcon('large-icon', 28, 14, headingDeg, color,
-    '<path d="M12,2L13,9L22,13L22,15.2L13,12.5L12.5,19L15.5,21V22.5L12,21.5L8.5,22.5V21L11.5,19L11,12.5L2,15.2' +
-          'V13L11,9z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
+  return rotatedDivIcon('large-icon', 28, 14, headingDeg, color, genericGlyph(color));
 }
 
-// Bulkier fuselage/broader wing sweep than large — heavy (OpenSky cat 6 /
-// ADSBExchange A5).
+// Heavy (OpenSky cat 6 / ADSBExchange A5).
 function heavyIcon(headingDeg, color) {
-  return rotatedDivIcon('heavy-icon', 30, 15, headingDeg, color,
-    '<path d="M12,1L13.2,8L23,12L23,14.5L13.3,11.5L12.7,19L16,21.5V23L12,21.7L8,23V21.5L11.3,19L10.7,11.5' +
-          'L1,14.5L1,12L10.8,8z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
+  return rotatedDivIcon('heavy-icon', 28, 14, headingDeg, color, genericGlyph(color));
 }
 
-// Sharp swept/delta silhouette, no distinct tailplane — high performance
-// (OpenSky cat 7 / ADSBExchange A6).
+// High performance (OpenSky cat 7 / ADSBExchange A6).
 function highPerformanceIcon(headingDeg, color) {
-  return rotatedDivIcon('high-performance-icon', 26, 13, headingDeg, color,
-    '<path d="M12,2L13,9L20,17L20,19L13,15.5L12,22L15,23.5V24L12,23L9,24V23.5L11,22L10,15.5L3,19L3,17L10,9z" ' +
-          'fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
+  return rotatedDivIcon('high-performance-icon', 28, 14, headingDeg, color, genericGlyph(color));
 }
 
 // High vortex large (747/A380-class, OpenSky cat 5 / ADSBExchange A4)
-// deliberately reuses the "heavy" silhouette — visually both read as
+// deliberately reuses the "heavy" builder — visually both read as
 // "extra-heavy" fixed-wing at marker size, and no distinct glyph is worth
 // inventing at this scale.
 function highVortexLargeIcon(headingDeg, color) {
   return heavyIcon(headingDeg, color);
 }
 
-// Helicopter: fuselage ellipse + top rotor bar + tail boom stub. Multiple
-// colored paths by design — exactly the case colorCounts() must stay robust
-// to (rotorcraft: OpenSky cat 8 / ADSBExchange A7).
+// Rotorcraft (OpenSky cat 8 / ADSBExchange A7).
 function rotorcraftIcon(headingDeg, color) {
-  return rotatedDivIcon('rotorcraft-icon', 26, 13, headingDeg, color,
-    '<ellipse cx="12" cy="15" rx="3.4" ry="6" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>' +
-    '<path d="M12,9V3M6,3H18" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" fill="none"/>' +
-    '<path d="M15,19.5L20,21.5" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round"/>');
+  return rotatedDivIcon('rotorcraft-icon', 28, 14, headingDeg, color, genericGlyph(color));
 }
 
-// Quadcopter: center body + 4 diagonal arms with rotor dots. Also
-// multi-path by design (uav: OpenSky cat 14 / ADSBExchange B6).
+// UAV (OpenSky cat 14 / ADSBExchange B6).
 function uavIcon(headingDeg, color) {
-  return rotatedDivIcon('uav-icon', 24, 12, headingDeg, color,
-    '<path d="M6,6L18,18M18,6L6,18" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round"/>' +
-    '<circle cx="6" cy="6" r="2.4" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>' +
-    '<circle cx="18" cy="6" r="2.4" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>' +
-    '<circle cx="6" cy="18" r="2.4" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>' +
-    '<circle cx="18" cy="18" r="2.4" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>' +
-    '<rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="' + color + '" stroke="#fff" stroke-width="0.6"/>');
+  return rotatedDivIcon('uav-icon', 28, 14, headingDeg, color, genericGlyph(color));
 }
 
 // Cell-tower glyph for ground stations/vehicles (`isGroundVehicle` or

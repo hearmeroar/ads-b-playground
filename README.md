@@ -40,10 +40,11 @@ color-coded markers.
   metric/imperial unit toggle, and a "hide non-aircraft" toggle that flags
   ground vehicles and reference beacons (e.g. tower test transponders)
   misreported alongside real traffic.
-- **Icons by category** — markers get a distinct silhouette for light/small/
-  large/heavy fixed-wing, high-performance and high-vortex-large, plus
-  helicopter and drone glyphs; ground vehicles/reference beacons get a
-  neutral-grey cell-tower icon instead of an aircraft glyph.
+- **Icons by category** — marker glyph selection is wired up per aircraft
+  category (fixed-wing weight classes, rotorcraft, UAV); most currently
+  share one placeholder glyph pending better-looking artwork, but ground
+  vehicles/reference beacons already get their own neutral-grey cell-tower
+  icon instead of an aircraft glyph.
 - **Quota-aware** — OpenSky's two independent daily quotas (map data and
   flight history) are each surfaced with a `(?)` explaining what ran out and
   counting down to when it returns. An exhausted map-data quota auto-disables

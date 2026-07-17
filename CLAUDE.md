@@ -394,12 +394,22 @@ because photographer name and photo URL come from an external API.
   reused for both the filter check and icon selection below), rather than
   discarded after filtering.
 - **Marker icon by category:** `iconFor(item, color)` dispatches on
-  `item.categoryGroup` via the `ICON_BUILDERS` lookup table — distinct
-  glyphs exist today for `light`, `small` (reuses the original default
-  "flight" glyph), `large`, `heavy`, `high_performance`, `high_vortex_large`
-  (deliberately reuses the `heavy` glyph — no separate silhouette was worth
-  inventing at marker size), `rotorcraft` (helicopter) and `uav` (drone).
-  Any category group absent from `ICON_BUILDERS` (`glider`,
+  `item.categoryGroup` via the `ICON_BUILDERS` lookup table, one builder
+  per group (`light`, `small`, `large`, `heavy`, `high_performance`,
+  `high_vortex_large`, `rotorcraft`, `uav`) — the dispatch table, per-group
+  builder functions, and per-group CSS classes (`light-icon`, `heavy-icon`,
+  `rotorcraft-icon`, etc.) all exist for real. **Their drawn glyph is
+  currently a shared placeholder**, though: distinct hand-drawn silhouettes
+  for each group were tried and didn't look good, so every builder except
+  `smallIcon`/`towerIcon` currently renders `GENERIC_AIRCRAFT_GLYPH` (the
+  original default "flight" icon) via `genericGlyph()` — a deliberate, called
+  -out-in-code temporary state, not an oversight. Swapping in a better look
+  later is just replacing a given builder's `genericGlyph(color)` call with
+  its own `svgInner` markup — no change to `iconFor()`, `ICON_BUILDERS`, or
+  the CSS classes is needed. `high_vortex_large` separately reuses the
+  `heavy` builder specifically (rather than the shared placeholder
+  directly), since conceptually the two should probably always look alike
+  even once real glyphs exist. Any category group absent from `ICON_BUILDERS` (`glider`,
   `lighter_than_air`, `parachutist`, `ultralight`, `space`, `unknown`) falls
   through to the plain default `planeIcon()`. `rotatedDivIcon()` is the
   shared builder every rotating icon goes through; it stamps a `data-color`
