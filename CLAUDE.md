@@ -279,6 +279,102 @@ this app (unit system, dev mode, motion/category filters are all
 session-only; nothing here uses `localStorage`) — always resets to
 Voyager on load.
 
+**Weather layers** (`static/js/map-init.js`'s weather section, `#weather-
+filter` in the HUD — four `source-row` checkboxes, not a single-select
+dropdown like the basemap picker, since e.g. Precipitation + SIGMET
+together is a completely normal combination to want on at once — wired in
+`static/js/state-filters.js`): four independent, off-by-default overlays,
+researched against what real trackers show (FlightRadar24/FlightAware/
+ADS-B Exchange all have some precipitation-radar toggle; Windy.com is the
+fuller reference UX with wind/clouds/temperature too — noted as possible
+future additions, not built here) and picked to be genuinely free with no
+API key:
+- **Precipitation / Forecast** — [RainViewer](https://www.rainviewer.com/api.html)
+  tile composites. Free, no key, and (confirmed via `curl -I -H "Origin:
+  ..."`) sends `Access-Control-Allow-Origin: *` on both its discovery JSON
+  and its tile images — the one weather source callable directly from the
+  browser with **no backend proxy**, since CORS (not licensing) was
+  always the actual reason every other proxied source in this app needs
+  one. `refreshWeatherTileLayer(key)` fetches
+  `https://api.rainviewer.com/public/weather-maps.json`, takes the latest
+  entry from `radar.past` (Precipitation) or `radar.nowcast` (Forecast —
+  not always published; an empty result is normal, not an error, and
+  simply shows nothing for that layer), and builds an `L.tileLayer` from
+  it. **`maxNativeZoom: 7`**: RainViewer's radar tiles genuinely stop at
+  native zoom 7 — confirmed by fetching actual tile *bytes*, not just the
+  HTTP status (which is 200 either way) — past that the server returns a
+  real, valid, ~1-3KB PNG that just reads "Zoom Level Not Supported" in
+  gray text, at both its 256 and 512 tileSize options.  `maxNativeZoom`
+  stops Leaflet from ever requesting past z=7 (upscaling the z=7 tile
+  instead), while `maxZoom` stays 19 so the layer still renders at the
+  map's actual max zoom, just blurry past z=7 rather than showing that
+  placeholder image. Both layers live in their own Leaflet pane
+  (`weatherPane`, z-index 350, between `tilePane`'s 200 and `overlayPane`'s
+  400) rather than the default `tilePane` the basemap tiles also use —
+  Leaflet stacks same-pane layers by add order, so switching basemaps
+  (which re-`addLayer`s the new one *after* an already-active weather tile
+  layer) would otherwise silently bury the radar under the new base tiles,
+  which looked like the weather layer "disappearing" on every basemap
+  switch. Refreshed every 5 minutes while enabled (RainViewer's own
+  composite updates roughly every 10) via `setWeatherTileLayerEnabled(key,
+  enabled)`, which owns that key's own `setInterval`/`clearInterval` —
+  each of the two layers is independent, so turning one off doesn't stop
+  the other's timer.
+- **SIGMET** — significant weather hazards for aviation (icing,
+  turbulence, convective activity, volcanic ash), from
+  [aviationweather.gov](https://aviationweather.gov/)'s international-
+  SIGMET endpoint via a new `/api/sigmet` proxy in `app.py`. Unlike
+  RainViewer, this source sends **no CORS header at all** (confirmed the
+  same way, with an explicit `Origin` header) — same situation as OpenSky,
+  so it genuinely needs a backend proxy, not a stylistic choice. The
+  endpoint itself **ignores bbox/loc query params entirely** (confirmed
+  live: an identical ~144-record global response regardless of what's
+  passed), so `/api/sigmet` fetches the full global list and filters
+  server-side via `_sigmet_intersects_area()` — any SIGMET with at least
+  one vertex inside `BBOX` padded by `SIGMET_FILTER_PADDING_DEG` (10°,
+  generous since a hazard polygon can be large and centered outside the
+  exact box while still overlapping it) is kept; the rest are dropped
+  before the response ever reaches the frontend. **Two coordinate
+  shapes**, keyed by the SIGMET's own `geom` field — a single-polygon
+  SIGMET (`"AREA"`) has `coords` as a flat list of `{lat, lon}` points, but
+  a multi-polygon one (`"AREAS"` — e.g. two separate boxes describing a
+  "west of this line / east of that line" corridor, confirmed against a
+  real FCBB/Brazzaville SIGMET) has `coords` as a list of *rings*, each
+  itself a list of points. A first version assumed the flat shape
+  unconditionally and 500'd the moment a real `"AREAS"` record came
+  through in production — `_sigmet_coord_points()` (backend) and the
+  matching ring-detection in `refreshSigmet()` (frontend) both normalize
+  either shape into "a list of rings" (length 1 for `"AREA"`) before doing
+  anything else with it. Rendered as one `L.polygon` per ring (all sharing
+  the same hazard's color/popup), colored by `sigmetColor(hazard)`
+  (`SIGMET_HAZARD_COLORS` — red for convective/thunderstorm, orange for
+  turbulence, blue for icing, gray for ash, purple for IFR/mountain
+  obscuration, gray fallback for anything else), each with a popup showing
+  the hazard/qualifier, FIR name, and altitude range. Cached server-side
+  for `SIGMET_MIN_INTERVAL` (300s) like every other proxied source; a
+  network error re-serves the last good list if one exists, otherwise 502
+  (same stale-or-fail pattern as the four radius sources).
+- **METAR** — airport weather-station observations (wind, visibility,
+  ceiling, raw text) from the same aviationweather.gov source, via a new
+  `/api/metar` proxy — same no-CORS situation as SIGMET, but this endpoint
+  *does* respect a `bbox` query (confirmed live, returned exactly the
+  nearby stations for a test bbox), so `/api/metar` just passes `BBOX`
+  straight through as `"{lamin},{lomin},{lamax},{lomax}"` rather than
+  filtering a global list itself. Rendered as a small `L.circleMarker` per
+  station, colored by `metarColor(fltCat)` (`METAR_CATEGORY_COLORS` — the
+  standard aviation flight-category convention: green VFR, blue MVFR, red
+  IFR, magenta LIFR — the same colors pilots and every other aviation
+  weather display already use), with a popup showing the station name and
+  raw METAR text. Cached for `METAR_MIN_INTERVAL` (300s) — station
+  observations update roughly hourly, so this is generous headroom, not a
+  tight budget.
+- All four share one `WEATHER_REFRESH_INTERVAL_MS` (5 min) cadence and the
+  same enable/disable shape: a `{layer, enabled, timer}` state object per
+  layer (`weatherTileState.precip`/`.nowcast`, `weatherSigmetState`,
+  `weatherMetarState`), where the `enabled` flag is checked again inside
+  the fetch's `.then()` — a layer toggled off while its own fetch was
+  still in flight must not add itself back after the fact.
+
 **Aircraft photos, two sources, Planespotters primary + airport-data.com
 top-up** (`app.py`):
 - `/api/photo/reg/<registration>`, `/api/photo/hex/<icao24>` →
@@ -1677,6 +1773,22 @@ because photographer name and photo URL come from an external API.
   styles swaps which single entry `map.hasLayer()` reports true for and
   updates the dropdown's label; the dropdown closes after a selection,
   same as `#category-filter`'s own behavior.
+- `test_weather.spec.js` covers the four weather layers: all off with zero
+  network activity by default; enabling Precipitation/Forecast fetches
+  RainViewer's discovery JSON and builds a tile layer from the latest
+  matching frame (asserting the real `pane`/`maxZoom`/`maxNativeZoom`
+  values, not just that a layer exists); Precipitation and Forecast can be
+  on simultaneously and toggle independently of each other; switching the
+  basemap doesn't remove an active Precipitation layer (the dedicated-pane
+  fix); enabling SIGMET/METAR fetches their own backend routes and renders
+  a polygon/marker respectively; and all four layers together at once.
+  `tests/backend/test_metar_sigmet.py` covers `/api/metar`/`/api/sigmet`
+  directly: the bbox param passed to METAR, caching, stale-cache-on-error
+  and no-cache-502 for both, SIGMET's area-filtering (a nearby one kept, a
+  far-away one dropped), and — the one real bug this shipped with — a
+  `geom: "AREAS"` (multi-polygon) SIGMET's nested-rings coordinate shape,
+  which the first version 500'd on since it assumed every SIGMET's
+  `coords` was a flat list.
 
 ## SVG Icon Rendering
 
