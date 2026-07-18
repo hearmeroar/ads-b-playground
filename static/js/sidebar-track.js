@@ -535,8 +535,7 @@ async function loadAdsbdb(icao24, info) {
 
 function selectAircraft(icao24) {
   selectedIcao24 = icao24;
-  const saveBtn = document.getElementById('sidebar-save-collection');
-  if (saveBtn) saveBtn.classList.remove('saved');
+  updateSaveButtonState(); // auth-collection.js — reflects saved/C0-disabled state for this aircraft
   trackUsesLiveFallback = false;
   drawTrack(null); // never leave the previously selected aircraft's path visible
   loadTrack(icao24);
@@ -668,15 +667,24 @@ function renderGallery(photos) {
     return;
   }
 
+  const N = photos.length;
+
+  let dotsWrap = null;
+  let dots = [];
+  if (N > 1) {
+    dotsWrap = document.createElement('div');
+    dotsWrap.className = 'gallery-dots';
+    dots = photos.map((_, i) => {
+      const dot = document.createElement('span');
+      dot.className = 'gallery-dot';
+      dot.addEventListener('click', () => goTo(i));
+      dotsWrap.appendChild(dot);
+      return dot;
+    });
+  }
+
   const imgWrap = document.createElement('div');
-  imgWrap.className = 'gallery-image-wrap stretch';
-  const anchor = document.createElement('a');
-  anchor.target = '_blank';
-  anchor.rel = 'noopener noreferrer';
-  const img = document.createElement('img');
-  img.alt = 'Aircraft photo';
-  anchor.appendChild(img);
-  imgWrap.appendChild(anchor);
+  imgWrap.className = 'gallery-image-wrap';
 
   const credit = document.createElement('div');
   credit.className = 'gallery-credit';
@@ -685,57 +693,106 @@ function renderGallery(photos) {
   creditLink.target = '_blank';
   creditLink.rel = 'noopener noreferrer';
   credit.appendChild(creditLink);
-  imgWrap.appendChild(credit);
 
-  let dotsWrap = null;
-  let dots = [];
-  if (photos.length > 1) {
-    dotsWrap = document.createElement('div');
-    dotsWrap.className = 'gallery-dots';
-    dots = photos.map((_, i) => {
-      const dot = document.createElement('span');
-      dot.className = 'gallery-dot';
-      dot.addEventListener('click', () => setIndex(i));
-      dotsWrap.appendChild(dot);
-      return dot;
-    });
-  }
-
-  function setIndex(i) {
-    const index = (i + photos.length) % photos.length;
-    const photo = photos[index];
-    dots.forEach((dot, i2) => dot.classList.toggle('active', i2 === index));
-
-    // Reset to "stretch" every time: a previous slide may have degraded to
-    // "native" below, and that must not leak into the next real photo.
-    // forceNative (adsbdb's thumbnail-only photo — see loadAdsbdb) skips
-    // straight to native size instead of stretching a genuinely tiny
-    // image into visible blur first.
-    imgWrap.classList.remove('native', 'stretch');
-    imgWrap.classList.add(photo.forceNative ? 'native' : 'stretch');
+  // Shared slide builder — used for the N real slides plus one clone each
+  // of the first/last (for the infinite-loop illusion below). Built via
+  // this same function rather than cloneNode() so the clones keep a
+  // correctly-wired img.onerror fallback too (a JS property, not an HTML
+  // attribute — cloneNode() would silently drop it).
+  function buildSlide(photo) {
+    const slide = document.createElement('div');
+    slide.className = 'gallery-slide ' + (photo.forceNative ? 'native' : 'stretch');
+    const anchor = document.createElement('a');
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    const img = document.createElement('img');
+    img.alt = 'Aircraft photo';
     img.onerror = () => {
-      // Only airport-data.com photos carry fallback_src (their original
-      // ~200px thumbnail) — a reconstructed full-size URL that 404s
-      // degrades to it, shown at native size rather than stretched (it's
-      // too small to stretch without visible blur).
       if (photo.fallback_src && img.src !== photo.fallback_src) {
-        imgWrap.classList.remove('stretch');
-        imgWrap.classList.add('native');
+        slide.className = 'gallery-slide native';
         img.src = photo.fallback_src;
       }
     };
     const src = (photo.thumbnail_large && photo.thumbnail_large.src) || (photo.thumbnail && photo.thumbnail.src) || '';
     img.src = src;
     anchor.href = photo.link || '';
+    anchor.appendChild(img);
+    slide.appendChild(anchor);
+    return slide;
+  }
+
+  // DOM order: [clone-of-last, real[0], real[1], ..., real[N-1], clone-of-first]
+  // — but the two clones only exist at all when N > 1 (a lone photo has no
+  // "next"/"prev" to loop through in the first place). domIdx (physical
+  // track position) is logicalIdx + CLONE_OFFSET for a real slide, where
+  // CLONE_OFFSET is 1 when clones are present and 0 when there's only ever
+  // the one real slide at position 0 — using a hardcoded +1 unconditionally
+  // here was a real bug: for a single-photo gallery it shifted the track
+  // one full slide-width past the only slide that actually exists in the
+  // DOM, rendering nothing but blank space. With clones present, this is
+  // what lets next()/prev() always animate strictly forward/backward
+  // respectively, even across the last->first / first->last boundary,
+  // instead of rewinding back across the whole strip.
+  const CLONE_OFFSET = N > 1 ? 1 : 0;
+  let currentIdx = 0;
+  let domIdx = CLONE_OFFSET;
+  const sliderTrack = document.createElement('div');
+  sliderTrack.className = 'gallery-slider-track';
+  if (N > 1) sliderTrack.appendChild(buildSlide(photos[N - 1]));
+  photos.forEach((photo) => sliderTrack.appendChild(buildSlide(photo)));
+  if (N > 1) sliderTrack.appendChild(buildSlide(photos[0]));
+
+  function applyTransform(idx, animate) {
+    sliderTrack.style.transition = animate ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none';
+    sliderTrack.style.transform = `translate3d(${-idx * 100}%, 0, 0)`;
+  }
+
+  function updateChrome() {
+    const photo = photos[currentIdx];
+    if (dots.length > 0) {
+      dots.forEach((d, i2) => d.classList.toggle('active', i2 === currentIdx));
+    }
     creditLink.href = photo.link || '';
     creditLink.textContent = photo.photographer || 'Unknown';
   }
 
-  // Tracks which slide is showing purely by reading back the active dot, so
-  // prev/next/dots all share one source of truth without a separate index variable.
-  function currentIndex() {
-    const active = dots.findIndex((d) => d.classList.contains('active'));
-    return active === -1 ? 0 : active;
+  // Direct jump (dot click, initial render) — no wraparound trick needed,
+  // since it's not a "keep sliding past the edge" case.
+  function goTo(i, animate = true) {
+    currentIdx = (i + N) % N;
+    domIdx = currentIdx + CLONE_OFFSET;
+    applyTransform(domIdx, animate);
+    updateChrome();
+  }
+
+  function next() {
+    const wrapped = currentIdx === N - 1;
+    currentIdx = (currentIdx + 1) % N;
+    domIdx += 1;
+    applyTransform(domIdx, true);
+    if (wrapped) {
+      sliderTrack.addEventListener('transitionend', function handler() {
+        sliderTrack.removeEventListener('transitionend', handler);
+        domIdx = CLONE_OFFSET;
+        applyTransform(domIdx, false);
+      }, { once: true });
+    }
+    updateChrome();
+  }
+
+  function prev() {
+    const wrapped = currentIdx === 0;
+    currentIdx = (currentIdx - 1 + N) % N;
+    domIdx -= 1;
+    applyTransform(domIdx, true);
+    if (wrapped) {
+      sliderTrack.addEventListener('transitionend', function handler() {
+        sliderTrack.removeEventListener('transitionend', handler);
+        domIdx = N - 1 + CLONE_OFFSET;
+        applyTransform(domIdx, false);
+      }, { once: true });
+    }
+    updateChrome();
   }
 
   // Prev/next overlay the image itself, vertically centered — but with no
@@ -746,18 +803,54 @@ function renderGallery(photos) {
   // below the image (flanking the dots) was tried too but looked wrong in
   // this layout. A shape-less glyph avoids the "sits on top of the photo"
   // feel while staying in the natural, expected carousel position.
-  if (photos.length > 1) {
+  const sliderContainer = document.createElement('div');
+  sliderContainer.className = 'gallery-slider-container';
+  sliderContainer.appendChild(sliderTrack);
+  sliderContainer.appendChild(credit);
+
+  if (N > 1) {
     const prevBtn = document.createElement('button');
     prevBtn.type = 'button'; prevBtn.className = 'gallery-nav gallery-prev'; prevBtn.textContent = '‹';
-    prevBtn.addEventListener('click', () => setIndex(currentIndex() - 1));
+    prevBtn.addEventListener('click', prev);
     const nextBtn = document.createElement('button');
     nextBtn.type = 'button'; nextBtn.className = 'gallery-nav gallery-next'; nextBtn.textContent = '›';
-    nextBtn.addEventListener('click', () => setIndex(currentIndex() + 1));
-    imgWrap.appendChild(prevBtn);
-    imgWrap.appendChild(nextBtn);
+    nextBtn.addEventListener('click', next);
+    sliderContainer.appendChild(prevBtn);
+    sliderContainer.appendChild(nextBtn);
+
+    // Fotorama-style swipe: drag to preview next/prev, release to snap.
+    // Anchored on domIdx (not currentIdx) so dragging past either edge
+    // already previews the correct neighboring clone content for free.
+    let startX = 0, currentX = 0, isDragging = false;
+    sliderTrack.addEventListener('touchstart', (e) => {
+      isDragging = true;
+      startX = e.touches[0].clientX;
+      sliderTrack.style.transition = 'none';
+    }, { passive: true });
+    sliderTrack.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      currentX = e.touches[0].clientX;
+      const offset = currentX - startX;
+      const percent = (offset / sliderContainer.clientWidth) * 100;
+      sliderTrack.style.transform = `translate3d(calc(${-domIdx * 100}% + ${percent}%), 0, 0)`;
+    }, { passive: true });
+    sliderTrack.addEventListener('touchend', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      const dragDist = currentX - startX;
+      const threshold = sliderContainer.clientWidth * 0.15;
+      if (dragDist > threshold) {
+        prev();
+      } else if (dragDist < -threshold) {
+        next();
+      } else {
+        applyTransform(domIdx, true);
+      }
+    }, { passive: true });
   }
 
-  setIndex(0);
+  goTo(0, false);
+  imgWrap.appendChild(sliderContainer);
   sidebarGalleryEl.appendChild(imgWrap);
   if (dotsWrap) sidebarGalleryEl.appendChild(dotsWrap);
 }

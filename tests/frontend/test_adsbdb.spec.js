@@ -258,8 +258,10 @@ test('adsbdb\'s thumbnail is shown, at native size, only when no other photo exi
   const src = await page.getAttribute('#sidebar-gallery img', 'src');
   expect(src).toBe('https://airport-data.com/images/aircraft/thumbnails/000/111/000111222.jpg');
   // Rendered at native size from the start, not stretched-then-degraded.
-  const wrapClass = await page.getAttribute('#sidebar-gallery .gallery-image-wrap', 'class');
-  expect(wrapClass).toContain('native');
+  // The 'native'/'stretch' class lives on the per-photo .gallery-slide now
+  // (the slider-track rework), not the outer .gallery-image-wrap.
+  const slideClass = await page.getAttribute('#sidebar-gallery .gallery-slide', 'class');
+  expect(slideClass).toContain('native');
 });
 
 // Found via a real aircraft (4X-ABS, Israir) with no live registration —

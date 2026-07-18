@@ -1352,6 +1352,51 @@ because photographer name and photo URL come from an external API.
     sit flush against the image with zero gap. Its link itself is
     underlined only on hover now (was always underlined), to read as less
     visually noisy.
+  - **Slider rework + true infinite loop** (`renderGallery()`,
+    `static/js/sidebar-track.js`): the gallery used to rebuild its single
+    `<img>`'s `src`/classes on every click (`setIndex()`), which was
+    perceptibly janky switching slides. Reworked into a `.gallery-slider-
+    track` of GPU-accelerated `translate3d` slides (one `.gallery-slide`
+    per photo, `display:flex` track, each slide `flex: 0 0 100%`) —
+    switching is now a single `transform` change instead of several
+    sequential class/src mutations. Looping past either end is a genuine
+    infinite carousel, not a modulo-wrap that rewinds back across the
+    whole strip: the DOM holds `[clone-of-last, real photos..., clone-of-
+    first]`, and a `domIdx` (always `logicalIdx + 1`) tracks the physical
+    position while `currentIdx` stays the public 0..N-1 index dots/credit
+    key off. `next()`/`prev()` always step `domIdx` one slide in the
+    requested direction — including onto a clone when crossing the
+    boundary, which is pixel-identical to the real slide it stands in for
+    — then, once that transition finishes (`transitionend`, one-shot),
+    silently snap `domIdx` back to the matching real slide with
+    `transition: none`. Clones are built via the same `buildSlide(photo)`
+    helper as real slides (not `cloneNode()`, which would silently drop
+    `img.onerror`'s fallback-to-thumbnail handler — a JS property, not an
+    HTML attribute, so it isn't copied). Touch-drag anchors its live
+    preview transform on `domIdx` too, so dragging past either edge already
+    previews the correct neighboring clone for free, with no special-casing.
+  - **Fixed 16:9 slider box + `object-fit: cover`** (superseding two earlier
+    attempts at this same problem — a flat gray CSS fallback, then a
+    canvas-sampled per-photo "ambient" tint, both abandoned; the fixed box
+    itself started at 3:2, changed to 16:9 shortly after): the slider
+    container (`.gallery-slider-container`) has an explicit `aspect-ratio:
+    16 / 9` and `width: 100%` — a fixed box that doesn't reflow or jump as
+    photos of different native aspect ratios load in, unlike the original
+    "wrap sizes to its image" approach earlier in this section. Photos fill
+    that box completely via `object-fit: cover` (replacing `contain`),
+    which crops a small amount off the top/bottom of any photo shorter/
+    wider than 16:9 — accepted trade-off, since that's usually the least
+    informative part of an aircraft photo (sky/tarmac) and the alternative
+    (letterbox gaps) had no fully satisfying fix. `.gallery-credit` is
+    positioned relative to this fixed container, not to any individual
+    photo, so it always lands on real photo pixels in the same corner
+    regardless of what's loaded — no more letterbox-collision problem to
+    solve for it at all, since there's no letterbox gap left once every
+    photo covers the box. The one exception is `.gallery-slide.native`
+    (adsbdb's thumbnail-only last-resort photo, a genuinely tiny ~2-4KB
+    image — see "adsbdb.com" below): forcing that into `cover` would
+    visibly blur it, so it keeps `object-fit: contain` at a capped
+    `max-height` instead, same as before this rework.
   OpenSky may have no track for a given
   aircraft (`/api/track` 404s) — common for rotorcraft, whose short/local
   flights often aren't segmented into a continuous "flight" by OpenSky's
@@ -1726,7 +1771,10 @@ because photographer name and photo URL come from an external API.
       not surfaced in this view). Every card in this view is, by
       definition, currently saved, so its toggle icon (`.collection-card-
       icon-btn`, the same bookmark glyph/fill rule as the sidebar's) always
-      renders filled.
+      renders filled. `.collection-card-photo-wrap` uses the same fixed
+      `aspect-ratio: 16 / 9` + `object-fit: cover` treatment as the sidebar
+      gallery slider (see "Fixed 16:9 slider box" above) — one consistent
+      photo-box shape across every place this app shows an aircraft photo.
     - **"Elegant" soft delete + session-scoped Undo**: clicking a card's
       icon (`removeCardWithUndo()`) fires the real `DELETE` immediately —
       no confirmation dialog — but the card stays in the DOM, dimmed

@@ -428,13 +428,49 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #dev-aircraft-table tbody tr:hover { background: rgba(15, 23, 42, 0.05); }
 #dev-aircraft-table tbody td[title] { cursor: help; }
 
-/* Photo gallery. No flat background on the wrap itself any more — it used
-   to be a fixed 4:3 box with a solid gray fill behind it, so any photo
-   whose real aspect ratio wasn't exactly 4:3 (nearly all of them) showed
-   visible gray bars on the sides or top/bottom. Now the wrap just sizes to
-   its image (capped by max-height for the rare very-tall/very-wide case,
-   with object-fit: contain only kicking in then), so there's nothing
-   behind the photo to show through. */
+/* Photo gallery slider container — fixed 16:9 aspect ratio, set explicitly
+   so the sidebar doesn't reflow/jump as photos of different aspect ratios
+   load in. Holds all slides with GPU-accelerated transform animations for
+   smooth swipe/drag; .gallery-credit is positioned relative to this fixed
+   box, not to any individual photo, so it always sits at the same corner
+   regardless of what's loaded. */
+.gallery-slider-container {
+  position: relative; overflow: hidden;
+  width: 100%; aspect-ratio: 16 / 9;
+}
+.gallery-slider-track {
+  display: flex; width: 100%; height: 100%;
+  will-change: transform;
+}
+.gallery-slide {
+  flex: 0 0 100%; width: 100%; height: 100%;
+  overflow: hidden;
+}
+/* The <a> wrapping each <img> must be an explicit width:100%/height:100%
+   block — an anchor is inline by default, and even as a flex item it
+   shrinks to its content's intrinsic size unless stretched, leaving the
+   img's own width:100%/height:100% with no determinate box to resolve
+   percentages against (a real bug hit here: object-fit: cover silently
+   failed to actually cover, since the img's "100%" height had nothing
+   concrete to be 100% of). */
+.gallery-slide a { display: block; width: 100%; height: 100%; }
+.gallery-slide img { display: block; }
+/* object-fit: cover fills the fixed 3:2 box completely — crops a small
+   amount off the top/bottom of photos with a taller aspect ratio, which is
+   usually the least informative part of an aircraft photo (sky/tarmac),
+   in exchange for a stable, non-jumping layout and no letterbox gaps. */
+.gallery-slide.stretch img { width: 100%; height: 100%; object-fit: cover; }
+/* Exception: adsbdb's thumbnail-only last-resort photo (see "adsbdb.com"
+   below) is a genuinely tiny ~2-4KB image — covering it into a 3:2 box
+   would visibly blur it, so it stays at native size/contain instead,
+   centered rather than filling the box. */
+.gallery-slide.native {
+  display: flex; align-items: center; justify-content: center; padding: 10px 0;
+}
+.gallery-slide.native a { width: auto; height: auto; }
+.gallery-slide.native img { max-width: 100%; max-height: 220px; width: auto; height: auto; object-fit: contain; }
+
+/* Legacy .gallery-image-wrap (kept for compat if used elsewhere) */
 .gallery-image-wrap {
   position: relative;
   display: flex; align-items: center; justify-content: center;
@@ -442,10 +478,6 @@ html, body { margin: 0; padding: 0; height: 100%; }
 }
 .gallery-image-wrap img { display: block; }
 .gallery-image-wrap.stretch img { width: 100%; height: auto; max-height: 280px; object-fit: contain; }
-/* Degraded state: a reconstructed airport-data.com full-size URL 404'd and
-   the photo fell back to its original ~150px thumbnail (or this is
-   adsbdb's thumbnail-only last-resort photo) — shown at native resolution
-   rather than stretched, since that would just look blurry for no benefit. */
 .gallery-image-wrap.native { padding: 10px 0; }
 .gallery-image-wrap.native img { max-width: 100%; max-height: 220px; }
 .gallery-placeholder {
@@ -502,12 +534,16 @@ html, body { margin: 0; padding: 0; height: 100%; }
   width: 6px; height: 6px; border-radius: 50%; background: #d7dbe1; cursor: pointer;
 }
 .gallery-dot.active { background: #1a73e8; }
-/* Overlaid on the image's top-right corner (bottom-right was tried first,
-   but that's where a long attribution/copyright panel sometimes sits below
-   the gallery, and top-left is already occupied elsewhere in the sidebar) —
-   same treatment as .gallery-nav (translucent white text + drop-shadow, no
-   background shape) since it sits on top of arbitrary photo content rather
-   than the card background. */
+/* Overlaid on .gallery-slider-container's top-right corner (bottom-right
+   was tried first, but that's where a long attribution/copyright panel
+   sometimes sits below the gallery, and top-left is already occupied
+   elsewhere in the sidebar) — same treatment as .gallery-nav (translucent
+   white text + drop-shadow, no background shape) since it sits on top of
+   arbitrary photo content rather than the card background. Anchored to
+   the fixed-aspect-ratio *container*, not any individual photo, so it
+   always lands on real photo pixels (see "Gallery tuning" below — the
+   container's own object-fit: cover always fills the box completely, no
+   letterbox gap for it to collide with). */
 .gallery-credit {
   position: absolute; right: 8px; top: 6px;
   font-size: 11px; color: rgba(255, 255, 255, 0.65);
@@ -617,7 +653,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
   background: rgba(15, 23, 42, 0.02); position: relative;
 }
 .collection-card-photo-wrap {
-  width: 100%; aspect-ratio: 4 / 3; background: rgba(15, 23, 42, 0.05);
+  width: 100%; aspect-ratio: 16 / 9; background: rgba(15, 23, 42, 0.05);
   display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
 .collection-card-photo-wrap img { width: 100%; height: 100%; object-fit: cover; }
