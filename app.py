@@ -115,40 +115,53 @@ def _save_track_cache():
 
 _load_track_cache()
 
-# adsb.fi (https://github.com/adsbfi/opendata) and airplanes.live
-# (https://airplanes.live/api-guide/): both open, anonymous, no daily quota,
-# but rate-limited to 1 req/s — our own MIN_INTERVAL-style cache below keeps
-# us well under that regardless. Neither has a bounding-box query, only
-# lat/lon/radius (nautical miles, max 250 for both), so each *_CENTER
-# approximates the same Serbia-focused area as BBOX above. Both return the
-# same ADSBExchange-compatible JSON shape.
-ADSBFI_URL = "https://opendata.adsb.fi/api/v3/lat/{lat}/lon/{lon}/dist/{dist}"
-ADSBFI_CENTER = {"lat": 44.0, "lon": 21.0, "dist": 220}
-ADSBFI_MIN_INTERVAL = 10
-_adsbfi_cache = {"data": None, "ts": 0.0}
-
-AIRPLANESLIVE_URL = "https://api.airplanes.live/v2/point/{lat}/{lon}/{radius}"
-AIRPLANESLIVE_CENTER = {"lat": 44.0, "lon": 21.0, "radius": 220}
-AIRPLANESLIVE_MIN_INTERVAL = 10
-_airplaneslive_cache = {"data": None, "ts": 0.0}
-
-# adsb.lol (https://api.adsb.lol/docs) and adsb.one (https://api.adsb.one):
-# two more independent instances of the same aggregator family as adsb.fi —
-# same open, anonymous, no-quota access and the same ADSBExchange-compatible
-# JSON shape, so they reuse cached_radius_source() and the frontend's shared
-# parseAdsbExchangeAircraft() exactly like adsb.fi/airplanes.live. Both cap the
-# radius at 250 nm. NOTE: as of 2026-07-17 api.adsb.one sits behind a Cloudflare
+# The four simple radius sources — adsb.fi (https://github.com/adsbfi/opendata),
+# airplanes.live (https://airplanes.live/api-guide/), adsb.lol
+# (https://api.adsb.lol/docs) and adsb.one (https://api.adsb.one) — are all
+# open, anonymous, no-daily-quota aggregators (rate-limited to 1 req/s, but
+# our own MIN_INTERVAL-style cache keeps us well under that regardless) that
+# return the same ADSBExchange-compatible JSON shape, so they share one
+# table instead of four repeated URL/CENTER/MIN_INTERVAL/cache groups. None
+# has a bounding-box query, only lat/lon/radius (nautical miles, max 250 for
+# all four), so each "center" approximates the same Serbia-focused area as
+# BBOX above. NOTE: as of 2026-07-17 api.adsb.one sits behind a Cloudflare
 # WAF that 403s server-side requests, so its proxy will return an empty list
 # until that's lifted; the pipeline tolerates a dataless source by design.
-ADSBLOL_URL = "https://api.adsb.lol/v2/lat/{lat}/lon/{lon}/dist/{dist}"
-ADSBLOL_CENTER = {"lat": 44.0, "lon": 21.0, "dist": 220}
-ADSBLOL_MIN_INTERVAL = 10
-_adsblol_cache = {"data": None, "ts": 0.0}
+# Adding a fifth is one dict entry plus a one-line alias route below.
+RADIUS_SOURCES = {
+    "adsbfi": {
+        "url": "https://opendata.adsb.fi/api/v3/lat/{lat}/lon/{lon}/dist/{dist}",
+        "center": {"lat": 44.0, "lon": 21.0, "dist": 220},
+        "min_interval": 10,
+    },
+    "airplaneslive": {
+        "url": "https://api.airplanes.live/v2/point/{lat}/{lon}/{radius}",
+        "center": {"lat": 44.0, "lon": 21.0, "radius": 220},
+        "min_interval": 10,
+    },
+    "adsblol": {
+        "url": "https://api.adsb.lol/v2/lat/{lat}/lon/{lon}/dist/{dist}",
+        "center": {"lat": 44.0, "lon": 21.0, "dist": 220},
+        "min_interval": 10,
+    },
+    "adsbone": {
+        "url": "https://api.adsb.one/v2/point/{lat}/{lon}/{radius}",
+        "center": {"lat": 44.0, "lon": 21.0, "radius": 220},
+        "min_interval": 10,
+    },
+}
+for _cfg in RADIUS_SOURCES.values():
+    _cfg["cache"] = {"data": None, "ts": 0.0}
+del _cfg
 
-ADSBONE_URL = "https://api.adsb.one/v2/point/{lat}/{lon}/{radius}"
-ADSBONE_CENTER = {"lat": 44.0, "lon": 21.0, "radius": 220}
-ADSBONE_MIN_INTERVAL = 10
-_adsbone_cache = {"data": None, "ts": 0.0}
+# Back-compat module-level aliases: existing tests (and conftest.py's
+# reset_caches) reference these cache dicts directly by name. Same dict
+# objects as RADIUS_SOURCES[name]["cache"], not copies — mutating one
+# through .clear()/.update() is visible through the other.
+_adsbfi_cache = RADIUS_SOURCES["adsbfi"]["cache"]
+_airplaneslive_cache = RADIUS_SOURCES["airplaneslive"]["cache"]
+_adsblol_cache = RADIUS_SOURCES["adsblol"]["cache"]
+_adsbone_cache = RADIUS_SOURCES["adsbone"]["cache"]
 
 # FlightAware AeroAPI (https://www.flightaware.com/commercial/aeroapi/):
 # unlike the four radius sources above, this is a paid/metered, API-key-
@@ -383,26 +396,38 @@ def cached_radius_source(url, cache, min_interval, headers=None, params=None, em
         return jsonify(default_empty), 502
 
 
+def radius_source_response(name):
+    cfg = RADIUS_SOURCES[name]
+    return cached_radius_source(cfg["url"].format(**cfg["center"]), cfg["cache"], cfg["min_interval"])
+
+
+@app.route("/api/source/<name>")
+def api_radius_source(name):
+    if name not in RADIUS_SOURCES:
+        return jsonify({"ac": [], "error": "unknown_source"}), 404
+    return radius_source_response(name)
+
+
+# One-line aliases for the routes the frontend/tests already call — kept
+# stable rather than migrating callers to /api/source/<name>.
 @app.route("/api/adsbfi")
 def api_adsbfi():
-    return cached_radius_source(ADSBFI_URL.format(**ADSBFI_CENTER), _adsbfi_cache, ADSBFI_MIN_INTERVAL)
+    return radius_source_response("adsbfi")
 
 
 @app.route("/api/airplaneslive")
 def api_airplaneslive():
-    return cached_radius_source(
-        AIRPLANESLIVE_URL.format(**AIRPLANESLIVE_CENTER), _airplaneslive_cache, AIRPLANESLIVE_MIN_INTERVAL
-    )
+    return radius_source_response("airplaneslive")
 
 
 @app.route("/api/adsblol")
 def api_adsblol():
-    return cached_radius_source(ADSBLOL_URL.format(**ADSBLOL_CENTER), _adsblol_cache, ADSBLOL_MIN_INTERVAL)
+    return radius_source_response("adsblol")
 
 
 @app.route("/api/adsbone")
 def api_adsbone():
-    return cached_radius_source(ADSBONE_URL.format(**ADSBONE_CENTER), _adsbone_cache, ADSBONE_MIN_INTERVAL)
+    return radius_source_response("adsbone")
 
 
 @app.route("/api/flightaware")

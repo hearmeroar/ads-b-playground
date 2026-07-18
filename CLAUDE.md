@@ -113,21 +113,27 @@ https://github.com/adsbfi/opendata), adsb.lol (`/api/adsblol` →
 `api.adsb.one/v2/point/.../.../...`), and airplanes.live
 (`/api/airplaneslive` → `api.airplanes.live/v2/point/.../.../...`, see
 https://airplanes.live/api-guide/) — are all fully anonymous with no daily
-quota, so they need none of OpenSky's auth machinery. All four go through
-`cached_radius_source()`, one shared cache/retry helper, each with its own
-`*_MIN_INTERVAL` (10s) and `*_CENTER`; adding a fifth is a URL, a center, an
-interval, and a three-line route. None has a bbox query, only lat/lon/radius
-(nautical miles, max 250), so each `*_CENTER` approximates the same area as
-`BBOX`. All return the same ADSBExchange-compatible JSON shape (altitude in
-feet, speed in knots — converted client-side to match OpenSky's units), which
-is why one parser (`parseAdsbExchangeAircraft()`) serves all four.
+quota, so they need none of OpenSky's auth machinery. All four are entries in
+one `RADIUS_SOURCES` table (`{name: {url, center, min_interval, cache}}`)
+rather than four repeated groups of constants; `radius_source_response(name)`
+looks up a table entry and calls `cached_radius_source()`, the shared
+cache/retry helper, with it. `/api/source/<name>` serves any table entry
+generically, and `/api/adsbfi`/`/api/adsblol`/`/api/adsbone`/`/api/airplaneslive`
+are one-line aliases onto it — kept stable since the frontend and the test
+suite already call those specific paths. Adding a fifth source is one dict
+entry plus (only if it needs its own stable path) a one-line alias route.
+None has a bbox query, only lat/lon/radius (nautical miles, max 250), so each
+entry's `center` approximates the same area as `BBOX`. All return the same
+ADSBExchange-compatible JSON shape (altitude in feet, speed in knots —
+converted client-side to match OpenSky's units), which is why one parser
+(`parseAdsbExchangeAircraft()`) serves all four.
 **adsb.one is off by default** in the HUD: its upstream is currently behind a
 Cloudflare block. adsb.lol shipped off for the same kind of reason (its
 upstream had intermittent multi-second hangs) but was switched to **on by
 default** (2026-07-17, explicit re-approval) despite that known instability —
 a failing/slow source degrades to `null` for that cycle rather than breaking
 the poll, so the occasional hang costs one cycle, not the map. Both are wired
-up and working either way; `*_MIN_INTERVAL`/`*_CENTER` and the shared
+up and working either way; the `RADIUS_SOURCES` entries and the shared
 `cached_radius_source()` plumbing don't distinguish "on by default" from
 "off by default" — it's purely a frontend checkbox default.
 
