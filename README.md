@@ -3,7 +3,9 @@
 A single-page live aircraft tracker for Serbia and its neighboring region.
 No build step, no database — a Flask backend proxies five free ADS-B data
 sources plus FlightAware AeroAPI, and a static Leaflet page polls them and
-renders aircraft as color-coded markers.
+renders aircraft as color-coded markers. The no-build-step choice fits the
+project's current size and isn't a hard rule — it's fine to introduce one
+later if a real need for it shows up.
 
 ## Features
 

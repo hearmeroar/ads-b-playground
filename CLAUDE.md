@@ -887,3 +887,7 @@ because photographer name and photo URL come from an external API.
   no framework, no build step, no database. This is an intentional MVP
   constraint, not an oversight. `static/style.css` is a `<link>`ed
   stylesheet, not a build artifact, so it doesn't violate "no build step."
+  Not a hard requirement, though — the project isn't attached to staying
+  build-step-free forever. If a future need (bundling, minification,
+  TypeScript, whatever) makes a build step the better tradeoff, adopt one;
+  this convention just reflects that nothing so far has justified it.
