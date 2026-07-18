@@ -82,7 +82,13 @@ later if a real need for it shows up.
   FlightAware, its origin/destination airports and operating airline.
   Ranked between the live feed and this app's own computed guesses. Its
   toggle only appears once dev mode is on (on by default there), since it
-  has no per-poll footprint to show/hide otherwise.
+  has no per-poll footprint to show/hide otherwise. Since adsbdb's route
+  comes from a historical callsign lookup rather than a live flight plan,
+  it's treated as a hypothesis: a geometric check compares the aircraft's
+  actual position/track/speed/altitude against the claimed route and flags
+  (rather than hides) one that doesn't add up.
+- Optional OAuth2 auth against OpenSky for a much higher daily quota than
+  anonymous access.
 - Optional OAuth2 auth against OpenSky for a much higher daily quota than
   anonymous access.
 
@@ -138,7 +144,7 @@ A handful of plain files carry all the logic:
   `/api/identity/<icao24>`. No external API, no database.
 - `static/index.html` — the frontend markup (map container, HUD, sidebar).
 - `static/js/` — the frontend logic (Leaflet map, polling, marker rendering,
-  filters, photo/track features) as eight plain classic `<script src>` files
+  filters, photo/track features) as nine plain classic `<script src>` files
   loaded in a fixed order — still no framework and no build step.
 - `static/style.css` — the frontend's styling, linked from `index.html`.
 - `static/flag-icons/` — the [flag-icons](https://github.com/lipis/flag-icons)

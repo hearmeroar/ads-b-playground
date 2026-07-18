@@ -12,15 +12,18 @@ markers. A seventh source, adsbdb.com, is proxied too but is not part of
 that per-poll set — it's a lazy, click-only lookup for identity/route
 enrichment with no markers of its own (see "adsbdb.com" further below).
 Backend logic lives in `app.py`; the frontend is
-`static/index.html` (markup) plus `static/js/*.js` (eight plain classic
+`static/index.html` (markup) plus `static/js/*.js` (nine plain classic
 `<script src>` files, loaded in a fixed order) and `static/style.css` — no
 framework, no build step, all of it just plain `<link>`/`<script>`-included
 static files. The JS files share one global scope (deliberately NOT ES
 modules: the Playwright tests reach top-level names like `openskyMarkers`
 via `page.evaluate`, and load-time statements rely on the original
 execution order), so their `<script>` order in `index.html` is load-bearing:
-`map-init` → `constants` → `state-filters` → `sidebar-track` → `icons` →
-`render-details` → `parsers` → `main`. Where this file says
+`map-init` → `constants` → `route-validation` → `state-filters` →
+`sidebar-track` → `icons` → `render-details` → `parsers` → `main`
+(`route-validation` holds only pure geometry functions with no DOM/fetch
+dependencies of its own — it's placed early since `sidebar-track`'s
+`buildMergedDetails()` is its only caller). Where this file says
 "`static/index.html`" about a JS function, read "the frontend JS" — the
 function now lives in one of those `static/js/*.js` files. Leaflet 1.9.4
 itself is vendored at `static/leaflet/` (`leaflet.js` + `leaflet.css` +
@@ -653,6 +656,75 @@ because photographer name and photo URL come from an external API.
     wrong, not just superfluous. Unchecking it only gates *future*
     `loadAdsbdb()` calls (`adsbdbEnabled`) — it doesn't purge `adsbdbById`,
     same as every other lazy-cache in this app.
+- **Route validation (Layer 2 geometric check, `static/js/
+  route-validation.js`)**: adsbdb's flightroute is a historical
+  callsign→route lookup, not a live flight plan — reused callsigns,
+  schedule/seasonal changes, and irregular ops all produce wrong matches,
+  so it's treated as a hypothesis, not ground truth. **Scoped to adsbdb
+  routes only** — checked in `buildMergedDetails()` via `fieldSources.
+  originAirport` being exactly `['adsbdb']` — since FlightAware's route
+  comes from a live paid tracking service, not a historical guess, and
+  doesn't need this scrutiny.
+  `validateAdsbdbRoute({curLat, curLon, trackDeg, speedKmh, altitudeM,
+  originLat, originLon, destLat, destLon})` computes a 0–100 confidence
+  score from five geometric checks against standard spherical-navigation
+  formulas (Ed Williams' Aviation Formulary — not novel math), summed with
+  a fixed 30-point baseline (present whenever there's a route to validate
+  at all) so the total maxes at 100:
+  - **Track alignment (20 pts)**: how closely the aircraft's current
+    ground `trackDeg` matches the bearing from its **current position** to
+    the destination — recomputed fresh each render, not a single fixed
+    origin→destination bearing. This is a deliberate correction to the
+    naive version of this check: great-circle bearing isn't constant along
+    a route (can drift 20–30°+ from the initial bearing on
+    transatlantic-scale distances), so comparing against a stale fixed
+    bearing produces false negatives mid-flight on long routes. Uses
+    ground track, not `magHeadingDeg`/`trueHeadingDeg` — track already
+    reflects actual direction of travel over ground (accounts for wind
+    drift, which is exactly what this check needs), and it's reliably
+    present on both OpenSky and adsb.fi/airplanes.live, unlike the heading
+    fields (enrichment-only, often null).
+  - **Distance to route (25 pts)**: cross-track distance from the
+    aircraft's current position to the origin→destination great circle.
+  - **Route progress (10 pts)**: along-track projection as a percentage
+    (0–100% expected; a negative or >100% projection means the aircraft
+    is behind departure or past arrival, penalized smoothly).
+  - **Speed/altitude plausibility (10 + 5 pts)**: a phase-of-flight
+    heuristic — near either end of the route (progress ≤8% or ≥92%,
+    "terminal") a high-cruise-like speed/altitude is incongruous (the
+    doc-derived examples this was designed against: 780 km/h 8km from
+    departure, FL380 12km from departure); mid-route ("cruise") gets no
+    penalty regardless of value, since cruise altitudes/speeds vary hugely
+    by aircraft type. Explicitly the two least rigorously specified/lowest-
+    weighted checks — reasonable heuristics, not validated aviation
+    science, tunable later without touching anything else.
+  All five checks use smooth piecewise-linear interpolation between the
+  same band boundaries a discrete Excellent/Good/Weak/Invalid scale would
+  use (`interpolateFraction()`), rather than cliff-edged step functions, so
+  the score doesn't jump discontinuously right at e.g. exactly 20° of track
+  deviation. Bands: 96–100 Very High, 80–95 High, 60–79 Medium, 40–59 Low,
+  0–39 Reject.
+  **No lat/lon existed anywhere for the currently-selected aircraft before
+  this** — `info`/`detailsById` never carried position (only the Leaflet
+  marker itself did, via `marker.getLatLng()`, dropped before reaching
+  `detailsById`). Fixed by threading `item.lat`/`item.lon` through into the
+  object `syncMarkers()` stores in `detailsById` (`static/js/icons.js`).
+  Recomputed on **every** render (poll resync, not just the initial click)
+  since position/speed/altitude change continuously — deliberately
+  uncached, unlike the network-backed adsbdb/enrichment lookups, since it's
+  a cheap pure computation with no I/O of its own.
+  **UI**: a route scoring below 60 (Low/Reject) is never hidden — it still
+  renders, prefixed with a `⚠` and styled via `.route-warning` (amber, not
+  red — red stays reserved for emergency/alert fields), **in both normal
+  and dev mode**, since a likely-wrong route is misleading regardless of
+  dev-mode status. Dev mode additionally makes the Route row's badge
+  clickable to a tooltip with the score breakdown (band, total score,
+  track/distance/progress numbers) — reusing the same generic
+  `#source-tooltip` click mechanism already wired for Flywme's badges
+  (`main.js`), just with a route-specific `data-detail` string
+  (`routeConfidenceDetail()`, `static/js/render-details.js`) instead of the
+  generic per-field badge path, since a route's confidence is a composite
+  result, not a single field's resolution tier.
 - **Unit toggle** (`#unit-toggle`, `currentUnitSystem` = `'metric'` |
   `'imperial'`): purely a rendering concern. Internal data always stays in
   the units above; only the formatters used inside `renderDetailsHtml()`
@@ -958,6 +1030,18 @@ because photographer name and photo URL come from an external API.
   to the real airport-data.com during the test run. Worth fixing at some
   point (adding a default `/api/photo2/**` mock to `mockAllSources()`
   itself), but out of scope for the adsbdb work that surfaced it.
+- `test_route_validation.spec.js` covers both the pure geometry (reached
+  directly via `page.evaluate`, the same style used elsewhere for
+  `normalizeAdsbExchange`/etc.): `initialBearingDeg` against the design
+  doc's own EGLL→KJFK worked example (~288°), `routeProgressPercent` at
+  the two route endpoints, and `validateAdsbdbRoute` scoring a
+  geometrically consistent flight Medium+ and an implausible one (position
+  and track both far off a fabricated route) into Reject — and the Route
+  row end-to-end: a consistent route renders with no warning, an
+  implausible one shows the `⚠`/`.route-warning` styling even with dev
+  mode off, and dev mode's badge tooltip contains the band name and score.
+  Uses `aaaaaa` (`states.json`) — its live lat/lon/track/speed/altitude are
+  the "current state" fed into every check.
 
 ## SVG Icon Rendering
 

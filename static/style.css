@@ -205,6 +205,11 @@ html, body { margin: 0; padding: 0; height: 100%; }
 }
 #sidebar-details b { display: inline-block; min-width: 96px; color: var(--muted); font-weight: 600; }
 #sidebar-details .emergency { color: #dc2626; font-weight: 700; }
+/* Amber, not red — red is reserved for emergency/alert fields above. Flags
+   a low-confidence adsbdb route (Layer 2 geometric validation scored it
+   below the Medium threshold), shown in both normal and dev mode since a
+   likely-wrong route is misleading either way. */
+#sidebar-details .route-warning { color: #b45309; font-weight: 600; }
 #sidebar-details .detail-group { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 #sidebar-details .detail-group:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 #sidebar-details .detail-group-title {

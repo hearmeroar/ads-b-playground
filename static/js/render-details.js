@@ -122,7 +122,23 @@ function formatAdsbExchangeCategory(category) {
 // currentDevMode (a persistent UI-mode toggle, module-scope like
 // currentUnitSystem), fieldSources changes per aircraft/per render, so it
 // can't live as a top-level closure var.
-function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputationBasis) {
+const ROUTE_CONFIDENCE_BAND_LABELS = {
+  very_high: 'Very High', high: 'High', medium: 'Medium', low: 'Low', reject: 'Reject',
+};
+
+// Human-readable breakdown for the Route badge's tooltip in dev mode — not
+// a value used anywhere else, purely explanatory.
+function routeConfidenceDetail(rv) {
+  const c = rv.checks;
+  const parts = [];
+  if (c.trackAlignment.diffDeg != null) parts.push('track diff ' + c.trackAlignment.diffDeg.toFixed(0) + '°');
+  parts.push(c.distanceToRoute.distanceKm.toFixed(0) + 'km off route');
+  parts.push(c.routeProgress.percent.toFixed(0) + '% progress');
+  return (ROUTE_CONFIDENCE_BAND_LABELS[rv.band] || rv.band) + ' confidence ('
+    + rv.score.toFixed(0) + '/100): ' + parts.join(', ');
+}
+
+function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation) {
   fieldSources = fieldSources || {};
   fieldConfidence = fieldConfidence || {};
   fieldComputationBasis = fieldComputationBasis || {};
@@ -186,6 +202,31 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const registeredOwnerValue = info.registeredOwner
     ? (registeredOwnerFlagHtml ? registeredOwnerFlagHtml + ' ' + info.registeredOwner : info.registeredOwner)
     : null;
+  // Route gets bespoke handling rather than a plain detailRow: a
+  // Layer-2-validated (adsbdb-sourced) route below the Medium confidence
+  // threshold (60) is still shown — never hidden — but with a visible
+  // warning, in BOTH normal and dev mode, since a likely-wrong route is
+  // misleading regardless of dev mode. The dev-mode badge, when a
+  // validation result exists, carries the full score breakdown instead of
+  // the generic per-source dot(s).
+  const routeHas = info.originAirport && info.destinationAirport;
+  const routeLowConfidence = routeValidation && routeValidation.score < 60;
+  let routeValueHtml = null;
+  if (routeHas) {
+    const routeText = info.originAirport + ' → ' + info.destinationAirport;
+    routeValueHtml = routeLowConfidence
+      ? '<span class="route-warning" title="Low-confidence route (adsbdb): validate before trusting">⚠ ' + routeText + '</span>'
+      : routeText;
+  }
+  let routeBadge = '';
+  if (currentDevMode) {
+    routeBadge = routeValidation
+      ? '<span class="source-badge" data-source="adsbdb" data-detail="' + routeConfidenceDetail(routeValidation) + '"></span>'
+      : sourceBadgeHtml(['originAirport', 'destinationAirport'], fieldSources, fieldConfidence, fieldComputationBasis);
+  }
+  const routeRow = (routeHas || currentDevMode)
+    ? '<b>Route:</b> ' + (routeValueHtml || dash) + routeBadge
+    : null;
   const identity = renderGroup('Identity', [
     detailRow('ICAO', info.icao24 ? info.icao24.toUpperCase() : null, 'icao24'),
     detailRow('Callsign', info.callsign || '—', 'callsign'),
@@ -198,9 +239,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     detailRow('Category', info.categoryDisplay, 'categoryDisplay'),
     identityRow('Year built', info.manufactureYear, 'manufactureYear'),
     identityRow('Registered Owner', registeredOwnerValue, 'registeredOwner'),
-    detailRow('Route', info.originAirport && info.destinationAirport
-      ? info.originAirport + ' → ' + info.destinationAirport
-      : null, ['originAirport', 'destinationAirport']),
+    routeRow,
   ]);
   const position = renderGroup('Position', [
     detailRow('Altitude', formatAltitude(info.altitudeM), 'altitudeM'),

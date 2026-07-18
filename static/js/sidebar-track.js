@@ -89,11 +89,28 @@ function buildMergedDetails(icao24) {
       info.operatorCountryIso = airline.country_iso;
     }
   }
+  let routeValidation = null;
   if (flightroute && flightroute.origin && flightroute.destination) {
     // Same "Name (IATA)" shape parseFlightAware() already builds, so Route
     // reads identically regardless of which source filled it.
     fillIfEmpty('originAirport', `${flightroute.origin.name} (${flightroute.origin.iata_code})`, 'adsbdb');
     fillIfEmpty('destinationAirport', `${flightroute.destination.name} (${flightroute.destination.iata_code})`, 'adsbdb');
+
+    // Layer 2 geometric validation — only for a route this call itself
+    // just filled from adsbdb (never for a live/FlightAware-sourced route,
+    // which comes from a real live tracking service, not a historical
+    // callsign->route guess). Requires the aircraft's current position,
+    // which only ever lives on detailsById's lat/lon (see icons.js).
+    const isAdsbdbRoute = fieldSources.originAirport && fieldSources.originAirport.length === 1
+      && fieldSources.originAirport[0] === 'adsbdb';
+    if (isAdsbdbRoute && live.lat != null && live.lon != null) {
+      routeValidation = validateAdsbdbRoute({
+        curLat: live.lat, curLon: live.lon,
+        trackDeg: info.trackDeg, speedKmh: info.speedKmh, altitudeM: info.altitudeM,
+        originLat: flightroute.origin.latitude, originLon: flightroute.origin.longitude,
+        destLat: flightroute.destination.latitude, destLon: flightroute.destination.longitude,
+      });
+    }
   }
 
   // --- Tier 3: Flywme (locally computed) ---
@@ -112,7 +129,7 @@ function buildMergedDetails(icao24) {
       fieldComputationBasis[feKey] = resolved.source;
     }
   }
-  return { info, fieldSources, fieldConfidence, fieldComputationBasis };
+  return { info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation };
 }
 
 // Single place that (re)renders the sidebar for whichever aircraft is
@@ -123,7 +140,7 @@ function buildMergedDetails(icao24) {
 function renderSelectedDetails() {
   if (selectedIcao24 == null || !detailsById.has(selectedIcao24)) return;
   const m = buildMergedDetails(selectedIcao24);
-  sidebarDetailsEl.innerHTML = renderDetailsHtml(m.info, m.fieldSources, m.fieldConfidence, m.fieldComputationBasis);
+  sidebarDetailsEl.innerHTML = renderDetailsHtml(m.info, m.fieldSources, m.fieldConfidence, m.fieldComputationBasis, m.routeValidation);
 }
 
 let selectedIcao24 = null;

@@ -148,7 +148,10 @@ function syncMarkers(markerMap, items, color) {
       markerMap.set(item.id, marker);
     }
 
-    detailsById.set(item.id, { info: item.info, registration: item.registration, fieldSources: item.fieldSources });
+    // lat/lon are carried through for route-validation.js's geometric
+    // checks (buildMergedDetails needs the aircraft's *current* position,
+    // which otherwise only ever lived on the marker itself).
+    detailsById.set(item.id, { info: item.info, registration: item.registration, fieldSources: item.fieldSources, lat: item.lat, lon: item.lon });
     // Keep the open sidebar's text live across polls. Unlike the old Leaflet
     // popup, this never touches the gallery (a separate element) — so an
     // already-loaded photo just keeps sitting there rather than needing to
