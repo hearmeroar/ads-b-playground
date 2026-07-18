@@ -678,25 +678,33 @@ because photographer name and photo URL come from an external API.
     `flightroute.airline.country_iso`) but only when adsbdb's tier is what
     filled it — a live-sourced or Flywme-computed operator still renders
     without one, the same known limitation as Country's own flag.
-  - **Photo (`url_photo`/`url_photo_thumbnail`)**: adsbdb's own sample data
-    shows this is, in practice, the *same* photo as our airport-data.com
-    top-up (identical numeric id in the path) — so most of the time it's
-    already in the gallery and gets deduplicated away. adsbdb doesn't supply
-    a `photographer` field at all (unlike airport-data.com's own API this
-    app otherwise always credits), so a genuinely unique adsbdb photo is
-    still shown, but with `photographer: 'via adsbdb.com'` rather than a
-    fabricated name, and appended to the **end** of the gallery — the
-    least-prominent slot, since it's the lowest-confidence of the three
-    candidates (no photographer credit, and usually a duplicate). Dedup
-    matches by the numeric id in the URL (`photoIdFromUrl()`, mirroring
-    `app.py`'s own `_AIRPORTDATA_ID_RE`) against every photo already in the
-    gallery, not exact URL string equality, since adsbdb's URL host/shape
-    differs from our own reconstructed full-size URL for the same photo.
+  - **Photo (`url_photo`/`url_photo_thumbnail`), last-resort only**: live
+    checks against api.adsbdb.com (4+ real aircraft) found `url_photo` —
+    the field that in theory points at a full-size image — **consistently
+    404s**, and so does the full-size URL `app.py`'s own
+    `_airportdata_fullsize_url()` logic would reconstruct from it (adsbdb's
+    photo data points at airport-data.com paths that airport-data.com no
+    longer serves, likely stale since adsbdb's own DB was populated). Only
+    `url_photo_thumbnail` — a genuinely tiny ~2-4KB image — ever actually
+    resolves, and adsbdb supplies no `photographer` field at all (unlike
+    airport-data.com's own API this app otherwise always credits). Given
+    both of those, it's shown only as a **strict last resort**: appended
+    (with `photographer: 'via adsbdb.com'`, never a fabricated name) only
+    when Planespotters + airport-data.com together found **zero** photos —
+    never alongside a real, properly-credited one, even a genuinely
+    different photo (an earlier version deduplicated by numeric photo id
+    instead; replaced after confirming the "usually a duplicate of our own
+    top-up" assumption behind that no longer held once `url_photo` turned
+    out to be dead). Rendered at native size from the start
+    (`photo.forceNative`, checked in `renderGallery()`'s `setIndex()`)
+    rather than stretched-then-degraded via the `img.onerror` fallback
+    path other undersized photos use — pointless here since the "large"
+    source is already known to fail, not just occasionally.
     `loadGallery()` and `loadAdsbdb()` are independent concurrent fetches
     kicked off together from `selectAircraft()`; whichever finishes *last*
-    is the one that actually performs the dedup+append+re-render, by
-    checking the other's cache (`galleryCache`/`adsbdbPhotoByIcao`) —
-    neither blocks on the other.
+    is the one that actually performs the append+re-render
+    (`appendAdsbdbPhotoAsLastResort()`), by checking the other's cache
+    (`galleryCache`/`adsbdbPhotoByIcao`) — neither blocks on the other.
   - **Dev-mode-only toggle** (`#source-adsbdb`, `#toggle-adsbdb`): a new UI
     pattern, distinct from the six `sourceToggles` — this row is `display:
     none` until dev mode is switched on (mirroring how `#opensky-help`
@@ -1109,10 +1117,11 @@ because photographer name and photo URL come from an external API.
   tagged with an `adsbdb` badge; a live registration is never overwritten
   even by a deliberately contradicting adsbdb response; Registered Owner
   shows literal "Unknown" like the other identity-enrichment fields when
-  adsbdb has nothing; a unique adsbdb photo lands at the *end* of the
-  gallery behind an existing, properly-credited Planespotters photo; and a
-  photo whose numeric id already exists in the gallery is deduplicated
-  away rather than appended. Also mocks `/api/photo2/**` itself, since
+  adsbdb has nothing; adsbdb's photo is never shown when a real
+  Planespotters photo already exists (last-resort only, not merely
+  deduplicated); and, when Planespotters/airport-data.com found nothing at
+  all, adsbdb's thumbnail *is* shown, rendered at native size from the
+  start rather than stretched. Also mocks `/api/photo2/**` itself, since
   this suite's aircraft always fall short of `GALLERY_TARGET_COUNT` from
   Planespotters alone and would otherwise trigger it — see the next bullet
   for why that mock can't be left to `mockAllSources()`'s own defaults yet.

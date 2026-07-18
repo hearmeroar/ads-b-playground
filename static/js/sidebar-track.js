@@ -420,48 +420,33 @@ let adsbdbFetchToken = 0; // guards against a stale response overwriting a newer
 // without re-deriving the candidate shape on every call.
 const adsbdbPhotoByIcao = new Map();
 
-// adsbdb's url_photo has no photographer field at all (unlike Planespotters/
-// airport-data.com, whose terms this app otherwise always credits) — in
-// practice it's almost always the very same airport-data.com photo our own
-// /api/photo2 top-up already found (same numeric id in the path), so most
-// of the time this never even reaches the gallery. `photoIdFromUrl` mirrors
-// app.py's own _AIRPORTDATA_ID_RE so a duplicate is caught regardless of
-// which of the (thumbnail vs reconstructed full-size) URL variants either
-// side happens to carry.
-function photoIdFromUrl(url) {
-  if (!url) return null;
-  const m = /(\d+)\.jpg(?:\?.*)?$/.exec(url);
-  return m ? m[1] : null;
-}
-
-function galleryHasPhotoId(photos, id) {
-  if (!id) return false;
-  return photos.some((p) => [p.thumbnail_large && p.thumbnail_large.src, p.fallback_src, p.link]
-    .some((u) => photoIdFromUrl(u) === id));
-}
-
-// Appends adsbdb's candidate photo to the *end* of the gallery — the least
-// prominent slot, since this is the lowest-confidence candidate of the
-// three (no photographer credit, and usually a duplicate already covered by
-// a properly-attributed source) — but only when it's genuinely not already
-// represented in the gallery.
-function appendUniqueAdsbdbPhoto(icao24, photos) {
+// adsbdb's photo is a last-resort-only candidate, not a top-up: live
+// checks against api.adsbdb.com (4+ real aircraft) found its `url_photo`
+// field — the one that would in theory be a full-size image — always
+// 404s, and the same is true of the full-size URL our own
+// _airportdata_fullsize_url() logic would reconstruct from it. Only
+// `url_photo_thumbnail` (a genuinely tiny ~2-4KB image) ever actually
+// resolves, and adsbdb supplies no photographer credit at all (unlike
+// Planespotters/airport-data.com, whose terms this app otherwise always
+// honors). Given that, it's not worth showing *alongside* a real,
+// properly-credited photo just because it happens to be a different one —
+// only worth showing when Planespotters + airport-data.com together found
+// nothing at all.
+function appendAdsbdbPhotoAsLastResort(icao24, photos) {
+  if (photos.length > 0) return photos;
   const candidate = adsbdbPhotoByIcao.get(icao24);
-  if (!candidate) return photos;
-  const id = photoIdFromUrl(candidate.thumbnail_large.src) || photoIdFromUrl(candidate.fallback_src);
-  if (galleryHasPhotoId(photos, id)) return photos;
-  return photos.concat([candidate]);
+  return candidate ? photos.concat([candidate]) : photos;
 }
 
 // loadGallery() and loadAdsbdb() are independent, concurrent fetches kicked
 // off together from selectAircraft() — whichever of the two finishes last
-// is the one that actually performs the dedup+append+re-render, by checking
+// is the one that actually performs the append+re-render, by checking
 // whether the other one's cache is already populated.
 function appendAdsbdbPhotoIfReady(icao24) {
   if (!adsbdbPhotoByIcao.has(icao24)) return; // adsbdb fetch hasn't landed yet
   if (!galleryCache.has(icao24)) return; // gallery hasn't landed yet either
   const current = galleryCache.get(icao24);
-  const merged = appendUniqueAdsbdbPhoto(icao24, current);
+  const merged = appendAdsbdbPhotoAsLastResort(icao24, current);
   if (merged !== current) {
     galleryCache.set(icao24, merged);
     if (selectedIcao24 === icao24) renderGallery(merged);
@@ -484,11 +469,18 @@ async function loadAdsbdb(icao24, info) {
     if (fetchId !== adsbdbFetchToken || selectedIcao24 !== icao24) return; // selection changed meanwhile
     adsbdbById.set(icao24, data);
     const aircraft = data.aircraft;
-    const photoUrl = aircraft && (aircraft.url_photo || aircraft.url_photo_thumbnail);
-    adsbdbPhotoByIcao.set(icao24, photoUrl ? {
-      thumbnail_large: { src: aircraft.url_photo || aircraft.url_photo_thumbnail },
-      fallback_src: aircraft.url_photo ? aircraft.url_photo_thumbnail : null,
-      link: aircraft.url_photo || aircraft.url_photo_thumbnail,
+    // aircraft.url_photo (the field that would in theory be full-size)
+    // reliably 404s in practice — only the thumbnail ever resolves, so
+    // that's the only field used here at all (see appendAdsbdbPhotoAsLastResort
+    // above). forceNative renders it at native size from the start
+    // instead of stretched-then-blurry (it's genuinely too small to
+    // stretch cleanly).
+    const photoThumb = aircraft && aircraft.url_photo_thumbnail;
+    adsbdbPhotoByIcao.set(icao24, photoThumb ? {
+      thumbnail_large: { src: photoThumb },
+      fallback_src: null,
+      forceNative: true,
+      link: photoThumb,
       photographer: 'via adsbdb.com',
     } : null);
     renderSelectedDetails();
@@ -664,8 +656,11 @@ function renderGallery(photos) {
 
     // Reset to "stretch" every time: a previous slide may have degraded to
     // "native" below, and that must not leak into the next real photo.
-    imgWrap.classList.remove('native');
-    imgWrap.classList.add('stretch');
+    // forceNative (adsbdb's thumbnail-only photo — see loadAdsbdb) skips
+    // straight to native size instead of stretching a genuinely tiny
+    // image into visible blur first.
+    imgWrap.classList.remove('native', 'stretch');
+    imgWrap.classList.add(photo.forceNative ? 'native' : 'stretch');
     img.onerror = () => {
       // Only airport-data.com photos carry fallback_src (their original
       // ~200px thumbnail) — a reconstructed full-size URL that 404s

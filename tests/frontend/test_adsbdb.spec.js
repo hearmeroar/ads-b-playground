@@ -161,7 +161,12 @@ test('Registered Owner shows literal "Unknown" when adsbdb has nothing, like oth
   expect(sidebarText).toContain('Registered Owner: Unknown');
 });
 
-test('a unique adsbdb photo is appended at the end of the gallery', async ({ page }) => {
+// adsbdb's url_photo consistently 404s in practice (verified live against
+// api.adsbdb.com) — only url_photo_thumbnail (a genuinely tiny image, no
+// photographer credit) ever resolves, so it's now shown only as an
+// absolute last resort: when Planespotters + airport-data.com together
+// found nothing at all, never alongside a real photo.
+test('adsbdb\'s photo is never shown when a real photo already exists', async ({ page }) => {
   await page.route('**/api/photo/**', (route) => route.fulfill({ json: { photos: [
     { thumbnail_large: { src: 'https://cdn.planespotters.net/photo/1.jpg' }, link: 'https://planespotters.net/1', photographer: 'Alice' },
   ] } }));
@@ -175,24 +180,22 @@ test('a unique adsbdb photo is appended at the end of the gallery', async ({ pag
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
+  await page.waitForFunction(() => adsbdbById.has('eeeeee'));
+  await page.waitForTimeout(200);
 
-  await page.waitForFunction(() => document.querySelectorAll('#sidebar-gallery .gallery-dot').length === 2);
-  // First slide (index 0) must stay Planespotters' photo — adsbdb's unique
-  // photo goes to the end, not ahead of an existing, properly-credited one.
-  const firstCredit = await page.textContent('#sidebar-gallery .gallery-credit a');
-  expect(firstCredit).toBe('Alice');
-  await page.click('#sidebar-gallery .gallery-next');
-  const secondCredit = await page.textContent('#sidebar-gallery .gallery-credit a');
-  expect(secondCredit).toBe('via adsbdb.com');
+  // Still just Alice's photo — no second slide, no dots (lone-photo
+  // galleries render no carousel chrome at all).
+  const dotCount = await page.evaluate(() => document.querySelectorAll('#sidebar-gallery .gallery-dot').length);
+  expect(dotCount).toBe(0);
+  const credit = await page.textContent('#sidebar-gallery .gallery-credit a');
+  expect(credit).toBe('Alice');
 });
 
-test('an adsbdb photo matching an existing photo id is deduplicated, not appended', async ({ page }) => {
-  await page.route('**/api/photo/**', (route) => route.fulfill({ json: { photos: [
-    { thumbnail_large: { src: 'https://image.airport-data.com/aircraft/000111222.jpg' }, link: 'https://airport-data.com/x', photographer: 'Bob' },
-  ] } }));
+test('adsbdb\'s thumbnail is shown, at native size, only when no other photo exists', async ({ page }) => {
+  await page.route('**/api/photo/**', (route) => route.fulfill({ json: { photos: [] } }));
+  await page.route('**/api/photo2/**', (route) => route.fulfill({ json: { photos: [] } }));
   await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
     aircraft: Object.assign({}, AIRCRAFT_UNIQUE, {
-      // Same numeric id (000111222) as the photo already in the gallery above.
       url_photo: 'https://airport-data.com/images/aircraft/000/111/000111222.jpg',
       url_photo_thumbnail: 'https://airport-data.com/images/aircraft/thumbnails/000/111/000111222.jpg',
     }),
@@ -201,10 +204,14 @@ test('an adsbdb photo matching an existing photo id is deduplicated, not appende
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
-  await page.waitForTimeout(300); // let both the gallery and adsbdb fetch settle
+  await page.waitForFunction(() => adsbdbById.has('eeeeee'));
+  await page.waitForTimeout(200);
 
-  const dotCount = await page.evaluate(() => document.querySelectorAll('#sidebar-gallery .gallery-dot').length);
-  expect(dotCount).toBe(0); // still just the one (lone-photo galleries render no dots at all)
   const credit = await page.textContent('#sidebar-gallery .gallery-credit a');
-  expect(credit).toBe('Bob');
+  expect(credit).toBe('via adsbdb.com');
+  const src = await page.getAttribute('#sidebar-gallery img', 'src');
+  expect(src).toBe('https://airport-data.com/images/aircraft/thumbnails/000/111/000111222.jpg');
+  // Rendered at native size from the start, not stretched-then-degraded.
+  const wrapClass = await page.getAttribute('#sidebar-gallery .gallery-image-wrap', 'class');
+  expect(wrapClass).toContain('native');
 });
