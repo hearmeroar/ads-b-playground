@@ -79,7 +79,7 @@ devModeToggle.addEventListener('change', () => {
   // the dev-mode aircraft table whenever both are open — dock it to the
   // table's right instead so both stay visible/usable together.
   sidebarEl.classList.toggle('dev-shifted', currentDevMode);
-  if (currentDevMode) renderDevAircraftTable();
+  if (currentDevMode) { renderDevAircraftTable(); refreshIdentityStats(); }
   if (selectedIcao24 != null) renderSelectedDetails();
 });
 adsbdbToggle.addEventListener('change', () => {

@@ -72,6 +72,10 @@ html, body { margin: 0; padding: 0; height: 100%; }
   font-size: 11px; line-height: 1.35; color: var(--ink);
 }
 #hud .source-help-popover[hidden] { display: none; }
+/* Denser content than the other help popovers (several labeled sections,
+   not one short quota sentence) — the shared 200px width read as an
+   overly narrow, heavily-wrapped column for this one specifically. */
+#dev-mode-help-popover { width: 260px; }
 #hud .source-row.locked .source-name,
 #hud .source-row.locked .source-count { opacity: 0.55; }
 #hud .source-row.locked .switch { opacity: 0.5; }
@@ -368,6 +372,10 @@ html, body { margin: 0; padding: 0; height: 100%; }
   border-bottom: 1px solid var(--border);
 }
 #dev-aircraft-count { color: var(--muted); font-weight: 500; }
+#dev-identity-stats {
+  padding: 6px 14px; font-weight: 400; color: var(--muted); flex: none;
+  border-bottom: 1px solid var(--border);
+}
 #dev-aircraft-panel-scroll { overflow: auto; }
 #dev-aircraft-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 #dev-aircraft-table th, #dev-aircraft-table td {

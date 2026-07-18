@@ -137,3 +137,29 @@ test('toggling dev mode off restores the exact non-dev-mode markup', async ({ pa
     document.querySelectorAll('#sidebar-header .source-badge, #sidebar-details .source-badge, #sidebar-route .source-badge').length);
   expect(badgeCount).toBe(0);
 });
+
+// /api/adsbdb/** is always mocked (see mockAllSources), so the real backend
+// endpoint this stats panel reads from (app.py's persistent _identity_cache)
+// never actually gets populated during this suite — asserting the exact
+// shape rather than a specific count, since the real number depends on
+// backend state this test doesn't control.
+test('dev mode shows the identity-cache stats line, hidden the rest of the time', async ({ page }) => {
+  // mockAllSources' blanket "**/api/identity/**" mock (for the per-aircraft
+  // enrichment route) would otherwise also swallow this distinct stats
+  // route — register a more specific override (Playwright matches the
+  // most-recently-registered route) with the real shape this endpoint
+  // actually returns.
+  await page.route('**/api/identity/stats', (route) => route.fulfill({
+    json: { identity_count: 3, history_count: 1 },
+  }));
+
+  expect(await page.isVisible('#dev-identity-stats')).toBe(false);
+
+  await page.click('#toggle-dev-mode');
+  await page.waitForFunction(() => document.querySelector('#dev-identity-stats').textContent.length > 0);
+  const text = await page.textContent('#dev-identity-stats');
+  expect(text).toBe('Identity cache: 3 aircraft · 1 changes logged');
+
+  await page.click('#toggle-dev-mode');
+  expect(await page.isVisible('#dev-identity-stats')).toBe(false);
+});

@@ -732,6 +732,28 @@ def api_adsbdb(icao24):
     return fetch_adsbdb(icao24, callsign)
 
 
+def _count_identity_history():
+    """Line count of IDENTITY_HISTORY_FILE (0 if missing) — cheap enough to
+    just re-read on each dev-mode-only stats request rather than keep a
+    separately-maintained in-memory counter that could drift from the file."""
+    try:
+        with open(IDENTITY_HISTORY_FILE, "r") as f:
+            return sum(1 for line in f if line.strip())
+    except OSError:
+        return 0
+
+
+@app.route("/api/identity/stats")
+def api_identity_stats():
+    # Dev-mode-only diagnostic for the persistent identity cache/history log
+    # (see _identity_cache above) — pure local reads, no I/O worth caching,
+    # same rationale as /api/identity/<icao24>'s own uncached status.
+    return jsonify({
+        "identity_count": len(_identity_cache),
+        "history_count": _count_identity_history(),
+    })
+
+
 @app.route("/api/identity/<icao24>")
 def api_identity(icao24):
     # Fetched lazily on marker select (static/index.html's

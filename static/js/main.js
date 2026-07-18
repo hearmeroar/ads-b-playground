@@ -2,6 +2,25 @@
 const devAircraftPanel = document.getElementById('dev-aircraft-panel');
 const devAircraftTbody = document.getElementById('dev-aircraft-tbody');
 const devAircraftCountEl = document.getElementById('dev-aircraft-count');
+const devIdentityStatsEl = document.getElementById('dev-identity-stats');
+
+// Dev-mode-only diagnostic for the persistent identity cache (app.py's
+// _identity_cache/_identity_history — see CLAUDE.md's "adsbdb.com"
+// section): how many aircraft it has ever resolved, and how many field
+// changes it has logged, across the process's whole lifetime (not just
+// what's currently on screen — unlike the aircraft table above, this
+// number can only grow). Refreshed alongside that table (poll end + the
+// dev-mode toggle switching on) rather than on its own timer.
+function refreshIdentityStats() {
+  fetch('/api/identity/stats')
+    .then((resp) => resp.json())
+    .then((stats) => {
+      devIdentityStatsEl.textContent =
+        'Identity cache: ' + stats.identity_count + ' aircraft · '
+        + stats.history_count + ' changes logged';
+    })
+    .catch(() => {});
+}
 
 // A compact, narrow, vertically-scrolling list of every aircraft currently
 // on the map (any enabled source), refreshed alongside the HUD counts each
@@ -157,15 +176,27 @@ function refreshOpenSkyQuotaHelp() {
     + 'The historical-track quota is separate and tracked per aircraft.';
 }
 
+// Split into short labeled sections rather than one long paragraph — this
+// popover has grown a lot as dev mode gained more sub-features, and a wall
+// of run-on text stopped being scannable at a glance.
 function refreshDevModeHelp() {
-  document.getElementById('dev-mode-help-popover').textContent =
-    'Shows every sidebar field, even ones normally hidden because they’re empty '
-    + '(shown as —). A colored dot on a populated field shows which source supplied '
-    + 'it — click the dot for its name. Enrichment: OpenSky’s own fields (position, '
-    + 'speed, squawk, etc.) always win when OpenSky is on; gaps are filled from whichever '
-    + 'adsb.fi/adsb.lol/adsb.one/airplanes.live response has that aircraft (one radius '
-    + 'source per field, highest-priority match wins); FlightAware’s route data is '
-    + 'merged in separately by matching callsigns, not by ICAO24.';
+  document.getElementById('dev-mode-help-popover').innerHTML =
+    '<b>Sidebar fields:</b> shows every field, even ones normally hidden '
+    + 'for being empty (shown as —). A colored dot on a populated field '
+    + 'names its source — click the dot to see it.'
+    + '<br><br><b>Enrichment order:</b> OpenSky’s own fields (position, speed, '
+    + 'squawk, etc.) always win when OpenSky is on; gaps are filled from '
+    + 'whichever adsb.fi/adsb.lol/adsb.one/airplanes.live response has that '
+    + 'aircraft (highest-priority match wins); FlightAware’s route is merged '
+    + 'in separately by matching callsigns, not ICAO24.'
+    + '<br><br><b>All aircraft table:</b> a scrollable list of every aircraft '
+    + 'currently on the map — click a row to open its sidebar.'
+    + '<br><br><b>adsbdb.com toggle:</b> appears only here — a lazy per-click '
+    + 'lookup source with no map markers/count of its own.'
+    + '<br><br><b>Identity cache:</b> counts in the aircraft-table header show '
+    + 'how many aircraft this server has ever resolved via adsbdb, and how '
+    + 'many field changes (e.g. a registration change) it has logged — '
+    + 'persists across restarts, grows over the process’s whole lifetime.';
 }
 
 // A "(?)" icon is click-to-toggle (works on touch, unlike a hover title): it
@@ -426,7 +457,7 @@ async function poll() {
   }
 
   updateCounts(counts);
-  if (currentDevMode) renderDevAircraftTable();
+  if (currentDevMode) { renderDevAircraftTable(); refreshIdentityStats(); }
 
   // Do not spend OpenSky track credits every 12 seconds for an already-open
   // sidebar. When its historical endpoint is unavailable, keep the local

@@ -717,6 +717,24 @@ because photographer name and photo URL come from an external API.
     than a versioned entity graph. This is intentionally the entire scope
     of Phase 1 from that discussion; phases 2 (merging in external
     registries) and 3 (a full identity-graph product) are not planned.
+    **`/api/identity/stats`** (a static route registered ahead of the
+    dynamic `/api/identity/<icao24>` below, though Werkzeug would resolve
+    the static path correctly either way) exposes this layer's two raw
+    counters — `identity_count` (`len(_identity_cache)`) and
+    `history_count` (a line count of `IDENTITY_HISTORY_FILE`, recomputed
+    from disk on each request rather than kept as a separately-maintained
+    in-memory counter that could drift) — for the dev-mode-only frontend
+    panel below. Deliberately uncached, same rationale as
+    `/api/identity/<icao24>` itself.
+  - **Dev-mode stats display** (`#dev-identity-stats`, a line inside the
+    existing `#dev-aircraft-panel` header — no new panel, just reuses that
+    one's existing show/hide wiring): `refreshIdentityStats()`
+    (`static/js/main.js`) fetches `/api/identity/stats` and renders
+    `"Identity cache: N aircraft · N changes logged"`. Refreshed at the
+    same two points `renderDevAircraftTable()` already is — the end of
+    `poll()` and the dev-mode toggle switching on — rather than its own
+    timer, since both numbers only change on an adsbdb fetch, which
+    already triggers a re-render of that table anyway.
   - **Priority chain, agreed with the project owner**: live feed > adsbdb >
     Flywme-computed, i.e. adsbdb is inserted as a *second* tier between the
     two `buildMergedDetails()` already had. Each tier only fills a field
@@ -1294,7 +1312,18 @@ because photographer name and photo URL come from an external API.
   unknown (404) aircraft never touches the cache at all. `conftest.py`'s
   `reset_caches` redirects `IDENTITY_CACHE_FILE`/`IDENTITY_HISTORY_FILE` to
   throwaway files, same rationale as the existing `TRACK_CACHE_FILE`
-  redirect.
+  redirect. Also covers `/api/identity/stats`: zero counts on an empty
+  cache, and both counters incrementing correctly after a fetch followed
+  by a field change.
+- `test_dev_mode.spec.js` also covers the `#dev-identity-stats` line:
+  hidden whenever dev mode is off (it's inside `#dev-aircraft-panel`,
+  which shares that show/hide state), and shows the exact
+  `"Identity cache: N aircraft · N changes logged"` text once dev mode is
+  on. Registers its own `/api/identity/stats` route override (Playwright
+  matches the most-recently-registered route) since `mockAllSources()`'s
+  blanket `**/api/identity/**` mock — meant for the unrelated per-aircraft
+  enrichment route — would otherwise also swallow this distinct stats
+  route and produce `"undefined"` text.
 - `test_adsbdb.spec.js` covers: the `#source-adsbdb` dev-mode-only toggle
   (hidden + checked by default, appears checked once dev mode is on,
   hides again when dev mode is switched off); Registered Owner/Operator/

@@ -86,3 +86,18 @@ def test_no_identity_update_on_unknown_aircraft(client, mock_get):
     mock_get.return_value = make_response(status_code=404)
     client.get("/api/adsbdb/deadbe")
     assert "deadbe" not in app._identity_cache
+
+
+def test_identity_stats_endpoint(client, mock_get):
+    resp = client.get("/api/identity/stats")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"identity_count": 0, "history_count": 0}
+
+    mock_get.return_value = make_response(json_data={"response": {"aircraft": AIRCRAFT_V1}})
+    client.get("/api/adsbdb/a835af")
+    changed = dict(AIRCRAFT_V1, registration="N999ZZ")
+    mock_get.return_value = make_response(json_data={"response": {"aircraft": changed}})
+    client.get("/api/adsbdb/a835af?callsign=TEST123")
+
+    resp = client.get("/api/identity/stats")
+    assert resp.get_json() == {"identity_count": 1, "history_count": 1}
