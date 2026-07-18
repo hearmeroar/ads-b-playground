@@ -200,6 +200,35 @@ function refreshDevModeHelp() {
     + 'persists across restarts, grows over the process’s whole lifetime.';
 }
 
+function refreshWeatherPrecipHelp() {
+  document.getElementById('weather-precip-help-popover').textContent =
+    'Live precipitation radar composite from RainViewer, updated every ~10 minutes. '
+    + 'Shows recent rain patterns. Note: RainViewer\'s native tiles stop at zoom 7; '
+    + 'higher zoom levels display an upscaled view.';
+}
+
+function refreshWeatherForecastHelp() {
+  document.getElementById('weather-forecast-help-popover').textContent =
+    'Short-range precipitation forecast (nowcast) from RainViewer, typically valid '
+    + 'for 0–2 hours ahead. Not always published by RainViewer; this layer may appear '
+    + 'empty on occasion.';
+}
+
+function refreshWeatherSigmetHelp() {
+  document.getElementById('weather-sigmet-help-popover').textContent =
+    'Significant weather hazards for aviation: icing, turbulence, convective activity, '
+    + 'volcanic ash, and IFR/mountain obscuration. Polygons are colored by hazard type '
+    + '(red = convection, orange = turbulence, blue = icing, purple = IFR/obscuration, '
+    + 'gray = ash). Sourced from aviationweather.gov, updated every ~5 minutes.';
+}
+
+function refreshWeatherMetarHelp() {
+  document.getElementById('weather-metar-help-popover').textContent =
+    'Airport weather station observations: wind, visibility, ceiling, and flight category. '
+    + 'Circles are colored by category (green = VFR, blue = MVFR, red = IFR, magenta = LIFR). '
+    + 'Click a station for the raw METAR text. Sourced from aviationweather.gov, updated hourly.';
+}
+
 // A "(?)" icon is click-to-toggle (works on touch, unlike a hover title): it
 // opens a small popover explaining a source/track quota state, and a click
 // anywhere else closes it — same pattern as the category dropdown. Both the
@@ -226,6 +255,10 @@ function closeHelpPopovers() {
 wireHelpPopover('opensky-help', 'opensky-help-popover', refreshOpenSkyQuotaHelp);
 wireHelpPopover('track-help', 'track-help-popover', refreshTrackHelp);
 wireHelpPopover('dev-mode-help', 'dev-mode-help-popover', refreshDevModeHelp);
+wireHelpPopover('weather-precip-help', 'weather-precip-help-popover', refreshWeatherPrecipHelp);
+wireHelpPopover('weather-forecast-help', 'weather-forecast-help-popover', refreshWeatherForecastHelp);
+wireHelpPopover('weather-sigmet-help', 'weather-sigmet-help-popover', refreshWeatherSigmetHelp);
+wireHelpPopover('weather-metar-help', 'weather-metar-help-popover', refreshWeatherMetarHelp);
 document.addEventListener('click', closeHelpPopovers);
 
 // Dev-mode source badges (.source-badge) are freshly regenerated HTML every

@@ -36,10 +36,11 @@ html, body { margin: 0; padding: 0; height: 100%; }
    scrollable overflow, so scrolling to the very end would butt the card
    straight against the bottom edge with no gap, unlike the 14px it starts
    with at the top. This invisible pseudo-element extends #hud's own box
-   (which *does* count) by 14px to match. */
+   (which *does* count) — sized larger than that top gap (21px, ~1.5x) per
+   the project owner's preference, not a mirror-exact match. */
 #hud::after {
   content: ''; display: block; position: absolute; top: 100%; left: 0;
-  height: 14px; width: 1px;
+  height: 21px; width: 1px;
 }
 
 #hud .count-row { display: flex; align-items: baseline; gap: 7px; }
@@ -118,6 +119,8 @@ html, body { margin: 0; padding: 0; height: 100%; }
 
 #hud .filter-block { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 #hud .filter-title { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+#hud .filter-block .source-row { margin-bottom: 4px; }
+#hud .filter-block .source-row:last-child { margin-bottom: 0; }
 #hud .segmented {
   display: flex; background: #eef0f3; border-radius: 9px; padding: 2px; gap: 2px;
 }
@@ -564,48 +567,67 @@ html, body { margin: 0; padding: 0; height: 100%; }
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
 }
 #sidebar-save-collection:hover { background: rgba(255, 255, 255, 1); }
+/* Filled vs outline is the save/unsave state — the SVG path already ships
+   fill="none" (an outline), and this rule overrides that presentation
+   attribute (any CSS rule targeting the element always wins over a
+   presentation attribute, so no duplicate markup is needed for the two
+   states). */
 #sidebar-save-collection.saved { color: #1a73e8; }
+#sidebar-save-collection.saved svg path { fill: currentColor; }
+#sidebar-save-collection:disabled {
+  cursor: not-allowed; opacity: 0.4; color: var(--muted);
+}
 
-/* Collection overlay — same glass-card treatment as #hud/#sidebar, opened
-   over the map via the HUD's "My collection" button. Centered rather than
-   docked to an edge (unlike #sidebar/#dev-aircraft-panel), since it's a
-   browsing surface with no natural anchor to the currently-selected
-   aircraft the way those two have. */
+/* Collection overlay — a true fullscreen takeover (not a centered modal):
+   the owner asked for it to fully replace the map view while open, so
+   there's no backdrop to dim either. Still uses the same glass-card
+   language (blur, border, shadow removed since there's no edge to cast one
+   against) as #hud/#sidebar for visual consistency. */
 #collection-panel {
-  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-  z-index: 1200; width: 640px; max-width: 90vw; max-height: 86vh;
+  position: fixed; inset: 0; z-index: 1300;
   background: var(--card-bg);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--border); border-radius: 16px;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   color: var(--ink);
-  display: flex; flex-direction: column; overflow: hidden;
+  display: flex; flex-direction: column;
 }
 #collection-panel[hidden] { display: none; }
 #collection-panel-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 18px; font-weight: 700; flex: none;
+  padding: 18px 24px; font-weight: 700; font-size: 16px; flex: none;
   border-bottom: 1px solid var(--border);
 }
 #collection-panel-close {
-  width: 26px; height: 26px; border-radius: 50%; border: none;
+  width: 32px; height: 32px; border-radius: 50%; border: none;
   background: rgba(15, 23, 42, 0.06); color: var(--ink);
-  font-size: 16px; line-height: 1; cursor: pointer;
+  font-size: 18px; line-height: 1; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
 #collection-panel-close:hover { background: rgba(15, 23, 42, 0.12); }
 #collection-panel-grid {
-  overflow: auto; padding: 16px 18px;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 14px;
+  overflow: auto; padding: 20px 24px 32px; flex: 1;
+  max-width: 1100px; width: 100%; margin: 0 auto;
+}
+.collection-group-header {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); margin: 22px 0 10px;
+}
+.collection-group-header:first-child { margin-top: 0; }
+.collection-group-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
 }
 #collection-panel-empty {
-  padding: 30px 18px; text-align: center; color: var(--muted); font-size: 13px;
-  grid-column: 1 / -1;
+  height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center;
+  color: var(--muted); padding: 30px;
 }
+.collection-empty-icon { width: 96px; height: 96px; color: rgba(15, 23, 42, 0.16); }
+.collection-empty-title { font-size: 15px; font-weight: 700; color: var(--ink); margin-top: 14px; }
+.collection-empty-hint { font-size: 13px; color: var(--muted); margin-top: 6px; max-width: 320px; }
+
 .collection-card {
-  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
   background: rgba(15, 23, 42, 0.02); position: relative;
 }
 .collection-card-photo-wrap {
@@ -613,16 +635,42 @@ html, body { margin: 0; padding: 0; height: 100%; }
   display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
 .collection-card-photo-wrap img { width: 100%; height: 100%; object-fit: cover; }
-.collection-card-photo-placeholder { color: var(--muted); font-size: 11px; }
-.collection-card-body { padding: 8px 10px 10px; }
-.collection-card-title { font-size: 13px; font-weight: 700; color: var(--ink); }
-.collection-card-subtitle { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.collection-card-delete {
-  position: absolute; top: 6px; right: 6px; z-index: 2;
-  width: 22px; height: 22px; border-radius: 50%; border: none;
-  background: rgba(255, 255, 255, 0.92); color: var(--ink);
-  font-size: 14px; line-height: 1; cursor: pointer;
+.collection-card-photo-placeholder { color: var(--muted); font-size: 13px; }
+.collection-card-body { padding: 14px 16px 16px; }
+.collection-card-title { font-size: 17px; font-weight: 700; color: var(--ink); }
+.collection-card-subtitle { font-size: 13px; color: var(--muted); margin-top: 3px; }
+/* The panel's own save/unsave toggle — same bookmark glyph + fill rule as
+   #sidebar-save-collection above, always rendered filled here (a live card
+   in this list is, by definition, currently saved). */
+.collection-card-icon-btn {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: rgba(255, 255, 255, 0.92); color: #1a73e8;
+  cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
 }
-.collection-card-delete:hover { background: #fff; color: #dc2626; }
+.collection-card-icon-btn svg { width: 20px; height: 20px; }
+.collection-card-icon-btn:hover { background: #fff; }
+.collection-card-icon-btn.saved svg path { fill: currentColor; }
+
+/* "Elegant" removal: the card stays in place, dimmed, with an Undo action —
+   real deletion already happened server-side (see removeCardWithUndo in
+   auth-collection.js), this is purely a session-scoped grace period. */
+.collection-card.removed { opacity: 0.45; filter: grayscale(0.6); }
+.collection-card-removed-overlay {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; background: rgba(255, 255, 255, 0.55);
+}
+.collection-card-removed-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--ink); background: rgba(255, 255, 255, 0.9);
+  padding: 2px 8px; border-radius: 999px;
+}
+.collection-card-undo-btn {
+  font: inherit; font-size: 12px; font-weight: 600; color: #1a73e8;
+  background: rgba(255, 255, 255, 0.92); border: none; border-radius: 999px;
+  padding: 4px 12px; cursor: pointer; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+}
+.collection-card-undo-btn:hover { background: #fff; }

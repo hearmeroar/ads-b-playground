@@ -394,6 +394,20 @@ API key:
   `weatherMetarState`), where the `enabled` flag is checked again inside
   the fetch's `.then()` — a layer toggled off while its own fetch was
   still in flight must not add itself back after the fact.
+- **Help tooltips (required for all weather layers):** Each weather layer
+  in the HUD includes a small `(?)` help button with a click-to-toggle
+  popover explaining the layer's source, update frequency, and any caveats
+  (e.g., RainViewer's native zoom limits, SIGMET color legend). This is a
+  required pattern: any new weather layer added must include this same
+  affordance. Implement via: (1) add a `<button>` with `class="source-help"`
+  and an inline SVG question mark icon, plus a `<div class="source-help-popover"`
+  in `static/index.html`'s weather filter section; (2) write a
+  `refreshWeather<LayerName>Help()` function in `static/js/main.js` that
+  populates the popover text (concise, 2–3 sentences covering source,
+  frequency, and notable limits); (3) call `wireHelpPopover(btnId, popoverId,
+  refreshFunction)` to attach the click-to-toggle listener alongside the
+  existing weather layer wiring. Follow the Precipitation/Forecast/SIGMET/METAR
+  implementation as a template.
 
 **Aircraft photos, two sources, Planespotters primary + airport-data.com
 top-up** (`app.py`):

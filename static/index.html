@@ -62,7 +62,7 @@
 
 <div id="collection-panel" hidden>
   <div id="collection-panel-header">
-    <span>My collection</span>
+    <span id="collection-panel-title">My collection</span>
     <button type="button" id="collection-panel-close" aria-label="Close">&times;</button>
   </div>
   <div id="collection-panel-grid"></div>
@@ -243,37 +243,73 @@
 
   <div class="filter-block">
     <div class="filter-title">Weather</div>
-    <div class="source-row" title="Live precipitation radar composite (RainViewer, refreshed every ~5 min)">
+    <div class="source-row">
       <span class="swatch" style="background:#3b82f6"></span>
       <span class="source-name">Precipitation</span>
+      <button type="button" class="source-help" id="weather-precip-help"
+              aria-label="About precipitation radar">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
       <label class="switch" style="--row-color:#3b82f6">
         <input type="checkbox" id="toggle-weather-precip">
         <span class="switch-track"></span>
       </label>
+      <div class="source-help-popover" id="weather-precip-help-popover" hidden></div>
     </div>
-    <div class="source-row" title="Short-range precipitation forecast (RainViewer nowcast — not always published)">
+    <div class="source-row">
       <span class="swatch" style="background:#93c5fd"></span>
       <span class="source-name">Forecast</span>
+      <button type="button" class="source-help" id="weather-forecast-help"
+              aria-label="About precipitation forecast">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
       <label class="switch" style="--row-color:#93c5fd">
         <input type="checkbox" id="toggle-weather-nowcast">
         <span class="switch-track"></span>
       </label>
+      <div class="source-help-popover" id="weather-forecast-help-popover" hidden></div>
     </div>
-    <div class="source-row" title="Significant weather hazards for aviation — icing, turbulence, convective activity, ash, etc. (aviationweather.gov international SIGMETs)">
+    <div class="source-row">
       <span class="swatch" style="background:#f59e0b"></span>
       <span class="source-name">SIGMET</span>
+      <button type="button" class="source-help" id="weather-sigmet-help"
+              aria-label="About SIGMET hazards">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
       <label class="switch" style="--row-color:#f59e0b">
         <input type="checkbox" id="toggle-weather-sigmet">
         <span class="switch-track"></span>
       </label>
+      <div class="source-help-popover" id="weather-sigmet-help-popover" hidden></div>
     </div>
-    <div class="source-row" title="Airport weather station observations — wind, visibility, ceiling, flight category (aviationweather.gov METAR)">
+    <div class="source-row">
       <span class="swatch" style="background:#10b981"></span>
       <span class="source-name">METAR</span>
+      <button type="button" class="source-help" id="weather-metar-help"
+              aria-label="About airport weather">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
       <label class="switch" style="--row-color:#10b981">
         <input type="checkbox" id="toggle-weather-metar">
         <span class="switch-track"></span>
       </label>
+      <div class="source-help-popover" id="weather-metar-help-popover" hidden></div>
     </div>
   </div>
 
