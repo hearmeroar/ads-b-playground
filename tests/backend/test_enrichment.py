@@ -52,6 +52,15 @@ def test_registration_prefix_covers_essentially_every_icao_member_state():
     assert lookup_country_by_registration("PP-ABC")["country_iso"] == "BR"  # Brazil
 
 
+def test_registration_prefix_israel():
+    # Found missing the same way SE (Sweden) was originally: a real aircraft
+    # (4X-ABS, Israir) resolved no country at all because "4X" wasn't in the
+    # table yet.
+    result = lookup_country_by_registration("4X-ABS")
+    assert result["country_iso"] == "IL"
+    assert result["country"] == "Israel"
+
+
 def test_registration_prefix_composite_marks_hong_kong_macau():
     # Hong Kong ("B-H...") and Macau ("B-M...") both fall under China's bare
     # "B" mark but get their own sub-block after the dash — the more specific

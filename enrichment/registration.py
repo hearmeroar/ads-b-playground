@@ -16,6 +16,7 @@ PREFIX_TO_ISO = {
     # Composite marks (checked before their parent's bare prefix)
     "BH": "HK", "BM": "MO",
     # Everything else, alphabetical by mark
+    "4X": "IL",
     "5A": "LY", "5B": "CY", "5H": "TZ", "5N": "NG", "5R": "MG", "5T": "MR",
     "5U": "NE", "5V": "TG", "5W": "WS", "5X": "UG", "5Y": "KE",
     "6O": "SO", "6V": "SN", "6W": "SN", "6Y": "JM",

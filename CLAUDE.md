@@ -560,10 +560,15 @@ because photographer name and photo URL come from an external API.
     ISO code missing from this table would silently resolve to nothing);
     `registration.py` maps ICAO/ITU registration prefixes — a real,
     standardized convention (ICAO Annex 7), not a placeholder guess — to a
-    country. Expanded from an initial ~20-entry placeholder subset to 192
-    entries covering essentially every nationality mark, after a real
-    aircraft (`SE-RTJ`, Sweden) came up with no country resolved simply
-    because `SE` wasn't in the table yet. Longest-prefix-match, with one
+    country. Expanded from an initial ~20-entry placeholder subset to 193
+    entries covering essentially every nationality mark, after real
+    aircraft came up with no country resolved simply because their prefix
+    wasn't in the table yet — first `SE-RTJ` (Sweden), then later `4X-ABS`
+    (Israel, an Israir A320) turned up the same gap for `4X`. "192/193
+    entries" is a moving target in this doc, not a guarantee of
+    completeness — treat any future "no country for a real, valid
+    registration" report the same way: check whether the prefix is simply
+    missing before assuming a deeper bug. Longest-prefix-match, with one
     extra wrinkle: two ICAO territories share their sovereign's base mark
     but get their own sub-block after the dash — Hong Kong (`B-H...`) and
     Macau (`B-M...`) both fall under China's bare `B` — handled by trying
