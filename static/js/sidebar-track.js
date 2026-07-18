@@ -9,6 +9,7 @@ const sidebarEl = document.getElementById('sidebar');
 const sidebarDetailsEl = document.getElementById('sidebar-details');
 const sidebarGalleryEl = document.getElementById('sidebar-gallery');
 const sidebarCloseBtn = document.getElementById('sidebar-close');
+const sidebarCenterMapBtn = document.getElementById('sidebar-center-map');
 
 // detailsById holds every currently-visible aircraft's latest details HTML +
 // registration (for the photo lookup), refreshed every poll regardless of
@@ -524,6 +525,18 @@ function deselectAircraft() {
 // map — see the CLAUDE.md note on L.Marker's bubblingMouseEvents default).
 map.on('click', deselectAircraft);
 sidebarCloseBtn.addEventListener('click', deselectAircraft);
+
+// Centers on the selected aircraft's *current* position (detailsById's
+// lat/lon, kept fresh every poll — see icons.js — not wherever it was when
+// the sidebar first opened), keeping the current zoom level rather than
+// forcing one, so this doubles as "re-center without losing my zoom" for
+// an aircraft that's drifted off-screen while its sidebar stayed open.
+sidebarCenterMapBtn.addEventListener('click', () => {
+  if (selectedIcao24 == null) return;
+  const details = detailsById.get(selectedIcao24);
+  if (!details || details.lat == null || details.lon == null) return;
+  map.setView([details.lat, details.lon], map.getZoom());
+});
 
 // --- Aircraft photo gallery ---
 // Two sources, merged rather than strict either/or:

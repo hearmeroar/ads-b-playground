@@ -819,7 +819,15 @@ because photographer name and photo URL come from an external API.
   1.9.4's source, so a marker click never reaches the map's own click
   handler in the first place. (An earlier session note claimed otherwise and
   was wrong — verify against Leaflet's actual source rather than assuming,
-  if this area needs touching again.) OpenSky may have no track for a given
+  if this area needs touching again.) A small crosshair icon button
+  (`#sidebar-center-map`, top-left of the sidebar, mirroring `#sidebar-close`
+  at top-right) re-centers the map on the selected aircraft's *current*
+  position — reads `detailsById.get(selectedIcao24)`'s `lat`/`lon` (kept
+  fresh every poll, not a snapshot from whenever the sidebar first opened)
+  and calls `map.setView([lat, lon], map.getZoom())`, preserving whatever
+  zoom the user was already at rather than forcing one — useful for an
+  aircraft that's drifted off-screen while its sidebar stayed open, or
+  after panning away to look at something else. OpenSky may have no track for a given
   aircraft (`/api/track` 404s) — common for rotorcraft, whose short/local
   flights often aren't segmented into a continuous "flight" by OpenSky's
   history system. `loadTrack()` then falls back to the small in-browser
@@ -1118,6 +1126,11 @@ because photographer name and photo URL come from an external API.
   clicking the marker; and disabling a source drops its rows from the
   table (verifies the list is built from live marker maps, not the
   never-pruned `detailsById`).
+- `test_center_map.spec.js` covers `#sidebar-center-map`: clicking it
+  re-centers on the selected aircraft's known fixture position while
+  preserving the current zoom level (rather than resetting it), and
+  clicking it with nothing selected is a safe no-op (the map's view is
+  left untouched).
 
 ## SVG Icon Rendering
 

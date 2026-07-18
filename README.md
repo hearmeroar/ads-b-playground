@@ -30,7 +30,9 @@ later if a real need for it shows up.
   autopilot, weather, status, signal quality). OpenSky's own data has no
   registration/aircraft type; the other sources fill that in automatically
   when they see the same aircraft, without duplicating fields every source
-  agrees on. Groups with nothing to show are omitted.
+  agrees on. Groups with nothing to show are omitted. A crosshair button
+  re-centers the map on the selected aircraft's current position at any
+  time, keeping the current zoom level.
 - **Flight history on click** — draws an aircraft's actual track (not just
   positions polled since the page loaded) via OpenSky's `/tracks/all`,
   colored by altitude. Aircraft OpenSky has no history for (common for
