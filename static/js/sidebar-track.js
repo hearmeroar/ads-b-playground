@@ -680,11 +680,12 @@ function renderGallery(photos) {
 
   const credit = document.createElement('div');
   credit.className = 'gallery-credit';
-  credit.append('Photo: ');
+  credit.append('© ');
   const creditLink = document.createElement('a');
   creditLink.target = '_blank';
   creditLink.rel = 'noopener noreferrer';
   credit.appendChild(creditLink);
+  imgWrap.appendChild(credit);
 
   let dotsWrap = null;
   let dots = [];
@@ -759,7 +760,6 @@ function renderGallery(photos) {
   setIndex(0);
   sidebarGalleryEl.appendChild(imgWrap);
   if (dotsWrap) sidebarGalleryEl.appendChild(dotsWrap);
-  sidebarGalleryEl.appendChild(credit);
 }
 
 async function loadGallery(icao24, registration) {

@@ -489,12 +489,18 @@ html, body { margin: 0; padding: 0; height: 100%; }
   width: 6px; height: 6px; border-radius: 50%; background: #d7dbe1; cursor: pointer;
 }
 .gallery-dot.active { background: #1a73e8; }
-/* padding-top here (not just relying on .gallery-dots' own padding) since
-   a lone photo has no dots row at all — without this the credit line sat
-   flush against the image with no gap. */
-.gallery-credit { font-size: 11px; color: var(--muted); padding: 8px 18px 14px; }
+/* Overlaid on the image's top-right corner (bottom-right was tried first,
+   but that's where a long attribution/copyright panel sometimes sits below
+   the gallery, and top-left is already occupied elsewhere in the sidebar) —
+   same treatment as .gallery-nav (translucent white text + drop-shadow, no
+   background shape) since it sits on top of arbitrary photo content rather
+   than the card background. */
+.gallery-credit {
+  position: absolute; right: 8px; top: 6px;
+  font-size: 11px; color: rgba(255, 255, 255, 0.65);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+}
 .gallery-credit a { color: inherit; text-decoration: none; }
-.gallery-credit a:hover { text-decoration: underline; }
 #sidebar-icon-credit { font-size: 11px; color: var(--muted); padding: 10px 18px 14px; border-top: 1px solid var(--border); text-align: left; }
 #sidebar-icon-credit a { color: var(--muted); text-decoration: underline; }
 #sidebar-icon-credit a:hover { color: var(--ink); }
