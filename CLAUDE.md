@@ -683,6 +683,40 @@ because photographer name and photo URL come from an external API.
   `env.allow_update` config and their own `Authorization` token, which this
   app has no access to and no reason to seek), not something a consumer of
   their read API can use.
+  - **Persistent aircraft-identity cache** (`_identity_cache`,
+    `IDENTITY_CACHE_FILE`/`.aircraft_identity_cache.json`,
+    `IDENTITY_HISTORY_FILE`/`.identity_history.jsonl`): a backend-only,
+    side-effect persistence layer with **no API route and no frontend
+    surface** — the deliberately narrow slice of a much broader "aircraft
+    identity intelligence layer" idea (persistent identity + history +
+    observations graph) discussed and rejected at that full scope for this
+    project (no ground truth registry to validate confidence against, no
+    relational query need yet, and the space is already occupied by
+    entrenched players like ch-aviation/Cirium/airframes.org who have
+    decades of curation and registry licensing this project doesn't).
+    What survives: whenever `fetch_adsbdb()` resolves a real `aircraft`
+    object on a fresh (non-cached) upstream fetch, `_update_identity_cache()`
+    merges four *airframe-level* fields — `registration`, `manufacturer`,
+    `type`, `registered_owner` — into `_identity_cache[icao24]`, persisted
+    to disk with the exact same atomic-write pattern as `_track_cache`/
+    `TRACK_CACHE_FILE` (`_load_identity_cache()` runs at import,
+    `_save_identity_cache()` rewrites the file after each update), just
+    without a TTL — identity facts don't expire the way a flight track
+    does, so the file only grows by one entry per distinct aircraft ever
+    resolved, not per poll. `flightroute`'s own fields
+    (`registered_owner_country_name`, and especially `airline`/operator)
+    are deliberately excluded from this cache — they're properties of a
+    specific flight/callsign, not the airframe itself, and can legitimately
+    differ across leases/codeshares, which would conflate "who owns this
+    plane" with "who's operating this particular flight." A null incoming
+    value never overwrites a previously known one (adsbdb responses are
+    sometimes partial). When a tracked field *does* change to a different
+    non-null value, one line is appended to `IDENTITY_HISTORY_FILE`
+    (`{icao24, field, old, new, ts}`) before the cache is overwritten —
+    the only "history" this layer keeps, a flat append-only log rather
+    than a versioned entity graph. This is intentionally the entire scope
+    of Phase 1 from that discussion; phases 2 (merging in external
+    registries) and 3 (a full identity-graph product) are not planned.
   - **Priority chain, agreed with the project owner**: live feed > adsbdb >
     Flywme-computed, i.e. adsbdb is inserted as a *second* tier between the
     two `buildMergedDetails()` already had. Each tier only fills a field
@@ -1249,6 +1283,18 @@ because photographer name and photo URL come from an external API.
   different callsign for the same icao24 is a distinct cache entry), and
   that a network error returns 502 *without* caching. `conftest.py`'s
   `reset_caches` gained a `_adsbdb_cache.clear()` entry.
+- `tests/backend/test_identity_cache.py` covers the persistent
+  aircraft-identity cache: a fresh fetch populates `_identity_cache` with
+  the four tracked fields; a later fetch (different callsign, so a fresh
+  upstream request rather than a cache hit) with a changed field both
+  updates the cache and appends exactly one line to
+  `IDENTITY_HISTORY_FILE`; a null field in a later response never erases a
+  previously known value (and logs nothing); the cache persists to and
+  reloads from disk (same style as `test_track.py`'s restart test); an
+  unknown (404) aircraft never touches the cache at all. `conftest.py`'s
+  `reset_caches` redirects `IDENTITY_CACHE_FILE`/`IDENTITY_HISTORY_FILE` to
+  throwaway files, same rationale as the existing `TRACK_CACHE_FILE`
+  redirect.
 - `test_adsbdb.spec.js` covers: the `#source-adsbdb` dev-mode-only toggle
   (hidden + checked by default, appears checked once dev mode is on,
   hides again when dev mode is switched off); Registered Owner/Operator/

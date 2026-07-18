@@ -38,6 +38,11 @@ def reset_caches(monkeypatch, tmp_path):
     app._photo_cache.clear()
     app._airportdata_cache.clear()
     app._adsbdb_cache.clear()
+    app._identity_cache.clear()
+    # Redirect the persistent identity cache/history log to throwaway files
+    # too, same rationale as the TRACK_CACHE_FILE redirect above.
+    monkeypatch.setattr(app, "IDENTITY_CACHE_FILE", str(tmp_path / "identity_cache.json"))
+    monkeypatch.setattr(app, "IDENTITY_HISTORY_FILE", str(tmp_path / "identity_history.jsonl"))
     yield
 
 

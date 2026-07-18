@@ -258,6 +258,85 @@ _airportdata_cache = {}  # "reg:<REGISTRATION>" or "hex:<icao24>" -> list of pho
 ADSBDB_BASE = "https://api.adsbdb.com/v0"
 _adsbdb_cache = {}  # "<icao24>:<callsign-or-empty>" -> {"aircraft": ..., "flightroute": ...}
 
+# Persistent aircraft-identity cache: the narrow, justified slice of a
+# broader "aircraft identity intelligence layer" idea discussed and
+# rejected at full scope (no ground truth registry to validate against, no
+# relational query need yet, entrenched existing players in that space).
+# What survives: persisting adsbdb's resolved *airframe* fields (as opposed
+# to per-flight fields like operator, which come from flightroute and can
+# legitimately differ by callsign/lease) across restarts, and logging when
+# one of those fields is later seen with a different value — a minimal,
+# free-standing changelog rather than a full history/observations graph.
+# Same persistence shape as _track_cache/TRACK_CACHE_FILE below, just
+# without a TTL: identity facts don't expire the way a flight track does.
+_identity_cache = {}  # icao24 -> {"registration":, "manufacturer":, "type":, "registered_owner":, "updated_ts":}
+IDENTITY_CACHE_FILE = os.environ.get("IDENTITY_CACHE_FILE", ".aircraft_identity_cache.json")
+IDENTITY_HISTORY_FILE = os.environ.get("IDENTITY_HISTORY_FILE", ".identity_history.jsonl")
+IDENTITY_TRACKED_FIELDS = ("registration", "manufacturer", "type", "registered_owner")
+
+
+def _load_identity_cache():
+    """Best-effort: populate _identity_cache from disk. A missing or corrupt
+    file is ignored — like the track cache, this is an optimization/history
+    layer, not a source of truth."""
+    try:
+        with open(IDENTITY_CACHE_FILE, "r") as f:
+            stored = json.load(f)
+    except (OSError, ValueError):
+        return
+    if not isinstance(stored, dict):
+        return
+    for icao24, entry in stored.items():
+        if isinstance(entry, dict):
+            _identity_cache[icao24] = entry
+
+
+def _save_identity_cache():
+    """Best-effort atomic write of the whole cache. Identity resolutions are
+    infrequent (per user click, further throttled by adsbdb's own indefinite
+    cache), so rewriting the file each time is cheap. Write errors are
+    ignored."""
+    tmp = IDENTITY_CACHE_FILE + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(_identity_cache, f)
+        os.replace(tmp, IDENTITY_CACHE_FILE)
+    except OSError:
+        pass
+
+
+def _update_identity_cache(icao24, aircraft):
+    """Merges a freshly-fetched adsbdb aircraft record into the persistent
+    identity cache. A null incoming value never overwrites a previously
+    known one (adsbdb sometimes has partial data). A changed non-null value
+    is recorded to IDENTITY_HISTORY_FILE before being overwritten — the
+    only "history" this layer keeps, deliberately just a flat append-only
+    log rather than a full versioned entity graph."""
+    existing = _identity_cache.get(icao24, {})
+    updated = dict(existing)
+    now = time.time()
+    for field in IDENTITY_TRACKED_FIELDS:
+        new_value = aircraft.get(field)
+        if new_value is None:
+            continue
+        old_value = existing.get(field)
+        if old_value is not None and old_value != new_value:
+            try:
+                with open(IDENTITY_HISTORY_FILE, "a") as f:
+                    f.write(json.dumps({
+                        "icao24": icao24, "field": field,
+                        "old": old_value, "new": new_value, "ts": now,
+                    }) + "\n")
+            except OSError:
+                pass
+        updated[field] = new_value
+    updated["updated_ts"] = now
+    _identity_cache[icao24] = updated
+    _save_identity_cache()
+
+
+_load_identity_cache()
+
 
 def _airportdata_fullsize_url(raw_photo):
     for field in ("image", "link"):
@@ -639,6 +718,8 @@ def fetch_adsbdb(icao24, callsign):
             "flightroute": payload.get("flightroute"),
         }
         _adsbdb_cache[cache_key] = result
+        if result["aircraft"]:
+            _update_identity_cache(icao24, result["aircraft"])
         return jsonify(result)
 
     except requests.RequestException as exc:
