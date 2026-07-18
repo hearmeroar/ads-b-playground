@@ -272,36 +272,47 @@ _adsbdb_cache = {}  # "<icao24>:<callsign-or-empty>" -> {"aircraft": ..., "fligh
 # Same persistence shape as _track_cache/TRACK_CACHE_FILE below, just
 # without a TTL: identity facts don't expire the way a flight track does.
 _identity_cache = {}  # icao24 -> {"registration":, "manufacturer":, "type":, "registered_owner":, "updated_ts":}
-IDENTITY_CACHE_FILE = os.environ.get("IDENTITY_CACHE_FILE", ".aircraft_identity_cache.json")
+IDENTITY_CACHE_FILE = os.environ.get("IDENTITY_CACHE_FILE", ".aircraft_identity_cache.jsonl")
 IDENTITY_HISTORY_FILE = os.environ.get("IDENTITY_HISTORY_FILE", ".identity_history.jsonl")
 IDENTITY_TRACKED_FIELDS = ("registration", "manufacturer", "type", "registered_owner")
 
 
 def _load_identity_cache():
-    """Best-effort: populate _identity_cache from disk. A missing or corrupt
-    file is ignored — like the track cache, this is an optimization/history
-    layer, not a source of truth."""
+    """Best-effort: populate _identity_cache from disk. One JSON object per
+    line (icao24 + its fields), same readable JSONL convention as
+    IDENTITY_HISTORY_FILE, rather than one giant single-line blob — easier
+    to scan/diff/grep by hand. A missing file, a corrupt line, or a line
+    missing "icao24" is skipped rather than failing the whole load — like
+    the track cache, this is an optimization/history layer, not a source
+    of truth."""
     try:
         with open(IDENTITY_CACHE_FILE, "r") as f:
-            stored = json.load(f)
-    except (OSError, ValueError):
+            lines = f.readlines()
+    except OSError:
         return
-    if not isinstance(stored, dict):
-        return
-    for icao24, entry in stored.items():
-        if isinstance(entry, dict):
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        icao24 = entry.pop("icao24", None)
+        if icao24:
             _identity_cache[icao24] = entry
 
 
 def _save_identity_cache():
-    """Best-effort atomic write of the whole cache. Identity resolutions are
-    infrequent (per user click, further throttled by adsbdb's own indefinite
-    cache), so rewriting the file each time is cheap. Write errors are
-    ignored."""
+    """Best-effort atomic write of the whole cache, one aircraft per line.
+    Identity resolutions are infrequent (per user click, or one every
+    IDENTITY_BACKFILL_INTERVAL seconds in the background), so rewriting the
+    whole file each time is cheap. Write errors are ignored."""
     tmp = IDENTITY_CACHE_FILE + ".tmp"
     try:
         with open(tmp, "w") as f:
-            json.dump(_identity_cache, f)
+            for icao24, entry in _identity_cache.items():
+                f.write(json.dumps({"icao24": icao24, **entry}) + "\n")
         os.replace(tmp, IDENTITY_CACHE_FILE)
     except OSError:
         pass

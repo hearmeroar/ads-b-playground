@@ -572,8 +572,13 @@ because photographer name and photo URL come from an external API.
     specific candidate before falling back to the bare prefix; `callsign.py`
     maps ICAO 3-letter airline designators to an operator
     (confidence 0.8) and that operator's home country (confidence 0.6 —
-    two independently-confidenced facts from one lookup, since they feed
-    two different priority chains); `aircraft_database.py` holds a
+    two independently-confidenced facts from one lookup). Both ride on the
+    same `operator` result (`enrich_identity()`'s operator tier carries the
+    country data as `operator["country_iso"]` alongside its own
+    `value`/`source`/`confidence`) — the country half is *not* a fallback
+    tier for the separate `country` field, which means the aircraft's
+    country of registration and would otherwise get the operator's home
+    country conflated into it; `aircraft_database.py` holds a
     swappable ICAO24→full-record lookup (`AircraftDatabaseLookup.lookup()`,
     a small placeholder dataset behind an interface a real data source
     could later implement with zero caller changes) plus a separate ICAO
@@ -691,7 +696,7 @@ because photographer name and photo URL come from an external API.
   app has no access to and no reason to seek), not something a consumer of
   their read API can use.
   - **Persistent aircraft-identity cache** (`_identity_cache`,
-    `IDENTITY_CACHE_FILE`/`.aircraft_identity_cache.json`,
+    `IDENTITY_CACHE_FILE`/`.aircraft_identity_cache.jsonl`,
     `IDENTITY_HISTORY_FILE`/`.identity_history.jsonl`): a backend-only
     side-effect persistence layer (its only frontend-visible surface is
     the dev-mode stats line below, not a full API) — the deliberately
@@ -706,12 +711,16 @@ because photographer name and photo URL come from an external API.
     object on a fresh (non-cached) upstream fetch, `_update_identity_cache()`
     merges four *airframe-level* fields — `registration`, `manufacturer`,
     `type`, `registered_owner` — into `_identity_cache[icao24]`, persisted
-    to disk with the exact same atomic-write pattern as `_track_cache`/
+    to disk with the same atomic-write pattern as `_track_cache`/
     `TRACK_CACHE_FILE` (`_load_identity_cache()` runs at import,
     `_save_identity_cache()` rewrites the file after each update), just
     without a TTL — identity facts don't expire the way a flight track
     does, so the file only grows by one entry per distinct aircraft ever
-    resolved, not per poll. `flightroute`'s own fields
+    resolved, not per poll. **One JSON object per line** (`{"icao24":,
+    ...fields}`), not one giant single-line blob like `_track_cache`'s own
+    file — the same readable/diffable-by-hand JSONL convention
+    `IDENTITY_HISTORY_FILE` already used, applied here too after the
+    project owner asked for it explicitly. `flightroute`'s own fields
     (`registered_owner_country_name`, and especially `airline`/operator)
     are deliberately excluded from this cache — they're properties of a
     specific flight/callsign, not the airframe itself, and can legitimately
@@ -809,10 +818,26 @@ because photographer name and photo URL come from an external API.
     `Operator`). adsbdb is its only possible tier — no live feed or Flywme
     fallback exists for it — so it renders via `identityRow()` like
     Country/Operator/etc. (literal "Unknown" when unresolved, not a hidden
-    row). Operator gets a flag too (`operatorCountryIso`, from
-    `flightroute.airline.country_iso`) but only when adsbdb's tier is what
-    filled it — a live-sourced or Flywme-computed operator still renders
-    without one, the same known limitation as Country's own flag.
+    row). **`Country`, `Operator`, and `Registered Owner` are three
+    deliberately distinct concepts, never conflated**: Country always means
+    the aircraft's country of *registration* (ICAO Annex 7 nationality
+    mark — from live/`registration_prefix`/`icao24_lookup` only), Operator
+    means the operating airline's home country, Registered Owner means the
+    private/corporate registrant's country. adsbdb's
+    `registered_owner_country_name`/`registered_owner_country_iso_name`
+    fields feed *only* Registered Owner, never Country — an earlier version
+    of this code let them leak into Country too, which silently mixed
+    "who owns this plane" into a field meant to mean "where it's
+    registered"; fixed by scoping that adsbdb data to `registeredOwner`/
+    `registeredOwnerCountryIso` alone. Operator gets a flag
+    (`operatorCountryIso`) from either of two tiers now: adsbdb's
+    `flightroute.airline.country_iso`, or — new — `callsign_decode`'s own
+    `country_iso` (the ICAO airline designator's home country,
+    `enrichment/callsign.py`), carried on the `operator` result dict
+    alongside its `value`/`source`/`confidence` (mirrors how `country`
+    already carries its own `country_iso`). So only a *live-sourced*
+    operator renders without a flag now, the same known limitation as
+    Country's own flag on a live value with no `countries.py` name match.
   - **Photo (`url_photo`/`url_photo_thumbnail`), last-resort only**: live
     checks against api.adsbdb.com (4+ real aircraft) found `url_photo` —
     the field that in theory points at a full-size image — **consistently

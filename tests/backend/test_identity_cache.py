@@ -68,9 +68,15 @@ def test_identity_cache_persists_to_disk(client, mock_get):
     mock_get.return_value = make_response(json_data={"response": {"aircraft": AIRCRAFT_V1}})
     client.get("/api/adsbdb/a835af")
 
+    # One JSON object per line (icao24 + its fields) — readable/diffable by
+    # hand, same JSONL convention as IDENTITY_HISTORY_FILE, not a single
+    # giant blob.
     with open(app.IDENTITY_CACHE_FILE) as f:
-        stored = json.load(f)
-    assert stored["a835af"]["registration"] == "N628TS"
+        lines = [json.loads(line) for line in f if line.strip()]
+    assert lines == [{
+        "icao24": "a835af", "registration": "N628TS", "manufacturer": "Gulfstream Aerospace",
+        "type": "G650 ER", "registered_owner": "Falcon Landing LLC", "updated_ts": lines[0]["updated_ts"],
+    }]
 
 
 def test_identity_cache_survives_restart_via_disk(client, mock_get):

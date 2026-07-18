@@ -8,5 +8,5 @@ playwright-report/
 .DS_Store
 .claude/settings.local.json
 .track_cache.json
-.aircraft_identity_cache.json
+.aircraft_identity_cache.jsonl
 .identity_history.jsonl
