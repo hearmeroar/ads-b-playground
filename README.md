@@ -99,11 +99,13 @@ later if a real need for it shows up.
   ICAO airline callsign designators, aircraft-type normalization) — no
   external API, no database, and never overrides a value a live feed
   already supplied. Unresolved fields show "Unknown" rather than a blank
-  row. Country renders with a small SVG flag (the
-  [flag-icons](https://github.com/lipis/flag-icons) library, vendored
-  locally — no build step). In dev mode, a computed value gets a black
-  "Flywme" dot (this application, as a data source in its own right) whose
-  tooltip names the technique and confidence behind it.
+  row. Country (the aircraft's own registration) and **Operator Country**
+  (the operating airline's home country — a separate field, since the two
+  are frequently different countries) each render with their own small SVG
+  flag (the [flag-icons](https://github.com/lipis/flag-icons) library,
+  vendored locally — no build step). In dev mode, a computed value gets a
+  black "Flywme" dot (this application, as a data source in its own right)
+  whose tooltip names the technique and confidence behind it.
 - **adsbdb.com lookup** — a seventh source, queried lazily on click (not
   per-poll, no markers of its own) for whatever the live feeds and local
   enrichment still don't have: a **Registered Owner** field (the private/

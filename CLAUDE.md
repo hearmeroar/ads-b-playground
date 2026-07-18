@@ -12,7 +12,7 @@ markers. A seventh source, adsbdb.com, is proxied too but is not part of
 that per-poll set — it's a lazy, click-only lookup for identity/route
 enrichment with no markers of its own (see "adsbdb.com" further below).
 Backend logic lives in `app.py`; the frontend is
-`static/index.html` (markup) plus `static/js/*.js` (nine plain classic
+`static/index.html` (markup) plus `static/js/*.js` (ten plain classic
 `<script src>` files, loaded in a fixed order) and `static/style.css` — no
 framework, no build step, all of it just plain `<link>`/`<script>`-included
 static files. The JS files share one global scope (deliberately NOT ES
@@ -20,10 +20,15 @@ modules: the Playwright tests reach top-level names like `openskyMarkers`
 via `page.evaluate`, and load-time statements rely on the original
 execution order), so their `<script>` order in `index.html` is load-bearing:
 `map-init` → `constants` → `route-validation` → `state-filters` →
-`sidebar-track` → `icons` → `render-details` → `parsers` → `main`
+`sidebar-track` → `auth-collection` → `icons` → `render-details` →
+`parsers` → `main`
 (`route-validation` holds only pure geometry functions with no DOM/fetch
 dependencies of its own — it's placed early since `sidebar-track`'s
-`buildMergedDetails()` is its only caller). Where this file says
+`buildMergedDetails()` is its only caller; `auth-collection` is placed right
+after `sidebar-track` since it needs that file's globals — `selectedIcao24`,
+`buildMergedDetails`, `galleryCache` — to snapshot the selected aircraft, and
+nothing after it in the load order depends on anything `auth-collection`
+defines). Where this file says
 "`static/index.html`" about a JS function, read "the frontend JS" — the
 function now lives in one of those `static/js/*.js` files. Leaflet 1.9.4
 itself is vendored at `static/leaflet/` (`leaflet.js` + `leaflet.css` +
@@ -473,9 +478,11 @@ because photographer name and photo URL come from an external API.
   in `main.js`): a second dev-mode-only panel, alongside the sidebar-only
   behavior above — a compact, narrow, vertically-scrolling list of every
   aircraft currently on the map (any enabled source), one line each,
-  showing ICAO/Callsign/Registration/Type/Route (Operator/Country/Category
-  are still there, just folded into the row's `title` tooltip rather than
-  widening the panel). Deliberately a *tall narrow column* (mirrors
+  showing ICAO/Callsign/Registration/Type/Route (Operator/Operator
+  Country/Registration Country/Category are still there, just folded into
+  the row's `title` tooltip rather than widening the panel — Registered
+  Owner is not, a pre-existing gap this session's Operator Country
+  addition didn't extend to). Deliberately a *tall narrow column* (mirrors
   `#sidebar`'s own footprint on the same left edge, which simply covers it
   via z-index while a specific aircraft's sidebar is open) rather than a
   short wide bar, so many rows are visible at once instead of a handful —
@@ -860,14 +867,19 @@ because photographer name and photo URL come from an external API.
   - **Priority chain, agreed with the project owner**: live feed > adsbdb >
     Flywme-computed, i.e. adsbdb is inserted as a *second* tier between the
     two `buildMergedDetails()` already had. Each tier only fills a field
-    still empty after the tier above ran: Country/Operator/Registration/
-    Manufacturer/Model can all be filled from adsbdb
-    (`registered_owner_country_name`/`flightroute.airline.name`/
+    still empty after the tier above ran: Operator/Operator Country/
+    Registration/Manufacturer/Model can all be filled from adsbdb
+    (`flightroute.airline.name`/`flightroute.airline.country`/
     `registration`/`manufacturer`/`type` respectively) ahead of Flywme's own
-    guess; Year built has no adsbdb tier at all (the API doesn't return
-    one); Route (`originAirport`/`destinationAirport`) sits *below*
-    FlightAware's existing per-poll callsign-match tier (unchanged) but
-    above nothing else, since no tier ever computes a route locally.
+    guess; Registration Country has **no** adsbdb tier at all —
+    `registered_owner_country_name` feeds only Registered Owner (see
+    "Registered Owner is a brand new field" below), never Registration
+    Country, so it falls through to Flywme's `registration_prefix`/
+    `icao24_lookup` tiers instead; Year built likewise has no adsbdb tier
+    at all (the API doesn't return one); Route (`originAirport`/
+    `destinationAirport`) sits *below* FlightAware's existing per-poll
+    callsign-match tier (unchanged) but above nothing else, since no tier
+    ever computes a route locally.
   - **Flywme co-displays even when a higher tier already won** (added after
     the project owner noticed only one source badge ever showed once
     adsbdb resolved a field — the losing tier's own guess was silently
@@ -1371,6 +1383,113 @@ because photographer name and photo URL come from an external API.
   `<button>`, which really does bubble to the `document`-level "click
   outside closes the menu" listener, and would otherwise immediately close
   what the same click just opened.
+- **Aircraft collection** (`app.py`'s `/api/login/google*`, `/api/logout`,
+  `/api/me`, `/api/collection*`; `static/js/auth-collection.js`): the first
+  user/session concept anywhere in this codebase — everything above this
+  section is single-tenant with no login. Lets a signed-in user save an
+  aircraft they're looking at and browse saved ones later as cards, in a
+  new HUD-opened overlay panel.
+  - **Sign-in is Google OAuth, not a hand-rolled login form** — via
+    [Authlib](https://authlib.org) (`oauth = OAuth(app)`, registered with
+    Google's OpenID discovery document), the one new external-auth
+    dependency in this codebase. Hand-rolling the authorization-code
+    exchange/ID-token verification would be a real security risk for no
+    benefit over a well-audited library. `GOOGLE_CLIENT_ID`/
+    `GOOGLE_CLIENT_SECRET` are optional env vars — lazily-configured the
+    same way OpenSky's own OAuth2 client-credentials flow already degrades
+    to anonymous when unset (see `CLIENT_ID`/`CLIENT_SECRET` above):
+    without them, `/api/login/google` returns `{"error": "not_configured"}`
+    (503) instead of crashing, the same pattern FlightAware uses for a
+    missing API key. `app.secret_key` (needed for Flask's signed session
+    cookie) falls back to `os.urandom(32)` when `SECRET_KEY` isn't set in
+    `.env` — meaning every restart, including Flask debug's reloader
+    re-exec on each file save (see `_should_start_background_thread()`
+    below for the same restart-vs-reloader distinction), silently logs
+    everyone out; set `SECRET_KEY` for logins to survive restarts.
+  - **Users store** (`_users`, `USERS_FILE`/`.users.jsonl`): same atomic
+    tmp-file-then-`os.replace` JSONL idiom as `_identity_cache`/
+    `IDENTITY_CACHE_FILE` above — `_load_users()`/`_save_users()` mirror
+    `_load_identity_cache()`/`_save_identity_cache()` line for line, just
+    keyed by Google's `sub` (a stable unique id) rather than `icao24`.
+    **No password is ever stored** — Google's own consent screen is the
+    only credential check; the stored record is just `{sub, email, name,
+    picture, created_ts}`. `/api/login/google/callback` creates or updates
+    that record on every successful login (so a changed Google display
+    name/photo is picked up next login) and sets `session["user_id"]`;
+    `/api/logout` clears it; `/api/me` reflects the current session's user
+    (or `{"user": null}` when logged out).
+  - **Collection store** (`_collections`, `COLLECTIONS_FILE`/
+    `.collections.jsonl`): one shared JSONL file (not split per user),
+    filtered by `user_id` on read — mirrors `_identity_cache`'s "one dict,
+    filter per request" shape rather than multiplying file-handling code
+    across N per-user files. Each card is `{id, user_id, icao24, saved_at,
+    snapshot, photo_url, photo_link, photo_photographer}`; `id` is a
+    server-generated `uuid.uuid4().hex` (not derived from `icao24`), so
+    saving the same aircraft twice at different times produces two
+    independent cards rather than one being silently overwritten.
+  - **Snapshot, not live-refetch, by design**: a card stores `SNAPSHOT_FIELDS`
+    (`registration`, `aircraftType`, `manufacturer`, `model`,
+    `manufactureYear`, `operator`, `operatorCountry`/`operatorCountryIso`,
+    `originCountry`/`countryIso`, `registeredOwner`/
+    `registeredOwnerCountryIso`, `categoryDisplay`, `callsign`,
+    `originAirport`, `destinationAirport`) copied from `buildMergedDetails
+    (icao24).info` at save time — deliberately excluding live telemetry
+    (altitude, speed, squawk, position...), which is meaningless once the
+    aircraft is long gone from every live feed. `api_collection_save()`
+    filters the client-sent `snapshot` object to exactly this allowlist
+    before persisting — the client is never trusted to have sent only
+    permitted keys, so an arbitrary extra field can't be smuggled into
+    storage. The one photo saved alongside a card comes from whatever
+    `galleryCache` already resolved for that aircraft this session (its
+    already-normalized `{thumbnail_large:{src}, link, photographer}`
+    shape, shared by Planespotters/airport-data.com — see the photo
+    section above) — no new photo fetching or normalization logic.
+  - **Routes**: `GET /api/collection` (401 if logged out; else the
+    session's own cards, newest first), `POST /api/collection` (body
+    `{icao24, snapshot, photo_url, photo_link, photo_photographer}` → 201 +
+    the stored card), `DELETE /api/collection/<id>` (only deletes if
+    `user_id` matches the session's current user; a wrong-owner or
+    unknown id both return a plain 404 — never a distinguishing 403,
+    consistent with `/api/track`'s own plain-404-for-"not found" style, so
+    a delete attempt can't be used to probe whether some other user's card
+    id exists).
+  - **Frontend** (`static/js/auth-collection.js`, loaded right after
+    `sidebar-track.js` in the script order — see the top of this file):
+    `checkAuth()` calls `/api/me` on load and renders `#auth-status`
+    (either "Sign in with Google" or "Hi, `<name>` · Logout"). Signing in
+    is a **full-page navigation** to `/api/login/google` (`window.location
+    .href =`, not `fetch()`) since OAuth needs a real browser redirect to
+    Google's consent screen, not an XHR. `saveCurrentAircraftToCollection()`
+    (wired to the new `#sidebar-save-collection` bookmark-icon button,
+    a third circle alongside `#sidebar-close`/`#sidebar-center-map`) reads
+    `buildMergedDetails(selectedIcao24).info` + `galleryCache`'s first
+    resolved photo and `POST`s to `/api/collection`; `selectAircraft()`
+    resets the button's `.saved` class on every new selection so it
+    doesn't read as already-saved for a different aircraft.
+    `#collection-panel` (opened via the HUD's "My collection" button,
+    styled as a centered glass-card overlay like `#hud`/`#sidebar` — see
+    `static/style.css`) renders each card via `document.createElement`/
+    property assignment, not string-concatenated HTML — `snapshot.operator`/
+    `registration`/etc. ultimately originated from external APIs (adsbdb,
+    OpenSky), so the same "don't trust external strings as markup"
+    discipline `renderGallery()` already applies to photographer credits
+    applies here too. A card's `<img>` gets an `error` handler that swaps
+    in a plain "No photo" placeholder — there's no second stored URL to
+    fall back to the way the live gallery's `fallback_src` two-tier
+    degrade has.
+  - **Tests can't exercise real Google OAuth** (no browser automation can
+    complete Google's actual consent screen), so both layers mock around
+    it rather than through it: `tests/backend/test_google_auth.py`
+    monkeypatches `oauth.google.authorize_redirect`/
+    `authorize_access_token` directly, and `conftest.py`'s `login_as
+    (client, user_id)` helper sets the session cookie via Flask's test
+    client `session_transaction()` — bypassing the real redirect/callback
+    dance entirely — for every other backend test that needs an
+    already-logged-in user (`test_collections.py`).
+    `tests/frontend/test_auth_status.spec.js`/`test_collection.spec.js`
+    mock `/api/me` (and `/api/collection`) via `page.route()` to simulate
+    a logged-in session, the same way every other Playwright spec here
+    mocks external data.
 
 ## Tests
 
@@ -1433,20 +1552,30 @@ because photographer name and photo URL come from an external API.
   to mock) and the `/api/identity/<icao24>` route via Flask's test client
   directly. Verifies every worked example from the original spec exactly
   (`OK-SWC`→Czech Republic, `49d3d3`→Smartwings/Boeing/737 MAX 8/2021,
-  `TVP7200`→Smartwings), each orchestrator priority tier in isolation, and
-  that `conftest.py`'s `reset_caches` needs no new entry (this route is
-  intentionally uncached).
+  `TVP7200`→Smartwings, `4X-ABS`→Israel — the last one added after a real
+  Israir aircraft turned up with `4X` missing from `registration.py`'s
+  prefix table), each orchestrator priority tier in isolation (including
+  `operator_country`'s own `callsign_decode`-only tier, kept separate from
+  `operator` itself), and that `conftest.py`'s `reset_caches` needs no new
+  entry (this route is intentionally uncached).
 - `test_identity_enrichment.spec.js` covers: dev-mode-off shows resolved
   enrichment values plainly and unresolved ones as literal "Unknown" with
   zero badges; dev-mode-on shows exactly one black `flywme`-sourced badge
   whose tooltip reads "Flywme — computed from `<technique>`, confidence
   `<n>`"; a live value is never overwritten even by a deliberately
   contradicting enrichment response, and gets no Flywme badge alongside its
-  real source's badge; Registration is excluded from the "Unknown"
-  treatment (shows/hides by the ordinary rule) while the other four
-  identity fields aren't. Uses `eeeeee` (adsb.fi+airplanes.live only, no
-  live country/operator/year — good for gap-filling) and `dddddd` (has live
-  `originCountry`/registration — good for "live wins"). Selects a marker
+  real source's badge; a Flywme-resolved Operator Country (via
+  `callsign_decode`) gets its own flag even with no adsbdb data at all;
+  each of the four `.info-tip`-bearing identity-row labels (Operator/
+  Operator Country/Registered Owner/Registration Country) has a
+  click-to-toggle tooltip whose text cross-references the other three,
+  reachable with dev mode off; Registration is excluded from the "Unknown"
+  treatment (shows/hides by the ordinary rule) while the other six
+  identity fields (Manufacturer/Model/Year built/Operator/Operator
+  Country/Registered Owner/Registration Country) aren't. Uses `eeeeee`
+  (adsb.fi+airplanes.live only, no live country/operator/year — good for
+  gap-filling) and `dddddd` (has live `originCountry`/registration — good
+  for "live wins"). Selects a marker
   via `markerMapsBySource[sourceName].get(hex)` rather than the bare
   `openskyMarkers`/`adsbfiMarkers` globals used elsewhere in this suite,
   since the source name needs to be a runtime string here; waits for

@@ -61,7 +61,8 @@ function renderDevAircraftTable() {
     const icao = info.icao24 ? info.icao24.toUpperCase() : id;
     const title = [
       info.operator ? 'Operator: ' + info.operator : null,
-      info.originCountry ? 'Country: ' + info.originCountry : null,
+      info.operatorCountry ? 'Operator Country: ' + info.operatorCountry : null,
+      info.originCountry ? 'Registration Country: ' + info.originCountry : null,
       info.categoryDisplay ? 'Category: ' + info.categoryDisplay : null,
     ].filter(Boolean).join(' | ');
     const cells = [icao, info.callsign || '', info.registration || '', info.aircraftType || '', route];

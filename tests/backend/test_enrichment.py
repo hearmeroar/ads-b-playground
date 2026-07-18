@@ -329,7 +329,7 @@ def test_enrich_identity_year_built_unknown():
 def test_enrich_identity_all_fields_unknown_when_nothing_resolves():
     result = enrich_identity("ffffff")
     assert all(result[key] is None for key in
-               ("country", "operator", "registration", "manufacturer", "model", "year_built"))
+               ("country", "operator", "operator_country", "registration", "manufacturer", "model", "year_built"))
 
 
 # --- /api/identity/<icao24> route ---
