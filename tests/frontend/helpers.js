@@ -26,7 +26,8 @@ async function mockAllSources(page) {
   // never see a resolved Flywme badge or a value other than "Unknown" —
   // a test that wants to exercise enrichment overrides this route itself.
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
-    country: null, operator: null, registration: null, manufacturer: null, model: null, year_built: null,
+    country: null, operator: null, operator_country: null, registration: null,
+    manufacturer: null, model: null, year_built: null,
   } }));
   // All-null default, same rationale as /api/identity above — a test that
   // wants to exercise adsbdb enrichment/route/photo-dedup overrides this

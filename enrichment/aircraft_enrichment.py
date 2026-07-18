@@ -23,14 +23,19 @@ def enrich_identity(
     known_operator=None,
     known_manufacture_year=None,
 ):
-    """Returns a dict with all 6 keys always present: country, operator,
-    registration, manufacturer, model, year_built. Each is either None or
-    {"value", "source", "confidence"} — "country" additionally carries
-    "country_iso" whenever the value's name matches an entry in
-    countries.py, regardless of which tier resolved the value itself
-    (including "live"), so a flag can render no matter which source
-    supplied the country (the frontend renders it via the flag-icons SVG
-    library; this module never renders one itself).
+    """Returns a dict with all 7 keys always present: country, operator,
+    operator_country, registration, manufacturer, model, year_built. Each
+    is either None or {"value", "source", "confidence"} — "country" and
+    "operator_country" additionally carry "country_iso" whenever resolved,
+    so a flag can render regardless of which tier supplied the value (the
+    frontend renders it via the flag-icons SVG library; this module never
+    renders one itself). "country" always means the aircraft's country of
+    *registration* (ICAO Annex 7 nationality mark); "operator_country"
+    means the operating airline's home country — two distinct concepts,
+    never conflated under one field. "operator_country" has no live tier
+    (no live feed reports an operator's home country) — its only source is
+    callsign_decode, a byproduct of the same lookup that resolves
+    "operator" itself.
     """
     db_record = DEFAULT_AIRCRAFT_DATABASE.lookup(icao24)
     reg_country = lookup_country_by_registration(registration)
@@ -58,12 +63,10 @@ def enrich_identity(
             "confidence": db_record["confidence"],
             "country_iso": db_record["country_iso"],
         }
-    if not country and cs_decoded and cs_decoded.get("country"):
-        country = {
-            "value": cs_decoded["country"], "source": cs_decoded["source"],
-            "confidence": cs_decoded["country_confidence"],
-            "country_iso": cs_decoded["country_iso"],
-        }
+    # Deliberately no callsign_decode tier for country: a callsign only
+    # tells you the operator's home country, not the aircraft's country of
+    # registration — conflating the two under one "Country" field is what
+    # this fix removes. That data instead feeds the operator tier below.
 
     # --- operator ---
     operator = _live(known_operator)
@@ -76,6 +79,17 @@ def enrich_identity(
         operator = {
             "value": cs_decoded["operator"], "source": cs_decoded["source"],
             "confidence": cs_decoded["confidence"],
+        }
+
+    # --- operator_country (the operating airline's home country — a
+    # distinct concept from "country", which is the aircraft's own
+    # registration) ---
+    operator_country = None
+    if cs_decoded and cs_decoded.get("country"):
+        operator_country = {
+            "value": cs_decoded["country"], "source": cs_decoded["source"],
+            "confidence": cs_decoded["country_confidence"],
+            "country_iso": cs_decoded["country_iso"],
         }
 
     # --- registration ---
@@ -119,6 +133,7 @@ def enrich_identity(
     return {
         "country": country,
         "operator": operator,
+        "operator_country": operator_country,
         "registration": reg,
         "manufacturer": manufacturer,
         "model": model,

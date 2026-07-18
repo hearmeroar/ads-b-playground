@@ -205,11 +205,13 @@ def test_enrich_identity_country_icao24_tier():
     assert result["country"]["source"] == "icao24_lookup"
 
 
-def test_enrich_identity_country_callsign_tier():
+def test_enrich_identity_country_has_no_callsign_tier():
+    # Country means country of *registration* — a callsign only reveals the
+    # operator's home country, which is a different concept (surfaced via
+    # the operator tier's own country_iso instead, see below), so it must
+    # never fill "country" even when nothing else resolves it.
     result = enrich_identity("ffffff", callsign="TVP7200")
-    assert result["country"]["value"] == "Czech Republic"
-    assert result["country"]["source"] == "callsign_decode"
-    assert result["country"]["confidence"] == 0.6
+    assert result["country"] is None
 
 
 def test_enrich_identity_country_unknown():
@@ -232,6 +234,31 @@ def test_enrich_identity_operator_callsign_tier():
     result = enrich_identity("ffffff", callsign="RYR123")
     assert result["operator"]["value"] == "Ryanair"
     assert result["operator"]["source"] == "callsign_decode"
+
+
+def test_enrich_identity_operator_country_callsign_tier():
+    # The callsign->operator lookup's country data (the airline's home
+    # country) surfaces as its own "operator_country" field — never in the
+    # unrelated "country" field (registration), and never smuggled onto
+    # "operator" itself either.
+    result = enrich_identity("ffffff", callsign="RYR123")
+    assert result["operator_country"]["value"] == "Ireland"
+    assert result["operator_country"]["country_iso"] == "IE"
+    assert result["operator_country"]["source"] == "callsign_decode"
+    assert "country_iso" not in result["operator"]
+
+
+def test_enrich_identity_operator_country_unknown():
+    assert enrich_identity("ffffff")["operator_country"] is None
+
+
+def test_enrich_identity_operator_country_no_tier_from_icao24_lookup():
+    # aircraft_database.py's placeholder records only carry one country_iso
+    # (the aircraft's own registration country, already used for "country")
+    # — it must not double as operator_country too.
+    result = enrich_identity("49d3d3")
+    assert result["operator"]["value"] == "Smartwings"
+    assert result["operator_country"] is None
 
 
 def test_enrich_identity_operator_unknown():

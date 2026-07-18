@@ -28,6 +28,20 @@ function rowText(page, label) {
   }, label);
 }
 
+function flagClassForLabel(page, label) {
+  return page.evaluate((lbl) => {
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
+    if (!b) return null;
+    let node = b.nextSibling;
+    while (node) {
+      if (node.nodeType === 1 && node.classList.contains('fi')) return node.className;
+      if (node.nodeType === 1 && node.tagName === 'BR') break;
+      node = node.nextSibling;
+    }
+    return null;
+  }, label);
+}
+
 function badgeSourcesForLabel(page, label) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
@@ -111,6 +125,11 @@ test('adsbdb fills Registered Owner, Operator and Route when the live feed has n
 
   expect(await rowText(page, 'Registered Owner:')).toBe('Falcon Landing LLC');
   expect(await rowText(page, 'Operator:')).toBe('Unique Air');
+  // Operator Country is adsbdb's flightroute.airline.country/country_iso —
+  // its own dedicated row, not a flag riding on Operator's own row.
+  expect(await rowText(page, 'Operator Country:')).toBe('France');
+  expect(await flagClassForLabel(page, 'Operator Country:')).toBe('fi fi-fr');
+  expect(await flagClassForLabel(page, 'Operator:')).toBe(null);
   // Route is its own visual card now: big codes + small city names, not a
   // single combined "Name (CODE) → Name (CODE)" string.
   const routeText = await routeCardText(page);
@@ -121,7 +140,13 @@ test('adsbdb fills Registered Owner, Operator and Route when the live feed has n
 
   expect(await badgeSourcesForLabel(page, 'Registered Owner:')).toEqual(['adsbdb']);
   expect(await badgeSourcesForLabel(page, 'Operator:')).toEqual(['adsbdb']);
+  expect(await badgeSourcesForLabel(page, 'Operator Country:')).toEqual(['adsbdb']);
   expect(await routeCardDevBadgeSources(page)).toEqual(['adsbdb']);
+
+  // adsbdb's registered_owner_country_* describes the *owner's* country
+  // (already shown via Registered Owner's own flag) — it must never leak
+  // into the separate "Country" field, which means registration country.
+  expect(await rowText(page, 'Country:')).toBe('Unknown');
 
   // Registration is already live (F-UNIQ from adsb.fi) — adsbdb's own
   // registration value for this aircraft must not override it. It's in

@@ -158,6 +158,37 @@ test('a live-sourced country still gets a flag when the backend recognizes its n
   expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky']);
 });
 
+test('a Flywme-resolved Operator Country (via callsign_decode) fills in when adsbdb has nothing', async ({ page }) => {
+  // callsign_decode's country data (the airline's home country) is its own
+  // "operator_country" field now — Operator itself stays plain text, its
+  // flag lives only on the dedicated Operator Country row.
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null,
+    operator: { value: 'Ryanair', source: 'callsign_decode', confidence: 0.8 },
+    operator_country: { value: 'Ireland', source: 'callsign_decode', confidence: 0.6, country_iso: 'IE' },
+    registration: null, manufacturer: null, model: null, year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, 'eeeeee', 'adsbfi');
+
+  function flagClassFor(label) {
+    return page.evaluate((lbl) => {
+      const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
+      let node = b.nextSibling;
+      while (node) {
+        if (node.nodeType === 1 && node.classList.contains('fi')) return node.className;
+        if (node.nodeType === 1 && node.tagName === 'BR') break;
+        node = node.nextSibling;
+      }
+      return null;
+    }, label);
+  }
+
+  expect(await flagClassFor('Operator:')).toBe(null);
+  expect(await flagClassFor('Operator Country:')).toBe('fi fi-ie');
+});
+
 test('Registration is excluded from the Unknown-treatment: it\'s the header now, not an identityRow', async ({ page }) => {
   // Default all-null identity mock from beforeEach/mockAllSources.
   await page.goto('/');

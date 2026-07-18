@@ -36,8 +36,9 @@ const adsbdbById = new Map(); // icao24 -> raw /api/adsbdb response
 let adsbdbEnabled = true;
 
 const ENRICHMENT_FIELD_MAP = {
-  country: 'originCountry', operator: 'operator', registration: 'registration',
-  manufacturer: 'manufacturer', model: 'model', year_built: 'manufactureYear',
+  country: 'originCountry', operator: 'operator', operator_country: 'operatorCountry',
+  registration: 'registration', manufacturer: 'manufacturer', model: 'model',
+  year_built: 'manufactureYear',
 };
 
 // Combines a live-polled aircraft's { info, fieldSources } with cached
@@ -68,13 +69,11 @@ function buildMergedDetails(icao24) {
   const flightroute = adsbdb && adsbdb.flightroute;
   const airline = flightroute && flightroute.airline;
   if (aircraft) {
-    // Same "flag can attach regardless of which tier supplied the value"
-    // rule as Flywme's country_iso below — adsbdb gives the ISO directly,
-    // no reverse name lookup needed.
-    if (aircraft.registered_owner_country_iso_name && !info.countryIso) {
-      info.countryIso = aircraft.registered_owner_country_iso_name;
-    }
-    fillIfEmpty('originCountry', aircraft.registered_owner_country_name, 'adsbdb');
+    // Deliberately no originCountry/countryIso fill here: adsbdb's
+    // registered_owner_country_* fields describe the *owner's* country,
+    // not the aircraft's country of registration — that would conflate two
+    // different concepts under one "Country" label. That data instead
+    // feeds registeredOwnerCountryIso below, its own dedicated field.
     fillIfEmpty('registration', aircraft.registration, 'adsbdb');
     fillIfEmpty('manufacturer', aircraft.manufacturer, 'adsbdb');
     fillIfEmpty('model', aircraft.type, 'adsbdb');
@@ -88,7 +87,12 @@ function buildMergedDetails(icao24) {
     }
   }
   if (airline) {
-    if (fillIfEmpty('operator', airline.name, 'adsbdb') && airline.country_iso) {
+    fillIfEmpty('operator', airline.name, 'adsbdb');
+    // Operator Country is its own field (not a flag riding on Operator's
+    // own row) — same "dedicated row per concept" pattern as Registered
+    // Owner. adsbdb gives the country name directly, no reverse lookup
+    // needed.
+    if (fillIfEmpty('operatorCountry', airline.country, 'adsbdb') && airline.country_iso) {
       info.operatorCountryIso = airline.country_iso;
     }
   }
@@ -131,6 +135,11 @@ function buildMergedDetails(icao24) {
       const resolved = enrichment[beKey];
       if (beKey === 'country' && resolved && resolved.country_iso && !info.countryIso) {
         info.countryIso = resolved.country_iso;
+      }
+      // Same rule for operator_country: its own dedicated field/flag,
+      // never a decoration on Operator's own row (mirrors "country" above).
+      if (beKey === 'operator_country' && resolved && resolved.country_iso && !info.operatorCountryIso) {
+        info.operatorCountryIso = resolved.country_iso;
       }
       if (!resolved) continue;
       const already = info[feKey] != null && info[feKey] !== '';

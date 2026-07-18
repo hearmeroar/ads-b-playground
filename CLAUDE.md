@@ -569,13 +569,13 @@ because photographer name and photo URL come from an external API.
     Macau (`B-M...`) both fall under China's bare `B` — handled by trying
     "prefix + first character after the dash" (`BH`, `BM`) as a more
     specific candidate before falling back to the bare prefix; `callsign.py`
-    maps ICAO 3-letter airline designators to an operator
-    (confidence 0.8) and that operator's home country (confidence 0.6 —
-    two independently-confidenced facts from one lookup), both riding on
-    the same `operator` result (`operator["country_iso"]` alongside its
-    own `value`/`source`/`confidence`) rather than feeding the separate
-    `country` field — see "Registered Owner is a brand new field" below for
-    why that distinction matters; `aircraft_database.py` holds a
+    maps ICAO 3-letter airline designators to an operator (confidence 0.8)
+    and that operator's home country (confidence 0.6 — two independently-
+    confidenced facts from one lookup), returned as two separate results
+    from `enrich_identity()` — `operator` and `operator_country` — rather
+    than one field carrying the other's country as a side attribute; see
+    "Registered Owner is a brand new field" below for why that distinction
+    matters; `aircraft_database.py` holds a
     swappable ICAO24→full-record lookup (`AircraftDatabaseLookup.lookup()`,
     a small placeholder dataset behind an interface a real data source
     could later implement with zero caller changes) plus a separate ICAO
@@ -815,26 +815,32 @@ because photographer name and photo URL come from an external API.
     `Operator`). adsbdb is its only possible tier — no live feed or Flywme
     fallback exists for it — so it renders via `identityRow()` like
     Country/Operator/etc. (literal "Unknown" when unresolved, not a hidden
-    row). **`Country`, `Operator`, and `Registered Owner` are three
-    deliberately distinct concepts, never conflated**: Country always means
-    the aircraft's country of *registration* (ICAO Annex 7 nationality
-    mark — from live/`registration_prefix`/`icao24_lookup` only), Operator
-    means the operating airline's home country, Registered Owner means the
-    private/corporate registrant's country. adsbdb's
-    `registered_owner_country_name`/`registered_owner_country_iso_name`
+    row). **`Country`, `Operator Country`, and `Registered Owner` are three
+    deliberately distinct concepts, never conflated, each with its own row
+    and its own flag** — `Operator` itself stays plain text with no flag at
+    all: Country means the aircraft's country of *registration* (ICAO
+    Annex 7 nationality mark — from live/`registration_prefix`/
+    `icao24_lookup` only), **Operator Country** (`info.operatorCountry` +
+    `operatorCountryIso`, a brand new field/row, same treatment as
+    Registered Owner) means the operating airline's home country, and
+    Registered Owner means the private/corporate registrant's country.
+    adsbdb's `registered_owner_country_name`/`registered_owner_country_iso_name`
     fields feed *only* Registered Owner, never Country — an earlier version
     of this code let them leak into Country too, which silently mixed
     "who owns this plane" into a field meant to mean "where it's
     registered"; fixed by scoping that adsbdb data to `registeredOwner`/
-    `registeredOwnerCountryIso` alone. Operator gets a flag
-    (`operatorCountryIso`) from either of two tiers now: adsbdb's
-    `flightroute.airline.country_iso`, or — new — `callsign_decode`'s own
-    `country_iso` (the ICAO airline designator's home country,
-    `enrichment/callsign.py`), carried on the `operator` result dict
-    alongside its `value`/`source`/`confidence` (mirrors how `country`
-    already carries its own `country_iso`). So only a *live-sourced*
-    operator renders without a flag now, the same known limitation as
-    Country's own flag on a live value with no `countries.py` name match.
+    `registeredOwnerCountryIso` alone. Operator Country resolves through
+    two tiers: adsbdb's `flightroute.airline.country`/`country_iso` (name
+    and ISO given together, no reverse lookup needed) first, falling back
+    to `enrich_identity()`'s own `operator_country` field — a byproduct of
+    `callsign_decode`'s ICAO-designator lookup (`enrichment/callsign.py`),
+    which resolves `operator` and `operator_country` as two independently
+    sourced results from one table lookup, never smuggling the country
+    onto `operator` itself. Only a *live-sourced* Operator has no possible
+    Operator Country at all (no live feed reports an operator's home
+    country), which just means that row shows "Unknown" — the same known
+    limitation as Country's own flag on a live value with no
+    `countries.py` name match.
   - **Photo (`url_photo`/`url_photo_thumbnail`), last-resort only**: live
     checks against api.adsbdb.com (4+ real aircraft) found `url_photo` —
     the field that in theory points at a full-size image — **consistently

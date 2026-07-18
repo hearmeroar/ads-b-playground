@@ -319,13 +319,18 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const countryValue = info.originCountry
     ? (countryFlagHtml ? countryFlagHtml + ' ' + info.originCountry : info.originCountry)
     : null;
-  // Only ever present when Operator was filled from adsbdb's flightroute
-  // .airline (the only tier that carries a country alongside the airline
-  // name) — a live-feed or Flywme-computed operator renders without a flag,
-  // same known limitation as Country's own flag above.
-  const operatorFlagHtml = flagHtml(info.operatorCountryIso);
-  const operatorValue = info.operator
-    ? (operatorFlagHtml ? operatorFlagHtml + ' ' + info.operator : info.operator)
+  // Operator is plain text — its country lives in its own dedicated
+  // "Operator Country" row/flag below, never smeared onto this row (same
+  // "one concept per row" pattern as Registered Owner having its own flag
+  // rather than decorating Operator).
+  const operatorValue = info.operator || null;
+  // Operator Country: adsbdb's flightroute.airline (name + ISO together) as
+  // the primary tier, falling back to our own callsign-prefix enrichment
+  // (enrichment/callsign.py's AIRLINE_OPERATORS table) when adsbdb has
+  // nothing — see enrich_identity()'s "operator_country" field.
+  const operatorCountryFlagHtml = flagHtml(info.operatorCountryIso);
+  const operatorCountryValue = info.operatorCountry
+    ? (operatorCountryFlagHtml ? operatorCountryFlagHtml + ' ' + info.operatorCountry : info.operatorCountry)
     : null;
   // Registered Owner only ever comes from adsbdb (no live/Flywme tier exists
   // for it), which always gives the ISO directly alongside the name, so this
@@ -354,6 +359,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     identityRow('Model', info.model, 'model'),
     identityRow('Year built', info.manufactureYear, 'manufactureYear'),
     identityRow('Operator', operatorValue, 'operator'),
+    identityRow('Operator Country', operatorCountryValue, 'operatorCountry'),
     identityRow('Registered Owner', registeredOwnerValue, 'registeredOwner'),
     identityRow('Country', countryValue, 'originCountry'),
     detailRow('Category', categoryValue, 'categoryDisplay'),
