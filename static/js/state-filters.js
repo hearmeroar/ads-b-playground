@@ -203,6 +203,33 @@ function categoryIconHtml(key) {
     '</svg></div>';
 }
 
+// Basemap picker — same custom-dropdown pattern as the category filter
+// below, reused rather than inventing a second dropdown widget. Purely
+// presentational (setBaseLayer(), map-init.js): no poll()/re-render needed,
+// unlike the category filter which changes what's rendered.
+const basemapDropdown = document.getElementById('basemap-filter');
+const basemapTrigger = basemapDropdown.querySelector('.dropdown-trigger');
+const basemapValueWrap = basemapDropdown.querySelector('.dropdown-value-wrap');
+const basemapOptions = basemapDropdown.querySelectorAll('.dropdown-option');
+
+basemapTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  basemapDropdown.classList.toggle('open');
+});
+basemapOptions.forEach((opt) => {
+  opt.addEventListener('click', () => {
+    basemapOptions.forEach((o) => o.classList.remove('active'));
+    opt.classList.add('active');
+    const key = opt.dataset.value;
+    setBaseLayer(key);
+    basemapValueWrap.innerHTML =
+      '<span class="swatch" style="background:' + BASE_LAYERS[key].swatch + '"></span>'
+      + '<span class="dropdown-value">' + BASE_LAYERS[key].label + '</span>';
+    basemapDropdown.classList.remove('open');
+  });
+});
+document.addEventListener('click', () => basemapDropdown.classList.remove('open'));
+
 // Custom dropdown (a styled <div>, not a native <select> — see #category-filter
 // markup) for the category filter. Its selected value is tracked here rather
 // than read from a form-element `.value`, since it's built from plain divs.

@@ -89,12 +89,72 @@ fetch('/api/config')
 map.createPane('groundPane');
 map.getPane('groundPane').style.zIndex = 450;
 
-// CARTO's free "Positron" basemap — monochrome/light grey, no API key
-// required (unlike Mapbox, which would need a signup + access token).
-// Attribution to both CARTO and OSM is required by CARTO's terms of use.
-L.tileLayer('https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
-    '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-  maxZoom: 19,
-}).addTo(map);
+// Basemap picker: six free, no-API-key tile styles (same "no signup, no
+// token" constraint that picked CARTO over Mapbox originally) the user can
+// switch between via #basemap-filter (wired in state-filters.js). Each
+// L.tileLayer is built once up front — cheap, since a tile layer fetches
+// nothing until it's actually added to the map — and kept in baseLayers so
+// switching back to a previously-viewed style redraws from Leaflet's own
+// tile cache instead of refetching, rather than constructing a fresh layer
+// on every switch.
+const CARTO_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+  '&copy; <a href="https://carto.com/attributions">CARTO</a>';
+const BASE_LAYERS = {
+  light: {
+    label: 'Light', swatch: '#e3e5e8',
+    url: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: CARTO_ATTRIBUTION, maxZoom: 19,
+  },
+  dark: {
+    label: 'Dark', swatch: '#333744',
+    url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: CARTO_ATTRIBUTION, maxZoom: 19,
+  },
+  voyager: {
+    label: 'Voyager', swatch: '#f5cf8f',
+    url: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: CARTO_ATTRIBUTION, maxZoom: 19,
+  },
+  // Standard OpenStreetMap tiles — the single most recognizable web map
+  // look. Note: OSM's tile usage policy discourages embedding this in a
+  // high-traffic production app without self-hosting; accepted here since
+  // this is a low-traffic personal tracker, not a production service.
+  streets: {
+    label: 'Streets', swatch: '#a8d0a0',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19, subdomains: 'abc',
+  },
+  // Esri's free public World Imagery service — note the tile URL order is
+  // {z}/{y}/{x}, not {z}/{x}/{y} like every other layer here.
+  satellite: {
+    label: 'Satellite', swatch: '#3d4a3d',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    maxZoom: 19,
+  },
+  // OpenTopoMap — free community topographic tiles, same informal
+  // "don't hammer it" courtesy norm as OSM (which its own tiles derive from).
+  terrain: {
+    label: 'Terrain', swatch: '#c9b78c',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM ' +
+      '| Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+    maxZoom: 17, subdomains: 'abc',
+  },
+};
+const baseLayers = {};
+for (const key of Object.keys(BASE_LAYERS)) {
+  const cfg = BASE_LAYERS[key];
+  baseLayers[key] = L.tileLayer(cfg.url, { attribution: cfg.attribution, maxZoom: cfg.maxZoom, subdomains: cfg.subdomains || 'abc' });
+}
+let currentBaseLayerKey = 'light';
+baseLayers[currentBaseLayerKey].addTo(map);
+
+function setBaseLayer(key) {
+  if (key === currentBaseLayerKey || !baseLayers[key]) return;
+  map.removeLayer(baseLayers[currentBaseLayerKey]);
+  currentBaseLayerKey = key;
+  map.addLayer(baseLayers[currentBaseLayerKey]);
+}
