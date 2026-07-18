@@ -31,6 +31,16 @@ html, body { margin: 0; padding: 0; height: 100%; }
   font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   color: var(--ink);
 }
+/* A plain margin-bottom on #hud doesn't work here — margins on an
+   absolutely positioned box aren't counted toward the document's
+   scrollable overflow, so scrolling to the very end would butt the card
+   straight against the bottom edge with no gap, unlike the 14px it starts
+   with at the top. This invisible pseudo-element extends #hud's own box
+   (which *does* count) by 14px to match. */
+#hud::after {
+  content: ''; display: block; position: absolute; top: 100%; left: 0;
+  height: 14px; width: 1px;
+}
 
 #hud .count-row { display: flex; align-items: baseline; gap: 7px; }
 #hud .live-dot {
