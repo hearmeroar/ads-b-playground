@@ -506,10 +506,18 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   let route = '';
   if (routeHas) {
     if (isReject) {
-      route = '<div class="route-card route-card-unconfirmed">'
-        + '<div class="route-card-title">Route <span class="route-card-tag">Not confirmed</span></div>'
-        + '<div class="route-card-footer">' + routeConfidenceBadge + routeDevBadge + '</div>'
-        + '</div>';
+      // Reject-band routes are hidden entirely in normal mode — a "Not
+      // confirmed" card with no other info reads as clutter for a route
+      // that's essentially known to be wrong. Dev mode keeps showing it,
+      // same as every other dev-mode-only visibility exception here, since
+      // seeing that adsbdb resolved *something* (even a rejected one) is
+      // useful when debugging the enrichment chain.
+      if (currentDevMode) {
+        route = '<div class="route-card route-card-unconfirmed">'
+          + '<div class="route-card-title">Route <span class="route-card-tag">Not confirmed</span></div>'
+          + '<div class="route-card-footer">' + routeConfidenceBadge + routeDevBadge + '</div>'
+          + '</div>';
+      }
     } else {
       const origin = splitAirportString(info.originAirport);
       const dest = splitAirportString(info.destinationAirport);

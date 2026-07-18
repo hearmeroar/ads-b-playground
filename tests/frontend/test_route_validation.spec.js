@@ -142,11 +142,12 @@ test.describe('Route row end-to-end', () => {
 
   // IMPLAUSIBLE_ROUTE scores 'reject' (~35/100, well past the 300km
   // distance gate) — per live research, roughly a quarter of all adsbdb
-  // routes land here, so this isn't an edge case worth hiding gently: the
-  // specific (likely wrong) airport pair is replaced entirely rather than
-  // shown with just a warning, since naming a wrong city pair is more
-  // misleading than a plain "unconfirmed".
-  test('a rejected adsbdb route names no airports at all, just "Not confirmed"', async ({ page }) => {
+  // routes land here, so this isn't an edge case worth hiding gently: in
+  // normal mode the whole route card is now suppressed entirely (a "Not
+  // confirmed" card with no other info reads as clutter for a route that's
+  // essentially known to be wrong); dev mode still shows it, same as every
+  // other dev-mode-only visibility exception in this app.
+  test('a rejected adsbdb route is hidden entirely in normal mode, shown as "Not confirmed" in dev mode', async ({ page }) => {
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: null, flightroute: IMPLAUSIBLE_ROUTE,
     } }));
@@ -154,11 +155,16 @@ test.describe('Route row end-to-end', () => {
     await page.waitForSelector('.leaflet-marker-icon');
     await selectAircraft(page, 'aaaaaa', 'opensky');
 
-    const html = await routeHtml(page);
-    expect(html).toContain('route-card-unconfirmed');
-    expect(html).toContain('Not confirmed');
-    expect(html).not.toContain('Far Origin Airport');
-    expect(html).not.toContain('route-warning');
+    const normalHtml = await routeHtml(page);
+    expect(normalHtml || '').not.toContain('route-card');
+    expect(normalHtml || '').not.toContain('Far Origin Airport');
+
+    await page.click('#toggle-dev-mode');
+    const devHtml = await routeHtml(page);
+    expect(devHtml).toContain('route-card-unconfirmed');
+    expect(devHtml).toContain('Not confirmed');
+    expect(devHtml).not.toContain('Far Origin Airport');
+    expect(devHtml).not.toContain('route-warning');
   });
 
   // A 'low' (40-59) route is plausibly right, just imperfect — unlike
@@ -186,17 +192,18 @@ test.describe('Route row end-to-end', () => {
     expect(html).not.toContain('Not confirmed');
   });
 
-  test('the confidence dot\'s tooltip shows the score breakdown, in both normal and dev mode', async ({ page }) => {
+  test('the confidence dot\'s tooltip shows the score breakdown (dev mode, since a Reject-band card only renders there)', async ({ page }) => {
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: null, flightroute: IMPLAUSIBLE_ROUTE,
     } }));
     await page.goto('/');
     await page.waitForSelector('.leaflet-marker-icon');
     await selectAircraft(page, 'aaaaaa', 'opensky');
+    await page.click('#toggle-dev-mode');
 
-    // Visible and clickable without dev mode — the confidence badge is its
-    // own .info-tip trigger inside #sidebar-route (the small colored dot is
-    // purely decorative, nested inside it, not independently clickable).
+    // The confidence badge is its own .info-tip trigger inside
+    // #sidebar-route (the small colored dot is purely decorative, nested
+    // inside it, not independently clickable).
     await page.click('#sidebar-route .info-tip');
     const tooltip = await page.textContent('#source-tooltip');
     expect(tooltip).toContain('Reject confidence');

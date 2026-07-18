@@ -1282,11 +1282,16 @@ because photographer name and photo URL come from an external API.
     there's no real space pressure the truncation was solving since the
     card is free to grow taller), a direction icon between them, and (for
     an adsbdb-sourced route) the Layer 2 confidence badge in a footer.
-    Reject-band routes get `.route-card-unconfirmed` styling and a
-    "Not confirmed" tag instead of the airport codes; Low-band gets a
-    `.route-card-tag` "⚠ Unverified" tag but still shows the real pair
-    (superseded the earlier inline `.route-warning` wrapper approach from
-    Layer 2's initial ship). The confidence badge (`routeConfidenceBadgeHtml()`)
+    Reject-band routes are **hidden entirely in normal mode** — no route
+    card at all, not even a "Not confirmed" placeholder, since a card with
+    no other information reads as clutter for a route that's essentially
+    known to be wrong (re-approved 2026-07-18, superseding the original
+    "Not confirmed" `.route-card-unconfirmed` card shown unconditionally —
+    that styling/tag still renders, just dev-mode-only now, same as every
+    other dev-mode visibility exception in this app). Low-band gets a
+    `.route-card-tag` "⚠ Unverified" tag but still shows the real pair in
+    both modes (superseded the earlier inline `.route-warning` wrapper
+    approach from Layer 2's initial ship). The confidence badge (`routeConfidenceBadgeHtml()`)
     is itself an `.info-tip` — clicking it shows the same score breakdown
     tooltip as before, just via the unified mechanism (see below) instead
     of a bespoke one.
