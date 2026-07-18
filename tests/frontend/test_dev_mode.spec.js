@@ -55,7 +55,7 @@ function badgeSourcesForLabel(page, label) {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
     const sources = [];
-    let node = b.nextSibling;
+    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
     while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
       if (node.nodeType === 1 && node.classList.contains('source-badge')) sources.push(node.dataset.source);
       node = node.nextSibling;
@@ -71,14 +71,14 @@ test('a field reported by only one source shows exactly one badge, with a click-
   // Country (originCountry) has no equivalent field on adsb.fi/airplanes.live's
   // own parsed record at all (normalizeAdsbExchange always sets it null) —
   // OpenSky is the only possible source for it, a clean single-badge case.
-  expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky']);
+  expect(await badgeSourcesForLabel(page, 'Registration Country')).toEqual(['opensky']);
 
   // Tooltip hidden until clicked.
   expect(await page.getAttribute('#source-tooltip', 'hidden')).not.toBeNull();
 
   await page.evaluate(() => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Country:');
-    let node = b.nextSibling;
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration Country');
+    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
     while (node && !(node.nodeType === 1 && node.classList.contains('source-badge'))) node = node.nextSibling;
     node.click();
   });

@@ -23,7 +23,7 @@ function badgeSourcesForLabel(page, label) {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
     const sources = [];
-    let node = b.nextSibling;
+    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
     while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
       if (node.nodeType === 1 && node.classList.contains('source-badge')) sources.push(node.dataset.source);
       node = node.nextSibling;
@@ -35,7 +35,7 @@ function badgeSourcesForLabel(page, label) {
 async function clickBadge(page, label, index = 0) {
   await page.evaluate(({ lbl, index }) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
-    let node = b.nextSibling;
+    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
     const badges = [];
     while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
       if (node.nodeType === 1 && node.classList.contains('source-badge')) badges.push(node);
@@ -65,9 +65,9 @@ test('dev mode off: resolved fields render plain, unresolved render "Unknown", n
   expect(sidebarText).toContain('Manufacturer');
   expect(sidebarText).toContain('Boeing');
   expect(sidebarText).toContain('737-800');
-  expect(sidebarText).toContain('Operator: Unknown');
-  expect(sidebarText).toContain('Country: Unknown');
-  expect(sidebarText).toContain('Year built: Unknown');
+  expect(sidebarText).toContain('Operator? Unknown');
+  expect(sidebarText).toContain('Registration Country? Unknown');
+  expect(sidebarText).toContain('Year built Unknown');
 
   const badgeCount = await page.evaluate(() => document.querySelectorAll('#sidebar-details .source-badge').length);
   expect(badgeCount).toBe(0);
@@ -84,9 +84,9 @@ test('dev mode on: a Flywme badge shows the computation technique and confidence
   await page.click('#toggle-dev-mode');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
-  expect(await badgeSourcesForLabel(page, 'Operator:')).toEqual(['flywme']);
+  expect(await badgeSourcesForLabel(page, 'Operator')).toEqual(['flywme']);
 
-  await clickBadge(page, 'Operator:');
+  await clickBadge(page, 'Operator');
   expect(await page.textContent('#source-tooltip')).toBe('Flywme — computed from callsign decode, confidence 0.8');
 });
 
@@ -113,7 +113,7 @@ test('live values are never overwritten by enrichment, even a contradicting one 
   // resolve a real (if contradicting) guess of its own, its badge
   // co-displays second, after the winning source's, reflecting the
   // priority chain rather than making the losing tier's guess disappear.
-  expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky', 'flywme']);
+  expect(await badgeSourcesForLabel(page, 'Registration Country')).toEqual(['opensky', 'flywme']);
   // "dddddd"'s registration is independently reported by adsb.fi and
   // airplanes.live too (see fixtures) — the point here is just that
   // 'flywme' is appended last, after whichever live sources already won.
@@ -123,7 +123,7 @@ test('live values are never overwritten by enrichment, even a contradicting one 
   expect(regSources[regSources.length - 1]).toBe('flywme');
   expect(regSources.length).toBeGreaterThan(1);
 
-  await clickBadge(page, 'Country:', 1);
+  await clickBadge(page, 'Registration Country', 1);
   expect(await page.textContent('#source-tooltip')).toBe('Flywme — computed from registration prefix, confidence 1.0');
 });
 
@@ -142,8 +142,8 @@ test('a live-sourced country still gets a flag when the backend recognizes its n
   await selectAircraft(page, 'dddddd', 'opensky');
 
   const flagPresent = await page.evaluate(() => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Country:');
-    let node = b.nextSibling;
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration Country');
+    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
     while (node) {
       if (node.nodeType === 1 && node.classList.contains('fi')) return node.className;
       if (node.nodeType === 1 && node.tagName === 'BR') break;
@@ -155,7 +155,7 @@ test('a live-sourced country still gets a flag when the backend recognizes its n
 
   // Still attributed to OpenSky, not Flywme — the flag is a presentation
   // add-on, not a sign the value itself was enriched.
-  expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky']);
+  expect(await badgeSourcesForLabel(page, 'Registration Country')).toEqual(['opensky']);
 });
 
 test('a Flywme-resolved Operator Country (via callsign_decode) fills in when adsbdb has nothing', async ({ page }) => {
@@ -175,7 +175,7 @@ test('a Flywme-resolved Operator Country (via callsign_decode) fills in when ads
   function flagClassFor(label) {
     return page.evaluate((lbl) => {
       const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
-      let node = b.nextSibling;
+      let node = (b.closest('.identity-label-wrap') || b).nextSibling;
       while (node) {
         if (node.nodeType === 1 && node.classList.contains('fi')) return node.className;
         if (node.nodeType === 1 && node.tagName === 'BR') break;
@@ -185,8 +185,37 @@ test('a Flywme-resolved Operator Country (via callsign_decode) fills in when ads
     }, label);
   }
 
-  expect(await flagClassFor('Operator:')).toBe(null);
-  expect(await flagClassFor('Operator Country:')).toBe('fi fi-ie');
+  expect(await flagClassFor('Operator')).toBe(null);
+  expect(await flagClassFor('Operator Country')).toBe('fi fi-ie');
+});
+
+test('each of the four identity-row labels has a click-to-toggle tooltip disambiguating it from the other three, visible with dev mode off', async ({ page }) => {
+  // Default all-null identity mock — the tooltip explains the *concept*,
+  // so it must work regardless of whether the row resolved to a value or
+  // "Unknown", and regardless of dev mode (unlike per-source badges).
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, 'eeeeee', 'adsbfi');
+
+  async function tooltipTextFor(label) {
+    // Not a toggle — each click just repositions #source-tooltip and
+    // overwrites its content, so no explicit close step is needed between
+    // labels (see main.js's shared click handler).
+    await page.evaluate((lbl) => {
+      const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
+      // The "(?)" trigger sits right after </b>, inside the same
+      // .identity-label-wrap span (not a sibling of the wrapper itself).
+      let node = b.nextSibling;
+      while (node && !(node.nodeType === 1 && node.classList.contains('info-tip'))) node = node.nextSibling;
+      node.click();
+    }, label);
+    return page.textContent('#source-tooltip');
+  }
+
+  expect(await tooltipTextFor('Operator')).toContain('Not necessarily who owns it');
+  expect(await tooltipTextFor('Operator Country')).toContain('Not the aircraft’s own country of registration');
+  expect(await tooltipTextFor('Registered Owner')).toContain('can differ from the airline actually flying it');
+  expect(await tooltipTextFor('Registration Country')).toContain('not who operates or owns it');
 });
 
 test('Registration is excluded from the Unknown-treatment: it\'s the header now, not an identityRow', async ({ page }) => {
@@ -196,11 +225,11 @@ test('Registration is excluded from the Unknown-treatment: it\'s the header now,
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Country: Unknown');
-  expect(sidebarText).toContain('Operator: Unknown');
-  expect(sidebarText).toContain('Manufacturer: Unknown');
-  expect(sidebarText).toContain('Model: Unknown');
-  expect(sidebarText).toContain('Year built: Unknown');
+  expect(sidebarText).toContain('Registration Country? Unknown');
+  expect(sidebarText).toContain('Operator? Unknown');
+  expect(sidebarText).toContain('Manufacturer Unknown');
+  expect(sidebarText).toContain('Model Unknown');
+  expect(sidebarText).toContain('Year built Unknown');
   // Registration has a live value here, and lives in #sidebar-header (the
   // masthead title) rather than an identityRow — no "Unknown" treatment
   // applies to it at all any more, by construction.

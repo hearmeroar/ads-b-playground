@@ -426,6 +426,34 @@ async function loadIdentityEnrichment(icao24, info) {
   }
 }
 
+// loadIdentityEnrichment() and loadAdsbdb() are independent, concurrent
+// fetches kicked off together from selectAircraft() (same pattern as
+// loadGallery()/loadAdsbdb() above) — neither sees the other's result.
+// That means our own local tables (registration_prefix/callsign_decode,
+// see enrichment/) are blind to a registration/callsign that only adsbdb
+// resolved: loadIdentityEnrichment() already ran (and cached its result)
+// before adsbdb's response ever arrived. Re-running it with whatever new
+// registration/callsign adsbdb found gives those tables a fair shot —
+// found via a real aircraft (4X-ABS, no live registration, only adsbdb
+// knew it) whose Registration Country stayed "Unknown" even though our
+// own registration_prefix table could have resolved it from that tail
+// number alone.
+function maybeRefetchIdentityWithAdsbdbData(icao24, liveInfo, adsbdbData) {
+  const aircraft = adsbdbData && adsbdbData.aircraft;
+  if (!aircraft) return;
+  const liveReg = liveInfo && liveInfo.registration;
+  const liveCallsign = liveInfo && liveInfo.callsign;
+  const newReg = !liveReg && aircraft.registration ? aircraft.registration : null;
+  const flightroute = adsbdbData.flightroute;
+  const newCallsign = !liveCallsign && flightroute && flightroute.callsign ? flightroute.callsign : null;
+  if (!newReg && !newCallsign) return; // nothing our own tables didn't already see
+  enrichmentById.delete(icao24); // bypasses loadIdentityEnrichment()'s "already resolved" guard
+  loadIdentityEnrichment(icao24, Object.assign({}, liveInfo, {
+    registration: newReg || liveReg,
+    callsign: newCallsign || liveCallsign,
+  }));
+}
+
 let adsbdbFetchToken = 0; // guards against a stale response overwriting a newer selection
 
 // icao24 -> normalized photo candidate from adsbdb's url_photo, or null once
@@ -499,6 +527,7 @@ async function loadAdsbdb(icao24, info) {
     } : null);
     renderSelectedDetails();
     appendAdsbdbPhotoIfReady(icao24);
+    maybeRefetchIdentityWithAdsbdbData(icao24, info, data);
   } catch (e) {
     // Best-effort: leave adsbdbById unset so a later reselect retries.
   }

@@ -208,6 +208,15 @@ function infoTipHtml(triggerHtml, detailText) {
   return '<span class="info-tip" data-detail="' + detailText.replace(/"/g, '&quot;') + '">' + triggerHtml + '</span>';
 }
 
+// Same circled-"?" glyph as the HUD's own (?) help buttons (static/index.html,
+// #opensky-help/#track-help/#dev-mode-help — see the .source-help SVG there),
+// reused inline here so the identity rows' tooltip trigger reads as the same
+// "there's more info here" affordance rather than a differently-styled one.
+const HELP_ICON_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">' +
+  '<circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>' +
+  '<text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor">?</text>' +
+  '</svg>';
+
 // Renders one normalized info object (see normalizeOpenSky/
 // normalizeAdsbExchange) into the sidebar's grouped HTML. Each group is
 // omitted entirely when none of its fields are populated — e.g. an
@@ -296,10 +305,18 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // missing value shows the literal word "Unknown" rather than hiding the
   // row or falling back to dev-mode's dash, since these fields are
   // specifically meant to always resolve to *something* meaningful.
-  function identityRow(label, value, fieldKey) {
+  function identityRow(label, value, fieldKey, helpHtml) {
     const has = value != null && value !== '';
     const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) : '';
-    return '<b>' + label + ':</b> ' + (has ? value : 'Unknown') + badge;
+    // Label + "(?)" icon are wrapped together in .identity-label-wrap, which
+    // carries the min-width column-alignment that plain <b> used to have on
+    // its own (static/style.css) — keeps the icon flush against the label
+    // text itself while still lining up where the value starts for short
+    // labels, same as every other detailRow. class="identity-label" gets a
+    // lighter weight/smaller size than a plain detailRow <b> — four-plus
+    // rows of full-bold labels each now carrying their own icon read as too
+    // heavy/loud as a block.
+    return '<span class="identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span> ' + (has ? value : 'Unknown') + badge;
   }
   function renderGroup(title, rows, iconKey) {
     const filtered = rows.filter((r) => r != null);
@@ -339,6 +356,25 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const registeredOwnerValue = info.registeredOwner
     ? (registeredOwnerFlagHtml ? registeredOwnerFlagHtml + ' ' + info.registeredOwner : info.registeredOwner)
     : null;
+  // Operator/Operator Country/Registered Owner/Registration Country are
+  // four easily-confused concepts (found the hard way — a user kept
+  // getting them mixed up across a whole session). Each explanation
+  // cross-references the other three so they read as one disambiguated
+  // set rather than four isolated tooltips. A small circled-"?" icon
+  // (HELP_ICON_SVG, same glyph as the HUD's own (?) buttons) sits flush
+  // against the label, not wrapping the label itself and not wrapping the
+  // value either — unlike Category/header pieces, these rows show
+  // "Unknown" as often as a real value, and the icon needs to be there
+  // either way.
+  const IDENTITY_FIELD_EXPLANATIONS = {
+    operator: 'Operator — the airline or company flying this aircraft. Not necessarily who owns it (see Registered Owner).',
+    operatorCountry: 'Operator Country — the operating airline’s home country. Not the aircraft’s own country of registration (see Registration Country).',
+    registeredOwner: 'Registered Owner — the private or corporate entity the aircraft is registered to, which can differ from the airline actually flying it (e.g. leasing).',
+    registrationCountry: 'Registration Country — the country the aircraft itself is registered in (its ICAO nationality mark), not who operates or owns it (see Operator Country / Registered Owner).',
+  };
+  function identityHelp(key) {
+    return infoTipHtml(HELP_ICON_SVG, IDENTITY_FIELD_EXPLANATIONS[key]);
+  }
   // Category: compact "code · label" (or just "label" for OpenSky, which
   // has no short code of its own) — the parenthetical weight-range
   // explanation moves into the shared info-tip tooltip instead of showing
@@ -358,10 +394,10 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     identityRow('Manufacturer', info.manufacturer, 'manufacturer'),
     identityRow('Model', info.model, 'model'),
     identityRow('Year built', info.manufactureYear, 'manufactureYear'),
-    identityRow('Operator', operatorValue, 'operator'),
-    identityRow('Operator Country', operatorCountryValue, 'operatorCountry'),
-    identityRow('Registered Owner', registeredOwnerValue, 'registeredOwner'),
-    identityRow('Country', countryValue, 'originCountry'),
+    identityRow('Operator', operatorValue, 'operator', identityHelp('operator')),
+    identityRow('Operator Country', operatorCountryValue, 'operatorCountry', identityHelp('operatorCountry')),
+    identityRow('Registered Owner', registeredOwnerValue, 'registeredOwner', identityHelp('registeredOwner')),
+    identityRow('Registration Country', countryValue, 'originCountry', identityHelp('registrationCountry')),
     detailRow('Category', categoryValue, 'categoryDisplay'),
   ], 'identity');
   const position = renderGroup('Position', [

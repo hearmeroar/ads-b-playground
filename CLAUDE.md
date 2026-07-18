@@ -657,6 +657,26 @@ because photographer name and photo URL come from an external API.
     `syncMarkers()`, the unit-toggle and dev-mode-toggle handlers) now goes
     through one shared `renderSelectedDetails()` so none of them can drift
     out of sync with each other.
+  - **`loadIdentityEnrichment()`/`loadAdsbdb()` cross-pollination**: the two
+    are independent concurrent fetches kicked off together from
+    `selectAircraft()` (same pattern as `loadGallery()`/`loadAdsbdb()`
+    below) — neither sees the other's result by default. That means
+    `loadIdentityEnrichment()`'s local tables (`registration_prefix`/
+    `callsign_decode`) are blind to a registration/callsign that only
+    adsbdb resolved, since `/api/identity` is only ever called once, with
+    whatever the *live* feed had at click time. Found via a real aircraft
+    (`4X-ABS`, an Israir A320 with no live registration) whose Registration
+    Country stayed "Unknown" even though adsbdb went on to resolve its
+    tail number and `registration_prefix` could have used it. Fixed by
+    `maybeRefetchIdentityWithAdsbdbData(icao24, liveInfo, adsbdbData)`
+    (`sidebar-track.js`), called at the end of `loadAdsbdb()`'s success
+    path: if adsbdb resolved a registration or callsign the live feed
+    didn't have, it clears `enrichmentById`'s cached (mostly-empty) result
+    for that icao24 and re-runs `loadIdentityEnrichment()` with the new
+    value merged in — a second, better-informed `/api/identity` call. A
+    no-op whenever live already had a registration/callsign (the first
+    call already covered it) — this only recovers the specific gap where
+    adsbdb identified an aircraft the live feed couldn't.
   - **"Flywme"** is a new, separate synthetic source in `SOURCE_COLORS`/
     `SOURCE_DISPLAY_NAMES` (badged black), parallel to the six live sources
     — not a stand-in for anything. It represents "this application" as the
@@ -868,32 +888,47 @@ because photographer name and photo URL come from an external API.
     `Operator`). adsbdb is its only possible tier — no live feed or Flywme
     fallback exists for it — so it renders via `identityRow()` like
     Country/Operator/etc. (literal "Unknown" when unresolved, not a hidden
-    row). **`Country`, `Operator Country`, and `Registered Owner` are three
-    deliberately distinct concepts, never conflated, each with its own row
-    and its own flag** — `Operator` itself stays plain text with no flag at
-    all: Country means the aircraft's country of *registration* (ICAO
-    Annex 7 nationality mark — from live/`registration_prefix`/
-    `icao24_lookup` only), **Operator Country** (`info.operatorCountry` +
+    row). **`Registration Country`, `Operator Country`, and `Registered
+    Owner` are three deliberately distinct concepts, never conflated, each
+    with its own row and its own flag** — `Operator` itself stays plain
+    text with no flag at all: Registration Country means the aircraft's
+    country of *registration* (ICAO Annex 7 nationality mark — from
+    live/`registration_prefix`/`icao24_lookup` only; labeled "Country" in
+    an earlier version of this UI, renamed after a user repeatedly
+    confused it with operator/owner across a whole session — see the
+    tooltip note below), **Operator Country** (`info.operatorCountry` +
     `operatorCountryIso`, a brand new field/row, same treatment as
     Registered Owner) means the operating airline's home country, and
     Registered Owner means the private/corporate registrant's country.
     adsbdb's `registered_owner_country_name`/`registered_owner_country_iso_name`
-    fields feed *only* Registered Owner, never Country — an earlier version
-    of this code let them leak into Country too, which silently mixed
-    "who owns this plane" into a field meant to mean "where it's
-    registered"; fixed by scoping that adsbdb data to `registeredOwner`/
-    `registeredOwnerCountryIso` alone. Operator Country resolves through
-    two tiers: adsbdb's `flightroute.airline.country`/`country_iso` (name
-    and ISO given together, no reverse lookup needed) first, falling back
-    to `enrich_identity()`'s own `operator_country` field — a byproduct of
-    `callsign_decode`'s ICAO-designator lookup (`enrichment/callsign.py`),
-    which resolves `operator` and `operator_country` as two independently
-    sourced results from one table lookup, never smuggling the country
-    onto `operator` itself. Only a *live-sourced* Operator has no possible
-    Operator Country at all (no live feed reports an operator's home
-    country), which just means that row shows "Unknown" — the same known
-    limitation as Country's own flag on a live value with no
-    `countries.py` name match.
+    fields feed *only* Registered Owner, never Registration Country — an
+    earlier version of this code let them leak into Registration Country
+    too, which silently mixed "who owns this plane" into a field meant to
+    mean "where it's registered"; fixed by scoping that adsbdb data to
+    `registeredOwner`/`registeredOwnerCountryIso` alone. Operator Country
+    resolves through two tiers: adsbdb's `flightroute.airline.country`/
+    `country_iso` (name and ISO given together, no reverse lookup needed)
+    first, falling back to `enrich_identity()`'s own `operator_country`
+    field — a byproduct of `callsign_decode`'s ICAO-designator lookup
+    (`enrichment/callsign.py`), which resolves `operator` and
+    `operator_country` as two independently sourced results from one table
+    lookup, never smuggling the country onto `operator` itself. Only a
+    *live-sourced* Operator has no possible Operator Country at all (no
+    live feed reports an operator's home country), which just means that
+    row shows "Unknown" — the same known limitation as Registration
+    Country's own flag on a live value with no `countries.py` name match.
+    **Each of the four rows' labels** (Operator/Operator Country/
+    Registered Owner/Registration Country) **carries a click-to-toggle
+    `.info-tip`** (`IDENTITY_FIELD_EXPLANATIONS`, `static/js/
+    render-details.js`, same shared `#source-tooltip` mechanism as
+    Category/header pieces/route confidence — see "Unified tooltip
+    mechanism" below) whose text explicitly cross-references the other
+    three, so the four concepts read as one disambiguated set rather than
+    four isolated labels. Wraps the row's *label*, not its value — unlike
+    Category, these rows show "Unknown" as often as a real value
+    (`identityRow()`'s whole point), and the explanation needs to work
+    either way; always visible regardless of dev mode, same as every other
+    `.info-tip`, since knowing what a field means isn't a dev-only concern.
   - **Photo (`url_photo`/`url_photo_thumbnail`), last-resort only**: live
     checks against api.adsbdb.com (4+ real aircraft) found `url_photo` —
     the field that in theory points at a full-size image — **consistently

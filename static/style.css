@@ -242,6 +242,17 @@ html, body { margin: 0; padding: 0; height: 100%; }
   color: var(--ink);
 }
 #sidebar-details b { display: inline-block; min-width: 96px; color: var(--muted); font-weight: 600; }
+/* The four identity rows carrying a "(?)" icon (Operator/Operator Country/
+   Registered Owner/Registration Country) read as too heavy at the default
+   label weight once stacked with their own icons — a lighter weight and
+   slightly smaller size keeps them from visually dominating the group.
+   min-width:0/display:inline overrides the general #sidebar-details b rule
+   above so the icon sits flush against the label text itself, not pushed
+   past an invisible min-width box. The column-alignment min-width instead
+   moves to .identity-label-wrap (label + icon together, see below), so
+   values still line up the same way every other detailRow's value does. */
+#sidebar-details b.identity-label { font-weight: 500; font-size: 12px; min-width: 0; display: inline; }
+#sidebar-details .identity-label-wrap { display: inline-block; min-width: 96px; }
 #sidebar-details .emergency { color: #dc2626; font-weight: 700; }
 #sidebar-details .detail-group { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 #sidebar-details .detail-group:first-child { margin-top: 0; padding-top: 0; border-top: none; }
@@ -344,6 +355,15 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #sidebar-details .info-tip, #sidebar-route .info-tip, #sidebar-header .info-tip {
   cursor: pointer; border-bottom: 1px dotted var(--muted);
 }
+/* Icon-based triggers (the identity rows' circled-"?", HELP_ICON_SVG in
+   render-details.js) already read as clickable on their own — a dotted
+   underline under a circle icon looks like a rendering glitch, not an
+   affordance, so it's dropped specifically for those. */
+#sidebar-details .info-tip:has(svg) {
+  border-bottom: none; display: inline-flex; align-items: center;
+  vertical-align: -2px; color: #aab0b9; margin-left: 4px;
+}
+#sidebar-details .info-tip:has(svg):hover { color: var(--muted); }
 
 /* Dev-mode "all aircraft" table — a debugging aid. A tall, narrow vertical
    column (mirrors #sidebar's own footprint on the same left edge — #sidebar

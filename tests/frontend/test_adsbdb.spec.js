@@ -19,7 +19,7 @@ function rowText(page, label) {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
     let text = '';
-    let node = b.nextSibling;
+    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
     while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
       if (node.nodeType === 3) text += node.textContent;
       node = node.nextSibling;
@@ -32,7 +32,7 @@ function flagClassForLabel(page, label) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    let node = b.nextSibling;
+    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
     while (node) {
       if (node.nodeType === 1 && node.classList.contains('fi')) return node.className;
       if (node.nodeType === 1 && node.tagName === 'BR') break;
@@ -47,7 +47,7 @@ function badgeSourcesForLabel(page, label) {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
     const sources = [];
-    let node = b.nextSibling;
+    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
     while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
       if (node.nodeType === 1 && node.classList.contains('source-badge')) sources.push(node.dataset.source);
       node = node.nextSibling;
@@ -123,13 +123,13 @@ test('adsbdb fills Registered Owner, Operator and Route when the live feed has n
   await page.click('#toggle-dev-mode');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
-  expect(await rowText(page, 'Registered Owner:')).toBe('Falcon Landing LLC');
-  expect(await rowText(page, 'Operator:')).toBe('Unique Air');
+  expect(await rowText(page, 'Registered Owner')).toBe('Falcon Landing LLC');
+  expect(await rowText(page, 'Operator')).toBe('Unique Air');
   // Operator Country is adsbdb's flightroute.airline.country/country_iso —
   // its own dedicated row, not a flag riding on Operator's own row.
-  expect(await rowText(page, 'Operator Country:')).toBe('France');
-  expect(await flagClassForLabel(page, 'Operator Country:')).toBe('fi fi-fr');
-  expect(await flagClassForLabel(page, 'Operator:')).toBe(null);
+  expect(await rowText(page, 'Operator Country')).toBe('France');
+  expect(await flagClassForLabel(page, 'Operator Country')).toBe('fi fi-fr');
+  expect(await flagClassForLabel(page, 'Operator')).toBe(null);
   // Route is its own visual card now: big codes + small city names, not a
   // single combined "Name (CODE) → Name (CODE)" string.
   const routeText = await routeCardText(page);
@@ -138,15 +138,15 @@ test('adsbdb fills Registered Owner, Operator and Route when the live feed has n
   expect(routeText).toContain('DOH');
   expect(routeText).toContain('Hamad International Airport');
 
-  expect(await badgeSourcesForLabel(page, 'Registered Owner:')).toEqual(['adsbdb']);
-  expect(await badgeSourcesForLabel(page, 'Operator:')).toEqual(['adsbdb']);
-  expect(await badgeSourcesForLabel(page, 'Operator Country:')).toEqual(['adsbdb']);
+  expect(await badgeSourcesForLabel(page, 'Registered Owner')).toEqual(['adsbdb']);
+  expect(await badgeSourcesForLabel(page, 'Operator')).toEqual(['adsbdb']);
+  expect(await badgeSourcesForLabel(page, 'Operator Country')).toEqual(['adsbdb']);
   expect(await routeCardDevBadgeSources(page)).toEqual(['adsbdb']);
 
   // adsbdb's registered_owner_country_* describes the *owner's* country
   // (already shown via Registered Owner's own flag) — it must never leak
   // into the separate "Country" field, which means registration country.
-  expect(await rowText(page, 'Country:')).toBe('Unknown');
+  expect(await rowText(page, 'Registration Country')).toBe('Unknown');
 
   // Registration is already live (F-UNIQ from adsb.fi) — adsbdb's own
   // registration value for this aircraft must not override it. It's in
@@ -171,10 +171,10 @@ test('Flywme\'s own guess co-displays alongside adsbdb when both resolve the sam
   await page.waitForTimeout(100);
 
   // adsbdb's value is still what's displayed (higher priority)...
-  expect(await rowText(page, 'Operator:')).toBe('Unique Air');
+  expect(await rowText(page, 'Operator')).toBe('Unique Air');
   // ...but Flywme's own guess co-displays as a second badge, reflecting
   // the priority chain rather than silently disappearing.
-  expect(await badgeSourcesForLabel(page, 'Operator:')).toEqual(['adsbdb', 'flywme']);
+  expect(await badgeSourcesForLabel(page, 'Operator')).toEqual(['adsbdb', 'flywme']);
 });
 
 test('a live registration is never overwritten by adsbdb, even a contradicting one', async ({ page }) => {
@@ -204,7 +204,7 @@ test('Registered Owner shows literal "Unknown" when adsbdb has nothing, like oth
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Registered Owner: Unknown');
+  expect(sidebarText).toContain('Registered Owner? Unknown');
 });
 
 // adsbdb's url_photo consistently 404s in practice (verified live against
@@ -260,4 +260,52 @@ test('adsbdb\'s thumbnail is shown, at native size, only when no other photo exi
   // Rendered at native size from the start, not stretched-then-degraded.
   const wrapClass = await page.getAttribute('#sidebar-gallery .gallery-image-wrap', 'class');
   expect(wrapClass).toContain('native');
+});
+
+// Found via a real aircraft (4X-ABS, Israir) with no live registration —
+// loadIdentityEnrichment() and loadAdsbdb() are independent concurrent
+// fetches, so our own registration_prefix table never saw the tail number
+// adsbdb went on to resolve, and Registration Country stayed "Unknown"
+// even though "4X" -> Israel was resolvable all along. See
+// maybeRefetchIdentityWithAdsbdbData() in sidebar-track.js.
+test('a registration adsbdb resolves (but the live feed never had) triggers a second /api/identity lookup, filling Registration Country', async ({ page }) => {
+  await page.route('**/api/adsblol', (route) => route.fulfill({ json: { ac: [{
+    hex: 'ab1234',
+    // Deliberately no `r` (registration) and no `flight` (callsign) — the
+    // live feed has nothing to identify this aircraft by.
+    t: 'A320', desc: 'AIRBUS A-320', alt_baro: 9000, gs: 100, track: 90,
+    category: 'A3', squawk: '5000', lat: 44.1, lon: 21.1,
+  }] } }));
+  await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
+    aircraft: {
+      type: 'A320 232', icao_type: 'A320', manufacturer: 'Airbus', mode_s: 'AB1234',
+      registration: '4X-ABS', registered_owner_country_iso_name: null,
+      registered_owner_country_name: null, registered_owner_operator_flag_code: null,
+      registered_owner: null, url_photo: null, url_photo_thumbnail: null,
+    },
+    flightroute: null,
+  } }));
+
+  // Override the default all-null /api/identity mock with a passthrough to
+  // the real backend (this app's Flask server, running enrich_identity()
+  // for real, including its registration_prefix table) while recording
+  // every request's query string.
+  const identityRequests = [];
+  await page.route('**/api/identity/**', (route) => {
+    identityRequests.push(new URL(route.request().url()).search);
+    route.continue();
+  });
+
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, 'ab1234', 'adsblol');
+
+  await page.waitForFunction(() =>
+    document.querySelector('#sidebar-details')?.textContent.includes('Israel'));
+
+  expect(identityRequests.length).toBe(2);
+  expect(identityRequests[0]).not.toContain('registration=');
+  expect(identityRequests[1]).toContain('registration=4X-ABS');
+  expect(await rowText(page, 'Registration Country')).toBe('Israel');
+  expect(await flagClassForLabel(page, 'Registration Country')).toBe('fi fi-il');
 });
