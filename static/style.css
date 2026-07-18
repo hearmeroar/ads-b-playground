@@ -36,11 +36,11 @@ html, body { margin: 0; padding: 0; height: 100%; }
    scrollable overflow, so scrolling to the very end would butt the card
    straight against the bottom edge with no gap, unlike the 14px it starts
    with at the top. This invisible pseudo-element extends #hud's own box
-   (which *does* count) — sized larger than that top gap (21px, ~1.5x) per
-   the project owner's preference, not a mirror-exact match. */
+   (which *does* count) — sized larger than that top gap per the project
+   owner's preference, not a mirror-exact match. */
 #hud::after {
   content: ''; display: block; position: absolute; top: 100%; left: 0;
-  height: 21px; width: 1px;
+  height: 28px; width: 1px;
 }
 
 #hud .count-row { display: flex; align-items: baseline; gap: 7px; }
