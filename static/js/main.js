@@ -1,3 +1,62 @@
+// --- Dev-mode "all aircraft" table ---
+const devAircraftPanel = document.getElementById('dev-aircraft-panel');
+const devAircraftTbody = document.getElementById('dev-aircraft-tbody');
+const devAircraftCountEl = document.getElementById('dev-aircraft-count');
+
+// A compact, narrow, vertically-scrolling list of every aircraft currently
+// on the map (any enabled source), refreshed alongside the HUD counts each
+// poll while dev mode is on — a tall column rather than a short wide bar,
+// so many single-line rows are visible at once. Shows the same
+// Identity-group fields the sidebar does, including Route, via the same
+// buildMergedDetails() merge a click would use — but reads only
+// already-cached adsbdb/Flywme data rather than triggering new fetches for
+// every visible aircraft (lazy-on-click stays lazy; a row for an aircraft
+// never clicked this session just shows its live-only fields, same as the
+// sidebar would before that click). Built from each enabled source's own
+// marker map (not detailsById directly), since detailsById entries are
+// never removed for aircraft that left the map/a disabled source, while
+// marker maps are — so this only ever lists what's actually visible now.
+// Only the 5 narrowest/most-scannable fields get their own column (ICAO,
+// Callsign, Registration, Type, Route); Operator/Country/Category are
+// still there, just folded into the row's `title` tooltip rather than
+// widening the panel — the point of this view is a quick scan + click to
+// drill into the full sidebar, not replacing it.
+function renderDevAircraftTable() {
+  const rows = [];
+  for (const name of Object.keys(sourceToggles)) {
+    if (!isSourceEnabled(name)) continue;
+    for (const id of markerMapsBySource[name].keys()) {
+      rows.push({ id, info: buildMergedDetails(id).info });
+    }
+  }
+  devAircraftCountEl.textContent = rows.length + ' aircraft';
+  devAircraftTbody.innerHTML = '';
+  for (const { id, info } of rows) {
+    const tr = document.createElement('tr');
+    const route = info.originAirport && info.destinationAirport
+      ? info.originAirport + ' → ' + info.destinationAirport
+      : '';
+    // FlightAware aircraft carry no icao24 (flight-centric, not
+    // transponder-centric) — fall back to their own id (fa_flight_id) so
+    // the row still has something identifying in that column.
+    const icao = info.icao24 ? info.icao24.toUpperCase() : id;
+    const title = [
+      info.operator ? 'Operator: ' + info.operator : null,
+      info.originCountry ? 'Country: ' + info.originCountry : null,
+      info.categoryDisplay ? 'Category: ' + info.categoryDisplay : null,
+    ].filter(Boolean).join(' | ');
+    const cells = [icao, info.callsign || '', info.registration || '', info.aircraftType || '', route];
+    for (const value of cells) {
+      const td = document.createElement('td');
+      td.textContent = value;
+      if (title) td.title = title;
+      tr.appendChild(td);
+    }
+    tr.addEventListener('click', () => selectAircraft(id));
+    devAircraftTbody.appendChild(tr);
+  }
+}
+
 // --- Polling ---
 
 for (const name of Object.keys(sourceToggles)) {
@@ -353,6 +412,7 @@ async function poll() {
   }
 
   updateCounts(counts);
+  if (currentDevMode) renderDevAircraftTable();
 
   // Do not spend OpenSky track credits every 12 seconds for an already-open
   // sidebar. When its historical endpoint is unavailable, keep the local

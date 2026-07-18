@@ -190,6 +190,17 @@ html, body { margin: 0; padding: 0; height: 100%; }
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
 #sidebar.open { transform: translateX(0); }
+/* While the dev-mode aircraft table is showing, the sidebar docks to its
+   right instead of on top of it (368px = the table's own 14px inset +
+   340px width + 14px gap) — both stay visible/usable at once rather than
+   the sidebar (higher z-index) simply covering the table when an aircraft
+   is selected. */
+#sidebar.dev-shifted { left: 368px; }
+/* The closed-state translateX distance (calc(-100% - 14px) normally) is
+   calibrated to fully clear the sidebar's own `left` offset — with
+   dev-shifted's larger left:368px, that same distance would leave it
+   partially on-screen while "closed", so it needs its own larger offset. */
+#sidebar.dev-shifted:not(.open) { transform: translateX(calc(-100% - 368px)); }
 #sidebar-close {
   position: absolute; top: 10px; right: 10px; z-index: 2;
   width: 28px; height: 28px; border-radius: 50%; border: none;
@@ -247,6 +258,54 @@ html, body { margin: 0; padding: 0; height: 100%; }
   color: var(--ink); pointer-events: none;
 }
 #source-tooltip[hidden] { display: none; }
+
+/* Dev-mode "all aircraft" table — a debugging aid. A tall, narrow vertical
+   column (mirrors #sidebar's own footprint on the same left edge — #sidebar
+   sits above it, z-index-wise, and simply covers it while a specific
+   aircraft is open) rather than a short wide bar, so many single-line rows
+   are visible at once instead of just a handful. Columns are kept narrow
+   with ellipsis truncation rather than dropped, so the full Identity-field
+   breadth (including Route) still fits without wrapping or horizontal
+   scroll. */
+#dev-aircraft-panel {
+  position: absolute; left: 14px; top: 14px; bottom: 14px; z-index: 1100;
+  width: 340px; max-width: 82vw;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+  font: 11px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  color: var(--ink);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+#dev-aircraft-panel-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 10px 14px; font-weight: 600; flex: none;
+  border-bottom: 1px solid var(--border);
+}
+#dev-aircraft-count { color: var(--muted); font-weight: 500; }
+#dev-aircraft-panel-scroll { overflow: auto; }
+#dev-aircraft-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+#dev-aircraft-table th, #dev-aircraft-table td {
+  text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--border);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#dev-aircraft-table thead th {
+  position: sticky; top: 0; background: var(--card-bg);
+  color: var(--muted); font-weight: 600;
+}
+/* Fixed narrow widths for the short fields, leaving Route (the most
+   variable-length one) to take whatever's left. */
+#dev-aircraft-table col.icao { width: 15%; }
+#dev-aircraft-table col.callsign { width: 15%; }
+#dev-aircraft-table col.reg { width: 15%; }
+#dev-aircraft-table col.type { width: 15%; }
+#dev-aircraft-table col.route { width: 40%; }
+#dev-aircraft-table tbody tr { cursor: pointer; }
+#dev-aircraft-table tbody tr:hover { background: rgba(15, 23, 42, 0.05); }
+#dev-aircraft-table tbody td[title] { cursor: help; }
 
 /* Photo gallery */
 .gallery-image-wrap {

@@ -84,8 +84,12 @@ test('a field reported by only one source shows exactly one badge, with a click-
   expect(await page.getAttribute('#source-tooltip', 'hidden')).toBeNull();
   expect(await page.textContent('#source-tooltip')).toBe('OpenSky');
 
-  // Clicking elsewhere closes it.
-  await page.click('#map');
+  // Clicking elsewhere closes it. A plain center click would now land on
+  // the sidebar itself — dev mode docks it to the right of the "all
+  // aircraft" table (#sidebar.dev-shifted), so both stay visible/usable
+  // together — so this targets open map area between that table+sidebar
+  // pair (left) and #hud (right) instead.
+  await page.click('#map', { position: { x: 850, y: 360 } });
   await page.waitForTimeout(100);
   expect(await page.getAttribute('#source-tooltip', 'hidden')).not.toBeNull();
 });

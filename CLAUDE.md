@@ -375,6 +375,46 @@ because photographer name and photo URL come from an external API.
   reduces to exactly today's hide-when-empty behavior, so dev mode is
   strictly opt-in with zero effect on the default view.
 
+  **"All aircraft" table** (`#dev-aircraft-panel`, `renderDevAircraftTable()`
+  in `main.js`): a second dev-mode-only panel, alongside the sidebar-only
+  behavior above — a compact, narrow, vertically-scrolling list of every
+  aircraft currently on the map (any enabled source), one line each,
+  showing ICAO/Callsign/Registration/Type/Route (Operator/Country/Category
+  are still there, just folded into the row's `title` tooltip rather than
+  widening the panel). Deliberately a *tall narrow column* (mirrors
+  `#sidebar`'s own footprint on the same left edge, which simply covers it
+  via z-index while a specific aircraft's sidebar is open) rather than a
+  short wide bar, so many rows are visible at once instead of a handful —
+  an earlier wide-table version was reworked into this shape specifically
+  for that reason. Built from each enabled source's own marker map (`for
+  (const id of markerMapsBySource[name].keys())`), **not** `detailsById`
+  directly — `detailsById` entries are never removed for an aircraft that
+  left the map or whose source got disabled, while marker maps are cleared
+  correctly each poll (`clearStaleMarkers`/`clearAllMarkers`), so building
+  the list from `detailsById`'s own keys would show stale ghosts. Each
+  row's fields come from `buildMergedDetails(id)` — the exact same merge a
+  click would produce — but this reads only whatever's *already* cached
+  (adsbdb/Flywme are still lazy-on-click everywhere, this table doesn't
+  special-case itself into forcing new fetches for 50+ visible aircraft at
+  once): a row for an aircraft never clicked this session shows only its
+  live-only fields until it is. Refreshed alongside `updateCounts()` at
+  the end of every `poll()` while `currentDevMode` is on, and once
+  immediately when dev mode is switched on. Clicking a row calls
+  `selectAircraft(id)` — same as clicking the marker itself.
+
+  **`#sidebar.dev-shifted`**: while dev mode is on, `#sidebar` docks to
+  `left: 368px` (the table's own 14px inset + 340px width + 14px gap)
+  instead of its usual `left: 14px` — otherwise it (higher z-index) simply
+  covers the table the moment an aircraft is selected, defeating the point
+  of having both open at once. The closed-state `translateX` distance is
+  calibrated against the *default* `left: 14px` (moves it exactly its own
+  width + 14px further left, landing it just off-screen) — `dev-shifted`
+  needs its own larger closed-state transform (`calc(-100% - 368px)`) or
+  the sidebar would sit partially back on-screen while "closed" once its
+  `left` grew to 368px. Toggled by the same `devModeToggle` handler that
+  shows/hides `#dev-aircraft-panel` and `#source-adsbdb`
+  (`static/js/state-filters.js`).
+
   The hard part is that **no part of the pipeline otherwise tracks which
   source populated a given field** — `normalizeOpenSky`/
   `normalizeAdsbExchange`/`normalizeFlightAware` return plain flat objects,
@@ -1068,6 +1108,16 @@ because photographer name and photo URL come from an external API.
   mode off, and dev mode's badge tooltip contains the band name and score.
   Uses `aaaaaa` (`states.json`) — its live lat/lon/track/speed/altitude are
   the "current state" fed into every check.
+- `test_dev_aircraft_table.spec.js` covers the "All aircraft" dev-mode
+  panel: hidden by default and appears with one row per currently-visible
+  aircraft (9, the default fixture total also asserted in
+  `test_filters.spec.js`) once dev mode is on; a row shows the sidebar's
+  own Identity fields including Route once resolved (and correctly shows
+  nothing yet for a never-clicked aircraft, proving the table doesn't force
+  new adsbdb fetches); clicking a row calls `selectAircraft()` exactly like
+  clicking the marker; and disabling a source drops its rows from the
+  table (verifies the list is built from live marker maps, not the
+  never-pruned `detailsById`).
 
 ## SVG Icon Rendering
 

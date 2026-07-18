@@ -62,7 +62,9 @@ later if a real need for it shows up.
   a value for the same field, every one of them gets its own dot — not
   just whichever value ended up displayed — so you can see at a glance how
   many sources agree on an aircraft's data. Click a dot for a tooltip
-  naming its source.
+  naming its source. Also adds a compact "All aircraft" table — a narrow,
+  scrollable list of every visible aircraft's ICAO/callsign/registration/
+  type/route, one line each, click any row to open its full sidebar.
 - **Identity enrichment** — fills gaps the live feeds leave (country,
   operator, manufacturer/model, year built) from small local lookup tables
   (registration-prefix nationality marks, a placeholder ICAO24 database,

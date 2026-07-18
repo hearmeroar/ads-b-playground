@@ -22,6 +22,27 @@
 
 <div id="source-tooltip" hidden></div>
 
+<div id="dev-aircraft-panel" style="display:none">
+  <div id="dev-aircraft-panel-header">
+    <span>All aircraft (dev mode)</span>
+    <span id="dev-aircraft-count"></span>
+  </div>
+  <div id="dev-aircraft-panel-scroll">
+    <table id="dev-aircraft-table">
+      <colgroup>
+        <col class="icao"><col class="callsign"><col class="reg">
+        <col class="type"><col class="route">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>ICAO</th><th>C/S</th><th>Reg</th><th>Type</th><th>Route</th>
+        </tr>
+      </thead>
+      <tbody id="dev-aircraft-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
 <div id="hud">
   <div class="count-row">
     <span class="live-dot"></span>
