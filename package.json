@@ -6,6 +6,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
-    "flag-icons": "^7.5.0"
+    "flag-icons": "^7.5.0",
+    "leaflet": "^1.9.4"
   }
 }

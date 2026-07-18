@@ -133,6 +133,10 @@ A handful of plain files carry all the logic:
 - `static/flag-icons/` — the [flag-icons](https://github.com/lipis/flag-icons)
   SVG library (CSS + `flags/4x3/`), vendored as plain files (via `npm install
   flag-icons` then a one-time copy — no runtime npm dependency, no build step).
+- `static/leaflet/` — [Leaflet](https://leafletjs.com) 1.9.4 (`leaflet.js`,
+  `leaflet.css`, `images/`, `LICENSE`), vendored the same way instead of
+  loading from the unpkg CDN, so the map works without third-party uptime
+  (and the Playwright suite runs without touching the network).
 
 Alongside them, `schema/aircraft.schema.json` documents the normalized
 aircraft shape the sidebar renders — every field, with the raw source field

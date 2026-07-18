@@ -19,7 +19,12 @@ execution order), so their `<script>` order in `index.html` is load-bearing:
 `map-init` → `constants` → `state-filters` → `sidebar-track` → `icons` →
 `render-details` → `parsers` → `main`. Where this file says
 "`static/index.html`" about a JS function, read "the frontend JS" — the
-function now lives in one of those `static/js/*.js` files.
+function now lives in one of those `static/js/*.js` files. Leaflet 1.9.4
+itself is vendored at `static/leaflet/` (`leaflet.js` + `leaflet.css` +
+`images/` + `LICENSE`, copied from the npm package the same way
+`static/flag-icons/` is) rather than loaded from the unpkg CDN — the map
+keeps working with no third-party uptime dependency, and the Playwright
+suite no longer needs network access for the page to boot.
 The `enrichment/` package (see Identity enrichment below) is the one
 exception to "`app.py` is the whole backend" — a small set of local static
 lookup modules, still no framework/database, just organized into their own
