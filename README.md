@@ -70,6 +70,9 @@ later if a real need for it shows up.
   (Light, Dark, Voyager, Streets, Satellite, Terrain, Physical, Terrain
   Base, Hillshade — including a proper elevation-tint relief map) from a
   HUD dropdown.
+- **Weather radar overlay** — an off-by-default HUD toggle overlays a
+  live precipitation radar composite via [RainViewer](https://www.rainviewer.com/)
+  (free, no API key), refreshed every ~5 minutes.
 - **Icons by category** — each aircraft category (fixed-wing weight classes,
   rotorcraft, glider, lighter-than-air, parachutist, ultralight, UAV) renders
   with its own distinct SVG silhouette from the

@@ -110,6 +110,32 @@ scanRadiusToggle.addEventListener('change', () => {
   if (scanRadiusToggle.checked) scanRadiusLayer.addTo(map);
   else map.removeLayer(scanRadiusLayer);
 });
+
+// Same custom-dropdown pattern as #basemap-filter/#category-filter.
+// setWeatherMode() (map-init.js) owns starting/stopping the refresh
+// interval and adding/removing the tile layer — purely presentational,
+// no poll() retrigger, like the basemap picker.
+const weatherDropdown = document.getElementById('weather-filter');
+const weatherTrigger = weatherDropdown.querySelector('.dropdown-trigger');
+const weatherValueWrap = weatherDropdown.querySelector('.dropdown-value-wrap');
+const weatherOptions = weatherDropdown.querySelectorAll('.dropdown-option');
+
+weatherTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  weatherDropdown.classList.toggle('open');
+});
+weatherOptions.forEach((opt) => {
+  opt.addEventListener('click', () => {
+    weatherOptions.forEach((o) => o.classList.remove('active'));
+    opt.classList.add('active');
+    const mode = opt.dataset.value;
+    setWeatherMode(mode);
+    weatherValueWrap.innerHTML = '<span class="dropdown-value">' + opt.textContent + '</span>';
+    weatherDropdown.classList.remove('open');
+  });
+});
+document.addEventListener('click', () => weatherDropdown.classList.remove('open'));
+
 const GROUND_VEHICLE_MARKERS = new Set(['TWR']);
 const GROUND_VEHICLE_CALLSIGN_RE = /^[A-Z]{4}\d{2}$/;
 function looksLikeGroundVehicle({ category, registration, aircraftType, callsign }) {

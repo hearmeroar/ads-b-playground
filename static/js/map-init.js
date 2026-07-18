@@ -189,3 +189,76 @@ function setBaseLayer(key) {
   currentBaseLayerKey = key;
   map.addLayer(baseLayers[currentBaseLayerKey]);
 }
+
+// Weather radar overlay — RainViewer (https://www.rainviewer.com/api.html),
+// free, no API key, and (confirmed via curl -I) sends
+// Access-Control-Allow-Origin: * on both its discovery JSON and its tile
+// images. That's the actual reason every other source in this app goes
+// through a backend proxy (OpenSky sends no CORS headers at all) — since
+// RainViewer already sends an open one, calling it straight from the
+// browser follows the same rule as everywhere else, not an exception to it.
+// Off by default (#weather-filter in state-filters.js, same supplementary-
+// display-toggle convention as scan-radius rings).
+//
+// Dedicated pane, not the default tilePane: base layers (map-init.js's
+// baseLayers) also live in tilePane, and Leaflet stacks same-pane layers
+// by add order — switching basemaps calls map.addLayer() on the newly
+// chosen one *after* the weather layer was already added, which silently
+// buried the radar under the new base tiles (looked like the weather
+// layer "disappeared" on every basemap switch). A pane between tilePane
+// (200) and overlayPane (400, scan-radius rings) fixes this regardless of
+// which basemap is active or when it was switched.
+map.createPane('weatherPane');
+map.getPane('weatherPane').style.zIndex = 350;
+
+const RAINVIEWER_ATTRIBUTION = 'Weather &copy; <a href="https://www.rainviewer.com">RainViewer</a>';
+// RainViewer's radar tiles genuinely stop at native zoom 7 — confirmed by
+// fetching actual tile bytes (not just the HTTP status, which is 200
+// either way): past zoom 7 the server returns a real, valid, ~1-3KB PNG
+// that just reads "Zoom Level Not Supported" in gray text, at both the
+// 256 and 512 tileSize options. maxNativeZoom stops Leaflet from ever
+// requesting z>7 (it upscales the z=7 tile instead), while maxZoom stays
+// 19 so the layer still renders at the map's actual max zoom, just blurry
+// past z=7 rather than showing that placeholder image.
+const WEATHER_MODES = {
+  radar: { label: 'Precipitation', framesKey: 'past' },
+  nowcast: { label: 'Forecast', framesKey: 'nowcast' },
+};
+let weatherLayer = null;
+let currentWeatherMode = 'off'; // 'off' | 'radar' | 'nowcast'
+let weatherRefreshTimer = null;
+
+function refreshWeatherRadar() {
+  fetch('https://api.rainviewer.com/public/weather-maps.json')
+    .then((resp) => resp.json())
+    .then((data) => {
+      if (currentWeatherMode === 'off') return; // switched off while this fetch was in flight
+      const modeCfg = WEATHER_MODES[currentWeatherMode];
+      const frames = data && data.radar && data.radar[modeCfg.framesKey];
+      if (weatherLayer) { map.removeLayer(weatherLayer); weatherLayer = null; }
+      if (!frames || !frames.length) return; // e.g. nowcast frames aren't always published
+      const latest = frames[frames.length - 1];
+      const url = 'https://tilecache.rainviewer.com' + latest.path + '/256/{z}/{x}/{y}/2/1_1.png';
+      weatherLayer = L.tileLayer(url, {
+        attribution: RAINVIEWER_ATTRIBUTION, opacity: 0.6,
+        maxZoom: 19, maxNativeZoom: 7, pane: 'weatherPane',
+      });
+      weatherLayer.addTo(map);
+    })
+    .catch(() => {}); // a failed refresh just leaves the last-good frame showing
+}
+
+// RainViewer's own composite updates roughly every 10 minutes; polling
+// every 5 keeps the displayed frame from ever being too stale without
+// hammering it. Only runs while a mode other than 'off' is selected.
+function setWeatherMode(mode) {
+  currentWeatherMode = mode;
+  clearInterval(weatherRefreshTimer);
+  weatherRefreshTimer = null;
+  if (mode === 'off') {
+    if (weatherLayer) { map.removeLayer(weatherLayer); weatherLayer = null; }
+    return;
+  }
+  refreshWeatherRadar();
+  weatherRefreshTimer = setInterval(refreshWeatherRadar, 5 * 60 * 1000);
+}

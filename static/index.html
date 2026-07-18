@@ -218,6 +218,25 @@
   </div>
 
   <div class="filter-block">
+    <div class="filter-title">Weather</div>
+    <div class="dropdown" id="weather-filter">
+      <button type="button" class="dropdown-trigger">
+        <span class="dropdown-value-wrap">
+          <span class="dropdown-value">Off</span>
+        </span>
+        <svg class="dropdown-caret" width="10" height="6" viewBox="0 0 10 6">
+          <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="dropdown-menu">
+        <div class="dropdown-option active" data-value="off">Off</div>
+        <div class="dropdown-option" data-value="radar" title="Live precipitation radar composite (RainViewer, refreshed every ~5 min)">Precipitation</div>
+        <div class="dropdown-option" data-value="nowcast" title="Short-range precipitation forecast (RainViewer nowcast — not always available)">Forecast</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-block">
     <div class="source-row">
       <span class="source-name">Dev mode</span>
       <button type="button" class="source-help" id="dev-mode-help" aria-label="What does dev mode show?">
