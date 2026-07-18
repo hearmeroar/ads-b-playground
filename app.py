@@ -39,7 +39,9 @@ Backend responsibilities:
 import json
 import os
 import re
+import threading
 import time
+from collections import deque
 from urllib.parse import quote
 
 import requests
@@ -686,7 +688,7 @@ def api_photo2_hex(icao24):
     return fetch_airportdata("hex", icao24, count, registration=registration)
 
 
-def fetch_adsbdb(icao24, callsign):
+def _resolve_adsbdb(icao24, callsign):
     """Combined aircraft + flightroute lookup in a single upstream request
     (adsbdb supports a `?callsign=` query param on the aircraft endpoint
     that returns both objects together — no separate /v0/airline/ call is
@@ -695,10 +697,15 @@ def fetch_adsbdb(icao24, callsign):
     given callsign's route are stable facts, not live telemetry that goes
     stale. A network error/5xx is deliberately left uncached so a later
     click can retry; an "unknown aircraft" 404 is cached as an empty result
-    since that's a stable answer too."""
+    since that's a stable answer too.
+
+    Returns a plain (result_dict, status_code) tuple rather than a Flask
+    response — this is what lets the background identity-backfill worker
+    (a plain thread, no request/app context) call it directly. fetch_adsbdb()
+    below is the thin Flask-facing wrapper around this."""
     cache_key = f"{icao24}:{callsign or ''}"
     if cache_key in _adsbdb_cache:
-        return jsonify(_adsbdb_cache[cache_key])
+        return _adsbdb_cache[cache_key], 200
 
     url = f"{ADSBDB_BASE}/aircraft/{quote(icao24, safe='')}"
     params = {"callsign": callsign} if callsign else None
@@ -709,7 +716,7 @@ def fetch_adsbdb(icao24, callsign):
         if resp.status_code == 404:
             result = {"aircraft": None, "flightroute": None}
             _adsbdb_cache[cache_key] = result
-            return jsonify(result)
+            return result, 200
 
         resp.raise_for_status()
         payload = resp.json().get("response", {})
@@ -720,16 +727,93 @@ def fetch_adsbdb(icao24, callsign):
         _adsbdb_cache[cache_key] = result
         if result["aircraft"]:
             _update_identity_cache(icao24, result["aircraft"])
-        return jsonify(result)
+        return result, 200
 
     except requests.RequestException as exc:
-        return jsonify({"aircraft": None, "flightroute": None, "error": str(exc)}), 502
+        return {"aircraft": None, "flightroute": None, "error": str(exc)}, 502
+
+
+def fetch_adsbdb(icao24, callsign):
+    result, status = _resolve_adsbdb(icao24, callsign)
+    return jsonify(result), status
 
 
 @app.route("/api/adsbdb/<icao24>")
 def api_adsbdb(icao24):
     callsign = request.args.get("callsign") or None
     return fetch_adsbdb(icao24, callsign)
+
+
+# --- Background identity backfill ---
+# Resolves identity for aircraft this tracker actually sees, without
+# waiting for a marker click and without a bulk download from adsbdb (it
+# has none — only a per-ICAO24 endpoint). Reuses the OpenSky/radius-source
+# caches the frontend's own poll cycle already keeps warm, so this needs no
+# new frontend request and no separate "what's visible" bookkeeping.
+IDENTITY_BACKFILL_INTERVAL = float(os.environ.get("IDENTITY_BACKFILL_INTERVAL", 5.0))
+_backfill_queue = deque()
+
+
+def _collect_visible_icao24s():
+    """Every icao24 currently sitting in the already-warm OpenSky/radius-
+    source caches (populated by the frontend's own poll, not fetched here).
+    FlightAware's cache is skipped — it's flight-centric, no ICAO24 field
+    (see CLAUDE.md's FlightAware section)."""
+    visible = set()
+    states_data = _cache["data"]
+    if states_data and states_data.get("states"):
+        for state in states_data["states"]:
+            if state and state[0]:
+                visible.add(state[0].lower())
+    for cfg in RADIUS_SOURCES.values():
+        payload = cfg["cache"]["data"]
+        if payload and payload.get("ac"):
+            for aircraft in payload["ac"]:
+                hex_id = aircraft.get("hex")
+                if hex_id:
+                    visible.add(hex_id.lower())
+    return visible
+
+
+def _identity_backfill_tick():
+    """One step of the background worker: resolve at most one not-yet-
+    cached aircraft. Refills _backfill_queue from the currently-visible set
+    whenever it runs dry, rather than recomputing candidates every tick."""
+    if not _backfill_queue:
+        candidates = _collect_visible_icao24s() - set(_identity_cache.keys())
+        _backfill_queue.extend(sorted(candidates))
+    if not _backfill_queue:
+        return
+    icao24 = _backfill_queue.popleft()
+    if icao24 in _identity_cache:
+        return  # resolved via a real click since being queued
+    _resolve_adsbdb(icao24, None)  # no callsign needed — aircraft-only lookup
+
+
+def _should_start_background_thread():
+    """Flask's debug-mode reloader re-execs the whole process: a "watcher"
+    parent (app.debug True, WERKZEUG_RUN_MAIN unset) that only monitors
+    files, and a child that actually serves requests (WERKZEUG_RUN_MAIN=
+    "true"). Starting the background thread unconditionally would start it
+    twice — once uselessly in the watcher. Without the reloader (debug=False,
+    e.g. a production WSGI server), there is no watcher process at all, so
+    it should just start normally."""
+    return not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+
+
+def _start_identity_backfill_thread():
+    if IDENTITY_BACKFILL_INTERVAL <= 0 or not _should_start_background_thread():
+        return
+
+    def _loop():
+        while True:
+            try:
+                _identity_backfill_tick()
+            except Exception:
+                pass  # a transient bug here must never kill the worker
+            time.sleep(IDENTITY_BACKFILL_INTERVAL)
+
+    threading.Thread(target=_loop, daemon=True, name="identity-backfill").start()
 
 
 def _count_identity_history():
@@ -775,6 +859,14 @@ def api_identity(icao24):
 
 
 if __name__ == "__main__":
+    # app.debug isn't actually set to True until app.run(debug=True) starts
+    # executing — _should_start_background_thread() needs to see the value
+    # app.run() is about to use, not Flask's pre-run default of False, so
+    # it's set explicitly here first (app.run() below just confirms the
+    # same value).
+    app.debug = True
+    _start_identity_backfill_thread()
+
     # Port is configurable (PORT env var) so the test suite can run on a
     # different one — 5000 is macOS's AirPlay Receiver port by default, which
     # can confuse a health-checking test runner even though Flask itself

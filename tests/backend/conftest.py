@@ -43,6 +43,7 @@ def reset_caches(monkeypatch, tmp_path):
     # too, same rationale as the TRACK_CACHE_FILE redirect above.
     monkeypatch.setattr(app, "IDENTITY_CACHE_FILE", str(tmp_path / "identity_cache.json"))
     monkeypatch.setattr(app, "IDENTITY_HISTORY_FILE", str(tmp_path / "identity_history.jsonl"))
+    app._backfill_queue.clear()
     yield
 
 

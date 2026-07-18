@@ -371,11 +371,18 @@ because photographer name and photo URL come from an external API.
   This shape is formally documented in `schema/aircraft.schema.json`
   (47+ fields, raw source field names/units per property), including a
   7th sidebar group beyond the six above — **Signal & Data Quality**
-  (adsb.fi/airplanes.live-only: `operator`, `manufactureYear`, `dbFlags`,
-  `messageType`, `adsbVersion`, and the DO-260B NIC/NACp/NACv/SIL/GVA/SDA
-  accuracy fields — no OpenSky equivalents, confirmed against live API
-  responses), plus **two new fields unique to FlightAware**: `originAirport`
-  and `destinationAirport` (displayed as "Route" in the Identity group,
+  (adsb.fi/airplanes.live-only: `dbFlags`, `messageType`, `adsbVersion`, and
+  the DO-260B NIC/NACp/NACv/SIL/GVA/SDA accuracy fields — no OpenSky
+  equivalents, confirmed against live API responses). `operator` and
+  `manufactureYear` are *not* in this group despite being adsb.fi/
+  airplanes.live-only raw fields too — they render inside the **Identity**
+  group instead, via the `identityRow()` closure (`static/js/
+  render-details.js`) shared with Country/Manufacturer/Model/Registered
+  Owner, since all of those are enrichment-fillable fields that show the
+  literal word "Unknown" rather than hiding the row (see Identity
+  enrichment below). Plus **two new fields unique to FlightAware**:
+  `originAirport` and `destinationAirport` (displayed as "Route" in the
+  Identity group,
   `"Catania-Fontanarossa Airport (CTA) → Belgrade Nikola Tesla Int'l (BEG)"`). `trackDeg` falls back to adsb.fi/airplanes.live's
   `calc_track` when `track` is absent (observed on military aircraft).
   `icao24` (the transponder hex address — already the Map key every marker
@@ -685,9 +692,10 @@ because photographer name and photo URL come from an external API.
   their read API can use.
   - **Persistent aircraft-identity cache** (`_identity_cache`,
     `IDENTITY_CACHE_FILE`/`.aircraft_identity_cache.json`,
-    `IDENTITY_HISTORY_FILE`/`.identity_history.jsonl`): a backend-only,
-    side-effect persistence layer with **no API route and no frontend
-    surface** — the deliberately narrow slice of a much broader "aircraft
+    `IDENTITY_HISTORY_FILE`/`.identity_history.jsonl`): a backend-only
+    side-effect persistence layer (its only frontend-visible surface is
+    the dev-mode stats line below, not a full API) — the deliberately
+    narrow slice of a much broader "aircraft
     identity intelligence layer" idea (persistent identity + history +
     observations graph) discussed and rejected at that full scope for this
     project (no ground truth registry to validate confidence against, no
@@ -726,6 +734,41 @@ because photographer name and photo URL come from an external API.
     in-memory counter that could drift) — for the dev-mode-only frontend
     panel below. Deliberately uncached, same rationale as
     `/api/identity/<icao24>` itself.
+  - **Background identity backfill** (`_collect_visible_icao24s()`,
+    `_backfill_queue`, `_identity_backfill_tick()`,
+    `_start_identity_backfill_thread()`): the cache above only ever grew
+    from a real marker click — this passively resolves identity for
+    aircraft the tracker actually sees, without waiting for a click and
+    without a bulk download (adsbdb has none — only the per-ICAO24 endpoint
+    above, so scraping its whole database via speculative requests would
+    be out of scope/impolite, same posture as every other proxied source
+    here). `_collect_visible_icao24s()` doesn't fetch anything new — it
+    just reads the icao24/`hex` values already sitting in `_cache["data"]`
+    (OpenSky) and each `RADIUS_SOURCES[*]["cache"]["data"]` (the four
+    radius sources), which the frontend's own poll cycle keeps warm anyway;
+    FlightAware's cache is skipped (flight-centric, no ICAO24 field).
+    `_identity_backfill_tick()` refills `_backfill_queue` from that set
+    minus whatever's already in `_identity_cache` whenever the queue runs
+    dry, and resolves exactly one aircraft per call via `_resolve_adsbdb()`
+    (the plain, non-Flask-response half of `fetch_adsbdb()` — split
+    specifically so this can be called from a background thread with no
+    request/app context) — skipping it instead if a real click already
+    resolved it since being queued. `_start_identity_backfill_thread()`
+    runs this once every `IDENTITY_BACKFILL_INTERVAL` seconds (env var,
+    default 5; `<= 0` disables the whole feature) in a daemon thread — a
+    few seconds apart, so it never competes meaningfully with real user
+    traffic to adsbdb. **Only ever started from the `if __name__ ==
+    "__main__":` block**, immediately before `app.run(...)` — never at
+    plain module import time (unlike `_load_track_cache()`/
+    `_load_identity_cache()`, which are harmless file reads) — so
+    importing `app` in the test suite never spins up a real thread hitting
+    the network. Guarded by `_should_start_background_thread()` against
+    Flask's debug-mode reloader, which re-execs the whole process into a
+    "watcher" parent (imports `app.py`, `app.debug` True, `WERKZEUG_RUN_MAIN`
+    unset — starts nothing) and a child that actually serves requests
+    (`WERKZEUG_RUN_MAIN=true` — starts the thread); `app.debug` is set
+    explicitly right before this check since Flask doesn't actually set it
+    until `app.run(debug=True)` begins executing, one line later.
   - **Dev-mode stats display** (`#dev-identity-stats`, a line inside the
     existing `#dev-aircraft-panel` header — no new panel, just reuses that
     one's existing show/hide wiring): `refreshIdentityStats()`
@@ -1314,7 +1357,17 @@ because photographer name and photo URL come from an external API.
   throwaway files, same rationale as the existing `TRACK_CACHE_FILE`
   redirect. Also covers `/api/identity/stats`: zero counts on an empty
   cache, and both counters incrementing correctly after a fetch followed
-  by a field change.
+  by a field change. Also covers the background backfill helpers directly
+  (never the real thread/sleep loop, which would be slow and flaky to
+  test): `_collect_visible_icao24s()` unions fixture-shaped OpenSky +
+  radius-source cache data, lowercases and dedupes, and ignores
+  FlightAware's cache; `_identity_backfill_tick()` resolves exactly one
+  not-yet-cached aircraft per call, is a no-op when nothing new is visible,
+  and skips (doesn't re-fetch) an aircraft a simulated real click already
+  resolved after being queued; `_should_start_background_thread()` is
+  tested as a pure predicate over all three `(app.debug, WERKZEUG_RUN_MAIN)`
+  combinations via `monkeypatch`, with no thread ever actually started.
+  `conftest.py`'s `reset_caches` also clears `app._backfill_queue`.
 - `test_dev_mode.spec.js` also covers the `#dev-identity-stats` line:
   hidden whenever dev mode is off (it's inside `#dev-aircraft-panel`,
   which shares that show/hide state), and shows the exact

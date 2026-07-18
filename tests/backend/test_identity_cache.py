@@ -101,3 +101,62 @@ def test_identity_stats_endpoint(client, mock_get):
 
     resp = client.get("/api/identity/stats")
     assert resp.get_json() == {"identity_count": 1, "history_count": 1}
+
+
+# --- Background identity backfill ---
+
+def test_collect_visible_icao24s_unions_opensky_and_radius_sources(client):
+    app._cache["data"] = {"states": [["A835AF", "TES1"], ["471f9a", "TES2"], [None, "TES3"]]}
+    app._adsbfi_cache["data"] = {"ac": [{"hex": "AABBCC"}, {"hex": "471F9A"}]}  # dup, different case
+    app._adsblol_cache["data"] = {"ac": [{"hex": "ddeeff"}]}
+    app._flightaware_cache["data"] = {"flights": [{"ident": "TES1"}]}  # no icao24 -> must be ignored
+
+    visible = app._collect_visible_icao24s()
+    assert visible == {"a835af", "471f9a", "aabbcc", "ddeeff"}
+
+
+def test_collect_visible_icao24s_handles_empty_caches(client):
+    assert app._collect_visible_icao24s() == set()
+
+
+def test_backfill_tick_resolves_one_uncached_aircraft(client, mock_get):
+    app._cache["data"] = {"states": [["a835af", "TES1"]]}
+    mock_get.return_value = make_response(json_data={"response": {"aircraft": AIRCRAFT_V1}})
+
+    app._identity_backfill_tick()
+
+    assert app._identity_cache["a835af"]["registration"] == "N628TS"
+    assert mock_get.call_count == 1
+
+
+def test_backfill_tick_is_a_noop_when_nothing_new_is_visible(client, mock_get):
+    app._identity_backfill_tick()  # empty caches -> empty queue -> no-op
+    assert mock_get.call_count == 0
+    assert app._identity_cache == {}
+
+
+def test_backfill_tick_skips_an_aircraft_resolved_by_a_real_click_meanwhile(client, mock_get):
+    app._cache["data"] = {"states": [["a835af", "TES1"]]}
+    # Queue it, then resolve it "for real" (e.g. a user click) before the
+    # background tick actually runs.
+    app._backfill_queue.extend(["a835af"])
+    mock_get.return_value = make_response(json_data={"response": {"aircraft": AIRCRAFT_V1}})
+    client.get("/api/adsbdb/a835af")
+    assert mock_get.call_count == 1
+
+    app._identity_backfill_tick()
+    assert mock_get.call_count == 1  # not re-fetched
+
+
+def test_should_start_background_thread(monkeypatch):
+    monkeypatch.setattr(app.app, "debug", False)
+    monkeypatch.delenv("WERKZEUG_RUN_MAIN", raising=False)
+    assert app._should_start_background_thread() is True  # no reloader at all
+
+    monkeypatch.setattr(app.app, "debug", True)
+    monkeypatch.delenv("WERKZEUG_RUN_MAIN", raising=False)
+    assert app._should_start_background_thread() is False  # reloader's watcher parent
+
+    monkeypatch.setattr(app.app, "debug", True)
+    monkeypatch.setenv("WERKZEUG_RUN_MAIN", "true")
+    assert app._should_start_background_thread() is True  # reloader's actual serving child
