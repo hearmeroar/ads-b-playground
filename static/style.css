@@ -5,13 +5,25 @@
   --border: rgba(15, 23, 42, 0.08);
   --card-bg: rgba(255, 255, 255, 0.86);
 }
-html, body { margin: 0; padding: 0; height: 100%; }
+/* overflow: hidden here is what keeps the map acting as a fixed backdrop —
+   #map/#hud/#sidebar are all position: absolute, so none of them stretch
+   html/body's own layout size, but an absolutely positioned descendant
+   taller than the viewport (see #hud below) still expands the *scrollable*
+   overflow area of the page unless the root explicitly clips it, which
+   made the whole page (map included) scroll instead of just the HUD. */
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 #map { position: absolute; inset: 0; background: #eef1f4; }
 
 /* HUD panel */
 #hud {
   position: absolute; top: 14px; right: 14px; z-index: 1000;
   width: 216px;
+  /* Caps growth at the viewport edge and scrolls internally instead —
+     same pattern #sidebar already uses (top+bottom+overflow-y: auto) —
+     needed once enough rows (weather layers, dev mode, ...) stack up to
+     exceed viewport height. */
+  max-height: calc(100vh - 28px);
+  overflow-y: auto;
   background: var(--card-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
