@@ -114,6 +114,14 @@ function buildMergedDetails(icao24) {
   }
 
   // --- Tier 3: Flywme (locally computed) ---
+  // Always computed when enrichment data is available, even for a field a
+  // higher tier (live or adsbdb) already filled — never overwrites the
+  // displayed value, but surfaces what Flywme would have guessed as a
+  // secondary badge, so the priority chain itself is visible/debuggable in
+  // dev mode rather than the losing tier's guess silently disappearing.
+  // Pushed onto fieldSources *after* whatever tier already won, so the
+  // winning source's dot renders first and Flywme's second — the badge
+  // order itself reflects the priority chain.
   const enrichment = enrichmentById.get(icao24);
   if (enrichment) {
     for (const [beKey, feKey] of Object.entries(ENRICHMENT_FIELD_MAP)) {
@@ -121,10 +129,21 @@ function buildMergedDetails(icao24) {
       if (beKey === 'country' && resolved && resolved.country_iso && !info.countryIso) {
         info.countryIso = resolved.country_iso;
       }
+      if (!resolved) continue;
       const already = info[feKey] != null && info[feKey] !== '';
-      if (already || !resolved) continue;
-      info[feKey] = resolved.value;
-      fieldSources[feKey] = ['flywme'];
+      if (already) {
+        // Only co-display when enrichment resolved this field via a real
+        // locally-computed tier (registration_prefix/icao24_lookup/
+        // callsign_decode/aircraft_type_db) — its own "live" tier just
+        // echoes back the same known_* hint the caller passed in, which
+        // isn't an independent guess worth badging a second time.
+        if (resolved.source === 'live') continue;
+        if (!fieldSources[feKey]) fieldSources[feKey] = [];
+        if (!fieldSources[feKey].includes('flywme')) fieldSources[feKey].push('flywme');
+      } else {
+        info[feKey] = resolved.value;
+        fieldSources[feKey] = ['flywme'];
+      }
       fieldConfidence[feKey] = resolved.confidence;
       fieldComputationBasis[feKey] = resolved.source;
     }

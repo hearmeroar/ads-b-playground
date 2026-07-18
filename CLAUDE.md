@@ -614,6 +614,19 @@ because photographer name and photo URL come from an external API.
     one); Route (`originAirport`/`destinationAirport`) sits *below*
     FlightAware's existing per-poll callsign-match tier (unchanged) but
     above nothing else, since no tier ever computes a route locally.
+  - **Flywme co-displays even when a higher tier already won** (added after
+    the project owner noticed only one source badge ever showed once
+    adsbdb resolved a field — the losing tier's own guess was silently
+    never computed at all): `buildMergedDetails()`'s Flywme loop always
+    evaluates `enrichmentById`'s resolution for every field, even one
+    live/adsbdb already filled. If Flywme resolved something too, its
+    source is *appended* to that field's `fieldSources` (never replacing
+    the displayed value) — badge order is display order, so the winning
+    tier's dot renders first and Flywme's second, mirroring the actual
+    priority chain. **Exception**: skipped when `resolved.source ===
+    'live'` — that tier of `enrich_identity()` just echoes back the same
+    `known_*` hint the caller already passed in, not an independent guess,
+    so badging it a second time would be redundant rather than informative.
   - **Registered Owner is a brand new field** (`info.registeredOwner` +
     `registeredOwnerCountryIso` for its flag) — the *private/corporate*
     registrant (e.g. `"Falcon Landing LLC"`), a concept the `enrichment/`

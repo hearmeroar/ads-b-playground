@@ -109,6 +109,29 @@ test('adsbdb fills Registered Owner, Operator and Route when the live feed has n
   expect(await rowText(page, 'Registration:')).toBe('F-UNIQ');
 });
 
+test('Flywme\'s own guess co-displays alongside adsbdb when both resolve the same field', async ({ page }) => {
+  await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
+    aircraft: AIRCRAFT_UNIQUE, flightroute: FLIGHTROUTE,
+  } }));
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null,
+    operator: { value: 'Flywme Guessed Air', source: 'callsign_decode', confidence: 0.8 },
+    registration: null, manufacturer: null, model: null, year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await page.click('#toggle-dev-mode');
+  await selectAircraft(page, 'eeeeee', 'adsbfi');
+  await page.waitForFunction(() => enrichmentById.has('eeeeee'));
+  await page.waitForTimeout(100);
+
+  // adsbdb's value is still what's displayed (higher priority)...
+  expect(await rowText(page, 'Operator:')).toBe('Unique Air');
+  // ...but Flywme's own guess co-displays as a second badge, reflecting
+  // the priority chain rather than silently disappearing.
+  expect(await badgeSourcesForLabel(page, 'Operator:')).toEqual(['adsbdb', 'flywme']);
+});
+
 test('a live registration is never overwritten by adsbdb, even a contradicting one', async ({ page }) => {
   await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
     aircraft: Object.assign({}, AIRCRAFT_UNIQUE, { registration: 'X-DECOY' }),

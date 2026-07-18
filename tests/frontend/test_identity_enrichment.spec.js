@@ -32,13 +32,17 @@ function badgeSourcesForLabel(page, label) {
   }, label);
 }
 
-async function clickBadge(page, label) {
-  await page.evaluate((lbl) => {
+async function clickBadge(page, label, index = 0) {
+  await page.evaluate(({ lbl, index }) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     let node = b.nextSibling;
-    while (node && !(node.nodeType === 1 && node.classList.contains('source-badge'))) node = node.nextSibling;
-    node.click();
-  }, label);
+    const badges = [];
+    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
+      if (node.nodeType === 1 && node.classList.contains('source-badge')) badges.push(node);
+      node = node.nextSibling;
+    }
+    badges[index].click();
+  }, { lbl: label, index });
   await page.waitForTimeout(100);
 }
 
@@ -86,7 +90,7 @@ test('dev mode on: a Flywme badge shows the computation technique and confidence
   expect(await page.textContent('#source-tooltip')).toBe('Flywme — computed from callsign decode, confidence 0.8');
 });
 
-test('live values are never overwritten by enrichment, even a contradicting one', async ({ page }) => {
+test('live values are never overwritten by enrichment, even a contradicting one — but Flywme\'s own guess still co-displays for transparency', async ({ page }) => {
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
     country: { value: 'Decoyland', source: 'registration_prefix', confidence: 1.0 },
     operator: null,
@@ -104,8 +108,20 @@ test('live values are never overwritten by enrichment, even a contradicting one'
   expect(sidebarText).not.toContain('Decoyland');
   expect(sidebarText).not.toContain('X-DECOY');
 
-  // No Flywme badge appended alongside the live source's own badge.
-  expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky']);
+  // The displayed value is still OpenSky's own — but since Flywme did
+  // resolve a real (if contradicting) guess of its own, its badge
+  // co-displays second, after the winning source's, reflecting the
+  // priority chain rather than making the losing tier's guess disappear.
+  expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky', 'flywme']);
+  // "dddddd"'s registration is independently reported by adsb.fi and
+  // airplanes.live too (see fixtures) — the point here is just that
+  // 'flywme' is appended last, after whichever live sources already won.
+  const regSources = await badgeSourcesForLabel(page, 'Registration:');
+  expect(regSources[regSources.length - 1]).toBe('flywme');
+  expect(regSources.length).toBeGreaterThan(1);
+
+  await clickBadge(page, 'Country:', 1);
+  expect(await page.textContent('#source-tooltip')).toBe('Flywme — computed from registration prefix, confidence 1.0');
 });
 
 test('a live-sourced country still gets a flag when the backend recognizes its name, without becoming a Flywme field', async ({ page }) => {
