@@ -12,15 +12,11 @@ html, body { margin: 0; padding: 0; height: 100%; }
    element still allowed to make the document taller than the viewport). */
 #map { position: fixed; inset: 0; background: #eef1f4; }
 
-/* HUD panel. Deliberately position: absolute, not fixed: unlike every other
-   overlay here, #hud is the one element allowed to outgrow the viewport —
-   when it does (weather layers, dev mode, ...), that overflow becomes the
-   *document's* scrollable overflow, and the browser's own native scrollbar
-   handles it. The project owner specifically wanted that native scrollbar,
-   not a component-scoped one clipped to this panel's own box. */
+/* HUD panel with its own internal scrolling. Fixed position so the scrollbar
+   scrolls within the panel bounds, not the viewport. */
 #hud {
-  position: absolute; top: 14px; right: 14px; z-index: 1000;
-  width: 216px;
+  position: fixed; top: 14px; right: 14px; bottom: 14px; z-index: 1000;
+  width: 216px; overflow-y: auto;
   background: var(--card-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -30,17 +26,6 @@ html, body { margin: 0; padding: 0; height: 100%; }
   padding: 14px 16px;
   font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   color: var(--ink);
-}
-/* A plain margin-bottom on #hud doesn't work here — margins on an
-   absolutely positioned box aren't counted toward the document's
-   scrollable overflow, so scrolling to the very end would butt the card
-   straight against the bottom edge with no gap, unlike the 14px it starts
-   with at the top. This invisible pseudo-element extends #hud's own box
-   (which *does* count) — sized larger than that top gap per the project
-   owner's preference, not a mirror-exact match. */
-#hud::after {
-  content: ''; display: block; position: absolute; top: 100%; left: 0;
-  height: 28px; width: 1px;
 }
 
 #hud .count-row { display: flex; align-items: baseline; gap: 7px; }
