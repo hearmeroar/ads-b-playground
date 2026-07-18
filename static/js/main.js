@@ -501,6 +501,24 @@ async function poll() {
   }
 }
 
+// Aircraft search: find by ICAO24 (hex), center map, and select.
+document.getElementById('aircraft-search').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const hex = e.target.value.toLowerCase().trim();
+  if (!hex) return;
+
+  for (const [source, markerMap] of Object.entries(markerMapsBySource)) {
+    if (markerMap.has(hex)) {
+      const marker = markerMap.get(hex);
+      const latlng = marker.getLatLng();
+      map.setView([latlng.lat, latlng.lng], map.getZoom());
+      selectAircraft(hex);
+      e.target.value = '';
+      return;
+    }
+  }
+});
+
 // The first poll is the same "enabled, no numbers yet" state as a toggle-on,
 // so the sources that ship enabled get the same spinner rather than an empty
 // slot (the #map-loader overlay covers the map, not the HUD).
