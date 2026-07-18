@@ -1522,38 +1522,6 @@ because photographer name and photo URL come from an external API.
   "exactly one colored path per icon." The required attribution for the ADS-B
   Radar icon set is shown in the sidebar footer (visible when any aircraft
   details are open).
-- **Climb/descent marker icon:** a climbing or descending aircraft
-  (`item.verticalRateMs` outside `VERTICAL_RATE_LEVEL_THRESHOLD_MS`, `±0.5`
-  m/s — `constants.js`, shared with the sidebar's own `formatVerticalRateUnit`
-  so "what counts as climbing" can't drift between the two) shows a
-  different icon in `iconFor()`, checked after the ground-vehicle override
-  and before the normal category dispatch — trading the usual heading-
-  rotated top-down silhouette for a fixed climb/descent cue, since a 2D
-  side-view shape can't show both heading and pitch at once. `verticalRateMs`
-  is hoisted from `info.verticalRateMs` (already unified to m/s across
-  OpenSky/adsb.fi/airplanes.live — see `parseOpenSkyState`/
-  `parseAdsbExchangeAircraft`; always `null` for FlightAware, which has no
-  such field) onto the render `item` in all three `items.push()` call sites
-  (`parsers.js`) — it wasn't carried through before this feature, unlike
-  `heading`/`categoryGroup`. The glyph itself (`CLIMB_DESCENT_GLYPH`,
-  `icons.js`) is MDI's plain `airplane` icon (https://pictogrammers.com/
-  library/mdi/icon/airplane/, Apache-2.0) — a bare side-view silhouette
-  with no ground/runway element, vendored the same inline-SVG-string way
-  `GROUP_ICONS` vendors MDI icons in `render-details.js`, just with the
-  `COLOR`-placeholder convention `CATEGORY_GLYPHS` uses instead of
-  `fill="currentColor"`. Deliberately not MDI's `airplane-takeoff`/
-  `airplane-landing` (both add a ground line + motion streaks — explicitly
-  what was asked to avoid). One glyph serves both states: its native rest
-  orientation points up-and-right at ~45°, so `-45deg` (`CLIMBING_ROTATION_DEG`)
-  corrects it to point straight up, and the opposite orientation, `135deg`
-  (`DESCENDING_ROTATION_DEG`), points it straight down — reusing
-  `rotatedDivIcon()`'s existing rotation parameter to encode a fixed pitch
-  angle instead of a real heading, rather than sourcing two separate assets.
-  CSS classes `climbing-icon`/`descending-icon` follow the same
-  `data-color`/class-name conventions every other marker icon does. Applies
-  uniformly across every flying category (not scoped to fixed-wing only);
-  ground vehicles/surface obstacles are already exempted by the earlier
-  `towerIcon` check, so this never applies to them.
 - **Hide non-aircraft filter:** `looksLikeGroundVehicle()` flags surface
   vehicles/obstacles/reference beacons reported alongside real aircraft —
   category in the surface-vehicle/obstacle range (OpenSky 16-20, ADSBExchange
@@ -2038,14 +2006,6 @@ because photographer name and photo URL come from an external API.
   `geom: "AREAS"` (multi-polygon) SIGMET's nested-rings coordinate shape,
   which the first version 500'd on since it assumed every SIGMET's
   `coords` was a flat list.
-- `test_climb_descent_icons.spec.js` covers the climb/descent marker icon:
-  a strongly-climbing aircraft renders `.climbing-icon` in its normal
-  source color; a strongly-descending one renders `.descending-icon`,
-  rotated the opposite way (`-45deg` vs `135deg`); and — the regression
-  guard — an aircraft with a rate inside the level band, and one with no
-  vertical-rate field at all (matching every other fixture in this suite),
-  both keep rendering their ordinary category icon (`large-icon`)
-  unchanged.
 
 ## SVG Icon Rendering
 

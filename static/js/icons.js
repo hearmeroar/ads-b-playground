@@ -103,48 +103,15 @@ for (const group of Object.keys(CATEGORY_GLYPHS)) {
   ICON_BUILDERS[group] = (headingDeg, color) => categoryIcon(group, headingDeg, color);
 }
 
-// Climb/descent marker icon — MDI "airplane" (https://pictogrammers.com/
-// library/mdi/icon/airplane/, Apache-2.0), vendored the same inline-SVG-
-// string way GROUP_ICONS is in render-details.js, just with the COLOR-
-// placeholder convention CATEGORY_GLYPHS uses instead of fill="currentColor",
-// since a map marker needs the per-source color. Deliberately not one of
-// MDI's flight_takeoff/flight_land equivalents — those add a ground/runway
-// line and motion streaks; this is the bare side-view silhouette, no ground.
-const CLIMB_DESCENT_GLYPH =
-  '<path d="M20.56 3.91C21.15 4.5 21.15 5.45 20.56 6.03L16.67 9.92L18.79 19.11L17.38 20.53L13.5 13.1' +
-  'L9.6 17L9.96 19.47L8.89 20.53L7.13 17.35L3.94 15.58L5 14.5L7.5 14.87L11.37 11L3.94 7.09L5.36 5.68' +
-  'L14.55 7.8L18.44 3.91C19 3.33 20 3.33 20.56 3.91Z" fill="COLOR"/>';
-// The glyph's own rest orientation points up-and-right at ~45°, so -45deg
-// corrects it to point straight up (climbing) and the opposite orientation,
-// 135deg, points it straight down (descending) — one vendored shape, reused
-// via rotatedDivIcon's existing rotation parameter rather than two assets.
-const CLIMBING_ROTATION_DEG = -45;
-const DESCENDING_ROTATION_DEG = 135;
-
-function climbDescentIcon(rateMs, color) {
-  const climbing = rateMs > 0;
-  const cssClass = climbing ? 'climbing-icon' : 'descending-icon';
-  const rotation = climbing ? CLIMBING_ROTATION_DEG : DESCENDING_ROTATION_DEG;
-  return rotatedDivIcon(cssClass, 20, 10, rotation, color, CLIMB_DESCENT_GLYPH.replace(/COLOR/g, color), '0 0 24 24');
-}
-
 // Ground vehicles (either flagged by looksLikeGroundVehicle()'s heuristics,
 // which can fire even when category is absent/unknown, or by categoryGroup
 // itself being "surface_obstacle") always get the tower icon regardless of
-// category. A climbing/descending aircraft (vertical rate outside the level
-// band — VERTICAL_RATE_LEVEL_THRESHOLD_MS, constants.js) gets the climb/
-// descent icon instead of its usual category glyph, trading heading display
-// for pitch state while it's actively changing altitude — a side-view
-// silhouette can't show both on one 2D shape. Every other item is dispatched
-// by categoryGroup via ICON_BUILDERS, falling back to the unknown-category
-// icon (a0.svg) for groups with no dedicated icon (space category, or no
-// category at all).
+// category. Every other item is dispatched by categoryGroup via
+// ICON_BUILDERS, falling back to the unknown-category icon (a0.svg) for
+// groups with no dedicated icon (space category, or no category at all).
 function iconFor(item, color) {
   if (item.isGroundVehicle || item.categoryGroup === 'surface_obstacle') {
     return towerIcon(color);
-  }
-  if (item.verticalRateMs != null && Math.abs(item.verticalRateMs) > VERTICAL_RATE_LEVEL_THRESHOLD_MS) {
-    return climbDescentIcon(item.verticalRateMs, color);
   }
   const builder = ICON_BUILDERS[item.categoryGroup];
   return builder ? builder(item.heading, color) : categoryIcon('unknown', item.heading, color);

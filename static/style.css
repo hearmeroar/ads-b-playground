@@ -492,6 +492,12 @@ html, body { margin: 0; padding: 0; height: 100%; }
 .gallery-placeholder.loading { background: none; }
 @keyframes gallery-spin { to { transform: rotate(360deg); } }
 
+/* Route card arrow animation: gentle oscillation when climbing/descending */
+@keyframes route-arrow-climb { 0%, 100% { transform: rotate(80deg); } 50% { transform: rotate(70deg); } }
+@keyframes route-arrow-descend { 0%, 100% { transform: rotate(100deg); } 50% { transform: rotate(110deg); } }
+.route-card-arrow .route-arrow-climbing { animation: route-arrow-climb 1.8s ease-in-out infinite; }
+.route-card-arrow .route-arrow-descending { animation: route-arrow-descend 1.8s ease-in-out infinite; }
+
 /* Map loader overlay */
 /* Initial-load overlay: shown until the first poll resolves, then fades out.
    position: fixed for the same reason as #sidebar/#dev-aircraft-panel above. */

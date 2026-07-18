@@ -135,10 +135,22 @@ for (const [code, label] of Object.entries(ADSBEXCHANGE_CATEGORY_LABELS)) {
 // the map uses, so 90° points right — origin to destination reads
 // left-to-right). Falls back to the same "unknown" silhouette the map
 // itself falls back to when the category can't be determined at all.
-function routeArrowIconHtml(categoryGroup) {
+// When the aircraft is climbing or descending (verticalRateMs outside the
+// level band), the arrow animates with a gentle oscillation around a tilted
+// angle, signaling active altitude change via motion rather than a static
+// tilt (CSS @keyframes animation survives the sidebar's per-render .innerHTML
+// swap, unlike a one-shot transition).
+const ROUTE_ARROW_TILT_DEG = 15;
+function routeArrowIconHtml(categoryGroup, verticalRateMs) {
   const glyphTemplate = (categoryGroup && CATEGORY_GLYPHS[categoryGroup]) || UNKNOWN_GLYPH;
   const glyph = glyphTemplate.replace(/COLOR/g, '#6b7280');
-  return '<div style="transform: rotate(90deg); display: flex;">'
+
+  let animClass = '';
+  if (verticalRateMs != null && Math.abs(verticalRateMs) > VERTICAL_RATE_LEVEL_THRESHOLD_MS) {
+    animClass = verticalRateMs > 0 ? ' route-arrow-climbing' : ' route-arrow-descending';
+  }
+
+  return '<div class="route-arrow-wrapper' + animClass + '" style="transform: rotate(90deg); display: flex;">'
     + '<svg width="22" height="22" viewBox="0 0 200 200">' + glyph + '</svg></div>';
 }
 
@@ -527,7 +539,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
           + '<div class="route-card-title">Route <span class="route-card-tag">⚠ Unverified</span></div>'
           + '<div class="route-card-endpoints">'
           + '<div class="route-card-endpoint"><div class="route-card-code">' + (origin.code || '—') + '</div><div class="route-card-city">' + origin.name + '</div></div>'
-          + '<div class="route-card-arrow">' + routeArrowIconHtml(routeCategoryGroup) + '</div>'
+          + '<div class="route-card-arrow">' + routeArrowIconHtml(routeCategoryGroup, info.verticalRateMs) + '</div>'
           + '<div class="route-card-endpoint"><div class="route-card-code">' + (dest.code || '—') + '</div><div class="route-card-city">' + dest.name + '</div></div>'
           + '</div>'
           + '<div class="route-card-footer">' + routeConfidenceBadge + routeDevBadge + '</div>'
@@ -540,7 +552,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
         + '<div class="route-card-title">Route</div>'
         + '<div class="route-card-endpoints">'
         + '<div class="route-card-endpoint"><div class="route-card-code">' + (origin.code || '—') + '</div><div class="route-card-city">' + origin.name + '</div></div>'
-        + '<div class="route-card-arrow">' + routeArrowIconHtml(routeCategoryGroup) + '</div>'
+        + '<div class="route-card-arrow">' + routeArrowIconHtml(routeCategoryGroup, info.verticalRateMs) + '</div>'
         + '<div class="route-card-endpoint"><div class="route-card-code">' + (dest.code || '—') + '</div><div class="route-card-city">' + dest.name + '</div></div>'
         + '</div>'
         + '<div class="route-card-footer">' + routeConfidenceBadge + routeDevBadge + '</div>'
