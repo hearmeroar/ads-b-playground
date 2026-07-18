@@ -66,8 +66,10 @@ later if a real need for it shows up.
   sources' shared query radius actually ends: round-number scale rings
   (e.g. every 50 nm) plus one visually distinct ring at the true coverage
   edge, each labeled with its distance.
-- **Basemap picker** — switch between six free, no-API-key map styles
-  (Light, Dark, Voyager, Streets, Satellite, Terrain) from a HUD dropdown.
+- **Basemap picker** — switch between nine free, no-API-key map styles
+  (Light, Dark, Voyager, Streets, Satellite, Terrain, Physical, Terrain
+  Base, Hillshade — including a proper elevation-tint relief map) from a
+  HUD dropdown.
 - **Icons by category** — each aircraft category (fixed-wing weight classes,
   rotorcraft, glider, lighter-than-air, parachutist, ultralight, UAV) renders
   with its own distinct SVG silhouette from the

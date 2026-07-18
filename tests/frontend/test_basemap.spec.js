@@ -1,7 +1,11 @@
 const { test, expect } = require('@playwright/test');
 const { mockAllSources } = require('./helpers');
 
-const KEYS = ['light', 'dark', 'voyager', 'streets', 'satellite', 'terrain'];
+const KEYS = ['light', 'dark', 'voyager', 'streets', 'satellite', 'terrain', 'physical', 'terrainbase', 'hillshade'];
+const LABELS = {
+  light: 'Light', dark: 'Dark', voyager: 'Voyager', streets: 'Streets', satellite: 'Satellite',
+  terrain: 'Terrain', physical: 'Physical', terrainbase: 'Terrain Base', hillshade: 'Hillshade',
+};
 
 test.beforeEach(async ({ page }) => {
   await mockAllSources(page);
@@ -12,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 test('Voyager is the active basemap on load, all others are not', async ({ page }) => {
   const active = await page.evaluate((keys) =>
     Object.fromEntries(keys.map((k) => [k, map.hasLayer(baseLayers[k])])), KEYS);
-  expect(active).toEqual({ light: false, dark: false, voyager: true, streets: false, satellite: false, terrain: false });
+  expect(active).toEqual(Object.fromEntries(KEYS.map((k) => [k, k === 'voyager'])));
 
   const label = await page.textContent('#basemap-filter .dropdown-value');
   expect(label).toBe('Voyager');
@@ -29,7 +33,7 @@ for (const key of KEYS.filter((k) => k !== 'voyager')) {
     expect(active).toEqual(expected);
 
     const label = await page.textContent('#basemap-filter .dropdown-value');
-    expect(label.toLowerCase()).toBe(key);
+    expect(label).toBe(LABELS[key]);
     expect(await page.isVisible('#basemap-filter .dropdown-menu')).toBe(false);
   });
 }

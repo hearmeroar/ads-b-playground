@@ -228,30 +228,41 @@ defaults to off, so there's no visible gap from this.
 
 **Basemap picker** (`static/js/map-init.js`'s `BASE_LAYERS`/`baseLayers`/
 `setBaseLayer()`, `#basemap-filter` in the HUD, wired in `static/js/
-state-filters.js`): six free, no-API-key tile styles the user can switch
+state-filters.js`): nine free, no-API-key tile styles the user can switch
 between — the same "no signup, no token" constraint that picked CARTO
 over Mapbox in the first place, applied to the rest of the set too.
 Light (CARTO Positron, the original hardcoded layer before this feature)
 and two siblings from the same CDN — Dark (`dark_all`) and **Voyager**
 (`rastertiles/voyager`, colorful labeled streets — **the default**,
-re-approved 2026-07-18 over Light) — plus three from entirely different
-providers: Streets
-(standard `tile.openstreetmap.org` — the single most recognizable web map
-look; its tile usage policy discourages embedding in a high-traffic
-production app without self-hosting, accepted here since this is a
-low-traffic personal tracker, not a production service), Satellite (Esri's
-free public World Imagery service — **its tile URL order is `{z}/{y}/{x}`,
-not `{z}/{x}/{y}` like every other layer here**, an easy transposition bug
-if copied carelessly), and Terrain (OpenTopoMap, free community
-topographic tiles derived from OSM data, same informal "don't hammer it"
-courtesy norm). All six `L.tileLayer` objects are constructed once up
-front — cheap, since a tile layer fetches nothing until actually added to
-the map — and kept in the `baseLayers` lookup rather than recreated on
-every switch, so switching back to a previously-viewed style redraws from
-Leaflet's own tile cache instead of refetching; `setBaseLayer(key)` just
-`removeLayer`s the current one and `addLayer`s the new one. The picker
-reuses the exact custom-dropdown markup/CSS/wiring pattern already built
-for `#category-filter` (`.dropdown`/`.dropdown-trigger`/
+re-approved 2026-07-18 over Light) — plus Streets (standard
+`tile.openstreetmap.org` — the single most recognizable web map look; its
+tile usage policy discourages embedding in a high-traffic production app
+without self-hosting, accepted here since this is a low-traffic personal
+tracker, not a production service) and five from Esri's free public
+ArcGIS Online basemap services (**all five share the `{z}/{y}/{x}` tile
+URL order, not `{z}/{x}/{y}` like every CARTO/OSM/OpenTopoMap layer
+here** — an easy transposition bug if copied carelessly): Satellite
+(World Imagery), Terrain (OpenTopoMap — a different provider than the
+Esri three below, free community topographic tiles derived from OSM data,
+same informal "don't hammer it" courtesy norm as OSM itself), **Physical**
+(`World_Physical_Map`, added 2026-07-18 to answer "a map with heights" —
+a genuine standalone hypsometric-tint relief map, colored by elevation
+from green lowlands to tan/white highlands; its native data tops out
+around zoom 8, so it's given `maxNativeZoom: 8` while `maxZoom` stays 19
+like every other layer, so Leaflet upscales its last real tile past zoom 8
+instead of just showing blank tiles), **Terrain Base** and **Hillshade**
+(`World_Terrain_Base`/`Elevation/World_Hillshade` — both intentionally
+pale/muted layers designed to be combined with a labels overlay this app
+doesn't add, included anyway for side-by-side comparison since that's
+what was asked for; `maxNativeZoom: 13` for both). All nine
+`L.tileLayer` objects are constructed once up front — cheap, since a tile
+layer fetches nothing until actually added to the map — and kept in the
+`baseLayers` lookup rather than recreated on every switch, so switching
+back to a previously-viewed style redraws from Leaflet's own tile cache
+instead of refetching; `setBaseLayer(key)` just `removeLayer`s the
+current one and `addLayer`s the new one. The picker reuses the exact
+custom-dropdown markup/CSS/wiring pattern already built for
+`#category-filter` (`.dropdown`/`.dropdown-trigger`/
 `.dropdown-value-wrap`/`.dropdown-option`) rather than inventing a second
 widget — a small color swatch per option (reusing `#hud .swatch`, the same
 dot already used for the six data sources) stands in for category's
@@ -1498,7 +1509,7 @@ because photographer name and photo URL come from an external API.
   clicking it with nothing selected is a safe no-op (the map's view is
   left untouched).
 - `test_basemap.spec.js` covers the basemap picker: Voyager is the only
-  active `baseLayers` entry on load; switching to each of the other five
+  active `baseLayers` entry on load; switching to each of the other eight
   styles swaps which single entry `map.hasLayer()` reports true for and
   updates the dropdown's label; the dropdown closes after a selection,
   same as `#category-filter`'s own behavior.

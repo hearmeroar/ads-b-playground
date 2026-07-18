@@ -89,7 +89,7 @@ fetch('/api/config')
 map.createPane('groundPane');
 map.getPane('groundPane').style.zIndex = 450;
 
-// Basemap picker: six free, no-API-key tile styles (same "no signup, no
+// Basemap picker: nine free, no-API-key tile styles (same "no signup, no
 // token" constraint that picked CARTO over Mapbox originally) the user can
 // switch between via #basemap-filter (wired in state-filters.js). Each
 // L.tileLayer is built once up front — cheap, since a tile layer fetches
@@ -143,11 +143,42 @@ const BASE_LAYERS = {
       '| Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
     maxZoom: 17, subdomains: 'abc',
   },
+  // Three more Esri ArcGIS Online basemaps (same free service/{z}/{y}/{x}
+  // order as Satellite above), added to compare elevation-focused styles:
+  // Physical is a genuine standalone hypsometric-tint relief map (colored
+  // by elevation, green lowlands to tan/white highlands); Terrain Base and
+  // Hillshade are both intentionally pale/muted underlay layers (designed
+  // to be combined with a labels overlay this app doesn't add), included
+  // anyway for comparison since that was asked for directly.
+  physical: {
+    label: 'Physical', swatch: '#c7d9a3',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri — Source: US National Park Service',
+    // World_Physical_Map's own native data tops out around zoom 8;
+    // maxNativeZoom upscales its last real tile beyond that instead of
+    // Leaflet just showing blank tiles past zoom 8.
+    maxZoom: 19, maxNativeZoom: 8,
+  },
+  terrainbase: {
+    label: 'Terrain Base', swatch: '#cde8e6',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri — Source: USGS, Esri, TANA, DeLorme, and NPS',
+    maxZoom: 19, maxNativeZoom: 13,
+  },
+  hillshade: {
+    label: 'Hillshade', swatch: '#d9d9d9',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri',
+    maxZoom: 19, maxNativeZoom: 13,
+  },
 };
 const baseLayers = {};
 for (const key of Object.keys(BASE_LAYERS)) {
   const cfg = BASE_LAYERS[key];
-  baseLayers[key] = L.tileLayer(cfg.url, { attribution: cfg.attribution, maxZoom: cfg.maxZoom, subdomains: cfg.subdomains || 'abc' });
+  baseLayers[key] = L.tileLayer(cfg.url, {
+    attribution: cfg.attribution, maxZoom: cfg.maxZoom, subdomains: cfg.subdomains || 'abc',
+    maxNativeZoom: cfg.maxNativeZoom,
+  });
 }
 let currentBaseLayerKey = 'voyager';
 baseLayers[currentBaseLayerKey].addTo(map);
