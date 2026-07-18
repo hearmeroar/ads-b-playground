@@ -149,7 +149,7 @@ for (const key of Object.keys(BASE_LAYERS)) {
   const cfg = BASE_LAYERS[key];
   baseLayers[key] = L.tileLayer(cfg.url, { attribution: cfg.attribution, maxZoom: cfg.maxZoom, subdomains: cfg.subdomains || 'abc' });
 }
-let currentBaseLayerKey = 'light';
+let currentBaseLayerKey = 'voyager';
 baseLayers[currentBaseLayerKey].addTo(map);
 
 function setBaseLayer(key) {

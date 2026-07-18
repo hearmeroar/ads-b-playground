@@ -9,16 +9,16 @@ test.beforeEach(async ({ page }) => {
   await page.waitForSelector('.leaflet-marker-icon');
 });
 
-test('Light is the active basemap on load, all others are not', async ({ page }) => {
+test('Voyager is the active basemap on load, all others are not', async ({ page }) => {
   const active = await page.evaluate((keys) =>
     Object.fromEntries(keys.map((k) => [k, map.hasLayer(baseLayers[k])])), KEYS);
-  expect(active).toEqual({ light: true, dark: false, voyager: false, streets: false, satellite: false, terrain: false });
+  expect(active).toEqual({ light: false, dark: false, voyager: true, streets: false, satellite: false, terrain: false });
 
   const label = await page.textContent('#basemap-filter .dropdown-value');
-  expect(label).toBe('Light');
+  expect(label).toBe('Voyager');
 });
 
-for (const key of KEYS.filter((k) => k !== 'light')) {
+for (const key of KEYS.filter((k) => k !== 'voyager')) {
   test(`switching to ${key} swaps the active tile layer and label`, async ({ page }) => {
     await page.click('#basemap-filter .dropdown-trigger');
     await page.click(`#basemap-filter .dropdown-option[data-value="${key}"]`);
