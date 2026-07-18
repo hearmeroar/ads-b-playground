@@ -14,6 +14,12 @@ const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
 // data-quality ranking).
 const SOURCE_COLORS = {
   opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32', flightaware: '#00acc1',
+  // adsbdb.com is a lazy-on-click lookup (like Flywme below), not a per-poll
+  // marker source — see the CLAUDE.md pitfall about SOURCE_COLORS entries
+  // needing to stay out of sourceToggles/markerMapsBySource unless they
+  // actually have their own polled markers. Pink, distinct from every color
+  // above and from Flywme's black.
+  adsbdb: '#ec4899',
   // Flywme is a separate synthetic source — "this application" — used for
   // identity fields it computed itself (registration prefix/ICAO24 lookup/
   // callsign decode/aircraft-type db) rather than read from a live feed.
@@ -23,6 +29,7 @@ const SOURCE_COLORS = {
 const SOURCE_DISPLAY_NAMES = {
   opensky: 'OpenSky', adsbfi: 'adsb.fi', adsblol: 'adsb.lol',
   adsbone: 'adsb.one', airplaneslive: 'airplanes.live', flightaware: 'FlightAware',
+  adsbdb: 'adsbdb.com',
   flywme: 'Flywme',
 };
 // Human labels for the *technique* Flywme used to compute a field — tooltip

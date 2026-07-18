@@ -24,31 +24,83 @@ const detailsById = new Map(); // id -> { html, registration }
 // galleryCache), so reselecting an aircraft costs no extra request.
 const enrichmentById = new Map(); // icao24 -> raw /api/identity response
 
+// Same persistence rationale as enrichmentById above, for adsbdb.com's
+// combined aircraft+flightroute lookup. adsbdbEnabled is toggled by the
+// dev-mode-only #toggle-adsbdb checkbox (see state-filters.js) — unlike the
+// 6 main sourceToggles, this doesn't gate a per-poll fetch/marker set, only
+// whether loadAdsbdb() below does anything on the next aircraft selection.
+const adsbdbById = new Map(); // icao24 -> raw /api/adsbdb response
+let adsbdbEnabled = true;
+
 const ENRICHMENT_FIELD_MAP = {
   country: 'originCountry', operator: 'operator', registration: 'registration',
   manufacturer: 'manufacturer', model: 'model', year_built: 'manufactureYear',
 };
 
-// Combines a live-polled aircraft's { info, fieldSources } with any cached
-// /api/identity enrichment for the same icao24. Live values always win —
-// enrichment only fills a field that's currently null/empty, mirroring the
-// same rule the backend itself applies via its own known_* short-circuit.
+// Combines a live-polled aircraft's { info, fieldSources } with cached
+// /api/adsbdb and /api/identity lookups for the same icao24, in priority
+// order live > adsbdb > Flywme-computed (agreed with the project owner: the
+// live feed always wins since it's the freshest read; adsbdb is a real
+// external database so it outranks our own locally-computed guesses, which
+// only ever fire as a last resort). Each tier only fills a field that's
+// still null/empty after the tier above it ran.
 function buildMergedDetails(icao24) {
   const live = detailsById.get(icao24) || { info: {}, fieldSources: {} };
   const info = Object.assign({}, live.info);
   const fieldSources = Object.assign({}, live.fieldSources);
   const fieldConfidence = {};
   const fieldComputationBasis = {};
+
+  function fillIfEmpty(feKey, value, source) {
+    const already = info[feKey] != null && info[feKey] !== '';
+    if (already || value == null || value === '') return false;
+    info[feKey] = value;
+    fieldSources[feKey] = [source];
+    return true;
+  }
+
+  // --- Tier 2: adsbdb.com ---
+  const adsbdb = adsbdbById.get(icao24);
+  const aircraft = adsbdb && adsbdb.aircraft;
+  const flightroute = adsbdb && adsbdb.flightroute;
+  const airline = flightroute && flightroute.airline;
+  if (aircraft) {
+    // Same "flag can attach regardless of which tier supplied the value"
+    // rule as Flywme's country_iso below — adsbdb gives the ISO directly,
+    // no reverse name lookup needed.
+    if (aircraft.registered_owner_country_iso_name && !info.countryIso) {
+      info.countryIso = aircraft.registered_owner_country_iso_name;
+    }
+    fillIfEmpty('originCountry', aircraft.registered_owner_country_name, 'adsbdb');
+    fillIfEmpty('registration', aircraft.registration, 'adsbdb');
+    fillIfEmpty('manufacturer', aircraft.manufacturer, 'adsbdb');
+    fillIfEmpty('model', aircraft.type, 'adsbdb');
+    // Registered Owner is a genuinely new field — no live source and no
+    // Flywme tier exist for it (the enrichment/ package has no concept of a
+    // private/corporate registrant, only an operating airline), so this is
+    // its only tier.
+    fillIfEmpty('registeredOwner', aircraft.registered_owner, 'adsbdb');
+    if (aircraft.registered_owner_country_iso_name && !info.registeredOwnerCountryIso) {
+      info.registeredOwnerCountryIso = aircraft.registered_owner_country_iso_name;
+    }
+  }
+  if (airline) {
+    if (fillIfEmpty('operator', airline.name, 'adsbdb') && airline.country_iso) {
+      info.operatorCountryIso = airline.country_iso;
+    }
+  }
+  if (flightroute && flightroute.origin && flightroute.destination) {
+    // Same "Name (IATA)" shape parseFlightAware() already builds, so Route
+    // reads identically regardless of which source filled it.
+    fillIfEmpty('originAirport', `${flightroute.origin.name} (${flightroute.origin.iata_code})`, 'adsbdb');
+    fillIfEmpty('destinationAirport', `${flightroute.destination.name} (${flightroute.destination.iata_code})`, 'adsbdb');
+  }
+
+  // --- Tier 3: Flywme (locally computed) ---
   const enrichment = enrichmentById.get(icao24);
   if (enrichment) {
     for (const [beKey, feKey] of Object.entries(ENRICHMENT_FIELD_MAP)) {
       const resolved = enrichment[beKey];
-      // A flag can attach to the country's ISO regardless of which source
-      // supplied the country text itself — the backend resolves country_iso
-      // for a "live" value too when its name matches a known country, so
-      // this must run even when the value itself is already live (i.e.
-      // before the "already resolved, skip" check below, which only guards
-      // the *value*, not the flag).
       if (beKey === 'country' && resolved && resolved.country_iso && !info.countryIso) {
         info.countryIso = resolved.country_iso;
       }
@@ -323,6 +375,92 @@ async function loadIdentityEnrichment(icao24, info) {
   }
 }
 
+let adsbdbFetchToken = 0; // guards against a stale response overwriting a newer selection
+
+// icao24 -> normalized photo candidate from adsbdb's url_photo, or null once
+// resolved with no photo. Kept separate from adsbdbById (the raw response)
+// so appendAdsbdbPhotoIfReady() below has a simple has()/get() to check
+// without re-deriving the candidate shape on every call.
+const adsbdbPhotoByIcao = new Map();
+
+// adsbdb's url_photo has no photographer field at all (unlike Planespotters/
+// airport-data.com, whose terms this app otherwise always credits) — in
+// practice it's almost always the very same airport-data.com photo our own
+// /api/photo2 top-up already found (same numeric id in the path), so most
+// of the time this never even reaches the gallery. `photoIdFromUrl` mirrors
+// app.py's own _AIRPORTDATA_ID_RE so a duplicate is caught regardless of
+// which of the (thumbnail vs reconstructed full-size) URL variants either
+// side happens to carry.
+function photoIdFromUrl(url) {
+  if (!url) return null;
+  const m = /(\d+)\.jpg(?:\?.*)?$/.exec(url);
+  return m ? m[1] : null;
+}
+
+function galleryHasPhotoId(photos, id) {
+  if (!id) return false;
+  return photos.some((p) => [p.thumbnail_large && p.thumbnail_large.src, p.fallback_src, p.link]
+    .some((u) => photoIdFromUrl(u) === id));
+}
+
+// Appends adsbdb's candidate photo to the *end* of the gallery — the least
+// prominent slot, since this is the lowest-confidence candidate of the
+// three (no photographer credit, and usually a duplicate already covered by
+// a properly-attributed source) — but only when it's genuinely not already
+// represented in the gallery.
+function appendUniqueAdsbdbPhoto(icao24, photos) {
+  const candidate = adsbdbPhotoByIcao.get(icao24);
+  if (!candidate) return photos;
+  const id = photoIdFromUrl(candidate.thumbnail_large.src) || photoIdFromUrl(candidate.fallback_src);
+  if (galleryHasPhotoId(photos, id)) return photos;
+  return photos.concat([candidate]);
+}
+
+// loadGallery() and loadAdsbdb() are independent, concurrent fetches kicked
+// off together from selectAircraft() — whichever of the two finishes last
+// is the one that actually performs the dedup+append+re-render, by checking
+// whether the other one's cache is already populated.
+function appendAdsbdbPhotoIfReady(icao24) {
+  if (!adsbdbPhotoByIcao.has(icao24)) return; // adsbdb fetch hasn't landed yet
+  if (!galleryCache.has(icao24)) return; // gallery hasn't landed yet either
+  const current = galleryCache.get(icao24);
+  const merged = appendUniqueAdsbdbPhoto(icao24, current);
+  if (merged !== current) {
+    galleryCache.set(icao24, merged);
+    if (selectedIcao24 === icao24) renderGallery(merged);
+  }
+}
+
+// Lazily fetches /api/adsbdb for the selected aircraft — same lazy-on-click
+// pattern as loadTrack/loadGallery/loadIdentityEnrichment. Passes the
+// currently-known callsign so the backend can use adsbdb's combined
+// aircraft+flightroute endpoint in one request instead of two.
+async function loadAdsbdb(icao24, info) {
+  if (!adsbdbEnabled) return;
+  if (adsbdbById.has(icao24)) return; // already resolved this session
+  const fetchId = ++adsbdbFetchToken;
+  let url = '/api/adsbdb/' + encodeURIComponent(icao24);
+  if (info && info.callsign) url += '?callsign=' + encodeURIComponent(info.callsign.trim());
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (fetchId !== adsbdbFetchToken || selectedIcao24 !== icao24) return; // selection changed meanwhile
+    adsbdbById.set(icao24, data);
+    const aircraft = data.aircraft;
+    const photoUrl = aircraft && (aircraft.url_photo || aircraft.url_photo_thumbnail);
+    adsbdbPhotoByIcao.set(icao24, photoUrl ? {
+      thumbnail_large: { src: aircraft.url_photo || aircraft.url_photo_thumbnail },
+      fallback_src: aircraft.url_photo ? aircraft.url_photo_thumbnail : null,
+      link: aircraft.url_photo || aircraft.url_photo_thumbnail,
+      photographer: 'via adsbdb.com',
+    } : null);
+    renderSelectedDetails();
+    appendAdsbdbPhotoIfReady(icao24);
+  } catch (e) {
+    // Best-effort: leave adsbdbById unset so a later reselect retries.
+  }
+}
+
 function selectAircraft(icao24) {
   selectedIcao24 = icao24;
   trackUsesLiveFallback = false;
@@ -334,6 +472,7 @@ function selectAircraft(icao24) {
   sidebarEl.classList.add('open');
   loadGallery(icao24, details && details.registration);
   loadIdentityEnrichment(icao24, details && details.info);
+  loadAdsbdb(icao24, details && details.info);
 }
 
 function deselectAircraft() {
@@ -539,6 +678,7 @@ async function loadGallery(icao24, registration) {
   if (planespottersPhotos.length >= GALLERY_TARGET_COUNT) {
     renderGallery(planespottersPhotos);
     galleryCache.set(icao24, planespottersPhotos);
+    appendAdsbdbPhotoIfReady(icao24); // in case adsbdb's fetch already landed
     return;
   }
   // Render Planespotters' (short) result immediately; airport-data.com fills
@@ -552,4 +692,5 @@ async function loadGallery(icao24, registration) {
   const finalPhotos = planespottersPhotos.concat(topUpPhotos);
   renderGallery(finalPhotos);
   galleryCache.set(icao24, finalPhotos);
+  appendAdsbdbPhotoIfReady(icao24); // in case adsbdb's fetch already landed
 }

@@ -74,6 +74,15 @@ later if a real need for it shows up.
   locally — no build step). In dev mode, a computed value gets a black
   "Flywme" dot (this application, as a data source in its own right) whose
   tooltip names the technique and confidence behind it.
+- **adsbdb.com lookup** — a seventh source, queried lazily on click (not
+  per-poll, no markers of its own) for whatever the live feeds and local
+  enrichment still don't have: a **Registered Owner** field (the private/
+  corporate registrant — a new concept, distinct from the operating
+  airline) and, when the aircraft's route isn't already known from
+  FlightAware, its origin/destination airports and operating airline.
+  Ranked between the live feed and this app's own computed guesses. Its
+  toggle only appears once dev mode is on (on by default there), since it
+  has no per-poll footprint to show/hide otherwise.
 - Optional OAuth2 auth against OpenSky for a much higher daily quota than
   anonymous access.
 
@@ -152,3 +161,9 @@ gotchas, and rationale behind specific decisions.
 **Aircraft SVG icons** by [ADS-B Radar for macOS](https://adsb-radar.com) —
 [App Store](https://apps.apple.com/app/id1538149835). Free to use for personal
 and commercial projects.
+
+**Aircraft, airline, and flightroute lookup data** via
+[adsbdb.com](https://www.adsbdb.com), which itself credits
+[PlaneBase](http://planebase.biz/) for aircraft data, flightroute data to
+David Taylor (Edinburgh) and Jim Mason (Glasgow), and
+[airport-data.com](https://www.airport-data.com) for aircraft photographs.

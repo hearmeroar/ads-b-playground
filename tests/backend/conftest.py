@@ -37,6 +37,7 @@ def reset_caches(monkeypatch, tmp_path):
     app._flightaware_cache.update({"data": None, "ts": 0.0})
     app._photo_cache.clear()
     app._airportdata_cache.clear()
+    app._adsbdb_cache.clear()
     yield
 
 

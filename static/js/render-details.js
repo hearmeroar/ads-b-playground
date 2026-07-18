@@ -171,6 +171,21 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const countryValue = info.originCountry
     ? (countryFlagHtml ? countryFlagHtml + ' ' + info.originCountry : info.originCountry)
     : null;
+  // Only ever present when Operator was filled from adsbdb's flightroute
+  // .airline (the only tier that carries a country alongside the airline
+  // name) — a live-feed or Flywme-computed operator renders without a flag,
+  // same known limitation as Country's own flag above.
+  const operatorFlagHtml = flagHtml(info.operatorCountryIso);
+  const operatorValue = info.operator
+    ? (operatorFlagHtml ? operatorFlagHtml + ' ' + info.operator : info.operator)
+    : null;
+  // Registered Owner only ever comes from adsbdb (no live/Flywme tier exists
+  // for it), which always gives the ISO directly alongside the name, so this
+  // one always has a flag when it has a value at all.
+  const registeredOwnerFlagHtml = flagHtml(info.registeredOwnerCountryIso);
+  const registeredOwnerValue = info.registeredOwner
+    ? (registeredOwnerFlagHtml ? registeredOwnerFlagHtml + ' ' + info.registeredOwner : info.registeredOwner)
+    : null;
   const identity = renderGroup('Identity', [
     detailRow('ICAO', info.icao24 ? info.icao24.toUpperCase() : null, 'icao24'),
     detailRow('Callsign', info.callsign || '—', 'callsign'),
@@ -178,10 +193,11 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     detailRow('Aircraft', info.aircraftType, 'aircraftType'),
     identityRow('Manufacturer', info.manufacturer, 'manufacturer'),
     identityRow('Model', info.model, 'model'),
-    identityRow('Operator', info.operator, 'operator'),
+    identityRow('Operator', operatorValue, 'operator'),
     identityRow('Country', countryValue, 'originCountry'),
     detailRow('Category', info.categoryDisplay, 'categoryDisplay'),
     identityRow('Year built', info.manufactureYear, 'manufactureYear'),
+    identityRow('Registered Owner', registeredOwnerValue, 'registeredOwner'),
     detailRow('Route', info.originAirport && info.destinationAirport
       ? info.originAirport + ' → ' + info.destinationAirport
       : null, ['originAirport', 'destinationAirport']),

@@ -8,7 +8,10 @@ A single-page live aircraft tracker: a Flask backend proxies six
 independent data sources — OpenSky Network, adsb.fi, adsb.lol,
 adsb.one, airplanes.live, and FlightAware AeroAPI — and a static Leaflet
 page polls the enabled ones and renders aircraft as rotated, color-coded
-markers. Backend logic lives in `app.py`; the frontend is
+markers. A seventh source, adsbdb.com, is proxied too but is not part of
+that per-poll set — it's a lazy, click-only lookup for identity/route
+enrichment with no markers of its own (see "adsbdb.com" further below).
+Backend logic lives in `app.py`; the frontend is
 `static/index.html` (markup) plus `static/js/*.js` (eight plain classic
 `<script src>` files, loaded in a fixed order) and `static/style.css` — no
 framework, no build step, all of it just plain `<link>`/`<script>`-included
@@ -573,6 +576,83 @@ because photographer name and photo URL come from an external API.
     that actually only has the six live, toggleable sources) — any future
     synthetic/non-toggleable source added to `SOURCE_COLORS` needs the same
     check.
+- **adsbdb.com** (`app.py`'s `/api/adsbdb/<icao24>`, `static/js/
+  sidebar-track.js`'s `loadAdsbdb()`/`buildMergedDetails()`): a seventh data
+  source, fetched lazily on marker select like `/api/identity` — never
+  during the poll loop, no markers/counts of its own. Unlike Flywme (locally
+  computed) and the six live/poll sources, it's a genuine external database
+  (https://api.adsbdb.com, docs at github.com/mrjackwills/adsbdb) queried
+  for two things in **one combined request**:
+  `GET /v0/aircraft/{icao24}?callsign={callsign}` returns both an `aircraft`
+  object (type/manufacturer/registration/**registered owner**) and a
+  `flightroute` object (origin/destination airports + the operating
+  airline) together — `flightroute.airline` is already nested in that
+  response, so the separate `/v0/airline/` endpoint is never called.
+  If the callsign is unknown but the aircraft is, adsbdb still answers 200
+  with just `aircraft`. Cached indefinitely in `_adsbdb_cache` (keyed
+  `"<icao24>:<callsign-or-empty>"`), same rationale as Planespotters: an
+  aircraft's identity and a given callsign's route are stable facts, not
+  live telemetry. A 404 (unknown aircraft) is cached as an empty result; a
+  network error/5xx is deliberately left uncached so a later click retries.
+  **Not proxied at all**: `/v0/stats`, `/v0/mode-s/`, `/v0/n-number/` (out
+  of scope for this app), and adsbdb's **PATCH** routes — those exist for
+  *adsbdb's own operators* to correct their database (need their
+  `env.allow_update` config and their own `Authorization` token, which this
+  app has no access to and no reason to seek), not something a consumer of
+  their read API can use.
+  - **Priority chain, agreed with the project owner**: live feed > adsbdb >
+    Flywme-computed, i.e. adsbdb is inserted as a *second* tier between the
+    two `buildMergedDetails()` already had. Each tier only fills a field
+    still empty after the tier above ran: Country/Operator/Registration/
+    Manufacturer/Model can all be filled from adsbdb
+    (`registered_owner_country_name`/`flightroute.airline.name`/
+    `registration`/`manufacturer`/`type` respectively) ahead of Flywme's own
+    guess; Year built has no adsbdb tier at all (the API doesn't return
+    one); Route (`originAirport`/`destinationAirport`) sits *below*
+    FlightAware's existing per-poll callsign-match tier (unchanged) but
+    above nothing else, since no tier ever computes a route locally.
+  - **Registered Owner is a brand new field** (`info.registeredOwner` +
+    `registeredOwnerCountryIso` for its flag) — the *private/corporate*
+    registrant (e.g. `"Falcon Landing LLC"`), a concept the `enrichment/`
+    package never had (it only ever models an operating *airline*, via
+    `Operator`). adsbdb is its only possible tier — no live feed or Flywme
+    fallback exists for it — so it renders via `identityRow()` like
+    Country/Operator/etc. (literal "Unknown" when unresolved, not a hidden
+    row). Operator gets a flag too (`operatorCountryIso`, from
+    `flightroute.airline.country_iso`) but only when adsbdb's tier is what
+    filled it — a live-sourced or Flywme-computed operator still renders
+    without one, the same known limitation as Country's own flag.
+  - **Photo (`url_photo`/`url_photo_thumbnail`)**: adsbdb's own sample data
+    shows this is, in practice, the *same* photo as our airport-data.com
+    top-up (identical numeric id in the path) — so most of the time it's
+    already in the gallery and gets deduplicated away. adsbdb doesn't supply
+    a `photographer` field at all (unlike airport-data.com's own API this
+    app otherwise always credits), so a genuinely unique adsbdb photo is
+    still shown, but with `photographer: 'via adsbdb.com'` rather than a
+    fabricated name, and appended to the **end** of the gallery — the
+    least-prominent slot, since it's the lowest-confidence of the three
+    candidates (no photographer credit, and usually a duplicate). Dedup
+    matches by the numeric id in the URL (`photoIdFromUrl()`, mirroring
+    `app.py`'s own `_AIRPORTDATA_ID_RE`) against every photo already in the
+    gallery, not exact URL string equality, since adsbdb's URL host/shape
+    differs from our own reconstructed full-size URL for the same photo.
+    `loadGallery()` and `loadAdsbdb()` are independent concurrent fetches
+    kicked off together from `selectAircraft()`; whichever finishes *last*
+    is the one that actually performs the dedup+append+re-render, by
+    checking the other's cache (`galleryCache`/`adsbdbPhotoByIcao`) —
+    neither blocks on the other.
+  - **Dev-mode-only toggle** (`#source-adsbdb`, `#toggle-adsbdb`): a new UI
+    pattern, distinct from the six `sourceToggles` — this row is `display:
+    none` until dev mode is switched on (mirroring how `#opensky-help`
+    shows/hides via the quota-lockout state machine, just driven by
+    `devModeToggle`'s own `change` handler instead), and checked by default
+    in the markup so it's already "on" the moment it becomes visible. It's
+    intentionally **not** added to `sourceToggles`/`markerMapsBySource` —
+    same reasoning as the `flywme` pitfall above: adsbdb has no per-poll
+    fetch, no markers, no HUD count, so pulling it into those loops would be
+    wrong, not just superfluous. Unchecking it only gates *future*
+    `loadAdsbdb()` calls (`adsbdbEnabled`) — it doesn't purge `adsbdbById`,
+    same as every other lazy-cache in this app.
 - **Unit toggle** (`#unit-toggle`, `currentUnitSystem` = `'metric'` |
   `'imperial'`): purely a rendering concern. Internal data always stays in
   the units above; only the formatters used inside `renderDetailsHtml()`
@@ -848,6 +928,36 @@ because photographer name and photo URL come from an external API.
   since the source name needs to be a runtime string here; waits for
   `enrichmentById.has(hex)` before asserting, since the identity fetch is
   async and lands after `selectAircraft()` returns.
+- `tests/backend/test_adsbdb.py` covers `/api/adsbdb/<icao24>`: the
+  combined aircraft+callsign request and its exact upstream `params`,
+  aircraft-only (no/unknown callsign, including adsbdb's "200 with just
+  aircraft" behavior for a known aircraft + unknown callsign), the 404
+  "unknown aircraft" response, indefinite caching (including that a
+  different callsign for the same icao24 is a distinct cache entry), and
+  that a network error returns 502 *without* caching. `conftest.py`'s
+  `reset_caches` gained a `_adsbdb_cache.clear()` entry.
+- `test_adsbdb.spec.js` covers: the `#source-adsbdb` dev-mode-only toggle
+  (hidden + checked by default, appears checked once dev mode is on,
+  hides again when dev mode is switched off); Registered Owner/Operator/
+  Route all filling from adsbdb when the live feed has none of them, each
+  tagged with an `adsbdb` badge; a live registration is never overwritten
+  even by a deliberately contradicting adsbdb response; Registered Owner
+  shows literal "Unknown" like the other identity-enrichment fields when
+  adsbdb has nothing; a unique adsbdb photo lands at the *end* of the
+  gallery behind an existing, properly-credited Planespotters photo; and a
+  photo whose numeric id already exists in the gallery is deduplicated
+  away rather than appended. Also mocks `/api/photo2/**` itself, since
+  this suite's aircraft always fall short of `GALLERY_TARGET_COUNT` from
+  Planespotters alone and would otherwise trigger it — see the next bullet
+  for why that mock can't be left to `mockAllSources()`'s own defaults yet.
+- **Pre-existing test-suite gap, found while adding `test_adsbdb.spec.js`,
+  not introduced by it**: unlike `/api/photo/**`, `/api/photo2/**` has no
+  default mock in `helpers.js`'s `mockAllSources()` at all — any spec that
+  opens a sidebar for an aircraft with fewer than `GALLERY_TARGET_COUNT`
+  Planespotters photos (the default mock returns none) genuinely calls out
+  to the real airport-data.com during the test run. Worth fixing at some
+  point (adding a default `/api/photo2/**` mock to `mockAllSources()`
+  itself), but out of scope for the adsbdb work that surfaced it.
 
 ## SVG Icon Rendering
 

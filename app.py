@@ -25,6 +25,16 @@ Backend responsibilities:
 8) Also proxy airport-data.com's photo lookup as a second photo source: the
    frontend's gallery uses it to top up the remaining slots whenever
    Planespotters didn't return enough photos to fill the gallery on its own.
+9) Also proxy adsbdb.com (https://api.adsbdb.com) — a combined aircraft +
+   flightroute lookup, used lazily on marker select (like Planespotters/
+   airport-data.com and /api/identity) to fill Registered Owner, and to
+   supply a flight's origin/destination airports + operating airline when
+   FlightAware isn't enabled or didn't match. See CLAUDE.md for the full
+   priority chain (live feed > adsbdb > locally-computed enrichment) and
+   why adsbdb's other routes (airline lookup, stats, mode-s/n-number
+   conversion, and its PATCH routes — those require adsbdb's own operator
+   credentials, not something a consumer of their API can use) aren't
+   proxied here.
 """
 import json
 import os
@@ -240,6 +250,13 @@ AIRPORTDATA_BASE = "https://airport-data.com/api/ac_thumb.json"
 AIRPORTDATA_FULLSIZE_BASE = "https://image.airport-data.com/aircraft/{photo_id}.jpg"
 _AIRPORTDATA_ID_RE = re.compile(r"(\d+)\.jpg(?:\?.*)?$")
 _airportdata_cache = {}  # "reg:<REGISTRATION>" or "hex:<icao24>" -> list of photo dicts
+
+
+# adsbdb.com (https://api.adsbdb.com, docs: github.com/mrjackwills/adsbdb):
+# free, no key, no documented rate limit. Combined aircraft+flightroute
+# lookup used lazily on marker select — see fetch_adsbdb() below.
+ADSBDB_BASE = "https://api.adsbdb.com/v0"
+_adsbdb_cache = {}  # "<icao24>:<callsign-or-empty>" -> {"aircraft": ..., "flightroute": ...}
 
 
 def _airportdata_fullsize_url(raw_photo):
@@ -588,6 +605,50 @@ def api_photo2_hex(icao24):
     count = request.args.get("n", default=1, type=int)
     registration = request.args.get("reg") or None
     return fetch_airportdata("hex", icao24, count, registration=registration)
+
+
+def fetch_adsbdb(icao24, callsign):
+    """Combined aircraft + flightroute lookup in a single upstream request
+    (adsbdb supports a `?callsign=` query param on the aircraft endpoint
+    that returns both objects together — no separate /v0/airline/ call is
+    needed since flightroute.airline is already nested in that response).
+    Cached indefinitely, like Planespotters: an aircraft's identity and a
+    given callsign's route are stable facts, not live telemetry that goes
+    stale. A network error/5xx is deliberately left uncached so a later
+    click can retry; an "unknown aircraft" 404 is cached as an empty result
+    since that's a stable answer too."""
+    cache_key = f"{icao24}:{callsign or ''}"
+    if cache_key in _adsbdb_cache:
+        return jsonify(_adsbdb_cache[cache_key])
+
+    url = f"{ADSBDB_BASE}/aircraft/{quote(icao24, safe='')}"
+    params = {"callsign": callsign} if callsign else None
+
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+
+        if resp.status_code == 404:
+            result = {"aircraft": None, "flightroute": None}
+            _adsbdb_cache[cache_key] = result
+            return jsonify(result)
+
+        resp.raise_for_status()
+        payload = resp.json().get("response", {})
+        result = {
+            "aircraft": payload.get("aircraft"),
+            "flightroute": payload.get("flightroute"),
+        }
+        _adsbdb_cache[cache_key] = result
+        return jsonify(result)
+
+    except requests.RequestException as exc:
+        return jsonify({"aircraft": None, "flightroute": None, "error": str(exc)}), 502
+
+
+@app.route("/api/adsbdb/<icao24>")
+def api_adsbdb(icao24):
+    callsign = request.args.get("callsign") or None
+    return fetch_adsbdb(icao24, callsign)
 
 
 @app.route("/api/identity/<icao24>")

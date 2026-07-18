@@ -65,9 +65,19 @@ unitToggleButtons.forEach((btn) => {
 // re-renders the open sidebar immediately rather than waiting for the next poll.
 let currentDevMode = false;
 const devModeToggle = document.getElementById('toggle-dev-mode');
+// adsbdb's own source-row is only relevant once dev mode is on (that's the
+// only place its badge dot can ever show), so it stays hidden the rest of
+// the time — same style.display show/hide mechanism already used for
+// #opensky-help's quota-lockout state, just driven by this toggle instead.
+const adsbdbSourceRow = document.getElementById('source-adsbdb');
+const adsbdbToggle = document.getElementById('toggle-adsbdb');
 devModeToggle.addEventListener('change', () => {
   currentDevMode = devModeToggle.checked;
+  adsbdbSourceRow.style.display = currentDevMode ? '' : 'none';
   if (selectedIcao24 != null) renderSelectedDetails();
+});
+adsbdbToggle.addEventListener('change', () => {
+  adsbdbEnabled = adsbdbToggle.checked;
 });
 
 // "Hide non-aircraft" filters out ground vehicles, obstacles, and

@@ -28,6 +28,12 @@ async function mockAllSources(page) {
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
     country: null, operator: null, registration: null, manufacturer: null, model: null, year_built: null,
   } }));
+  // All-null default, same rationale as /api/identity above — a test that
+  // wants to exercise adsbdb enrichment/route/photo-dedup overrides this
+  // route itself.
+  await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
+    aircraft: null, flightroute: null,
+  } }));
 }
 
 // Counts markers by source color via the wrapper div's data-color attribute
