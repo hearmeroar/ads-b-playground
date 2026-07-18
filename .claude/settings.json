@@ -44,7 +44,10 @@
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('satellite'\\)\\)\")",
       "Bash(python3 -c ' *)",
       "Bash(git restore *)",
-      "Bash(git apply *)"
+      "Bash(git apply *)",
+      "Bash(awk -F: '$1>=71 && $1<=260')",
+      "Bash(awk '/<div id=\"hud\">/{print NR\": \"$0; depth=1; next} depth{ n=gsub\\(/<div/,\"<div\"\\); c=gsub\\(/<\\\\/div>/,\"</div>\"\\); depth+=n-c; print NR\": \"$0; if\\(depth==0\\){print \"CLOSES AT \"NR; exit} }' /Users/alex/Documents/ADS-B_playgrund/static/index.html)",
+      "Bash(git reset *)"
     ],
     "deny": [
       "Bash(rm -rf *)",

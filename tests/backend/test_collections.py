@@ -59,6 +59,76 @@ def test_snapshot_filtered_to_allowlist(client):
     assert card["snapshot"] == {"registration": "HB-JXA"}
 
 
+def test_snapshot_drops_route_fields(client):
+    # originAirport/destinationAirport describe a specific flight, not the
+    # airframe being collected — removed from SNAPSHOT_FIELDS entirely.
+    login_as(client, "u1")
+    resp = client.post("/api/collection", json={
+        "icao24": "4b1805",
+        "snapshot": {
+            "registration": "HB-JXA",
+            "originAirport": "Zurich (ZRH)",
+            "destinationAirport": "Belgrade (BEG)",
+        },
+    })
+    card = resp.get_json()
+    assert card["snapshot"] == {"registration": "HB-JXA"}
+
+
+def test_snapshot_keeps_category_group(client):
+    login_as(client, "u1")
+    resp = client.post("/api/collection", json={
+        "icao24": "4b1805",
+        "snapshot": {"registration": "HB-JXA", "categoryGroup": "large"},
+    })
+    card = resp.get_json()
+    assert card["snapshot"]["categoryGroup"] == "large"
+
+
+def test_category_code_c0_is_rejected(client):
+    login_as(client, "u1")
+    resp = client.post("/api/collection", json={
+        "icao24": "aaa111", "snapshot": {"registration": "X"}, "category_code": "C0",
+    })
+    assert resp.status_code == 400
+    assert resp.get_json() == {"error": "category_not_collectible"}
+    assert client.get("/api/collection").get_json()["cards"] == []
+
+
+def test_category_code_other_than_c0_is_allowed(client):
+    login_as(client, "u1")
+    resp = client.post("/api/collection", json={
+        "icao24": "aaa111", "snapshot": {"registration": "X"}, "category_code": "A1",
+    })
+    assert resp.status_code == 201
+
+
+def test_resaving_same_icao24_updates_in_place(client):
+    # One icao24 = one card: re-saving refreshes snapshot/photo/timestamp on
+    # the existing card rather than appending a duplicate.
+    login_as(client, "u1")
+    first = client.post("/api/collection", json={
+        "icao24": "4b1805", "snapshot": {"registration": "HB-JXA"},
+        "photo_url": "https://cdn.example.com/old.jpg",
+    })
+    assert first.status_code == 201
+    first_card = first.get_json()
+
+    second = client.post("/api/collection", json={
+        "icao24": "4b1805", "snapshot": {"registration": "HB-JXA", "operator": "Swiss"},
+        "photo_url": "https://cdn.example.com/new.jpg",
+    })
+    assert second.status_code == 200
+    second_card = second.get_json()
+
+    assert second_card["id"] == first_card["id"]
+    assert second_card["snapshot"]["operator"] == "Swiss"
+    assert second_card["photo_url"] == "https://cdn.example.com/new.jpg"
+
+    cards = client.get("/api/collection").get_json()["cards"]
+    assert len(cards) == 1
+
+
 def test_list_only_returns_own_cards(client):
     login_as(client, "u1")
     client.post("/api/collection", json={"icao24": "aaa111", "snapshot": {}})

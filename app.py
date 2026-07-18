@@ -1002,7 +1002,7 @@ SNAPSHOT_FIELDS = (
     "registration", "aircraftType", "manufacturer", "model", "manufactureYear",
     "operator", "operatorCountry", "operatorCountryIso", "originCountry", "countryIso",
     "registeredOwner", "registeredOwnerCountryIso", "categoryDisplay", "callsign",
-    "originAirport", "destinationAirport",
+    "categoryGroup",
 )
 
 
@@ -1057,17 +1057,41 @@ def api_collection_save():
     icao24 = data.get("icao24")
     if not icao24:
         return jsonify({"error": "icao24_required"}), 400
+    # "C0" (ADS-B DO-260B: surface vehicle, no category info at all) is
+    # rejected server-side too, not just by the frontend disabling the save
+    # button — a client-sent field is never trusted alone. Only ever a
+    # concern for adsb.fi/airplanes.live-style codes; OpenSky's own numeric
+    # category has no such string, so this never fires for OpenSky-only
+    # aircraft.
+    if data.get("category_code") == "C0":
+        return jsonify({"error": "category_not_collectible"}), 400
     raw_snapshot = data.get("snapshot") or {}
     snapshot = {k: raw_snapshot.get(k) for k in SNAPSHOT_FIELDS if raw_snapshot.get(k) is not None}
+    photo_fields = {
+        "photo_url": data.get("photo_url"),
+        "photo_link": data.get("photo_link"),
+        "photo_photographer": data.get("photo_photographer"),
+    }
+    # One card per icao24 per user: re-saving an already-collected aircraft
+    # refreshes its snapshot/photo/timestamp in place rather than appending
+    # a duplicate — this is what makes a simple filled/outline toggle icon
+    # in the sidebar unambiguous (no "which of N saved copies" question).
+    existing = next(
+        (c for c in _collections if c["user_id"] == user_id and c["icao24"] == icao24), None
+    )
+    if existing:
+        existing["snapshot"] = snapshot
+        existing["saved_at"] = time.time()
+        existing.update(photo_fields)
+        _save_collections()
+        return jsonify(existing), 200
     card = {
         "id": uuid.uuid4().hex,
         "user_id": user_id,
         "icao24": icao24,
         "saved_at": time.time(),
         "snapshot": snapshot,
-        "photo_url": data.get("photo_url"),
-        "photo_link": data.get("photo_link"),
-        "photo_photographer": data.get("photo_photographer"),
+        **photo_fields,
     }
     _collections.append(card)
     _save_collections()
