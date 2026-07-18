@@ -41,11 +41,13 @@ import os
 import re
 import threading
 import time
+import uuid
 from collections import deque
 from urllib.parse import quote
 
 import requests
-from flask import Flask, jsonify, request, send_from_directory
+from authlib.integrations.flask_client import OAuth
+from flask import Flask, jsonify, redirect, request, send_from_directory, session, url_for
 
 from enrichment.aircraft_enrichment import enrich_identity
 
@@ -56,6 +58,121 @@ except ImportError:
     pass
 
 app = Flask(__name__, static_folder="static", static_url_path="")
+
+# Signed session cookie key, needed for Sign-in-with-Google below (Flask's
+# `session` is itsdangerous-signed, not server-side, so it needs a secret).
+# Falling back to a random key means every restart (including Flask debug's
+# reloader re-exec on each file save — see _should_start_background_thread()
+# further down for the same restart-vs-reloader distinction) invalidates all
+# existing sessions; set SECRET_KEY in .env for logins to survive restarts.
+app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
+
+# --- Google OAuth (Sign in with Google) ---
+# The one new external-auth dependency in this codebase: hand-rolling
+# OAuth2's authorization-code exchange and ID-token verification would be a
+# real security risk for no benefit over a well-audited library. Registered
+# lazily-configured the same way OpenSky's OAuth2 client-credentials flow
+# already degrades to anonymous when unset (see CLIENT_ID/CLIENT_SECRET
+# below) — GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET are optional; without them
+# /api/login/google just reports "not_configured" instead of crashing.
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
+
+oauth = OAuth(app)
+oauth.register(
+    name="google",
+    client_id=GOOGLE_CLIENT_ID,
+    client_secret=GOOGLE_CLIENT_SECRET,
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"},
+)
+
+# Users store: one JSONL line per user, keyed by Google's `sub` (a stable
+# unique id — unlike email, which a user can change on their Google
+# account). No password is ever stored; Google handles the actual
+# credential check. Same load/save idiom as _identity_cache below (atomic
+# tmp-file + os.replace, best-effort on a missing/corrupt file).
+_users = {}  # sub -> {"sub":, "email":, "name":, "picture":, "created_ts":}
+USERS_FILE = os.environ.get("USERS_FILE", ".users.jsonl")
+
+
+def _load_users():
+    try:
+        with open(USERS_FILE, "r") as f:
+            lines = f.readlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        sub = entry.get("sub")
+        if sub:
+            _users[sub] = entry
+
+
+def _save_users():
+    tmp = USERS_FILE + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            for entry in _users.values():
+                f.write(json.dumps(entry) + "\n")
+        os.replace(tmp, USERS_FILE)
+    except OSError:
+        pass
+
+
+_load_users()
+
+
+def _current_user_id():
+    return session.get("user_id")
+
+
+@app.route("/api/login/google")
+def api_login_google():
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        return jsonify({"error": "not_configured"}), 503
+    redirect_uri = url_for("api_login_google_callback", _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.route("/api/login/google/callback")
+def api_login_google_callback():
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        return jsonify({"error": "not_configured"}), 503
+    token = oauth.google.authorize_access_token()
+    userinfo = token.get("userinfo") or {}
+    sub = userinfo.get("sub")
+    if not sub:
+        return jsonify({"error": "google_auth_failed"}), 502
+    existing = _users.get(sub, {})
+    _users[sub] = {
+        "sub": sub,
+        "email": userinfo.get("email"),
+        "name": userinfo.get("name"),
+        "picture": userinfo.get("picture"),
+        "created_ts": existing.get("created_ts", time.time()),
+    }
+    _save_users()
+    session["user_id"] = sub
+    return redirect("/")
+
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    session.pop("user_id", None)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/me")
+def api_me():
+    user = _users.get(_current_user_id())
+    return jsonify({"user": user})
 
 OPENSKY_URL = "https://opensky-network.org/api/states/all"
 TRACKS_URL = "https://opensky-network.org/api/tracks/all"
@@ -867,6 +984,197 @@ def api_identity(icao24):
         known_manufacture_year=request.args.get("known_manufacture_year", type=int),
     )
     return jsonify(result)
+
+
+# --- Aircraft collection ("save aircraft you like, browse as cards") ---
+# One shared JSONL file (same atomic-write idiom as _identity_cache above),
+# filtered by user_id on read rather than split into per-user files — keeps
+# the load/save code to one file/one dict, same as the identity cache.
+_collections = []  # list of card dicts, see SNAPSHOT_FIELDS below
+COLLECTIONS_FILE = os.environ.get("COLLECTIONS_FILE", ".collections.jsonl")
+
+# Single source of truth for which `info` fields a saved card snapshots.
+# Deliberately excludes live telemetry (altitude/speed/squawk/...) — those
+# are meaningless once the aircraft is long gone, and the backend filters
+# the client-sent snapshot to exactly this allowlist before persisting, so
+# a client can never smuggle arbitrary extra keys into storage.
+SNAPSHOT_FIELDS = (
+    "registration", "aircraftType", "manufacturer", "model", "manufactureYear",
+    "operator", "operatorCountry", "operatorCountryIso", "originCountry", "countryIso",
+    "registeredOwner", "registeredOwnerCountryIso", "categoryDisplay", "callsign",
+    "originAirport", "destinationAirport",
+)
+
+
+def _load_collections():
+    try:
+        with open(COLLECTIONS_FILE, "r") as f:
+            lines = f.readlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if entry.get("id") and entry.get("user_id"):
+            _collections.append(entry)
+
+
+def _save_collections():
+    tmp = COLLECTIONS_FILE + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            for card in _collections:
+                f.write(json.dumps(card) + "\n")
+        os.replace(tmp, COLLECTIONS_FILE)
+    except OSError:
+        pass
+
+
+_load_collections()
+
+
+@app.route("/api/collection", methods=["GET"])
+def api_collection_list():
+    user_id = _current_user_id()
+    if not user_id:
+        return jsonify({"error": "not_authenticated"}), 401
+    cards = [c for c in _collections if c["user_id"] == user_id]
+    cards.sort(key=lambda c: c["saved_at"], reverse=True)
+    return jsonify({"cards": cards})
+
+
+@app.route("/api/collection", methods=["POST"])
+def api_collection_save():
+    user_id = _current_user_id()
+    if not user_id:
+        return jsonify({"error": "not_authenticated"}), 401
+    data = request.get_json(silent=True) or {}
+    icao24 = data.get("icao24")
+    if not icao24:
+        return jsonify({"error": "icao24_required"}), 400
+    raw_snapshot = data.get("snapshot") or {}
+    snapshot = {k: raw_snapshot.get(k) for k in SNAPSHOT_FIELDS if raw_snapshot.get(k) is not None}
+    card = {
+        "id": uuid.uuid4().hex,
+        "user_id": user_id,
+        "icao24": icao24,
+        "saved_at": time.time(),
+        "snapshot": snapshot,
+        "photo_url": data.get("photo_url"),
+        "photo_link": data.get("photo_link"),
+        "photo_photographer": data.get("photo_photographer"),
+    }
+    _collections.append(card)
+    _save_collections()
+    return jsonify(card), 201
+
+
+@app.route("/api/collection/<card_id>", methods=["DELETE"])
+def api_collection_delete(card_id):
+    user_id = _current_user_id()
+    if not user_id:
+        return jsonify({"error": "not_authenticated"}), 401
+    before = len(_collections)
+    _collections[:] = [
+        c for c in _collections if not (c["id"] == card_id and c["user_id"] == user_id)
+    ]
+    if len(_collections) == before:
+        return jsonify({"error": "not_found"}), 404
+    _save_collections()
+    return jsonify({"ok": True})
+
+
+# --- Aviation weather (aviationweather.gov / NOAA Aviation Weather Center) ---
+# Free, no API key, but (unlike RainViewer) sends no CORS header at all
+# (confirmed via curl -I -H "Origin: ..."), so — like OpenSky — it needs a
+# backend proxy; the browser would otherwise block reading the response.
+AVIATIONWEATHER_BASE = "https://aviationweather.gov/api/data"
+METAR_MIN_INTERVAL = 300  # station obs update roughly hourly; no need to hit more often
+SIGMET_MIN_INTERVAL = 300
+_metar_cache = {"data": None, "ts": 0.0}
+_sigmet_cache = {"data": None, "ts": 0.0}
+
+# The isigmet (international SIGMET) endpoint ignores bbox/loc query params
+# entirely — confirmed live, identical ~144-record global response
+# regardless — so filtering to "near our area" has to happen here instead.
+# Padded well past BBOX itself since a SIGMET polygon can be large and
+# centered outside our exact box while still overlapping it; a coarse
+# "does any vertex fall in the padded box" check is good enough for this
+# purpose (the polygon is drawn in full on the frontend regardless — this
+# only decides whether to include it at all).
+SIGMET_FILTER_PADDING_DEG = 10.0
+
+
+def _sigmet_coord_points(sigmet):
+    """Flattens sigmet["coords"] to a flat list of {"lat":, "lon":} dicts.
+
+    Its shape depends on "geom": a single-polygon SIGMET ("AREA") has
+    coords as a flat list of point dicts, but a multi-polygon one ("AREAS",
+    e.g. two separate boxes describing a "west of this line / east of that
+    line" corridor — confirmed against a real FCBB/Brazzaville SIGMET) has
+    coords as a list of *rings*, each itself a list of point dicts. A first
+    version assumed the flat shape unconditionally and 500'd the very first
+    time a real "AREAS" record came through.
+    """
+    coords = sigmet.get("coords") or []
+    if coords and isinstance(coords[0], list):
+        return [point for ring in coords for point in ring]
+    return coords
+
+
+def _sigmet_intersects_area(sigmet):
+    lamin = BBOX["lamin"] - SIGMET_FILTER_PADDING_DEG
+    lamax = BBOX["lamax"] + SIGMET_FILTER_PADDING_DEG
+    lomin = BBOX["lomin"] - SIGMET_FILTER_PADDING_DEG
+    lomax = BBOX["lomax"] + SIGMET_FILTER_PADDING_DEG
+    for coord in _sigmet_coord_points(sigmet):
+        lat, lon = coord.get("lat"), coord.get("lon")
+        if lat is not None and lon is not None and lamin <= lat <= lamax and lomin <= lon <= lomax:
+            return True
+    return False
+
+
+@app.route("/api/metar")
+def api_metar():
+    now = time.time()
+    if _metar_cache["data"] is not None and now - _metar_cache["ts"] < METAR_MIN_INTERVAL:
+        return jsonify(_metar_cache["data"])
+    bbox = f"{BBOX['lamin']},{BBOX['lomin']},{BBOX['lamax']},{BBOX['lomax']}"
+    try:
+        resp = requests.get(f"{AVIATIONWEATHER_BASE}/metar", params={"bbox": bbox, "format": "json"}, timeout=10)
+        resp.raise_for_status()
+        payload = resp.json()
+        _metar_cache["data"] = payload
+        _metar_cache["ts"] = now
+        return jsonify(payload)
+    except requests.RequestException:
+        if _metar_cache["data"] is not None:
+            return jsonify(_metar_cache["data"])
+        return jsonify([]), 502
+
+
+@app.route("/api/sigmet")
+def api_sigmet():
+    now = time.time()
+    if _sigmet_cache["data"] is not None and now - _sigmet_cache["ts"] < SIGMET_MIN_INTERVAL:
+        return jsonify(_sigmet_cache["data"])
+    try:
+        resp = requests.get(f"{AVIATIONWEATHER_BASE}/isigmet", params={"format": "json"}, timeout=10)
+        resp.raise_for_status()
+        payload = resp.json()
+        filtered = [s for s in payload if _sigmet_intersects_area(s)]
+        _sigmet_cache["data"] = filtered
+        _sigmet_cache["ts"] = now
+        return jsonify(filtered)
+    except requests.RequestException:
+        if _sigmet_cache["data"] is not None:
+            return jsonify(_sigmet_cache["data"])
+        return jsonify([]), 502
 
 
 if __name__ == "__main__":

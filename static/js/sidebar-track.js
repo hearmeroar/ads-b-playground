@@ -535,6 +535,8 @@ async function loadAdsbdb(icao24, info) {
 
 function selectAircraft(icao24) {
   selectedIcao24 = icao24;
+  const saveBtn = document.getElementById('sidebar-save-collection');
+  if (saveBtn) saveBtn.classList.remove('saved');
   trackUsesLiveFallback = false;
   drawTrack(null); // never leave the previously selected aircraft's path visible
   loadTrack(icao24);

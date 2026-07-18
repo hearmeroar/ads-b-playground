@@ -10,3 +10,5 @@ playwright-report/
 .track_cache.json
 .aircraft_identity_cache.jsonl
 .identity_history.jsonl
+.users.jsonl
+.collections.jsonl

@@ -23,6 +23,13 @@
     </svg>
   </button>
   <button type="button" id="sidebar-close" aria-label="Close">&times;</button>
+  <button type="button" id="sidebar-save-collection" aria-label="Save to collection">
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"
+            fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linejoin="round"/>
+    </svg>
+  </button>
   <div id="sidebar-header"></div>
   <div id="sidebar-gallery"></div>
   <div id="sidebar-route"></div>
@@ -53,12 +60,29 @@
   </div>
 </div>
 
+<div id="collection-panel" hidden>
+  <div id="collection-panel-header">
+    <span>My collection</span>
+    <button type="button" id="collection-panel-close" aria-label="Close">&times;</button>
+  </div>
+  <div id="collection-panel-grid"></div>
+</div>
+
 <div id="hud">
   <div class="count-row">
     <span class="live-dot"></span>
     <span class="count" id="count">–</span>
   </div>
   <div class="label">aircraft in view</div>
+
+  <div class="filter-block" id="auth-block">
+    <div class="source-row" id="auth-status-row">
+      <span class="source-name" id="auth-status">Sign in with Google</span>
+    </div>
+    <div class="source-row">
+      <button type="button" class="hud-text-button" id="collection-toggle">My collection</button>
+    </div>
+  </div>
 
   <div class="sources">
     <div class="source-row" id="source-opensky">
@@ -219,20 +243,37 @@
 
   <div class="filter-block">
     <div class="filter-title">Weather</div>
-    <div class="dropdown" id="weather-filter">
-      <button type="button" class="dropdown-trigger">
-        <span class="dropdown-value-wrap">
-          <span class="dropdown-value">Off</span>
-        </span>
-        <svg class="dropdown-caret" width="10" height="6" viewBox="0 0 10 6">
-          <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-      <div class="dropdown-menu">
-        <div class="dropdown-option active" data-value="off">Off</div>
-        <div class="dropdown-option" data-value="radar" title="Live precipitation radar composite (RainViewer, refreshed every ~5 min)">Precipitation</div>
-        <div class="dropdown-option" data-value="nowcast" title="Short-range precipitation forecast (RainViewer nowcast — not always available)">Forecast</div>
-      </div>
+    <div class="source-row" title="Live precipitation radar composite (RainViewer, refreshed every ~5 min)">
+      <span class="swatch" style="background:#3b82f6"></span>
+      <span class="source-name">Precipitation</span>
+      <label class="switch" style="--row-color:#3b82f6">
+        <input type="checkbox" id="toggle-weather-precip">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Short-range precipitation forecast (RainViewer nowcast — not always published)">
+      <span class="swatch" style="background:#93c5fd"></span>
+      <span class="source-name">Forecast</span>
+      <label class="switch" style="--row-color:#93c5fd">
+        <input type="checkbox" id="toggle-weather-nowcast">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Significant weather hazards for aviation — icing, turbulence, convective activity, ash, etc. (aviationweather.gov international SIGMETs)">
+      <span class="swatch" style="background:#f59e0b"></span>
+      <span class="source-name">SIGMET</span>
+      <label class="switch" style="--row-color:#f59e0b">
+        <input type="checkbox" id="toggle-weather-sigmet">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Airport weather station observations — wind, visibility, ceiling, flight category (aviationweather.gov METAR)">
+      <span class="swatch" style="background:#10b981"></span>
+      <span class="source-name">METAR</span>
+      <label class="switch" style="--row-color:#10b981">
+        <input type="checkbox" id="toggle-weather-metar">
+        <span class="switch-track"></span>
+      </label>
     </div>
   </div>
 
@@ -286,6 +327,7 @@
 <script src="js/route-validation.js"></script>
 <script src="js/state-filters.js"></script>
 <script src="js/sidebar-track.js"></script>
+<script src="js/auth-collection.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/render-details.js"></script>
 <script src="js/parsers.js"></script>

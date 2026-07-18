@@ -190,27 +190,44 @@ function setBaseLayer(key) {
   map.addLayer(baseLayers[currentBaseLayerKey]);
 }
 
-// Weather radar overlay — RainViewer (https://www.rainviewer.com/api.html),
-// free, no API key, and (confirmed via curl -I) sends
-// Access-Control-Allow-Origin: * on both its discovery JSON and its tile
-// images. That's the actual reason every other source in this app goes
-// through a backend proxy (OpenSky sends no CORS headers at all) — since
-// RainViewer already sends an open one, calling it straight from the
-// browser follows the same rule as everywhere else, not an exception to it.
-// Off by default (#weather-filter in state-filters.js, same supplementary-
-// display-toggle convention as scan-radius rings).
-//
+// --- Weather layers ---------------------------------------------------------
+// Four independent, simultaneously-toggleable layers (#weather-filter's own
+// checkboxes in state-filters.js — deliberately not a single-select picker
+// like the basemap one, since e.g. Precipitation + SIGMET together is a very
+// normal combination to want on at once):
+//   - Precipitation / Forecast: RainViewer tile composites (see below).
+//   - SIGMET: aviation hazard-zone polygons (icing, turbulence, convective
+//     activity, ash) from aviationweather.gov, proxied via /api/sigmet since
+//     that source sends no CORS header at all (confirmed via curl -I -H
+//     "Origin: ..." — unlike RainViewer, this one genuinely needs the same
+//     kind of backend proxy OpenSky does).
+//   - METAR: airport weather-station observations from the same source, via
+//     /api/metar, rendered as small colored dots.
+// Each has its own enabled flag + refresh timer, all sharing one
+// WEATHER_REFRESH_INTERVAL_MS cadence — independent because a user turning
+// off SIGMET shouldn't stop e.g. Precipitation's own timer.
+const WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 // Dedicated pane, not the default tilePane: base layers (map-init.js's
-// baseLayers) also live in tilePane, and Leaflet stacks same-pane layers
-// by add order — switching basemaps calls map.addLayer() on the newly
-// chosen one *after* the weather layer was already added, which silently
-// buried the radar under the new base tiles (looked like the weather
-// layer "disappeared" on every basemap switch). A pane between tilePane
-// (200) and overlayPane (400, scan-radius rings) fixes this regardless of
-// which basemap is active or when it was switched.
+// baseLayers) also live in tilePane, and Leaflet stacks same-pane layers by
+// add order — switching basemaps calls map.addLayer() on the newly chosen
+// one *after* a weather tile layer was already added, which would silently
+// bury it under the new base tiles (looked like the weather layer
+// "disappeared" on every basemap switch). A pane between tilePane (200) and
+// overlayPane (400, scan-radius rings/SIGMET polygons/METAR markers) fixes
+// this regardless of which basemap is active or when it was switched. Only
+// the two RainViewer tile layers need this pane — SIGMET/METAR are vector
+// layers in the ordinary overlayPane, which was never affected by the
+// basemap-swap bug (base layers don't touch overlayPane at all).
 map.createPane('weatherPane');
 map.getPane('weatherPane').style.zIndex = 350;
 
+// --- Precipitation / Forecast (RainViewer, https://www.rainviewer.com/api.html) ---
+// Free, no API key, and (confirmed via curl -I) sends
+// Access-Control-Allow-Origin: * on both its discovery JSON and its tile
+// images — the first data source in this app callable directly from the
+// browser with no backend proxy, since CORS (not licensing) was always the
+// actual reason for one elsewhere.
 const RAINVIEWER_ATTRIBUTION = 'Weather &copy; <a href="https://www.rainviewer.com">RainViewer</a>';
 // RainViewer's radar tiles genuinely stop at native zoom 7 — confirmed by
 // fetching actual tile bytes (not just the HTTP status, which is 200
@@ -220,45 +237,148 @@ const RAINVIEWER_ATTRIBUTION = 'Weather &copy; <a href="https://www.rainviewer.c
 // requesting z>7 (it upscales the z=7 tile instead), while maxZoom stays
 // 19 so the layer still renders at the map's actual max zoom, just blurry
 // past z=7 rather than showing that placeholder image.
-const WEATHER_MODES = {
-  radar: { label: 'Precipitation', framesKey: 'past' },
-  nowcast: { label: 'Forecast', framesKey: 'nowcast' },
+const WEATHER_TILE_MODES = {
+  precip: { framesKey: 'past' },
+  nowcast: { framesKey: 'nowcast' }, // not always published — an empty result is normal, not an error
 };
-let weatherLayer = null;
-let currentWeatherMode = 'off'; // 'off' | 'radar' | 'nowcast'
-let weatherRefreshTimer = null;
+const weatherTileState = {
+  precip: { layer: null, enabled: false, timer: null },
+  nowcast: { layer: null, enabled: false, timer: null },
+};
 
-function refreshWeatherRadar() {
+function refreshWeatherTileLayer(key) {
+  const state = weatherTileState[key];
   fetch('https://api.rainviewer.com/public/weather-maps.json')
     .then((resp) => resp.json())
     .then((data) => {
-      if (currentWeatherMode === 'off') return; // switched off while this fetch was in flight
-      const modeCfg = WEATHER_MODES[currentWeatherMode];
-      const frames = data && data.radar && data.radar[modeCfg.framesKey];
-      if (weatherLayer) { map.removeLayer(weatherLayer); weatherLayer = null; }
-      if (!frames || !frames.length) return; // e.g. nowcast frames aren't always published
+      if (!state.enabled) return; // toggled off while this fetch was in flight
+      const frames = data && data.radar && data.radar[WEATHER_TILE_MODES[key].framesKey];
+      if (state.layer) { map.removeLayer(state.layer); state.layer = null; }
+      if (!frames || !frames.length) return;
       const latest = frames[frames.length - 1];
       const url = 'https://tilecache.rainviewer.com' + latest.path + '/256/{z}/{x}/{y}/2/1_1.png';
-      weatherLayer = L.tileLayer(url, {
+      state.layer = L.tileLayer(url, {
         attribution: RAINVIEWER_ATTRIBUTION, opacity: 0.6,
         maxZoom: 19, maxNativeZoom: 7, pane: 'weatherPane',
       });
-      weatherLayer.addTo(map);
+      state.layer.addTo(map);
     })
     .catch(() => {}); // a failed refresh just leaves the last-good frame showing
 }
 
-// RainViewer's own composite updates roughly every 10 minutes; polling
-// every 5 keeps the displayed frame from ever being too stale without
-// hammering it. Only runs while a mode other than 'off' is selected.
-function setWeatherMode(mode) {
-  currentWeatherMode = mode;
-  clearInterval(weatherRefreshTimer);
-  weatherRefreshTimer = null;
-  if (mode === 'off') {
-    if (weatherLayer) { map.removeLayer(weatherLayer); weatherLayer = null; }
+// RainViewer's own composite updates roughly every 10 minutes; polling every
+// 5 keeps the displayed frame from ever being too stale without hammering it.
+function setWeatherTileLayerEnabled(key, enabled) {
+  const state = weatherTileState[key];
+  state.enabled = enabled;
+  clearInterval(state.timer);
+  state.timer = null;
+  if (!enabled) {
+    if (state.layer) { map.removeLayer(state.layer); state.layer = null; }
     return;
   }
-  refreshWeatherRadar();
-  weatherRefreshTimer = setInterval(refreshWeatherRadar, 5 * 60 * 1000);
+  refreshWeatherTileLayer(key);
+  state.timer = setInterval(() => refreshWeatherTileLayer(key), WEATHER_REFRESH_INTERVAL_MS);
+}
+
+// --- SIGMET (significant weather hazards for aviation) ---------------------
+// aviationweather.gov's international-SIGMET endpoint ignores bbox/loc query
+// params entirely (confirmed live — identical global ~144-record response
+// regardless), so /api/sigmet does the "near our area" filtering server-side
+// instead; the frontend just renders whatever comes back.
+const SIGMET_HAZARD_COLORS = {
+  CONVECTIVE: '#dc2626', TS: '#dc2626', TURB: '#f97316', ICE: '#3b82f6',
+  ASH: '#78716c', IFR: '#a855f7', MTN_OBSCN: '#a855f7',
+};
+function sigmetColor(hazard) { return SIGMET_HAZARD_COLORS[hazard] || '#6b7280'; }
+
+const weatherSigmetState = { layer: null, enabled: false, timer: null };
+
+function refreshSigmet() {
+  fetch('/api/sigmet')
+    .then((resp) => resp.json())
+    .then((data) => {
+      if (!weatherSigmetState.enabled) return;
+      if (weatherSigmetState.layer) { map.removeLayer(weatherSigmetState.layer); weatherSigmetState.layer = null; }
+      if (!Array.isArray(data) || !data.length) return;
+      const group = L.layerGroup();
+      for (const sigmet of data) {
+        // sigmet.coords' shape depends on sigmet.geom: a single-polygon
+        // SIGMET ("AREA") is a flat list of {lat,lon} points; a
+        // multi-polygon one ("AREAS" — e.g. two separate boxes describing
+        // a "west of this line / east of that line" corridor, confirmed
+        // against a real FCBB/Brazzaville SIGMET) is a list of *rings*,
+        // each itself a list of points. Normalize both into a list of
+        // rings (length 1 for "AREA") and draw one polygon per ring.
+        const rawRings = sigmet.coords && sigmet.coords.length && Array.isArray(sigmet.coords[0])
+          ? sigmet.coords
+          : [sigmet.coords || []];
+        const label = [sigmet.hazard, sigmet.qualifier].filter(Boolean).join(' ');
+        const altRange = sigmet.base != null && sigmet.top != null ? `<br>${sigmet.base}-${sigmet.top} ft` : '';
+        for (const ring of rawRings) {
+          const coords = ring.filter((c) => c.lat != null && c.lon != null).map((c) => [c.lat, c.lon]);
+          if (coords.length < 3) continue; // not a real polygon
+          const poly = L.polygon(coords, { color: sigmetColor(sigmet.hazard), weight: 2, fillOpacity: 0.15 });
+          poly.bindPopup(`<b>${label}</b><br>${sigmet.firName || ''}${altRange}`);
+          group.addLayer(poly);
+        }
+      }
+      group.addTo(map);
+      weatherSigmetState.layer = group;
+    })
+    .catch(() => {});
+}
+
+function setSigmetEnabled(enabled) {
+  weatherSigmetState.enabled = enabled;
+  clearInterval(weatherSigmetState.timer);
+  weatherSigmetState.timer = null;
+  if (!enabled) {
+    if (weatherSigmetState.layer) { map.removeLayer(weatherSigmetState.layer); weatherSigmetState.layer = null; }
+    return;
+  }
+  refreshSigmet();
+  weatherSigmetState.timer = setInterval(refreshSigmet, WEATHER_REFRESH_INTERVAL_MS);
+}
+
+// --- METAR (airport weather-station observations) --------------------------
+// Standard aviation flight-category colors (VFR/MVFR/IFR/LIFR), same
+// convention pilots and every aviation weather display already use.
+const METAR_CATEGORY_COLORS = { VFR: '#22c55e', MVFR: '#3b82f6', IFR: '#ef4444', LIFR: '#d946ef' };
+function metarColor(category) { return METAR_CATEGORY_COLORS[category] || '#6b7280'; }
+
+const weatherMetarState = { layer: null, enabled: false, timer: null };
+
+function refreshMetar() {
+  fetch('/api/metar')
+    .then((resp) => resp.json())
+    .then((data) => {
+      if (!weatherMetarState.enabled) return;
+      if (weatherMetarState.layer) { map.removeLayer(weatherMetarState.layer); weatherMetarState.layer = null; }
+      if (!Array.isArray(data) || !data.length) return;
+      const group = L.layerGroup();
+      for (const station of data) {
+        if (station.lat == null || station.lon == null) continue;
+        const marker = L.circleMarker([station.lat, station.lon], {
+          radius: 5, color: '#fff', weight: 1, fillColor: metarColor(station.fltCat), fillOpacity: 0.9,
+        });
+        marker.bindPopup(`<b>${station.name || station.icaoId || ''}</b><br><code>${station.rawOb || ''}</code>`);
+        group.addLayer(marker);
+      }
+      group.addTo(map);
+      weatherMetarState.layer = group;
+    })
+    .catch(() => {});
+}
+
+function setMetarEnabled(enabled) {
+  weatherMetarState.enabled = enabled;
+  clearInterval(weatherMetarState.timer);
+  weatherMetarState.timer = null;
+  if (!enabled) {
+    if (weatherMetarState.layer) { map.removeLayer(weatherMetarState.layer); weatherMetarState.layer = null; }
+    return;
+  }
+  refreshMetar();
+  weatherMetarState.timer = setInterval(refreshMetar, WEATHER_REFRESH_INTERVAL_MS);
 }

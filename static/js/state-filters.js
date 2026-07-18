@@ -111,30 +111,24 @@ scanRadiusToggle.addEventListener('change', () => {
   else map.removeLayer(scanRadiusLayer);
 });
 
-// Same custom-dropdown pattern as #basemap-filter/#category-filter.
-// setWeatherMode() (map-init.js) owns starting/stopping the refresh
-// interval and adding/removing the tile layer — purely presentational,
-// no poll() retrigger, like the basemap picker.
-const weatherDropdown = document.getElementById('weather-filter');
-const weatherTrigger = weatherDropdown.querySelector('.dropdown-trigger');
-const weatherValueWrap = weatherDropdown.querySelector('.dropdown-value-wrap');
-const weatherOptions = weatherDropdown.querySelectorAll('.dropdown-option');
-
-weatherTrigger.addEventListener('click', (e) => {
-  e.stopPropagation();
-  weatherDropdown.classList.toggle('open');
+// Four independent checkboxes (any combination can be on at once —
+// deliberately not the basemap picker's single-select dropdown, since e.g.
+// Precipitation + SIGMET together is a normal thing to want). Each setter
+// (map-init.js) owns starting/stopping its own refresh interval and adding/
+// removing its own layer — purely presentational, no poll() retrigger, same
+// as the scan-radius toggle above.
+document.getElementById('toggle-weather-precip').addEventListener('change', (e) => {
+  setWeatherTileLayerEnabled('precip', e.target.checked);
 });
-weatherOptions.forEach((opt) => {
-  opt.addEventListener('click', () => {
-    weatherOptions.forEach((o) => o.classList.remove('active'));
-    opt.classList.add('active');
-    const mode = opt.dataset.value;
-    setWeatherMode(mode);
-    weatherValueWrap.innerHTML = '<span class="dropdown-value">' + opt.textContent + '</span>';
-    weatherDropdown.classList.remove('open');
-  });
+document.getElementById('toggle-weather-nowcast').addEventListener('change', (e) => {
+  setWeatherTileLayerEnabled('nowcast', e.target.checked);
 });
-document.addEventListener('click', () => weatherDropdown.classList.remove('open'));
+document.getElementById('toggle-weather-sigmet').addEventListener('change', (e) => {
+  setSigmetEnabled(e.target.checked);
+});
+document.getElementById('toggle-weather-metar').addEventListener('change', (e) => {
+  setMetarEnabled(e.target.checked);
+});
 
 const GROUND_VEHICLE_MARKERS = new Set(['TWR']);
 const GROUND_VEHICLE_CALLSIGN_RE = /^[A-Z]{4}\d{2}$/;

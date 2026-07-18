@@ -123,6 +123,12 @@ later if a real need for it shows up.
   anonymous access.
 - Optional OAuth2 auth against OpenSky for a much higher daily quota than
   anonymous access.
+- **Aircraft collection** — sign in with Google, then save any aircraft
+  you're looking at (a small bookmark button in the sidebar) as a card:
+  registration, type, manufacturer, operator, country, and a photo, snapshotted
+  at save time so the card stays meaningful long after the aircraft is gone
+  from any live feed. Browse, and remove, saved cards from a "My collection"
+  panel opened from the HUD.
 
 ## Quick start
 
@@ -149,6 +155,18 @@ Copy `.env.example` to `.env` to enable:
   AeroAPI](https://www.flightaware.com/commercial/aeroapi/). Enables the
   FlightAware source on the map; without it, the source shows empty. Optional.
   Note: this is a paid, metered API; each poll costs quota.
+- `SECRET_KEY` — signs the login session cookie. Without it, a random key is
+  generated on every process start, which logs everyone out on every
+  restart (including Flask debug's auto-reload on each file save) — set a
+  fixed value so logins survive restarts.
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — OAuth 2.0 credentials for
+  "Sign in with Google" (the aircraft collection feature). Create an OAuth
+  client in the [Google Cloud Console](https://console.cloud.google.com/)
+  (APIs & Services → Credentials → OAuth client ID → Web application), and
+  add both `http://127.0.0.1:5000/api/login/google/callback` (dev) and
+  `http://127.0.0.1:5050/api/login/google/callback` (test runner) as
+  authorized redirect URIs. Without these, `/api/login/google` returns
+  `not_configured` instead of starting the OAuth flow.
 
 ## Tests
 
@@ -176,8 +194,9 @@ A handful of plain files carry all the logic:
   `/api/identity/<icao24>`. No external API, no database.
 - `static/index.html` — the frontend markup (map container, HUD, sidebar).
 - `static/js/` — the frontend logic (Leaflet map, polling, marker rendering,
-  filters, photo/track features) as nine plain classic `<script src>` files
-  loaded in a fixed order — still no framework and no build step.
+  filters, photo/track features, Google sign-in + the aircraft collection)
+  as ten plain classic `<script src>` files loaded in a fixed order — still
+  no framework and no build step.
 - `static/style.css` — the frontend's styling, linked from `index.html`.
 - `static/flag-icons/` — the [flag-icons](https://github.com/lipis/flag-icons)
   SVG library (CSS + `flags/4x3/`), vendored as plain files (via `npm install

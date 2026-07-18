@@ -44,6 +44,16 @@ def reset_caches(monkeypatch, tmp_path):
     monkeypatch.setattr(app, "IDENTITY_CACHE_FILE", str(tmp_path / "identity_cache.jsonl"))
     monkeypatch.setattr(app, "IDENTITY_HISTORY_FILE", str(tmp_path / "identity_history.jsonl"))
     app._backfill_queue.clear()
+    app._users.clear()
+    # Redirect the persistent users store to a throwaway file, same rationale
+    # as the TRACK_CACHE_FILE/IDENTITY_CACHE_FILE redirects above.
+    monkeypatch.setattr(app, "USERS_FILE", str(tmp_path / "users.jsonl"))
+    app._collections.clear()
+    monkeypatch.setattr(app, "COLLECTIONS_FILE", str(tmp_path / "collections.jsonl"))
+    app._metar_cache.clear()
+    app._metar_cache.update({"data": None, "ts": 0.0})
+    app._sigmet_cache.clear()
+    app._sigmet_cache.update({"data": None, "ts": 0.0})
     yield
 
 
@@ -53,6 +63,16 @@ def no_oauth_by_default(monkeypatch):
     explicitly by overriding these within its own test functions."""
     monkeypatch.setattr(app, "CLIENT_ID", None)
     monkeypatch.setattr(app, "CLIENT_SECRET", None)
+
+
+@pytest.fixture(autouse=True)
+def no_google_oauth_by_default(monkeypatch):
+    """Most tests exercise the not_configured path for Sign-in-with-Google;
+    test_google_auth.py opts into a configured client explicitly within its
+    own tests that need the real authorize_redirect/authorize_access_token
+    calls mocked."""
+    monkeypatch.setattr(app, "GOOGLE_CLIENT_ID", None)
+    monkeypatch.setattr(app, "GOOGLE_CLIENT_SECRET", None)
 
 
 @pytest.fixture(autouse=True)
@@ -74,6 +94,14 @@ def mock_post(monkeypatch):
     mock = MagicMock()
     monkeypatch.setattr(app.requests, "post", mock)
     return mock
+
+
+def login_as(client, user_id):
+    """Test helper: simulate an already-logged-in session without exercising
+    the real Google OAuth redirect/callback dance. Directly sets the same
+    session key api_login_google_callback sets on a real login."""
+    with client.session_transaction() as sess:
+        sess["user_id"] = user_id
 
 
 def make_response(status_code=200, json_data=None, headers=None):
