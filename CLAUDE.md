@@ -49,6 +49,24 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python app.py        # runs on http://127.0.0.1:5000
 ```
 
+**Ports 5000 and 5050 are not arbitrary — Google Sign-In's redirect URI is
+locked to them.** The Google Cloud Console OAuth client backing
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (see "Aircraft collection" below)
+has its Authorized redirect URIs and JavaScript origins registered for
+exactly `127.0.0.1`/`localhost` on `5000` (the app's normal port) and `5050`
+(the Playwright test port) and no others:
+- Redirect URIs: `http://127.0.0.1:5000/api/login/google/callback`,
+  `http://127.0.0.1:5050/api/login/google/callback`,
+  `http://localhost:5000/api/login/google/callback`,
+  `http://localhost:5050/api/login/google/callback`
+- JavaScript origins: `http://127.0.0.1:5000`, `http://127.0.0.1:5050`,
+  `http://localhost:5000`, `http://localhost:5050`
+
+Running `app.py` on any other port (e.g. via `PORT=5001` or picking a free
+port automatically) makes Google's OAuth consent screen reject the
+callback — always launch it on 5000 (or let `playwright.config.js` launch
+it on 5050 for tests), never a different port, even if 5000 looks busy.
+
 No linter or build step exists in this project. Tests:
 
 ```bash
@@ -1502,6 +1520,11 @@ because photographer name and photo URL come from an external API.
     re-exec on each file save (see `_should_start_background_thread()`
     below for the same restart-vs-reloader distinction), silently logs
     everyone out; set `SECRET_KEY` for logins to survive restarts.
+    **The OAuth client's redirect URI/JS origins are registered for ports
+    5000 and 5050 only** — see the "Commands" section at the top of this
+    file for the exact list; running the app on any other port breaks
+    the Google login flow even though everything else about the app
+    works fine on an arbitrary port.
   - **Users store** (`_users`, `USERS_FILE`/`.users.jsonl`): same atomic
     tmp-file-then-`os.replace` JSONL idiom as `_identity_cache`/
     `IDENTITY_CACHE_FILE` above — `_load_users()`/`_save_users()` mirror
