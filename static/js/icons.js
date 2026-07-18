@@ -22,15 +22,6 @@ function rotatedDivIcon(cssClass, size, anchor, headingDeg, color, svgInner, vie
   return L.divIcon({ className: '', html: html, iconSize: [size, size], iconAnchor: [anchor, anchor] });
 }
 
-// Default glyph (Material Design "flight" icon) — used for any category
-// group without its own dedicated icon below (glider, lighter_than_air,
-// parachutist, ultralight, space, unknown).
-function planeIcon(headingDeg, color) {
-  return rotatedDivIcon('', 28, 14, headingDeg, color,
-    '<path d="M21,16v-2l-8-5V3.5C13,2.67,12.33,2,11.5,2S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2.5,1.5V22l4-1l4,1v-1.5' +
-          'L13,19v-5.5L21,16z" fill="' + color + '" stroke="#fff" stroke-width="0.8"/>');
-}
-
 // Default glyph (Material Design "flight" icon, 24×24 viewBox) — used for
 // the uav category, which has no dedicated per-category artwork in the
 // icon set.
@@ -60,107 +51,42 @@ const SURFACE_OBSTACLE_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 
 // Unknown / no-category aircraft (ADS-B Radar a0.svg — "no ADS-B info" variant).
 const UNKNOWN_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="COLOR" stroke="#fff" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.2539 C 147.119 -41.8457 138.086 -46.6797 127.344 -46.6797 L 103.125 -46.6797 C 100.049 -46.6797 98.877 -47.168 96.9238 -49.2676 L 59.2773 -90.4785 C 58.0566 -91.7969 56.5918 -92.5293 55.0293 -92.5293 L 48.4375 -92.5293 C 46.9727 -92.5293 46.1426 -91.2109 46.875 -89.6484 L 66.2598 -46.6797 L 34.9121 -43.5547 L 24.6582 -62.1582 C 23.8281 -63.4766 22.9004 -64.0625 21.0938 -64.0625 L 18.3594 -64.0625 C 16.8945 -64.0625 16.0645 -63.2812 16.0645 -61.7676 L 16.0645 -8.78906 C 16.0645 -7.22656 16.8945 -6.49414 18.3594 -6.49414 L 21.0938 -6.49414 C 22.9004 -6.49414 23.8281 -7.08008 24.6582 -8.39844 L 34.9121 -26.9531 L 66.2598 -23.877 L 46.875 19.1406 C 46.1426 20.6543 46.9727 21.9727 48.4375 21.9727 L 55.0293 21.9727 C 56.5918 21.9727 58.0566 21.2402 59.2773 19.9219 L 96.9238 -21.2402 C 98.877 -23.3887 100.049 -23.877 103.125 -23.877 L 127.344 -23.877 C 138.086 -23.877 147.119 -28.6621 147.119 -35.2539 Z"/></g>';
 
-function lightGlyph(color) {
-  return LIGHT_GLYPH.replace(/COLOR/g, color);
-}
-function smallGlyph(color) {
-  return SMALL_GLYPH.replace(/COLOR/g, color);
-}
-function largeGlyph(color) {
-  return LARGE_GLYPH.replace(/COLOR/g, color);
-}
-function highVortexLargeGlyph(color) {
-  return HIGH_VORTEX_LARGE_GLYPH.replace(/COLOR/g, color);
-}
-function heavyGlyph(color) {
-  return HEAVY_GLYPH.replace(/COLOR/g, color);
-}
-function highPerformanceGlyph(color) {
-  return HIGH_PERFORMANCE_GLYPH.replace(/COLOR/g, color);
-}
-function rotorcraftGlyph(color) {
-  return ROTORCRAFT_GLYPH.replace(/COLOR/g, color);
-}
-function gliderGlyph(color) {
-  return GLIDER_GLYPH.replace(/COLOR/g, color);
-}
-function lighterThanAirGlyph(color) {
-  return LIGHTER_THAN_AIR_GLYPH.replace(/COLOR/g, color);
-}
-function parachutistGlyph(color) {
-  return PARACHUTIST_GLYPH.replace(/COLOR/g, color);
-}
-function ultralightGlyph(color) {
-  return ULTRALIGHT_GLYPH.replace(/COLOR/g, color);
-}
-function unknownGlyph(color) {
-  return UNKNOWN_GLYPH.replace(/COLOR/g, color);
+// Every per-category marker icon differs only in its glyph and CSS class,
+// so one table + one factory replaces the old per-category function pairs.
+// Keys are category groups with a dedicated ADS-B Radar glyph; uav is the
+// one exception (generic Material Design glyph, different size/viewBox —
+// see uavIcon) and joins ICON_BUILDERS separately below.
+const CATEGORY_GLYPHS = {
+  light: LIGHT_GLYPH,                     // OpenSky cat 2 / ADSBExchange A1
+  small: SMALL_GLYPH,                     // cat 3 / A2
+  large: LARGE_GLYPH,                     // cat 4 / A3
+  high_vortex_large: HIGH_VORTEX_LARGE_GLYPH, // 747/A380-class, cat 5 / A4
+  heavy: HEAVY_GLYPH,                     // cat 6 / A5
+  high_performance: HIGH_PERFORMANCE_GLYPH,   // cat 7 / A6
+  rotorcraft: ROTORCRAFT_GLYPH,           // cat 8 / A7
+  glider: GLIDER_GLYPH,                   // cat 9 / B1
+  lighter_than_air: LIGHTER_THAN_AIR_GLYPH,   // cat 10 / B2
+  parachutist: PARACHUTIST_GLYPH,         // cat 11 / B3
+  ultralight: ULTRALIGHT_GLYPH,           // cat 12 / B4
+  unknown: UNKNOWN_GLYPH,                 // cat 0 / absent (a0.svg) — also iconFor()'s fallback
+  // space: intentionally absent — falls through to the unknown icon in iconFor().
+};
+
+// The CSS class is exactly what the old per-category builders used
+// ("light-icon", "high-vortex-large-icon", ...) — style.css and the tests
+// key off these names, so the underscore→hyphen derivation must not change.
+function categoryIcon(group, headingDeg, color) {
+  const cssClass = group.replace(/_/g, '-') + '-icon';
+  return rotatedDivIcon(cssClass, 20, 10, headingDeg, color,
+    CATEGORY_GLYPHS[group].replace(/COLOR/g, color), '0 0 200 200');
 }
 
-// Light (OpenSky cat 2 / ADSBExchange A1).
-function lightIcon(headingDeg, color) {
-  return rotatedDivIcon('light-icon', 20, 10, headingDeg, color, lightGlyph(color), '0 0 200 200');
-}
-
-// Small (OpenSky cat 3 / ADSBExchange A2).
-function smallIcon(headingDeg, color) {
-  return rotatedDivIcon('small-icon', 20, 10, headingDeg, color, smallGlyph(color), '0 0 200 200');
-}
-
-// Large (OpenSky cat 4 / ADSBExchange A3).
-function largeIcon(headingDeg, color) {
-  return rotatedDivIcon('large-icon', 20, 10, headingDeg, color, largeGlyph(color), '0 0 200 200');
-}
-
-// Heavy (OpenSky cat 6 / ADSBExchange A5).
-function heavyIcon(headingDeg, color) {
-  return rotatedDivIcon('heavy-icon', 20, 10, headingDeg, color, heavyGlyph(color), '0 0 200 200');
-}
-
-// High performance (OpenSky cat 7 / ADSBExchange A6).
-function highPerformanceIcon(headingDeg, color) {
-  return rotatedDivIcon('high-performance-icon', 20, 10, headingDeg, color, highPerformanceGlyph(color), '0 0 200 200');
-}
-
-// High vortex large (747/A380-class, OpenSky cat 5 / ADSBExchange A4).
-function highVortexLargeIcon(headingDeg, color) {
-  return rotatedDivIcon('high-vortex-large-icon', 20, 10, headingDeg, color, highVortexLargeGlyph(color), '0 0 200 200');
-}
-
-// Rotorcraft (OpenSky cat 8 / ADSBExchange A7).
-function rotorcraftIcon(headingDeg, color) {
-  return rotatedDivIcon('rotorcraft-icon', 20, 10, headingDeg, color, rotorcraftGlyph(color), '0 0 200 200');
-}
-
-// Glider (OpenSky cat 9 / ADSBExchange B1).
-function gliderIcon(headingDeg, color) {
-  return rotatedDivIcon('glider-icon', 20, 10, headingDeg, color, gliderGlyph(color), '0 0 200 200');
-}
-
-// Lighter than air (OpenSky cat 10 / ADSBExchange B2).
-function lighterThanAirIcon(headingDeg, color) {
-  return rotatedDivIcon('lighter-than-air-icon', 20, 10, headingDeg, color, lighterThanAirGlyph(color), '0 0 200 200');
-}
-
-// Parachutist (OpenSky cat 11 / ADSBExchange B3).
-function parachutistIcon(headingDeg, color) {
-  return rotatedDivIcon('parachutist-icon', 20, 10, headingDeg, color, parachutistGlyph(color), '0 0 200 200');
-}
-
-// Ultralight (OpenSky cat 12 / ADSBExchange B4).
-function ultralightIcon(headingDeg, color) {
-  return rotatedDivIcon('ultralight-icon', 20, 10, headingDeg, color, ultralightGlyph(color), '0 0 200 200');
-}
-
-// UAV (OpenSky cat 14 / ADSBExchange B6).
+// UAV (OpenSky cat 14 / ADSBExchange B6) — deliberately keeps the generic
+// Material Design glyph rather than the icon set's b0.svg, which is used
+// for the category dropdown only (no re-approval was given to change the
+// on-map UAV glyph).
 function uavIcon(headingDeg, color) {
   return rotatedDivIcon('uav-icon', 28, 14, headingDeg, color, genericGlyph(color));
-}
-
-// Unknown / no category info (OpenSky cat 0 / ADSBExchange absent) — uses
-// ADS-B Radar icon set (a0.svg) instead of the generic fallback silhouette.
-function unknownIcon(headingDeg, color) {
-  return rotatedDivIcon('unknown-icon', 20, 10, headingDeg, color, unknownGlyph(color), '0 0 200 200');
 }
 
 // Surface obstacle icon for ground stations/vehicles (`isGroundVehicle` or
@@ -172,22 +98,10 @@ function towerIcon(color) {
   return rotatedDivIcon('surface-obstacle-icon', 20, 10, 0, color, SURFACE_OBSTACLE_GLYPH, '0 0 200 200');
 }
 
-const ICON_BUILDERS = {
-  light: lightIcon,
-  small: smallIcon,
-  large: largeIcon,
-  heavy: heavyIcon,
-  high_performance: highPerformanceIcon,
-  high_vortex_large: highVortexLargeIcon,
-  rotorcraft: rotorcraftIcon,
-  glider: gliderIcon,
-  lighter_than_air: lighterThanAirIcon,
-  parachutist: parachutistIcon,
-  ultralight: ultralightIcon,
-  uav: uavIcon,
-  unknown: unknownIcon,
-  // space: intentionally absent — falls through to the unknown icon below.
-};
+const ICON_BUILDERS = { uav: uavIcon };
+for (const group of Object.keys(CATEGORY_GLYPHS)) {
+  ICON_BUILDERS[group] = (headingDeg, color) => categoryIcon(group, headingDeg, color);
+}
 
 // Ground vehicles (either flagged by looksLikeGroundVehicle()'s heuristics,
 // which can fire even when category is absent/unknown, or by categoryGroup
@@ -200,7 +114,7 @@ function iconFor(item, color) {
     return towerIcon(color);
   }
   const builder = ICON_BUILDERS[item.categoryGroup];
-  return builder ? builder(item.heading, color) : unknownIcon(item.heading, color);
+  return builder ? builder(item.heading, color) : categoryIcon('unknown', item.heading, color);
 }
 
 // Creates/moves/removes markers in `markerMap` to match `items`

@@ -677,7 +677,12 @@ because photographer name and photo URL come from an external API.
   gets the correct icon and filter behavior. OpenSky's category takes
   priority only when it's a meaningful value (2+).
 - **Marker icon by category:** `iconFor(item, color)` dispatches on
-  `item.categoryGroup` via the `ICON_BUILDERS` lookup table. Each category
+  `item.categoryGroup` via the `ICON_BUILDERS` lookup table, which is built
+  from `CATEGORY_GLYPHS` (a `{group: glyph}` table) by the shared
+  `categoryIcon(group, headingDeg, color)` factory — the per-category CSS
+  class is derived as `group.replace(/_/g, '-') + '-icon'`, which must keep
+  producing the exact class names style.css and the tests key off
+  (`light-icon`, `high-vortex-large-icon`, ...). Each category
   group (`light`, `small`, `large`, `heavy`, `high_performance`,
   `high_vortex_large`, `rotorcraft`, `glider`, `lighter_than_air`,
   `parachutist`, `ultralight`, `uav`, `unknown`) has its own dedicated SVG
@@ -688,12 +693,13 @@ because photographer name and photo URL come from an external API.
   `SOURCE_COLORS`) via a wrapping `<g fill="COLOR">` and outlined in white
   with `vector-effect="non-scaling-stroke"` to keep the outline a constant
   ~1px on-screen regardless of scale. `unknown` uses `a0.svg` (the icon
-  set's "no ADS-B info" variant) via `unknownIcon()`/`UNKNOWN_GLYPH`; the
-  `space` category group (absent from `ICON_BUILDERS`, no dedicated icon in
+  set's "no ADS-B info" variant, `UNKNOWN_GLYPH`); the
+  `space` category group (absent from `CATEGORY_GLYPHS`, no dedicated icon in
   the set, and removed from the category filter dropdown as not relevant to
-  this tracker's region) also falls through to `unknownIcon()` — `iconFor()`
-  uses it as the default whenever `ICON_BUILDERS` has no entry for a
-  category group, including when category is absent/unrecognized entirely.
+  this tracker's region) also falls through to the unknown icon — `iconFor()`
+  uses `categoryIcon('unknown', ...)` as the default whenever `ICON_BUILDERS`
+  has no entry for a category group, including when category is
+  absent/unrecognized entirely.
   `uav` is kept as a generic Material Design glyph even though the icon set
   has a UAV-shaped file (`b0.svg`) — that file is used for the category
   dropdown only (see below), not the map marker, since no re-approval was
