@@ -506,23 +506,38 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   let route = '';
   if (routeHas) {
     if (isReject) {
-      // Reject-band routes are hidden entirely in normal mode — a "Not
-      // confirmed" card with no other info reads as clutter for a route
-      // that's essentially known to be wrong. Dev mode keeps showing it,
-      // same as every other dev-mode-only visibility exception here, since
-      // seeing that adsbdb resolved *something* (even a rejected one) is
-      // useful when debugging the enrichment chain.
+      // Reject-band routes are hidden entirely in normal mode — the
+      // confidence is so low the airports are essentially known to be wrong.
+      // Dev mode shows the card with "Not confirmed" but NO airport pair
+      // (they're not useful when confidence is <40).
       if (currentDevMode) {
         route = '<div class="route-card route-card-unconfirmed">'
           + '<div class="route-card-title">Route <span class="route-card-tag">Not confirmed</span></div>'
           + '<div class="route-card-footer">' + routeConfidenceBadge + routeDevBadge + '</div>'
           + '</div>';
       }
+    } else if (isLow) {
+      // Low-band routes are hidden in normal mode too — confidence uncertain
+      // enough to mislead. Dev mode shows them with "⚠ Unverified" and the
+      // real airport pair so enrichment can be debugged.
+      if (currentDevMode) {
+        const origin = splitAirportString(info.originAirport);
+        const dest = splitAirportString(info.destinationAirport);
+        route = '<div class="route-card route-card-low">'
+          + '<div class="route-card-title">Route <span class="route-card-tag">⚠ Unverified</span></div>'
+          + '<div class="route-card-endpoints">'
+          + '<div class="route-card-endpoint"><div class="route-card-code">' + (origin.code || '—') + '</div><div class="route-card-city">' + origin.name + '</div></div>'
+          + '<div class="route-card-arrow">' + routeArrowIconHtml(routeCategoryGroup) + '</div>'
+          + '<div class="route-card-endpoint"><div class="route-card-code">' + (dest.code || '—') + '</div><div class="route-card-city">' + dest.name + '</div></div>'
+          + '</div>'
+          + '<div class="route-card-footer">' + routeConfidenceBadge + routeDevBadge + '</div>'
+          + '</div>';
+      }
     } else {
       const origin = splitAirportString(info.originAirport);
       const dest = splitAirportString(info.destinationAirport);
-      route = '<div class="route-card' + (isLow ? ' route-card-low' : '') + '">'
-        + '<div class="route-card-title">Route' + (isLow ? ' <span class="route-card-tag">⚠ Unverified</span>' : '') + '</div>'
+      route = '<div class="route-card">'
+        + '<div class="route-card-title">Route</div>'
         + '<div class="route-card-endpoints">'
         + '<div class="route-card-endpoint"><div class="route-card-code">' + (origin.code || '—') + '</div><div class="route-card-city">' + origin.name + '</div></div>'
         + '<div class="route-card-arrow">' + routeArrowIconHtml(routeCategoryGroup) + '</div>'

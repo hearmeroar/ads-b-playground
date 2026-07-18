@@ -167,12 +167,14 @@ test.describe('Route row end-to-end', () => {
     expect(devHtml).not.toContain('route-warning');
   });
 
-  // A 'low' (40-59) route is plausibly right, just imperfect — unlike
-  // 'reject', it still shows the real airport pair, with the existing ⚠.
+  // A 'low' (40-59) route is plausibly right, just imperfect — per feedback,
+  // both low and reject confidence routes are now hidden entirely in normal
+  // mode (confidence too uncertain to show specific airports). Dev mode
+  // keeps showing them with "⚠ Unverified" and the real airport pair.
   // Coordinates chosen (via brute-force search against aaaaaa's actual
   // fixture state — lat 44.0/lon 21.0, track 90°, 828 km/h, 10000m) to land
   // exactly in Low (score ≈59.9), not Medium or Reject.
-  test('a "low" confidence adsbdb route still shows the real airport pair, with a warning', async ({ page }) => {
+  test('a "low" confidence adsbdb route is hidden in normal mode, shown as "⚠ Unverified" in dev mode', async ({ page }) => {
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: null,
       flightroute: Object.assign({}, CONSISTENT_ROUTE, {
@@ -184,12 +186,16 @@ test.describe('Route row end-to-end', () => {
     await page.waitForSelector('.leaflet-marker-icon');
     await selectAircraft(page, 'aaaaaa', 'opensky');
 
-    const html = await routeHtml(page);
-    expect(html).toContain('route-card-tag');
-    expect(html).toContain('Unverified');
-    expect(html).toContain('⚠');
-    expect(html).toContain('West Airport');
-    expect(html).not.toContain('Not confirmed');
+    const normalHtml = await routeHtml(page);
+    expect(normalHtml || '').not.toContain('route-card');
+
+    await page.click('#toggle-dev-mode');
+    const devHtml = await routeHtml(page);
+    expect(devHtml).toContain('route-card-low');
+    expect(devHtml).toContain('Unverified');
+    expect(devHtml).toContain('⚠');
+    expect(devHtml).toContain('West Airport');
+    expect(devHtml).not.toContain('Not confirmed');
   });
 
   test('the confidence dot\'s tooltip shows the score breakdown (dev mode, since a Reject-band card only renders there)', async ({ page }) => {
