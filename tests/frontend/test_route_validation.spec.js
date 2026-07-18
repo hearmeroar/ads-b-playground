@@ -145,7 +145,13 @@ test.describe('Route row end-to-end', () => {
     expect(html).not.toContain('⚠');
   });
 
-  test('a geometrically implausible adsbdb route shows a warning even outside dev mode', async ({ page }) => {
+  // IMPLAUSIBLE_ROUTE scores 'reject' (~35/100, well past the 300km
+  // distance gate) — per live research, roughly a quarter of all adsbdb
+  // routes land here, so this isn't an edge case worth hiding gently: the
+  // specific (likely wrong) airport pair is replaced entirely rather than
+  // shown with just a warning, since naming a wrong city pair is more
+  // misleading than a plain "unconfirmed".
+  test('a rejected adsbdb route names no airports at all, just "Not confirmed"', async ({ page }) => {
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: null, flightroute: IMPLAUSIBLE_ROUTE,
     } }));
@@ -154,28 +160,54 @@ test.describe('Route row end-to-end', () => {
     await selectAircraft(page, 'aaaaaa', 'opensky');
 
     const html = await rowHtml(page, 'Route:');
-    expect(html).toContain('route-warning');
-    expect(html).toContain('⚠');
-    expect(html).toContain('Far Origin Airport (CCC)');
+    expect(html).toContain('route-not-confirmed');
+    expect(html).toContain('Not confirmed');
+    expect(html).not.toContain('Far Origin Airport');
+    expect(html).not.toContain('route-warning');
   });
 
-  test('dev mode shows the score breakdown in the Route badge tooltip', async ({ page }) => {
+  // A 'low' (40-59) route is plausibly right, just imperfect — unlike
+  // 'reject', it still shows the real airport pair, with the existing ⚠.
+  // Coordinates chosen (via brute-force search against aaaaaa's actual
+  // fixture state — lat 44.0/lon 21.0, track 90°, 828 km/h, 10000m) to land
+  // exactly in Low (score ≈59.9), not Medium or Reject.
+  test('a "low" confidence adsbdb route still shows the real airport pair, with a warning', async ({ page }) => {
+    await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
+      aircraft: null,
+      flightroute: Object.assign({}, CONSISTENT_ROUTE, {
+        origin: Object.assign({}, CONSISTENT_ROUTE.origin, { latitude: 45, longitude: 20 }),
+        destination: Object.assign({}, CONSISTENT_ROUTE.destination, { latitude: 23, longitude: -10 }),
+      }),
+    } }));
+    await page.goto('/');
+    await page.waitForSelector('.leaflet-marker-icon');
+    await selectAircraft(page, 'aaaaaa', 'opensky');
+
+    const html = await rowHtml(page, 'Route:');
+    expect(html).toContain('route-warning');
+    expect(html).toContain('⚠');
+    expect(html).toContain('West Airport');
+    expect(html).not.toContain('Not confirmed');
+  });
+
+  test('the confidence dot\'s tooltip shows the score breakdown, in both normal and dev mode', async ({ page }) => {
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: null, flightroute: IMPLAUSIBLE_ROUTE,
     } }));
     await page.goto('/');
     await page.waitForSelector('.leaflet-marker-icon');
-    await page.click('#toggle-dev-mode');
     await selectAircraft(page, 'aaaaaa', 'opensky');
 
+    // Visible and clickable without dev mode.
     await page.evaluate(() => {
       const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Route:');
       let node = b.nextSibling;
-      while (node && !(node.nodeType === 1 && node.classList.contains('source-badge'))) node = node.nextSibling;
+      while (node && !(node.nodeType === 1 && node.classList.contains('route-confidence-dot'))) node = node.nextSibling;
       node.click();
     });
     const tooltip = await page.textContent('#source-tooltip');
-    expect(tooltip).toContain('adsbdb.com');
     expect(tooltip).toContain('Reject confidence');
+    expect(tooltip).toContain('km off route');
+    expect(tooltip).toContain('% progress');
   });
 });

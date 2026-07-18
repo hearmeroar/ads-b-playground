@@ -227,6 +227,19 @@ html, body { margin: 0; padding: 0; height: 100%; }
    below the Medium threshold), shown in both normal and dev mode since a
    likely-wrong route is misleading either way. */
 #sidebar-details .route-warning { color: #b45309; font-weight: 600; }
+/* Reject-band adsbdb routes (~a quarter of them, per live research) don't
+   name specific likely-wrong airports at all. */
+#sidebar-details .route-not-confirmed { color: var(--muted); font-style: italic; }
+/* Slightly larger than .source-badge (9px vs 7px) so the two read as
+   distinct concepts at a glance — this conveys confidence, not which
+   source populated the field — despite sharing the same click-tooltip
+   mechanism (see main.js) and dot shape. Always visible (not gated by
+   dev mode, unlike .source-badge). */
+#sidebar-details .route-confidence-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  margin-left: 5px; cursor: pointer; vertical-align: middle;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+}
 #sidebar-details .detail-group { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 #sidebar-details .detail-group:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 #sidebar-details .detail-group-title {

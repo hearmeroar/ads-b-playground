@@ -125,9 +125,21 @@ function formatAdsbExchangeCategory(category) {
 const ROUTE_CONFIDENCE_BAND_LABELS = {
   very_high: 'Very High', high: 'High', medium: 'Medium', low: 'Low', reject: 'Reject',
 };
+// A green->red gradient distinct from SOURCE_COLORS (those color by *which
+// source* supplied a field; this colors by *how confident* Layer 2 is in an
+// adsbdb route) — a separate visual language so the two are never confused.
+// Reject reuses the same red as emergency/alert fields elsewhere in the
+// sidebar; that's an intentional exception to "red is reserved for
+// emergencies" — this is a distinct element (a small dot, not a text
+// color) and "essentially don't trust this" deserves the same urgency cue.
+const ROUTE_CONFIDENCE_BAND_COLORS = {
+  very_high: '#16a34a', high: '#65a30d', medium: '#f59e0b', low: '#ea580c', reject: '#dc2626',
+};
 
-// Human-readable breakdown for the Route badge's tooltip in dev mode — not
-// a value used anywhere else, purely explanatory.
+// Human-readable breakdown for the route confidence dot's tooltip — shown
+// in both normal and dev mode (unlike the per-source badges, which stay
+// dev-mode-only), since knowing *why* a route was flagged is useful
+// regardless of dev mode.
 function routeConfidenceDetail(rv) {
   const c = rv.checks;
   const parts = [];
@@ -136,6 +148,17 @@ function routeConfidenceDetail(rv) {
   parts.push(c.routeProgress.percent.toFixed(0) + '% progress');
   return (ROUTE_CONFIDENCE_BAND_LABELS[rv.band] || rv.band) + ' confidence ('
     + rv.score.toFixed(0) + '/100): ' + parts.join(', ');
+}
+
+// Always-visible (not dev-mode-gated) colored dot conveying Layer 2's
+// confidence band for an adsbdb-sourced route — clicking it reuses the
+// same shared #source-tooltip click mechanism as the per-source badges
+// (see main.js), distinguished there by the .route-confidence-dot class.
+function routeConfidenceDotHtml(routeValidation) {
+  const color = ROUTE_CONFIDENCE_BAND_COLORS[routeValidation.band] || '#6b7280';
+  const detail = routeConfidenceDetail(routeValidation);
+  return '<span class="route-confidence-dot" style="background:' + color + '" data-detail="'
+    + detail.replace(/"/g, '&quot;') + '" title="' + (ROUTE_CONFIDENCE_BAND_LABELS[routeValidation.band] || routeValidation.band) + '"></span>';
 }
 
 function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation) {
@@ -202,30 +225,33 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const registeredOwnerValue = info.registeredOwner
     ? (registeredOwnerFlagHtml ? registeredOwnerFlagHtml + ' ' + info.registeredOwner : info.registeredOwner)
     : null;
-  // Route gets bespoke handling rather than a plain detailRow: a
-  // Layer-2-validated (adsbdb-sourced) route below the Medium confidence
-  // threshold (60) is still shown — never hidden — but with a visible
-  // warning, in BOTH normal and dev mode, since a likely-wrong route is
-  // misleading regardless of dev mode. The dev-mode badge, when a
-  // validation result exists, carries the full score breakdown instead of
-  // the generic per-source dot(s).
+  // Route gets bespoke handling rather than a plain detailRow. A
+  // Layer-2-validated (adsbdb-sourced) route always carries a colored
+  // confidence dot (see routeConfidenceDotHtml — always visible, not
+  // dev-mode-gated, since knowing how much to trust a route matters
+  // regardless of dev mode). Reject-band routes (~a quarter of adsbdb's
+  // routes on live research — a wrong historical callsign match, not just
+  // a slightly-off one) don't name specific, likely-wrong airports at all;
+  // "Low" still shows the real route text with the existing ⚠ warning,
+  // since it's plausibly right, just imperfect.
   const routeHas = info.originAirport && info.destinationAirport;
-  const routeLowConfidence = routeValidation && routeValidation.score < 60;
+  const isReject = routeValidation && routeValidation.band === 'reject';
+  const isLow = routeValidation && routeValidation.band === 'low';
   let routeValueHtml = null;
-  if (routeHas) {
+  if (isReject) {
+    routeValueHtml = '<span class="route-not-confirmed">Not confirmed</span>';
+  } else if (routeHas) {
     const routeText = info.originAirport + ' → ' + info.destinationAirport;
-    routeValueHtml = routeLowConfidence
+    routeValueHtml = isLow
       ? '<span class="route-warning" title="Low-confidence route (adsbdb): validate before trusting">⚠ ' + routeText + '</span>'
       : routeText;
   }
-  let routeBadge = '';
-  if (currentDevMode) {
-    routeBadge = routeValidation
-      ? '<span class="source-badge" data-source="adsbdb" data-detail="' + routeConfidenceDetail(routeValidation) + '"></span>'
-      : sourceBadgeHtml(['originAirport', 'destinationAirport'], fieldSources, fieldConfidence, fieldComputationBasis);
-  }
+  const routeConfidenceDot = routeValidation ? routeConfidenceDotHtml(routeValidation) : '';
+  const routeSourceBadge = currentDevMode
+    ? sourceBadgeHtml(['originAirport', 'destinationAirport'], fieldSources, fieldConfidence, fieldComputationBasis)
+    : '';
   const routeRow = (routeHas || currentDevMode)
-    ? '<b>Route:</b> ' + (routeValueHtml || dash) + routeBadge
+    ? '<b>Route:</b> ' + (routeValueHtml || dash) + routeConfidenceDot + routeSourceBadge
     : null;
   const identity = renderGroup('Identity', [
     detailRow('ICAO', info.icao24 ? info.icao24.toUpperCase() : null, 'icao24'),
@@ -234,11 +260,11 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     detailRow('Aircraft', info.aircraftType, 'aircraftType'),
     identityRow('Manufacturer', info.manufacturer, 'manufacturer'),
     identityRow('Model', info.model, 'model'),
+    identityRow('Year built', info.manufactureYear, 'manufactureYear'),
     identityRow('Operator', operatorValue, 'operator'),
+    identityRow('Registered Owner', registeredOwnerValue, 'registeredOwner'),
     identityRow('Country', countryValue, 'originCountry'),
     detailRow('Category', info.categoryDisplay, 'categoryDisplay'),
-    identityRow('Year built', info.manufactureYear, 'manufactureYear'),
-    identityRow('Registered Owner', registeredOwnerValue, 'registeredOwner'),
     routeRow,
   ]);
   const position = renderGroup('Position', [

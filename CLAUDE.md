@@ -779,18 +779,38 @@ because photographer name and photo URL come from an external API.
   since position/speed/altitude change continuously — deliberately
   uncached, unlike the network-backed adsbdb/enrichment lookups, since it's
   a cheap pure computation with no I/O of its own.
-  **UI**: a route scoring below 60 (Low/Reject) is never hidden — it still
-  renders, prefixed with a `⚠` and styled via `.route-warning` (amber, not
-  red — red stays reserved for emergency/alert fields), **in both normal
-  and dev mode**, since a likely-wrong route is misleading regardless of
-  dev-mode status. Dev mode additionally makes the Route row's badge
-  clickable to a tooltip with the score breakdown (band, total score,
-  track/distance/progress numbers) — reusing the same generic
-  `#source-tooltip` click mechanism already wired for Flywme's badges
-  (`main.js`), just with a route-specific `data-detail` string
-  (`routeConfidenceDetail()`, `static/js/render-details.js`) instead of the
-  generic per-field badge path, since a route's confidence is a composite
-  result, not a single field's resolution tier.
+  **UI**: every adsbdb-validated route carries a small colored
+  `.route-confidence-dot` (`routeConfidenceDotHtml()`, `static/js/
+  render-details.js`) next to the Route value — **always visible, not
+  dev-mode-gated**, unlike the per-source badges — since knowing how much
+  to trust a route matters regardless of dev mode. Five colors,
+  `ROUTE_CONFIDENCE_BAND_COLORS`, green→red matching the five bands
+  (Reject reuses emergency red — a deliberate exception to "red is
+  reserved for emergencies", justified since this is a distinct element, a
+  dot rather than text color, and "don't trust this" deserves the same
+  urgency cue). Clicking it reuses the same generic `#source-tooltip`
+  click-to-toggle mechanism already wired for the per-source badges
+  (`main.js`, extended to also match `.route-confidence-dot`), showing
+  `routeConfidenceDetail()`'s band name, score, and the
+  track/distance/progress breakdown numbers — **in both normal and dev
+  mode**, a deliberate choice (the team considered plain-language-only but
+  picked showing the numbers immediately, everywhere).
+  **Reject-band routes name no airports at all** — replaced with the
+  literal text "Not confirmed" (`.route-not-confirmed`, muted italic)
+  rather than showing a specific, likely-wrong city pair. This isn't a
+  rare edge case: live research across 100+ real aircraft found roughly a
+  **quarter of all adsbdb routes land in Reject** (e.g. a real aircraft
+  cruising over the Balkans whose callsign resolved to `JFK→DEL` or
+  `ICN→TSN`, thousands of km away) — naming the wrong cities would be more
+  misleading than a plain "unconfirmed". **Low-band routes still show the
+  real airport pair**, prefixed with `⚠` and styled via `.route-warning`
+  (amber) — unlike Reject, a Low route is plausibly still correct, just
+  imperfect, so hiding the names there isn't warranted. The dev-mode
+  per-source badge (`sourceBadgeHtml`, shows which source populated
+  `originAirport`/`destinationAirport` — almost always `adsbdb` here)
+  renders separately from the confidence dot, since they answer two
+  different questions ("which source" vs. "how much to trust it") that
+  happened to get conflated in an earlier version of this feature.
 - **Unit toggle** (`#unit-toggle`, `currentUnitSystem` = `'metric'` |
   `'imperial'`): purely a rendering concern. Internal data always stays in
   the units above; only the formatters used inside `renderDetailsHtml()`

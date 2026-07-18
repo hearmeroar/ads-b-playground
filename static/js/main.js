@@ -207,11 +207,19 @@ document.addEventListener('click', closeHelpPopovers);
 // differently-positioned tooltip.
 const sourceTooltipEl = document.getElementById('source-tooltip');
 sidebarDetailsEl.addEventListener('click', (e) => {
-  const badge = e.target.closest('.source-badge');
+  // .route-confidence-dot shares this same click-to-toggle tooltip
+  // mechanism but conveys a different concept (how much to trust an
+  // adsbdb route's geometry, not which source populated a field) — its
+  // data-detail is already the complete message, no source-name prefix.
+  const badge = e.target.closest('.source-badge, .route-confidence-dot');
   if (!badge) { sourceTooltipEl.setAttribute('hidden', ''); return; }
   e.stopPropagation();
-  sourceTooltipEl.textContent = SOURCE_DISPLAY_NAMES[badge.dataset.source] || badge.dataset.source;
-  if (badge.dataset.detail) sourceTooltipEl.textContent += ' — ' + badge.dataset.detail;
+  if (badge.classList.contains('route-confidence-dot')) {
+    sourceTooltipEl.textContent = badge.dataset.detail;
+  } else {
+    sourceTooltipEl.textContent = SOURCE_DISPLAY_NAMES[badge.dataset.source] || badge.dataset.source;
+    if (badge.dataset.detail) sourceTooltipEl.textContent += ' — ' + badge.dataset.detail;
+  }
   const r = badge.getBoundingClientRect();
   sourceTooltipEl.style.left = (r.left + window.scrollX) + 'px';
   sourceTooltipEl.style.top = (r.bottom + window.scrollY + 6) + 'px';
