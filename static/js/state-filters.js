@@ -99,6 +99,17 @@ const hideJunkToggle = document.getElementById('toggle-hide-junk');
 function hideNonAircraft() {
   return hideJunkToggle.checked;
 }
+
+// Purely presentational (no data to (re)fetch), so — like devModeToggle
+// above — this mutates the map directly instead of triggering poll().
+// scanRadiusLayer (map-init.js) is reassigned once /api/config resolves;
+// reading it here (rather than capturing it at listener-registration time)
+// picks up that later value automatically.
+const scanRadiusToggle = document.getElementById('toggle-scan-radius');
+scanRadiusToggle.addEventListener('change', () => {
+  if (scanRadiusToggle.checked) scanRadiusLayer.addTo(map);
+  else map.removeLayer(scanRadiusLayer);
+});
 const GROUND_VEHICLE_MARKERS = new Set(['TWR']);
 const GROUND_VEHICLE_CALLSIGN_RE = /^[A-Z]{4}\d{2}$/;
 function looksLikeGroundVehicle({ category, registration, aircraftType, callsign }) {

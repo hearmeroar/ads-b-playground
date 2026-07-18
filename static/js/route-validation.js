@@ -22,6 +22,22 @@ function haversineDistanceKm(lat1, lon1, lat2, lon2) {
   return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Point at a given distance+bearing from an origin (standard spherical
+// "destination point" formula, same Aviation Formulary family as
+// initialBearingDeg above) — used to place the scan-radius ring labels
+// (map-init.js) at true north of the map center.
+function destinationPoint(lat, lon, bearingDeg, distanceKm) {
+  const delta = distanceKm / EARTH_RADIUS_KM;
+  const theta = toRad(bearingDeg);
+  const phi1 = toRad(lat), lambda1 = toRad(lon);
+  const phi2 = Math.asin(Math.sin(phi1) * Math.cos(delta) + Math.cos(phi1) * Math.sin(delta) * Math.cos(theta));
+  const lambda2 = lambda1 + Math.atan2(
+    Math.sin(theta) * Math.sin(delta) * Math.cos(phi1),
+    Math.cos(delta) - Math.sin(phi1) * Math.sin(phi2),
+  );
+  return { lat: toDeg(phi2), lon: toDeg(lambda2) };
+}
+
 function initialBearingDeg(lat1, lon1, lat2, lon2) {
   const phi1 = toRad(lat1), phi2 = toRad(lat2);
   const dLambda = toRad(lon2 - lon1);

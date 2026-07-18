@@ -329,7 +329,7 @@ def api_config():
     # backend-owned AREA_CENTER instead of a hardcoded constant it has to
     # keep in sync by hand — see map-init.js. Pure local values, no I/O, so
     # (like /api/identity) this is deliberately uncached.
-    return jsonify({"center": AREA_CENTER, "zoom": AREA_ZOOM})
+    return jsonify({"center": AREA_CENTER, "zoom": AREA_ZOOM, "radius_nm": AREA_RADIUS_NM})
 
 
 @app.route("/api/states")

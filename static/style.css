@@ -470,3 +470,12 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #sidebar-icon-credit { font-size: 11px; color: var(--muted); padding: 10px 18px 14px; border-top: 1px solid var(--border); text-align: left; }
 #sidebar-icon-credit a { color: var(--muted); text-decoration: underline; }
 #sidebar-icon-credit a:hover { color: var(--ink); }
+
+/* Scan-radius range ring labels (map-init.js's L.divIcon markers) —
+   pointer-events:none so they never intercept map clicks/drags. */
+.radius-ring-label {
+  font-size: 10px; color: #64748b; background: rgba(255, 255, 255, 0.85);
+  padding: 1px 5px; border-radius: 3px; white-space: nowrap;
+  pointer-events: none; transform: translate(-50%, -50%);
+}
+.radius-ring-label-edge { color: #2563eb; font-weight: 600; }

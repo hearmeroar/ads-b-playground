@@ -184,7 +184,47 @@ call in `static/js/map-init.js` fetches the backend-owned values and self-correc
 if they drift. `map-init.js` has a hardcoded fallback (the original `[44.0, 21.0], 8`)
 so the map paints synchronously without waiting for `/api/config`; the fetch then
 happens and adjusts the view immediately if the backend differs. No more
-manual sync of six independent constants.
+manual sync of six independent constants. `/api/config` also exposes
+`radius_nm` (`AREA_RADIUS_NM`, 220) — the shared query radius every
+`RADIUS_SOURCES` entry's `center` is built from — which drives the
+scan-radius range rings below.
+
+**Scan-radius range rings** (`static/js/map-init.js`, toggled via
+`#toggle-scan-radius` in the HUD, wired in `static/js/state-filters.js`):
+a visual indicator of where the four radius sources' shared query area
+(`AREA_RADIUS_NM`) actually ends — off by default, its own HUD row (not
+grouped with the six data-source toggles, since it's a display option with
+no count/data of its own, same category as "Hide non-aircraft"). Drawn as
+concentric `L.circle` rings rather than one, since a single circle gives
+no sense of scale with nothing to compare it against — modeled on ATC/
+marine-radar range rings, which always use round evenly-spaced distances
+so the labels are instantly readable. `niceRingStepNm()` picks a spacing
+from `[25, 50, 100, 150, 200, 250]` such that `radius / step` lands at ≤5
+rings (50 nm for the current 220 nm radius, giving ticks at 50/100/150/
+200), so the ring count still looks right if `AREA_RADIUS_NM` is ever
+changed — a fixed "3 rings" or "quarters of the radius" scheme would
+instead label an arbitrary, hard-to-read distance like "73 nm". The true
+coverage edge (220 nm, where the four sources' data actually stops) is a
+different kind of fact than a scale tick, so it's drawn as one additional
+ring in a distinct accent color/weight rather than folded into the
+round-number sequence. Each ring gets a small text label (`"NN nm"`,
+`.radius-ring-label` in `static/style.css`, `pointer-events: none` so it
+never intercepts map clicks/drags) positioned at the ring's true-north
+point via a new `destinationPoint(lat, lon, bearingDeg, distanceKm)`
+helper in `static/js/route-validation.js` — the standard spherical
+"point at distance+bearing from origin" formula, same Aviation-Formulary
+family as that file's existing `initialBearingDeg`. `L.circle`'s `radius`
+option is meters, so nm values are converted (`nm * 1852`); circles use no
+special Leaflet pane, since the default `overlayPane` (z-index 400)
+already renders below `markerPane` (z-index 600), so aircraft markers stay
+on top automatically. **Load-order pitfall avoided**: `map-init.js` loads
+*before* `route-validation.js` (see the script-order list at the top of
+this file), so the initial `scanRadiusLayer` is built as an empty
+`L.layerGroup()` placeholder rather than calling the ring-building
+function (which needs `destinationPoint`) synchronously at load time —
+the real rings are built once the (genuinely async) `/api/config` fetch
+resolves, by which point every script has already loaded. The toggle
+defaults to off, so there's no visible gap from this.
 
 **Aircraft photos, two sources, Planespotters primary + airport-data.com
 top-up** (`app.py`):

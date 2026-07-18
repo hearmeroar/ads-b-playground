@@ -61,6 +61,11 @@ later if a real need for it shows up.
   metric/imperial unit toggle, and a "hide non-aircraft" toggle (off by
   default) that flags ground vehicles and reference beacons (e.g. tower
   test transponders) misreported alongside real traffic.
+- **Scan-radius rings** — an off-by-default HUD toggle draws concentric
+  range rings around the tracked area, showing where the four radius
+  sources' shared query radius actually ends: round-number scale rings
+  (e.g. every 50 nm) plus one visually distinct ring at the true coverage
+  edge, each labeled with its distance.
 - **Icons by category** — each aircraft category (fixed-wing weight classes,
   rotorcraft, glider, lighter-than-air, parachutist, ultralight, UAV) renders
   with its own distinct SVG silhouette from the
