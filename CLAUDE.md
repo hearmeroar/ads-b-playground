@@ -169,10 +169,16 @@ aircraft's sidebar (similar to `radiusRecordsByHex` for radius sources). A non-m
 difference, missing callsign, or a FlightAware-only flight) simply leaves FlightAware's own marker
 showing — never causes a false merge. Cached like the four radius sources (10s `FLIGHTAWARE_MIN_INTERVAL`).
 
-**Area coupling:** `BBOX` and the four `*_CENTER` constants in `app.py`, plus
-the map's initial center/zoom in `static/index.html` (`map.setView(...)`),
-are six independent constants that must be kept roughly in sync manually —
-there's no shared config between backend and frontend.
+**Area coupling:** All location-based constants derive from one `AREA_CENTER`
+(`{"lat": 44.0, "lon": 21.0}`) in `app.py`: `BBOX` is computed from it,
+every `RADIUS_SOURCES[*]["center"]` is set to it (with the appropriate
+`dist`/`radius` field per API), and `/api/config` exposes it (plus
+`AREA_ZOOM`, the initial map zoom level) so the frontend's `map.setView()`
+call in `static/js/map-init.js` fetches the backend-owned values and self-corrects
+if they drift. `map-init.js` has a hardcoded fallback (the original `[44.0, 21.0], 8`)
+so the map paints synchronously without waiting for `/api/config`; the fetch then
+happens and adjusts the view immediately if the backend differs. No more
+manual sync of six independent constants.
 
 **Aircraft photos, two sources, Planespotters primary + airport-data.com
 top-up** (`app.py`):

@@ -55,9 +55,35 @@ TOKEN_URL = (
 CLIENT_ID = os.environ.get("OPENSKY_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("OPENSKY_CLIENT_SECRET")
 
+# Single source of truth for the observation area: roughly the center of
+# Serbia. BBOX (OpenSky's bounding-box query) and every RADIUS_SOURCES
+# entry's "center" (lat/lon/radius query, see below) are both derived from
+# this one point instead of five independently-maintained constants.
+# AREA_ZOOM is the initial Leaflet zoom level that frames this area — served
+# via /api/config so the frontend's map.setView() call has one backend-owned
+# value to match against instead of a constant it must keep in sync by hand.
+AREA_CENTER = {"lat": 44.0, "lon": 21.0}
+AREA_ZOOM = 8
+
 # Bounding box: Serbia and its immediate neighbors (half the size of the
-# original Balkans-wide box, centered on Serbia).
-BBOX = {"lamin": 41.5, "lomin": 17.0, "lamax": 46.5, "lomax": 25.0}
+# original Balkans-wide box, centered on AREA_CENTER). Half-height/width are
+# in degrees latitude/longitude, not distance — deliberately kept as the
+# original hand-picked box shape rather than derived from AREA_RADIUS_NM
+# below, since a lat/lon box and a radius are different shapes and neither
+# converts exactly into the other.
+BBOX_HALF_HEIGHT_DEG = 2.5
+BBOX_HALF_WIDTH_DEG = 4.0
+BBOX = {
+    "lamin": AREA_CENTER["lat"] - BBOX_HALF_HEIGHT_DEG,
+    "lamax": AREA_CENTER["lat"] + BBOX_HALF_HEIGHT_DEG,
+    "lomin": AREA_CENTER["lon"] - BBOX_HALF_WIDTH_DEG,
+    "lomax": AREA_CENTER["lon"] + BBOX_HALF_WIDTH_DEG,
+}
+
+# Shared by every RADIUS_SOURCES entry below: none of the four has a
+# bounding-box query, only lat/lon/radius (nautical miles, max 250 for all
+# four), so each approximates the same area as BBOX from one shared radius.
+AREA_RADIUS_NM = 220
 
 # Never hit OpenSky more often than every MIN_INTERVAL seconds, no matter how
 # many tabs/clients poll our /api/states — keeps both anonymous and
@@ -129,28 +155,32 @@ _load_track_cache()
 # until that's lifted; the pipeline tolerates a dataless source by design.
 # Adding a fifth is one dict entry plus a one-line alias route below.
 RADIUS_SOURCES = {
+    # "dist_param" is the query field name each API uses for the radius —
+    # adsb.fi/adsb.lol call it "dist", adsb.one/airplanes.live call it
+    # "radius" — everything else about the four is identical.
     "adsbfi": {
         "url": "https://opendata.adsb.fi/api/v3/lat/{lat}/lon/{lon}/dist/{dist}",
-        "center": {"lat": 44.0, "lon": 21.0, "dist": 220},
+        "dist_param": "dist",
         "min_interval": 10,
     },
     "airplaneslive": {
         "url": "https://api.airplanes.live/v2/point/{lat}/{lon}/{radius}",
-        "center": {"lat": 44.0, "lon": 21.0, "radius": 220},
+        "dist_param": "radius",
         "min_interval": 10,
     },
     "adsblol": {
         "url": "https://api.adsb.lol/v2/lat/{lat}/lon/{lon}/dist/{dist}",
-        "center": {"lat": 44.0, "lon": 21.0, "dist": 220},
+        "dist_param": "dist",
         "min_interval": 10,
     },
     "adsbone": {
         "url": "https://api.adsb.one/v2/point/{lat}/{lon}/{radius}",
-        "center": {"lat": 44.0, "lon": 21.0, "radius": 220},
+        "dist_param": "radius",
         "min_interval": 10,
     },
 }
 for _cfg in RADIUS_SOURCES.values():
+    _cfg["center"] = {"lat": AREA_CENTER["lat"], "lon": AREA_CENTER["lon"], _cfg["dist_param"]: AREA_RADIUS_NM}
     _cfg["cache"] = {"data": None, "ts": 0.0}
 del _cfg
 
@@ -269,6 +299,15 @@ def fetch_states():
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")
+
+
+@app.route("/api/config")
+def api_config():
+    # Lets the frontend confirm/correct its initial map view against the one
+    # backend-owned AREA_CENTER instead of a hardcoded constant it has to
+    # keep in sync by hand — see map-init.js. Pure local values, no I/O, so
+    # (like /api/identity) this is deliberately uncached.
+    return jsonify({"center": AREA_CENTER, "zoom": AREA_ZOOM})
 
 
 @app.route("/api/states")
