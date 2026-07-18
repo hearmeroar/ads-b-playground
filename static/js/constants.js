@@ -1,5 +1,11 @@
 const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
 
+// Shared by render-details.js's formatVerticalRateUnit (sidebar text) and
+// icons.js's climb/descent marker-icon check, so "what counts as climbing"
+// can't silently drift between the two — a vertical rate whose magnitude
+// stays at or under this (m/s) reads as level in both places.
+const VERTICAL_RATE_LEVEL_THRESHOLD_MS = 0.5;
+
 // Three independent data sources, each rendered as its own color-coded set of
 // markers, all keyed by the aircraft's ICAO24/hex address (the same aircraft
 // can in principle show up in more than one feed at once — see the dedup

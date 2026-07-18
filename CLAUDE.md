@@ -26,9 +26,11 @@ execution order), so their `<script>` order in `index.html` is load-bearing:
 dependencies of its own — it's placed early since `sidebar-track`'s
 `buildMergedDetails()` is its only caller; `auth-collection` is placed right
 after `sidebar-track` since it needs that file's globals — `selectedIcao24`,
-`buildMergedDetails`, `galleryCache` — to snapshot the selected aircraft, and
-nothing after it in the load order depends on anything `auth-collection`
-defines). Where this file says
+`buildMergedDetails`, `galleryCache`, `detailsById` — to snapshot the
+selected aircraft, and after `state-filters` too, whose `CATEGORY_ICON_SVGS`
+it reuses for the collection panel's empty-state illustration; nothing after
+it in the load order depends on anything `auth-collection` defines). Where
+this file says
 "`static/index.html`" about a JS function, read "the frontend JS" — the
 function now lives in one of those `static/js/*.js` files. Leaflet 1.9.4
 itself is vendored at `static/leaflet/` (`leaflet.js` + `leaflet.css` +
@@ -1458,6 +1460,38 @@ because photographer name and photo URL come from an external API.
   "exactly one colored path per icon." The required attribution for the ADS-B
   Radar icon set is shown in the sidebar footer (visible when any aircraft
   details are open).
+- **Climb/descent marker icon:** a climbing or descending aircraft
+  (`item.verticalRateMs` outside `VERTICAL_RATE_LEVEL_THRESHOLD_MS`, `±0.5`
+  m/s — `constants.js`, shared with the sidebar's own `formatVerticalRateUnit`
+  so "what counts as climbing" can't drift between the two) shows a
+  different icon in `iconFor()`, checked after the ground-vehicle override
+  and before the normal category dispatch — trading the usual heading-
+  rotated top-down silhouette for a fixed climb/descent cue, since a 2D
+  side-view shape can't show both heading and pitch at once. `verticalRateMs`
+  is hoisted from `info.verticalRateMs` (already unified to m/s across
+  OpenSky/adsb.fi/airplanes.live — see `parseOpenSkyState`/
+  `parseAdsbExchangeAircraft`; always `null` for FlightAware, which has no
+  such field) onto the render `item` in all three `items.push()` call sites
+  (`parsers.js`) — it wasn't carried through before this feature, unlike
+  `heading`/`categoryGroup`. The glyph itself (`CLIMB_DESCENT_GLYPH`,
+  `icons.js`) is MDI's plain `airplane` icon (https://pictogrammers.com/
+  library/mdi/icon/airplane/, Apache-2.0) — a bare side-view silhouette
+  with no ground/runway element, vendored the same inline-SVG-string way
+  `GROUP_ICONS` vendors MDI icons in `render-details.js`, just with the
+  `COLOR`-placeholder convention `CATEGORY_GLYPHS` uses instead of
+  `fill="currentColor"`. Deliberately not MDI's `airplane-takeoff`/
+  `airplane-landing` (both add a ground line + motion streaks — explicitly
+  what was asked to avoid). One glyph serves both states: its native rest
+  orientation points up-and-right at ~45°, so `-45deg` (`CLIMBING_ROTATION_DEG`)
+  corrects it to point straight up, and the opposite orientation, `135deg`
+  (`DESCENDING_ROTATION_DEG`), points it straight down — reusing
+  `rotatedDivIcon()`'s existing rotation parameter to encode a fixed pitch
+  angle instead of a real heading, rather than sourcing two separate assets.
+  CSS classes `climbing-icon`/`descending-icon` follow the same
+  `data-color`/class-name conventions every other marker icon does. Applies
+  uniformly across every flying category (not scoped to fixed-wing only);
+  ground vehicles/surface obstacles are already exempted by the earlier
+  `towerIcon` check, so this never applies to them.
 - **Hide non-aircraft filter:** `looksLikeGroundVehicle()` flags surface
   vehicles/obstacles/reference beacons reported alongside real aircraft —
   category in the surface-vehicle/obstacle range (OpenSky 16-20, ADSBExchange
@@ -1543,59 +1577,158 @@ because photographer name and photo URL come from an external API.
     filter per request" shape rather than multiplying file-handling code
     across N per-user files. Each card is `{id, user_id, icao24, saved_at,
     snapshot, photo_url, photo_link, photo_photographer}`; `id` is a
-    server-generated `uuid.uuid4().hex` (not derived from `icao24`), so
-    saving the same aircraft twice at different times produces two
-    independent cards rather than one being silently overwritten.
+    server-generated `uuid.uuid4().hex`. **One `icao24` = one card per
+    user** (re-approved 2026-07-18, superseding the original "each save is
+    its own card" design): `api_collection_save()` looks up an existing
+    card by `(user_id, icao24)` and updates its snapshot/photo/`saved_at`
+    in place (200) rather than appending a duplicate (201 only for a truly
+    new aircraft) — this is what makes the sidebar's save button a simple
+    filled/outline toggle rather than an ambiguous "which of N saved
+    copies" question.
   - **Snapshot, not live-refetch, by design**: a card stores `SNAPSHOT_FIELDS`
     (`registration`, `aircraftType`, `manufacturer`, `model`,
     `manufactureYear`, `operator`, `operatorCountry`/`operatorCountryIso`,
     `originCountry`/`countryIso`, `registeredOwner`/
     `registeredOwnerCountryIso`, `categoryDisplay`, `callsign`,
-    `originAirport`, `destinationAirport`) copied from `buildMergedDetails
-    (icao24).info` at save time — deliberately excluding live telemetry
-    (altitude, speed, squawk, position...), which is meaningless once the
-    aircraft is long gone from every live feed. `api_collection_save()`
-    filters the client-sent `snapshot` object to exactly this allowlist
-    before persisting — the client is never trusted to have sent only
-    permitted keys, so an arbitrary extra field can't be smuggled into
-    storage. The one photo saved alongside a card comes from whatever
-    `galleryCache` already resolved for that aircraft this session (its
-    already-normalized `{thumbnail_large:{src}, link, photographer}`
-    shape, shared by Planespotters/airport-data.com — see the photo
-    section above) — no new photo fetching or normalization logic.
+    `categoryGroup`) copied from `buildMergedDetails(icao24).info` at save
+    time — deliberately excluding live telemetry (altitude, speed, squawk,
+    position...) *and*, as of the same 2026-07-18 rework, **route fields**
+    (`originAirport`/`destinationAirport` were dropped entirely) — a
+    specific flight's route isn't a property of the airframe being
+    collected, any more than its position is. `categoryGroup` is the one
+    field added in that rework, persisted specifically so the panel can
+    group saved cards without recomputing anything server-side.
+    `api_collection_save()` filters the client-sent `snapshot` object to
+    exactly this allowlist before persisting — the client is never trusted
+    to have sent only permitted keys. The one photo saved alongside a card
+    comes from whatever `galleryCache` already resolved for that aircraft
+    this session (its already-normalized `{thumbnail_large:{src}, link,
+    photographer}` shape, shared by Planespotters/airport-data.com — see
+    the photo section above) — no new photo fetching or normalization
+    logic.
+  - **"C0" aircraft can't be saved at all**: `"C0"` is the literal ADS-B
+    DO-260B letter+digit code (adsb.fi/airplanes.live's own encoding) for
+    "surface vehicle, no category info whatsoever" — a card for one would
+    have essentially nothing useful in its snapshot and would always land
+    in the panel's "Unknown / no info" group with zero identifying
+    content. The frontend sends the aircraft's raw category code as
+    `category_code` in the save request (see the frontend bullet below for
+    where that value comes from); the backend rejects it with 400
+    `{"error": "category_not_collectible"}` if it's exactly `"C0"` —
+    checked server-side too, never trusting the frontend's own disabled-
+    button state alone. This is deliberately narrower than
+    `categoryGroup === 'unknown'` (which also covers OpenSky's own
+    numeric 0/1 and several other ADS-B codes) — only the literal `"C0"`
+    string is blocked.
   - **Routes**: `GET /api/collection` (401 if logged out; else the
     session's own cards, newest first), `POST /api/collection` (body
-    `{icao24, snapshot, photo_url, photo_link, photo_photographer}` → 201 +
-    the stored card), `DELETE /api/collection/<id>` (only deletes if
-    `user_id` matches the session's current user; a wrong-owner or
-    unknown id both return a plain 404 — never a distinguishing 403,
-    consistent with `/api/track`'s own plain-404-for-"not found" style, so
-    a delete attempt can't be used to probe whether some other user's card
-    id exists).
+    `{icao24, snapshot, category_code, photo_url, photo_link,
+    photo_photographer}` → 201 for a new card, 200 for an upsert of an
+    existing one, 400 for a rejected `"C0"` code), `DELETE
+    /api/collection/<id>` (only deletes if `user_id` matches the session's
+    current user; a wrong-owner or unknown id both return a plain 404 —
+    never a distinguishing 403, consistent with `/api/track`'s own
+    plain-404-for-"not found" style, so a delete attempt can't be used to
+    probe whether some other user's card id exists). Deletion here is
+    always real and immediate — the "soft delete" experience described
+    below is entirely a frontend illusion built on top of it, not a
+    server-side flag.
+  - **Category data plumbing** (`static/js/parsers.js`/`icons.js`): the raw
+    ADS-B category code and `categoryGroup` used to never reach `info`/
+    `detailsById` at all (only the per-poll render `item` had them,
+    confirmed the same way the `render-details.js` comment already
+    documents for `categoryGroup` specifically). Fixed the same way `lat`/
+    `lon` were threaded through for route validation: `updateOpenSkyMarkers`/
+    `updateRadiusSourceMarkers` now also push `categoryCode` onto each
+    `item` (`extra && extra.category` for OpenSky-sourced items — OpenSky's
+    own numeric category isn't an ADS-B letter+digit code at all, so
+    there's nothing to carry when no radius-source `extra` is present; the
+    raw `a.category` for radius-source items), and `icons.js`'s
+    `syncMarkers()` carries both `categoryGroup`/`categoryCode` onto the
+    `detailsById` entry as sibling properties (not merged into `info`
+    itself, to avoid touching the dev-mode field-badge machinery that
+    `info`'s keys drive).
   - **Frontend** (`static/js/auth-collection.js`, loaded right after
-    `sidebar-track.js` in the script order — see the top of this file):
-    `checkAuth()` calls `/api/me` on load and renders `#auth-status`
-    (either "Sign in with Google" or "Hi, `<name>` · Logout"). Signing in
-    is a **full-page navigation** to `/api/login/google` (`window.location
-    .href =`, not `fetch()`) since OAuth needs a real browser redirect to
-    Google's consent screen, not an XHR. `saveCurrentAircraftToCollection()`
-    (wired to the new `#sidebar-save-collection` bookmark-icon button,
-    a third circle alongside `#sidebar-close`/`#sidebar-center-map`) reads
-    `buildMergedDetails(selectedIcao24).info` + `galleryCache`'s first
-    resolved photo and `POST`s to `/api/collection`; `selectAircraft()`
-    resets the button's `.saved` class on every new selection so it
-    doesn't read as already-saved for a different aircraft.
-    `#collection-panel` (opened via the HUD's "My collection" button,
-    styled as a centered glass-card overlay like `#hud`/`#sidebar` — see
-    `static/style.css`) renders each card via `document.createElement`/
-    property assignment, not string-concatenated HTML — `snapshot.operator`/
-    `registration`/etc. ultimately originated from external APIs (adsbdb,
-    OpenSky), so the same "don't trust external strings as markup"
-    discipline `renderGallery()` already applies to photographer credits
-    applies here too. A card's `<img>` gets an `error` handler that swaps
-    in a plain "No photo" placeholder — there's no second stored URL to
-    fall back to the way the live gallery's `fallback_src` two-tier
-    degrade has.
+    `sidebar-track.js` and `state-filters.js` in the script order — see the
+    top of this file; it reuses `state-filters.js`'s
+    `CATEGORY_ICON_SVGS.unknown` glyph for the empty-state illustration and
+    its category-group taxonomy for the panel's grouping): `checkAuth()`
+    calls `/api/me` on load and renders `#auth-status` (either "Sign in
+    with Google" or "Hi, `<name>` · Logout"); once logged in it also
+    fetches `/api/collection` once to populate a client-side `savedCardsByIcao`
+    (`Map<icao24, card>`) — this is what lets the sidebar button's filled/
+    outline state track "is *this* aircraft already saved" without a fetch
+    on every selection. Signing in is a **full-page navigation** to
+    `/api/login/google` (`window.location.href =`, not `fetch()`) since
+    OAuth needs a real browser redirect to Google's consent screen, not an
+    XHR.
+    - **Sidebar toggle** (`#sidebar-save-collection`, the bookmark-icon
+      button, a third circle alongside `#sidebar-close`/
+      `#sidebar-center-map`): `updateSaveButtonState()` — called from
+      `selectAircraft()` on every new selection, and after every login/
+      save/unsave — sets three things at once: the `.saved` class (filled
+      vs outline, a pure CSS fill-toggle on the SVG path — see
+      `static/style.css`, no duplicate markup needed since a CSS rule
+      always overrides an SVG presentation attribute), a `title` tooltip,
+      and `disabled` when the selected aircraft's `categoryCode` (read
+      directly off `detailsById.get(selectedIcao24)`, the same way route
+      validation reads `.lat`/`.lon` off that same entry — never through
+      `buildMergedDetails().info`) is exactly `"C0"`.
+      `saveCurrentAircraftToCollection()` branches on `savedCardsByIcao
+      .has(selectedIcao24)`: not yet saved → `POST` (the upsert route);
+      already saved → `unsaveAircraft()` → immediate `DELETE`, no ghost/
+      undo of its own (unlike the panel below) since there's no list
+      context in the sidebar and re-saving from there is trivial.
+    - **Fullscreen panel** (`#collection-panel`, `position:fixed; inset:0`,
+      re-approved 2026-07-18 over the original centered 640px modal):
+      opened via the HUD's "My collection" button, closable via its "×"
+      button or `Escape`. Renders from the two in-memory Maps
+      (`savedCardsByIcao` + `removedCards`, see below) rather than
+      re-fetching on every open — a fresh `/api/collection` fetch would
+      have no memory of a card removed-with-undo this session (the server
+      has already really deleted it), so re-fetching would silently drop
+      the ghost.
+    - **Grouped by category, not by literal aircraft type**: cards are
+      bucketed by `snapshot.categoryGroup` and rendered in the same fixed
+      weight-class order as `#category-filter`'s own dropdown (`light,
+      small, large, high_vortex_large, heavy, high_performance, rotorcraft,
+      glider, lighter_than_air, parachutist, ultralight, uav,
+      surface_obstacle, unknown`), reusing that dropdown's exact label
+      text for each group header + a live per-group count. Within a group,
+      most-recently-saved first.
+    - **Descriptive empty state**: a centered, muted illustration (the
+      exact same "no ADS-B info" glyph `CATEGORY_ICON_SVGS.unknown` already
+      uses elsewhere, reused rather than inventing a second icon language)
+      plus a title + hint line, rather than the original's plain-text-only
+      placeholder.
+    - **Compact per-card view**: photo + registration/ICAO + aircraft type
+      only (operator and everything else in the snapshot is dropped from
+      the card body to stay compact — still persisted server-side, just
+      not surfaced in this view). Every card in this view is, by
+      definition, currently saved, so its toggle icon (`.collection-card-
+      icon-btn`, the same bookmark glyph/fill rule as the sidebar's) always
+      renders filled.
+    - **"Elegant" soft delete + session-scoped Undo**: clicking a card's
+      icon (`removeCardWithUndo()`) fires the real `DELETE` immediately —
+      no confirmation dialog — but the card stays in the DOM, dimmed
+      (reduced opacity + greyscale) with a "Removed" label and an "Undo"
+      button, tracked in the `removedCards` `Map<id, card>` (populated from
+      that click, since the server has already forgotten it). Undo
+      (`undoRemoveCard()`) re-`POST`s the remembered snapshot/photo
+      (creating a fresh card, new `id`) and removes the entry from
+      `removedCards`. `removedCards` is in-memory only and never persisted
+      anywhere — a page reload clears it for free, which is exactly the
+      intended "gone for good after a refresh" behavior; nothing needed to
+      be built to make that true.
+    - Cards render via `document.createElement`/property assignment, not
+      string-concatenated HTML — `snapshot.operator`/`registration`/etc.
+      ultimately originated from external APIs (adsbdb, OpenSky), so the
+      same "don't trust external strings as markup" discipline
+      `renderGallery()` already applies to photographer credits applies
+      here too. A card's `<img>` gets an `error` handler that swaps in a
+      plain "No photo" placeholder — there's no second stored URL to fall
+      back to the way the live gallery's `fallback_src` two-tier degrade
+      has.
   - **Tests can't exercise real Google OAuth** (no browser automation can
     complete Google's actual consent screen), so both layers mock around
     it rather than through it: `tests/backend/test_google_auth.py`
@@ -1812,6 +1945,14 @@ because photographer name and photo URL come from an external API.
   `geom: "AREAS"` (multi-polygon) SIGMET's nested-rings coordinate shape,
   which the first version 500'd on since it assumed every SIGMET's
   `coords` was a flat list.
+- `test_climb_descent_icons.spec.js` covers the climb/descent marker icon:
+  a strongly-climbing aircraft renders `.climbing-icon` in its normal
+  source color; a strongly-descending one renders `.descending-icon`,
+  rotated the opposite way (`-45deg` vs `135deg`); and — the regression
+  guard — an aircraft with a rate inside the level band, and one with no
+  vertical-rate field at all (matching every other fixture in this suite),
+  both keep rendering their ordinary category icon (`large-icon`)
+  unchanged.
 
 ## SVG Icon Rendering
 

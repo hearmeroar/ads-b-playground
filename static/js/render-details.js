@@ -63,7 +63,7 @@ function formatSpeedKt(kt) {
 }
 function formatVerticalRateUnit(rateMs) {
   if (rateMs == null) return null;
-  if (rateMs <= 0.5 && rateMs >= -0.5) return 'level';
+  if (Math.abs(rateMs) <= VERTICAL_RATE_LEVEL_THRESHOLD_MS) return 'level';
   const word = rateMs > 0 ? 'climbing' : 'descending';
   const value = currentUnitSystem === 'imperial'
     ? (rateMs > 0 ? '+' : '') + Math.round(rateMs * 196.850) + ' ft/min'

@@ -83,7 +83,11 @@ later if a real need for it shows up.
   rotorcraft, glider, lighter-than-air, parachutist, ultralight, UAV) renders
   with its own distinct SVG silhouette from the
   [ADS-B Radar free icon set](https://adsb-radar.com/). Ground vehicles and
-  reference beacons get their own neutral-grey cell-tower icon.
+  reference beacons get their own neutral-grey cell-tower icon. A climbing
+  or descending aircraft (vertical rate outside a small level band) instead
+  shows a plain side-view airplane silhouette pointing straight up or down
+  — trading its usual heading-rotated top-down icon for a clear climb/
+  descent cue while it's actively changing altitude.
 - **Quota-aware** — OpenSky's two independent daily quotas (map data and
   flight history) are each surfaced with a `(?)` explaining what ran out and
   counting down to when it returns. An exhausted map-data quota auto-disables
@@ -130,11 +134,15 @@ later if a real need for it shows up.
 - Optional OAuth2 auth against OpenSky for a much higher daily quota than
   anonymous access.
 - **Aircraft collection** — sign in with Google, then save any aircraft
-  you're looking at (a small bookmark button in the sidebar) as a card:
-  registration, type, manufacturer, operator, country, and a photo, snapshotted
-  at save time so the card stays meaningful long after the aircraft is gone
-  from any live feed. Browse, and remove, saved cards from a "My collection"
-  panel opened from the HUD.
+  you're looking at (a bookmark toggle in the sidebar, filled once saved) as
+  a compact card: registration, type, and a photo, snapshotted at save time
+  so it stays meaningful long after the aircraft is gone from any live feed.
+  One card per aircraft — re-saving just refreshes it. Browse saved cards in
+  a fullscreen "My collection" panel (opened from the HUD), grouped by
+  category (light/small/large/heavy/etc). Removing a card is immediate but
+  forgiving — it dims in place with an Undo action for the rest of the
+  session. Aircraft with no usable category info at all (ADS-B code "C0")
+  can't be saved.
 
 ## Quick start
 

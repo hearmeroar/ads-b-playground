@@ -153,6 +153,14 @@ function updateOpenSkyMarkers(states, radiusRecordsByHex, flightawareByCallsign,
       id: s.icao24, lat: s.lat, lon: s.lon, heading: s.true_track,
       info: info, fieldSources: fieldSources, registration: extra && extra.registration,
       isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
+      // The ADS-B letter+digit code (e.g. "C0") only ever comes from a radius
+      // source's enrichment — OpenSky's own numeric category isn't that code
+      // at all, so there's nothing to carry when extra is absent.
+      categoryCode: extra && extra.category,
+      // Hoisted from info (already unified to m/s across sources — see
+      // normalizeOpenSky/normalizeAdsbExchange) so iconFor() can swap in the
+      // climb/descent icon without reaching into item.info itself.
+      verticalRateMs: info.verticalRateMs,
     });
   }
   return syncMarkers(openskyMarkers, items, SOURCE_COLORS.opensky);
@@ -392,6 +400,8 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, s
       id: a.icao24, lat: a.lat, lon: a.lon, heading: a.track,
       info: info, fieldSources: fieldSources, registration: a.registration,
       isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
+      categoryCode: a.category,
+      verticalRateMs: info.verticalRateMs,
     });
   }
   return syncMarkers(markerMap, items, color);
@@ -416,6 +426,10 @@ function updateFlightAwareMarkers(flights, excludedCallsigns) {
       id: f.fa_flight_id, lat: f.lat, lon: f.lon, heading: f.track,
       info: info, fieldSources: fieldSources, registration: null,
       isGroundVehicle: false, categoryGroup: 'unknown',
+      // Always null — AeroAPI's last_position payload has no vertical-rate
+      // field (see normalizeFlightAware) — but threaded through for parity
+      // with the other two builders rather than silently omitted.
+      verticalRateMs: info.verticalRateMs,
     });
   }
   return syncMarkers(flightawareMarkers, items, SOURCE_COLORS.flightaware);
