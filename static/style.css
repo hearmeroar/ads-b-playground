@@ -5,27 +5,21 @@
   --border: rgba(15, 23, 42, 0.08);
   --card-bg: rgba(255, 255, 255, 0.86);
 }
-/* overflow: hidden here is what keeps the map acting as a fixed backdrop —
-   #map/#hud-scroll/#sidebar are all position: absolute, so none of them
-   stretch html/body's own layout size, but an absolutely positioned
-   descendant taller than the viewport still expands the *scrollable*
-   overflow area of the page unless the root explicitly clips it, which
-   made the whole page (map included) scroll instead of just the HUD. */
-html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-#map { position: absolute; inset: 0; background: #eef1f4; }
+html, body { margin: 0; padding: 0; height: 100%; }
+/* position: fixed (not absolute) is what makes the map a true backdrop: its
+   containing block becomes the viewport itself rather than the document, so
+   it can never move even if the page scrolls (see #hud below — the one
+   element still allowed to make the document taller than the viewport). */
+#map { position: fixed; inset: 0; background: #eef1f4; }
 
-/* HUD panel. #hud-scroll is a transparent, viewport-clipped window; #hud
-   itself is a plain-flow child inside it with no height cap of its own, so
-   once its content (weather layers, dev mode, ...) grows taller than the
-   window, scrolling moves the *whole* card — border, shadow, rounded
-   corners and all — rather than clipping content inside a fixed-size box
-   (the first attempt at this fix did the latter; the project owner wanted
-   the card itself to scroll, not just its innards). */
-#hud-scroll {
-  position: absolute; top: 14px; right: 14px; bottom: 14px; z-index: 1000;
-  overflow-y: auto;
-}
+/* HUD panel. Deliberately position: absolute, not fixed: unlike every other
+   overlay here, #hud is the one element allowed to outgrow the viewport —
+   when it does (weather layers, dev mode, ...), that overflow becomes the
+   *document's* scrollable overflow, and the browser's own native scrollbar
+   handles it. The project owner specifically wanted that native scrollbar,
+   not a component-scoped one clipped to this panel's own box. */
 #hud {
+  position: absolute; top: 14px; right: 14px; z-index: 1000;
   width: 216px;
   background: var(--card-bg);
   backdrop-filter: blur(10px);
@@ -194,9 +188,11 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
   height: 100%;
 }
 
-/* Sidebar panel */
+/* Sidebar panel. position: fixed (not absolute) so it stays anchored to the
+   viewport rather than the document — same reasoning as #map above, needed
+   now that the page can genuinely scroll to reveal #hud's own overflow. */
 #sidebar {
-  position: absolute; top: 14px; left: 14px; bottom: 14px; z-index: 1150;
+  position: fixed; top: 14px; left: 14px; bottom: 14px; z-index: 1150;
   width: 300px; max-width: 82vw;
   background: var(--card-bg);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -388,8 +384,10 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
    with ellipsis truncation rather than dropped, so the full Identity-field
    breadth (including Route) still fits without wrapping or horizontal
    scroll. */
+/* position: fixed for the same reason as #sidebar above — stays put
+   regardless of any document scroll #hud's own overflow triggers. */
 #dev-aircraft-panel {
-  position: absolute; left: 14px; top: 14px; bottom: 14px; z-index: 1100;
+  position: fixed; left: 14px; top: 14px; bottom: 14px; z-index: 1100;
   width: 340px; max-width: 82vw;
   background: var(--card-bg);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -465,9 +463,10 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 @keyframes gallery-spin { to { transform: rotate(360deg); } }
 
 /* Map loader overlay */
-/* Initial-load overlay: shown until the first poll resolves, then fades out. */
+/* Initial-load overlay: shown until the first poll resolves, then fades out.
+   position: fixed for the same reason as #sidebar/#dev-aircraft-panel above. */
 #map-loader {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
   z-index: 900; display: flex; flex-direction: column; align-items: center; gap: 12px;
   padding: 20px 26px;
   background: var(--card-bg);
