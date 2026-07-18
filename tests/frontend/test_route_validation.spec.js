@@ -102,6 +102,27 @@ test.describe('pure geometry functions (route-validation.js)', () => {
     expect(result.score).toBeLessThan(40);
     expect(result.band).toBe('reject');
   });
+
+  // Regression test for a real mismatch found via live testing: a Norse
+  // Atlantic 787 (icao24 47b217) cruising over Bosnia, whose callsign
+  // IGO49F adsbdb resolved to an unrelated IndiGo Mumbai->Manchester
+  // flight. ~760km cross-track — a different flight entirely, not a
+  // slightly-off one — but scored 74.6/Medium before the distance gate was
+  // added, since track alignment/progress/speed/altitude alone (75 of the
+  // 100 points) can look coincidentally plausible even when the aircraft
+  // isn't anywhere near the claimed route.
+  test('a route hundreds of km off is rejected even when the other checks look plausible in isolation', async ({ page }) => {
+    await mockAllSources(page);
+    await page.goto('/');
+    await page.waitForSelector('.leaflet-marker-icon');
+    const result = await page.evaluate(() => validateAdsbdbRoute({
+      curLat: 44.4605, curLon: 18.1282, trackDeg: 289.63, speedKmh: 226.66 * 3.6, altitudeM: 12192,
+      originLat: 19.0886993408, originLon: 72.8678970337, // Mumbai
+      destLat: 53.349375, destLon: -2.279521, // Manchester
+    }));
+    expect(Math.abs(result.checks.distanceToRoute.distanceKm)).toBeGreaterThan(300);
+    expect(result.band).toBe('reject');
+  });
 });
 
 test.describe('Route row end-to-end', () => {

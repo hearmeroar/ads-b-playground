@@ -125,6 +125,10 @@ function altitudePlausibilityScore(percent, altitudeM) {
   return { fraction, note: `terminal phase (${(term * 100).toFixed(0)}%), altitude ${altitudeM.toFixed(0)}m` };
 }
 
+// Past this cross-track distance, the aircraft isn't meaningfully "on" the
+// claimed route at all — same boundary distanceToRouteScore already floors
+// its own fraction to 0 at, reused here as a hard gate on the total score.
+const DISTANCE_GATE_KM = 300;
 const ROUTE_CONFIDENCE_BASELINE = 30;
 const ROUTE_CONFIDENCE_BANDS = [
   [96, 'very_high'], [80, 'high'], [60, 'medium'], [40, 'low'], [0, 'reject'],
@@ -161,9 +165,21 @@ function validateAdsbdbRoute({ curLat, curLon, trackDeg, speedKmh, altitudeM, or
     speedPlausibility: { points: speed.fraction * 10, note: speed.note },
     altitudePlausibility: { points: alt.fraction * 5, note: alt.note },
   };
-  const score = ROUTE_CONFIDENCE_BASELINE
+  let score = ROUTE_CONFIDENCE_BASELINE
     + checks.trackAlignment.points + checks.distanceToRoute.points
     + checks.routeProgress.points + checks.speedPlausibility.points + checks.altitudePlausibility.points;
+
+  // Hard gate: cross-track distance alone only carries 25 of 100 points, so
+  // an aircraft that's flatly nowhere near the claimed route (a different
+  // flight entirely, not just a slightly-off one) could still land in
+  // "Medium" territory on the strength of the other four checks alone —
+  // confirmed against a real live mismatch (a Norse Atlantic 787 over
+  // Bosnia whose callsign adsbdb resolved to an unrelated IndiGo Mumbai->
+  // Manchester flight, ~760km cross-track, scored 74.6/Medium before this
+  // gate). Past DISTANCE_GATE_KM the aircraft simply isn't on this route in
+  // any meaningful sense, so the total is capped into Reject regardless of
+  // how plausible the other checks happen to look in isolation.
+  if (Math.abs(distanceKm) > DISTANCE_GATE_KM) score = Math.min(score, 39);
 
   return { score, band: routeConfidenceBand(score), checks };
 }

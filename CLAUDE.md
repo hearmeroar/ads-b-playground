@@ -704,6 +704,19 @@ because photographer name and photo URL come from an external API.
   the score doesn't jump discontinuously right at e.g. exactly 20° of track
   deviation. Bands: 96–100 Very High, 80–95 High, 60–79 Medium, 40–59 Low,
   0–39 Reject.
+  **`DISTANCE_GATE_KM` (300km) hard gate, found via live testing, not
+  synthetic cases**: cross-track distance only carries 25 of the 100
+  points, so an aircraft that's a completely different flight from the
+  claimed route (not just slightly off it) could still land in "Medium"
+  territory on the strength of the other four checks alone, if those
+  happen to look coincidentally plausible in isolation. Confirmed against
+  a real mismatch: a Norse Atlantic 787 (`47b217`) cruising over Bosnia,
+  whose callsign `IGO49F` adsbdb resolved to an unrelated IndiGo Mumbai→
+  Manchester flight — ~760km cross-track, scored 74.6/Medium before this
+  gate existed. Past `DISTANCE_GATE_KM`, the total score is capped to 39
+  (Reject) regardless of the other four checks — the aircraft simply isn't
+  "on" this route in any meaningful sense at that distance, so no
+  combination of the other signals should be able to rescue the score.
   **No lat/lon existed anywhere for the currently-selected aircraft before
   this** — `info`/`detailsById` never carried position (only the Leaflet
   marker itself did, via `marker.getLatLng()`, dropped before reaching
