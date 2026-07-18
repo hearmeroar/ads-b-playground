@@ -108,6 +108,43 @@ def test_decode_callsign_lowercase_and_unknown():
     assert decode_callsign(None) is None
 
 
+def test_decode_callsign_covers_at_least_90_airlines():
+    # The table was expanded from 18 to ~90+ entries; this test documents
+    # the minimum expected size and guards against accidental regressions.
+    from enrichment.callsign import AIRLINE_OPERATORS
+    assert len(AIRLINE_OPERATORS) >= 90
+
+
+def test_decode_callsign_every_entry_has_a_valid_country():
+    # Every ISO code in AIRLINE_OPERATORS must be present in countries.py,
+    # otherwise the country field would silently be missing from the result.
+    from enrichment.callsign import AIRLINE_OPERATORS
+    from enrichment.countries import COUNTRIES_BY_ISO
+    for code, entry in AIRLINE_OPERATORS.items():
+        assert entry["country_iso"] in COUNTRIES_BY_ISO, (
+            f"AIRLINE_OPERATORS['{code}'] has unknown ISO '{entry['country_iso']}'"
+        )
+
+
+def test_decode_callsign_covers_all_regions():
+    # Spot-check at least one airline from each major region.
+    regions = {
+        "ASL": ("Air Serbia", "RS"),    # Balkans
+        "AAL": ("American Airlines", "US"),  # North America
+        "WJA": ("WestJet", "CA"),        # Canada
+        "QTR": ("Qatar Airways", "QA"),  # Middle East
+        "SIA": ("Singapore Airlines", "SG"),  # Asia
+        "QFA": ("Qantas Airways", "AU"),  # Oceania
+        "ETH": ("Ethiopian Airlines", "ET"),  # Africa
+        "ITY": ("ITA Airways", "IT"),    # Europe
+    }
+    for code, (expected_operator, expected_iso) in regions.items():
+        result = decode_callsign(code + "123")
+        assert result is not None, f"Failed to decode {code}"
+        assert result["operator"] == expected_operator, f"{code}: expected {expected_operator}, got {result['operator']}"
+        assert result["country_iso"] == expected_iso, f"{code}: expected {expected_iso}, got {result['country_iso']}"
+
+
 # --- aircraft_database.py: type normalization ---
 
 def test_normalize_aircraft_type_by_code():
