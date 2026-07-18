@@ -261,15 +261,25 @@ async function poll() {
   // Each source fetches independently: fetchRadiusSourceAircraft swallows its
   // own failure into null, so one source erroring out (e.g. adsb.one's
   // Cloudflare block) never blocks the others from rendering this cycle.
-  const radiusLists = [adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft];
-  recordLiveTrails(openskyStates, radiusLists);
+  // Parse every source exactly once here; everything below (live trails,
+  // radiusRecordsByHex, the update*Markers renderers) works on these parsed
+  // lists. null (source disabled or failed) stays null — distinct from an
+  // empty list, which means "polled fine, zero aircraft".
+  const parsedStates = openskyStates && openskyStates.map(parseOpenSkyState);
+  const parsedAdsbfi = adsbfiAircraft && adsbfiAircraft.map(parseAdsbExchangeAircraft);
+  const parsedAdsblol = adsblolAircraft && adsblolAircraft.map(parseAdsbExchangeAircraft);
+  const parsedAdsbone = adsboneAircraft && adsboneAircraft.map(parseAdsbExchangeAircraft);
+  const parsedAirplaneslive = airplanesliveAircraft && airplanesliveAircraft.map(parseAdsbExchangeAircraft);
+  const parsedFlights = flightawareFlights && flightawareFlights.map(parseFlightAware);
+  const radiusLists = [parsedAdsbfi, parsedAdsblol, parsedAdsbone, parsedAirplaneslive];
+  recordLiveTrails(parsedStates, radiusLists);
 
   // The generic "updated" timestamp lives here, not in fetchOpenSkyStates()
   // — an OpenSky warning (rate limit/stale/unreachable) takes its place for
   // that cycle when the source is enabled and struggling.
   if (isSourceEnabled('opensky') && openskyStatusMessage) {
     document.getElementById('status').textContent = openskyStatusMessage;
-  } else if (openskyStates || radiusLists.some((l) => l)) {
+  } else if (parsedStates || radiusLists.some((l) => l)) {
     document.getElementById('status').textContent =
       'updated ' + new Date().toLocaleTimeString('en-GB');
   }
@@ -279,9 +289,8 @@ async function poll() {
   // FlightAware's own marker when a match is found.
   const flightawareByCallsign = new Map();
   const matchedFlightawareCallsigns = new Set();
-  if (flightawareFlights) {
-    for (const raw of flightawareFlights) {
-      const f = parseFlightAware(raw);
+  if (parsedFlights) {
+    for (const f of parsedFlights) {
       const key = normalizeCallsignKey(f.callsign);
       if (key) flightawareByCallsign.set(key, f);
     }
@@ -296,12 +305,11 @@ async function poll() {
   // mode can show a badge per source that independently supplied a field.
   const radiusRecordsByHex = new Map(); // icao24 -> Array<{ source, data }>
   for (const [name, list] of [
-    ['airplaneslive', airplanesliveAircraft], ['adsbone', adsboneAircraft],
-    ['adsblol', adsblolAircraft], ['adsbfi', adsbfiAircraft],
+    ['airplaneslive', parsedAirplaneslive], ['adsbone', parsedAdsbone],
+    ['adsblol', parsedAdsblol], ['adsbfi', parsedAdsbfi],
   ]) {
     if (!list) continue;
-    for (const raw of list) {
-      const a = parseAdsbExchangeAircraft(raw);
+    for (const a of list) {
       if (!a.icao24) continue;
       const arr = radiusRecordsByHex.get(a.icao24) || [];
       arr.push({ source: name, data: a });
@@ -313,16 +321,16 @@ async function poll() {
   // Each later source only contributes aircraft no earlier source covers — its
   // exclude set is the union of every higher-priority source's rendered keys.
   let openskyCount = openskyMarkers.size;
-  if (isSourceEnabled('opensky') && openskyStates) {
-    openskyCount = updateOpenSkyMarkers(openskyStates, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns);
+  if (isSourceEnabled('opensky') && parsedStates) {
+    openskyCount = updateOpenSkyMarkers(parsedStates, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns);
   }
 
   const counts = { opensky: openskyCount };
   const radiusSources = [
-    ['adsbfi', adsbfiMarkers, adsbfiAircraft],
-    ['adsblol', adsblolMarkers, adsblolAircraft],
-    ['adsbone', adsboneMarkers, adsboneAircraft],
-    ['airplaneslive', airplanesliveMarkers, airplanesliveAircraft],
+    ['adsbfi', adsbfiMarkers, parsedAdsbfi],
+    ['adsblol', adsblolMarkers, parsedAdsblol],
+    ['adsbone', adsboneMarkers, parsedAdsbone],
+    ['airplaneslive', airplanesliveMarkers, parsedAirplaneslive],
   ];
   const excludeIds = new Set(openskyMarkers.keys());
   for (const [name, markerMap, aircraft] of radiusSources) {
@@ -338,8 +346,8 @@ async function poll() {
   // FlightAware: after OpenSky/radius sources, render only those flights that
   // weren't matched to another source's callsign (matched ones had their data
   // merged into the other source's sidebar).
-  if (isSourceEnabled('flightaware') && flightawareFlights) {
-    counts.flightaware = updateFlightAwareMarkers(flightawareFlights, matchedFlightawareCallsigns);
+  if (isSourceEnabled('flightaware') && parsedFlights) {
+    counts.flightaware = updateFlightAwareMarkers(parsedFlights, matchedFlightawareCallsigns);
   } else {
     counts.flightaware = flightawareMarkers.size;
   }

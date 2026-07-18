@@ -98,14 +98,14 @@ function recordLiveTrailPoint(icao24, lat, lon, altitude) {
   }
 }
 
-function recordLiveTrails(openskyStates, radiusLists) {
-  for (const raw of openskyStates || []) {
-    const state = parseOpenSkyState(raw);
+function recordLiveTrails(parsedStates, parsedRadiusLists) {
+  // Both arguments arrive already parsed by poll() — one parse per cycle,
+  // shared with radiusRecordsByHex and the update*Markers renderers.
+  for (const state of parsedStates || []) {
     recordLiveTrailPoint(state.icao24, state.lat, state.lon, state.baro_altitude);
   }
-  for (const list of radiusLists) {
-    for (const raw of list || []) {
-      const aircraft = parseAdsbExchangeAircraft(raw);
+  for (const list of parsedRadiusLists) {
+    for (const aircraft of list || []) {
       recordLiveTrailPoint(aircraft.icao24, aircraft.lat, aircraft.lon, aircraft.altitudeM);
     }
   }

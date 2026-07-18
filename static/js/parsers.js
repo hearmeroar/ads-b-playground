@@ -118,8 +118,7 @@ function parseOpenSkyState(arr) {
 // they don't cover, since it's the only source that spends a daily quota.
 function updateOpenSkyMarkers(states, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns) {
   const items = [];
-  for (const raw of states) {
-    const s = parseOpenSkyState(raw);
+  for (const s of states) { // already parsed by poll() (parseOpenSkyState)
     if (s.lat == null || s.lon == null) continue; // no position — skip this aircraft
     if (!passesMotionFilter(s.on_ground)) continue;
     const radiusEntries = radiusRecordsByHex ? (radiusRecordsByHex.get(s.icao24) || []) : [];
@@ -366,8 +365,7 @@ function normalizeFlightAware(f) {
 // dev mode should show a badge for each of them, not just the winner.
 function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, sourceName, flightawareByCallsign, matchedFlightawareCallsigns, radiusRecordsByHex) {
   const items = [];
-  for (const raw of aircraftList) {
-    const a = parseAdsbExchangeAircraft(raw);
+  for (const a of aircraftList) { // already parsed by poll() (parseAdsbExchangeAircraft)
     if (a.lat == null || a.lon == null) continue;
     if (!passesMotionFilter(a.onGround)) continue;
     const isGroundVehicle = looksLikeGroundVehicle({
@@ -406,8 +404,7 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, s
 // flows through passesCategoryFilter() like any other).
 function updateFlightAwareMarkers(flights, excludedCallsigns) {
   const items = [];
-  for (const raw of flights) {
-    const f = parseFlightAware(raw);
+  for (const f of flights) { // already parsed by poll() (parseFlightAware)
     if (f.lat == null || f.lon == null) continue;
     const faKey = normalizeCallsignKey(f.callsign);
     if (excludedCallsigns && faKey && excludedCallsigns.has(faKey)) continue;
