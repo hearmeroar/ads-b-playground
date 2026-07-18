@@ -6,24 +6,27 @@
   --card-bg: rgba(255, 255, 255, 0.86);
 }
 /* overflow: hidden here is what keeps the map acting as a fixed backdrop —
-   #map/#hud/#sidebar are all position: absolute, so none of them stretch
-   html/body's own layout size, but an absolutely positioned descendant
-   taller than the viewport (see #hud below) still expands the *scrollable*
+   #map/#hud-scroll/#sidebar are all position: absolute, so none of them
+   stretch html/body's own layout size, but an absolutely positioned
+   descendant taller than the viewport still expands the *scrollable*
    overflow area of the page unless the root explicitly clips it, which
    made the whole page (map included) scroll instead of just the HUD. */
 html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 #map { position: absolute; inset: 0; background: #eef1f4; }
 
-/* HUD panel */
-#hud {
-  position: absolute; top: 14px; right: 14px; z-index: 1000;
-  width: 216px;
-  /* Caps growth at the viewport edge and scrolls internally instead —
-     same pattern #sidebar already uses (top+bottom+overflow-y: auto) —
-     needed once enough rows (weather layers, dev mode, ...) stack up to
-     exceed viewport height. */
-  max-height: calc(100vh - 28px);
+/* HUD panel. #hud-scroll is a transparent, viewport-clipped window; #hud
+   itself is a plain-flow child inside it with no height cap of its own, so
+   once its content (weather layers, dev mode, ...) grows taller than the
+   window, scrolling moves the *whole* card — border, shadow, rounded
+   corners and all — rather than clipping content inside a fixed-size box
+   (the first attempt at this fix did the latter; the project owner wanted
+   the card itself to scroll, not just its innards). */
+#hud-scroll {
+  position: absolute; top: 14px; right: 14px; bottom: 14px; z-index: 1000;
   overflow-y: auto;
+}
+#hud {
+  width: 216px;
   background: var(--card-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
