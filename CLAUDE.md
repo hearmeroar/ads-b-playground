@@ -336,9 +336,8 @@ because photographer name and photo URL come from an external API.
   each step depends on data or state from the others. **FlightAware uses callsign-based dedup:**
   after the ICAO24-keyed chain above, FlightAware flights matching any other source's
   callsign (trimmed, case-insensitive) are suppressed, and their route data is merged
-  into that source's sidebar. A source that fails resolves to `null` for that cycle and
-  is simply skipped (its existing markers and count are kept), so one dead source never
-  blocks the rest:
+  into that source's sidebar. A failing source degrades to `null` and is skipped for
+  that cycle (see the radius-sources note above) — its existing markers/count are kept:
   - OpenSky renders first (when enabled). Its sidebar data is enriched with
     everything it doesn't have itself (registration, aircraft type,
     `emergency`, IAS/TAS/Mach, mag/true heading, turn rate, roll, autopilot
@@ -572,13 +571,11 @@ because photographer name and photo URL come from an external API.
     specific candidate before falling back to the bare prefix; `callsign.py`
     maps ICAO 3-letter airline designators to an operator
     (confidence 0.8) and that operator's home country (confidence 0.6 —
-    two independently-confidenced facts from one lookup). Both ride on the
-    same `operator` result (`enrich_identity()`'s operator tier carries the
-    country data as `operator["country_iso"]` alongside its own
-    `value`/`source`/`confidence`) — the country half is *not* a fallback
-    tier for the separate `country` field, which means the aircraft's
-    country of registration and would otherwise get the operator's home
-    country conflated into it; `aircraft_database.py` holds a
+    two independently-confidenced facts from one lookup), both riding on
+    the same `operator` result (`operator["country_iso"]` alongside its
+    own `value`/`source`/`confidence`) rather than feeding the separate
+    `country` field — see "Registered Owner is a brand new field" below for
+    why that distinction matters; `aircraft_database.py` holds a
     swappable ICAO24→full-record lookup (`AircraftDatabaseLookup.lookup()`,
     a small placeholder dataset behind an interface a real data source
     could later implement with zero caller changes) plus a separate ICAO
