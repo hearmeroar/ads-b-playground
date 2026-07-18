@@ -103,6 +103,16 @@ def test_category_code_other_than_c0_is_allowed(client):
     assert resp.status_code == 201
 
 
+def test_is_ground_vehicle_is_rejected(client):
+    login_as(client, "u1")
+    resp = client.post("/api/collection", json={
+        "icao24": "aaa111", "snapshot": {"registration": "TWR"}, "is_ground_vehicle": True,
+    })
+    assert resp.status_code == 400
+    assert resp.get_json() == {"error": "category_not_collectible"}
+    assert client.get("/api/collection").get_json()["cards"] == []
+
+
 def test_resaving_same_icao24_updates_in_place(client):
     # One icao24 = one card: re-saving refreshes snapshot/photo/timestamp on
     # the existing card rather than appending a duplicate.

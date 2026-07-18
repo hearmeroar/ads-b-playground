@@ -123,32 +123,33 @@ authStatusEl.addEventListener('click', async () => {
 
 // --- Save-to-collection (sidebar button) ---
 
-// Reflects three things at once: whether the selected aircraft is already
-// saved (filled vs outline), whether it's a "C0" (ADS-B: surface vehicle,
-// no category info at all) aircraft that can't be saved at all (disabled,
-// with an explanatory tooltip), and the no-selection state.
+// Reflects whether the selected aircraft is already saved (filled vs
+// outline) and the no-selection state. A "C0" (ADS-B: surface vehicle, no
+// category info at all) or a ground vehicle/tower flagged by
+// looksLikeGroundVehicle() (see state-filters.js — not always caught by
+// "C0" alone, e.g. a plain registration/callsign heuristic match with no
+// category code at all, like a "TWR" beacon) isn't a real aircraft to
+// collect, so the button is hidden entirely rather than shown disabled —
+// there's nothing meaningful to save, so no control should imply otherwise.
 function updateSaveButtonState() {
   if (!sidebarSaveCollectionBtn) return;
   if (selectedIcao24 == null) {
     sidebarSaveCollectionBtn.classList.remove('saved');
-    sidebarSaveCollectionBtn.disabled = false;
+    sidebarSaveCollectionBtn.hidden = false;
     sidebarSaveCollectionBtn.removeAttribute('title');
     return;
   }
   const details = detailsById.get(selectedIcao24);
-  const isC0 = !!(details && details.categoryCode === 'C0');
-  sidebarSaveCollectionBtn.disabled = isC0;
-  if (isC0) {
-    sidebarSaveCollectionBtn.title = 'Not enough category info to save this aircraft';
-  } else {
-    sidebarSaveCollectionBtn.title = savedCardsByIcao.has(selectedIcao24)
-      ? 'Remove from collection' : 'Save to collection';
-  }
-  sidebarSaveCollectionBtn.classList.toggle('saved', !isC0 && savedCardsByIcao.has(selectedIcao24));
+  const notCollectible = !!(details && (details.categoryCode === 'C0' || details.isGroundVehicle));
+  sidebarSaveCollectionBtn.hidden = notCollectible;
+  if (notCollectible) return;
+  sidebarSaveCollectionBtn.title = savedCardsByIcao.has(selectedIcao24)
+    ? 'Remove from collection' : 'Save to collection';
+  sidebarSaveCollectionBtn.classList.toggle('saved', savedCardsByIcao.has(selectedIcao24));
 }
 
 async function saveCurrentAircraftToCollection() {
-  if (selectedIcao24 == null || sidebarSaveCollectionBtn.disabled) return;
+  if (selectedIcao24 == null || sidebarSaveCollectionBtn.hidden) return;
   if (!currentUser) {
     window.location.href = '/api/login/google';
     return;
@@ -165,6 +166,7 @@ async function saveCurrentAircraftToCollection() {
     icao24: selectedIcao24,
     snapshot: merged.info,
     category_code: details && details.categoryCode,
+    is_ground_vehicle: !!(details && details.isGroundVehicle),
     photo_url: photo ? ((photo.thumbnail_large && photo.thumbnail_large.src) || null) : null,
     photo_link: photo ? (photo.link || null) : null,
     photo_photographer: photo ? (photo.photographer || null) : null,

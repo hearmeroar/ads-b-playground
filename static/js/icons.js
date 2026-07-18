@@ -191,6 +191,7 @@ function syncMarkers(markerMap, items, color) {
     detailsById.set(item.id, {
       info: item.info, registration: item.registration, fieldSources: item.fieldSources,
       lat: item.lat, lon: item.lon, categoryGroup: item.categoryGroup, categoryCode: item.categoryCode,
+      isGroundVehicle: item.isGroundVehicle,
     });
     // Keep the open sidebar's text live across polls. Unlike the old Leaflet
     // popup, this never touches the gallery (a separate element) — so an

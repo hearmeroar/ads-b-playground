@@ -62,7 +62,7 @@ test('re-selecting an already-saved aircraft shows the save button already fille
   await expect(page.locator('#sidebar-save-collection')).toHaveClass(/saved/);
 });
 
-test('an aircraft with ADS-B category "C0" cannot be saved', async ({ page }) => {
+test('an aircraft with ADS-B category "C0" (or flagged as a ground vehicle) shows no save button at all', async ({ page }) => {
   await page.route('**/api/collection', (route) => route.fulfill({ json: { cards: [] } }));
   let postCount = 0;
   await page.route('**/api/collection', (route) => {
@@ -82,10 +82,9 @@ test('an aircraft with ADS-B category "C0" cannot be saved', async ({ page }) =>
   await expect(page.locator('#sidebar')).toHaveClass(/open/);
   await page.waitForTimeout(300); // let the sidebar's own open transition finish
 
-  const saveBtn = page.locator('#sidebar-save-collection');
-  await expect(saveBtn).toBeDisabled();
-  await saveBtn.click({ force: true });
-  await page.waitForTimeout(150);
+  // Not just disabled — not in the DOM's visible layout at all, since
+  // there's nothing meaningful to save for a non-aircraft.
+  await expect(page.locator('#sidebar-save-collection')).toBeHidden();
   expect(postCount).toBe(0);
 });
 

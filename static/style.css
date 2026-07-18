@@ -596,9 +596,12 @@ html, body { margin: 0; padding: 0; height: 100%; }
    states). */
 #sidebar-save-collection.saved { color: #1a73e8; }
 #sidebar-save-collection.saved svg path { fill: currentColor; }
-#sidebar-save-collection:disabled {
-  cursor: not-allowed; opacity: 0.4; color: var(--muted);
-}
+/* Not-collectible aircraft (a "C0" ADS-B code, or a ground vehicle/tower
+   flagged by looksLikeGroundVehicle()) get no save button at all, rather
+   than a disabled one — an ID selector's specificity beats the [hidden]
+   attribute selector's, so the base rule's display:flex above would
+   otherwise silently win and keep the button visible. */
+#sidebar-save-collection[hidden] { display: none; }
 
 /* Collection overlay — a true fullscreen takeover (not a centered modal):
    the owner asked for it to fully replace the map view while open, so

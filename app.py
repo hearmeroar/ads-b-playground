@@ -1057,13 +1057,13 @@ def api_collection_save():
     icao24 = data.get("icao24")
     if not icao24:
         return jsonify({"error": "icao24_required"}), 400
-    # "C0" (ADS-B DO-260B: surface vehicle, no category info at all) is
-    # rejected server-side too, not just by the frontend disabling the save
-    # button — a client-sent field is never trusted alone. Only ever a
-    # concern for adsb.fi/airplanes.live-style codes; OpenSky's own numeric
-    # category has no such string, so this never fires for OpenSky-only
-    # aircraft.
-    if data.get("category_code") == "C0":
+    # "C0" (ADS-B DO-260B: surface vehicle, no category info at all) and any
+    # aircraft flagged as a ground vehicle/tower (looksLikeGroundVehicle()'s
+    # heuristics on the frontend — a registration/callsign match, like a
+    # "TWR" beacon, can flag one with no category code at all) are both
+    # rejected server-side too, not just by the frontend hiding the save
+    # button entirely — a client-sent field is never trusted alone.
+    if data.get("category_code") == "C0" or data.get("is_ground_vehicle"):
         return jsonify({"error": "category_not_collectible"}), 400
     raw_snapshot = data.get("snapshot") or {}
     snapshot = {k: raw_snapshot.get(k) for k in SNAPSHOT_FIELDS if raw_snapshot.get(k) is not None}

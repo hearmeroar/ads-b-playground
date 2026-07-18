@@ -1668,20 +1668,48 @@ because photographer name and photo URL come from an external API.
     photographer}` shape, shared by Planespotters/airport-data.com — see
     the photo section above) — no new photo fetching or normalization
     logic.
-  - **"C0" aircraft can't be saved at all**: `"C0"` is the literal ADS-B
-    DO-260B letter+digit code (adsb.fi/airplanes.live's own encoding) for
-    "surface vehicle, no category info whatsoever" — a card for one would
-    have essentially nothing useful in its snapshot and would always land
-    in the panel's "Unknown / no info" group with zero identifying
-    content. The frontend sends the aircraft's raw category code as
-    `category_code` in the save request (see the frontend bullet below for
-    where that value comes from); the backend rejects it with 400
-    `{"error": "category_not_collectible"}` if it's exactly `"C0"` —
-    checked server-side too, never trusting the frontend's own disabled-
-    button state alone. This is deliberately narrower than
-    `categoryGroup === 'unknown'` (which also covers OpenSky's own
+  - **"C0" aircraft, and any ground vehicle/tower, can't be saved at all —
+    and show no save button, not a disabled one**: `"C0"` is the literal
+    ADS-B DO-260B letter+digit code (adsb.fi/airplanes.live's own encoding)
+    for "surface vehicle, no category info whatsoever". Separately, an
+    aircraft flagged by `looksLikeGroundVehicle()` (`state-filters.js` —
+    a known ground-vehicle registration/type marker like `"TWR"`, or a
+    callsign matching the airport-ground-vehicle pattern) can be a
+    non-aircraft even with *no* `"C0"` category code at all (e.g. an
+    OpenSky-only ground beacon with an empty/absent category, still caught
+    by the registration heuristic) — so the two checks are independent,
+    not one subsuming the other. A card for either would have essentially
+    nothing useful in its snapshot and would always land in the panel's
+    "Unknown / no info" group with zero identifying content. First shipped
+    as a *disabled* button with an explanatory tooltip; changed
+    (2026-07-19, explicit re-approval) to **hide the button from the DOM
+    entirely** (`sidebarSaveCollectionBtn.hidden = true` in
+    `updateSaveButtonState()`, `auth-collection.js`) instead — a disabled
+    control still implies "this is a thing you could maybe save," which
+    isn't true for a non-aircraft, so no control should render at all.
+    `#sidebar-save-collection[hidden] { display: none; }` is needed in
+    `static/style.css` specifically because the base rule sets
+    `display: flex` on the same ID selector, which otherwise wins over the
+    `[hidden]` attribute selector on specificity (both are one selector
+    deep, but an ID beats an attribute) — without that override rule the
+    browser's default `[hidden]` behavior would be silently defeated and
+    the button would stay visible.
+    `isGroundVehicle` didn't reach `detailsById` before this (only
+    `categoryGroup`/`categoryCode` did, via `syncMarkers()` in
+    `icons.js`) — added as a sibling property the same way those two
+    already were, read by `updateSaveButtonState()` via
+    `detailsById.get(selectedIcao24).isGroundVehicle`.
+    The frontend sends both the aircraft's raw category code as
+    `category_code` and a boolean `is_ground_vehicle` in the save request
+    (see the frontend bullet below for where `category_code` comes from);
+    the backend rejects with 400 `{"error": "category_not_collectible"}`
+    if `category_code` is exactly `"C0"` **or** `is_ground_vehicle` is
+    truthy — checked server-side too, never trusting the frontend's own
+    hidden-button state alone. The `"C0"` check is deliberately narrower
+    than `categoryGroup === 'unknown'` (which also covers OpenSky's own
     numeric 0/1 and several other ADS-B codes) — only the literal `"C0"`
-    string is blocked.
+    string is blocked by that half of the check; `is_ground_vehicle` is
+    what catches everything else `looksLikeGroundVehicle()` flags.
   - **Routes**: `GET /api/collection` (401 if logged out; else the
     session's own cards, newest first), `POST /api/collection` (body
     `{icao24, snapshot, category_code, photo_url, photo_link,
