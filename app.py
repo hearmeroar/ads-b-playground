@@ -129,11 +129,16 @@ def _load_track_cache():
 def _save_track_cache():
     """Best-effort atomic write of the whole cache. Track fetches are infrequent
     (per user click, throttled by TRACK_MIN_INTERVAL), so rewriting the file each
-    time is cheap. Write errors are ignored for the same reason as above."""
+    time is cheap. Entries older than TRACK_CACHE_MAX_AGE are dropped before
+    writing to bound the file's growth across long-running processes.
+    Write errors are ignored."""
     tmp = TRACK_CACHE_FILE + ".tmp"
     try:
+        # Prune entries older than TRACK_CACHE_MAX_AGE (same cutoff as _load_track_cache)
+        cutoff = time.time() - TRACK_CACHE_MAX_AGE
+        pruned = {k: v for k, v in _track_cache.items() if v.get("ts", 0) >= cutoff}
         with open(tmp, "w") as f:
-            json.dump(_track_cache, f)
+            json.dump(pruned, f)
         os.replace(tmp, TRACK_CACHE_FILE)
     except OSError:
         pass
