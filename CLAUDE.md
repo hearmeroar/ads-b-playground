@@ -855,7 +855,106 @@ because photographer name and photo URL come from an external API.
   and calls `map.setView([lat, lon], map.getZoom())`, preserving whatever
   zoom the user was already at rather than forcing one — useful for an
   aircraft that's drifted off-screen while its sidebar stayed open, or
-  after panning away to look at something else. OpenSky may have no track for a given
+  after panning away to look at something else.
+- **Sidebar visual hierarchy** (`#sidebar-header`, `#sidebar-gallery`,
+  `#sidebar-route`, `#sidebar-details` — four sibling elements inside
+  `#sidebar`, in that visual order): reworked from a single flat field list
+  into a title-first layout. `renderDetailsHtml()` (`static/js/
+  render-details.js`) now returns `{header, route, body}` instead of one
+  HTML string; `renderSelectedDetails()` (`static/js/sidebar-track.js`)
+  writes each piece into its own container. `#sidebar-close`/
+  `#sidebar-center-map` float over `#sidebar-header` now (they used to
+  float over the gallery, before a header existed) — `#sidebar-header`'s
+  `padding-top: 40px` keeps the title text starting entirely below both
+  28px-tall buttons rather than sharing their vertical band (an early
+  version had them nearly touching).
+  - **Header**: ICAO/Callsign/Registration/Aircraft type — promoted out of
+    the Identity group into a masthead (registration or ICAO24 as the big
+    title, callsign/type/ICAO as a middot-joined subtitle) rather than
+    four more rows in a field list. Each piece is wrapped in the shared
+    `.info-tip` click-tooltip (`HEADER_FIELD_EXPLANATIONS`) explaining what
+    it actually is — a first-time viewer has no other way to know "TC-LGY"
+    is a registration and "THY1RT" is a callsign, not two arbitrary codes.
+    Dev-mode source badges still apply here (`badgeFor()`/`headerPiece()`
+    in `render-details.js`) — **`.source-badge`'s CSS had to be widened
+    from `#sidebar-details .source-badge` to also cover `#sidebar-header`/
+    `#sidebar-route`**, a real bug caught after shipping: badges rendered
+    correctly into the DOM with the right colors, but with zero size/shape
+    at all outside `#sidebar-details`, so they were completely invisible
+    in the header despite "working."
+  - **Route card** (`#sidebar-route`, populated only when a route
+    resolved): replaces the old plain-text `<b>Route:</b> A → B` row —
+    big IATA codes, small city names below each (wrapped, not
+    ellipsis-truncated — a name cut off mid-word read as broken, and
+    there's no real space pressure the truncation was solving since the
+    card is free to grow taller), a direction icon between them, and (for
+    an adsbdb-sourced route) the Layer 2 confidence badge in a footer.
+    Reject-band routes get `.route-card-unconfirmed` styling and a
+    "Not confirmed" tag instead of the airport codes; Low-band gets a
+    `.route-card-tag` "⚠ Unverified" tag but still shows the real pair
+    (superseded the earlier inline `.route-warning` wrapper approach from
+    Layer 2's initial ship). The confidence badge (`routeConfidenceBadgeHtml()`)
+    is itself an `.info-tip` — clicking it shows the same score breakdown
+    tooltip as before, just via the unified mechanism (see below) instead
+    of a bespoke one.
+    **Direction icon**: reuses the exact per-category glyph the map marker
+    itself uses (`CATEGORY_GLYPHS`, `static/js/icons.js`) rather than a
+    generic arrow — neutral gray, rotated 90° (the same 0°=north/up
+    convention every rotating marker uses, so 90° points right). Since
+    `categoryGroup` only ever lives on the per-poll render `item`
+    (`parsers.js`), never on `info`/`detailsById`, `render-details.js`
+    rebuilds it via a reverse lookup (`CATEGORY_LABEL_TO_GROUP`, built once
+    from `OPENSKY_CATEGORY_GROUP`/`ADSBEXCHANGE_CATEGORY_GROUP` +
+    the label tables) keyed off the same bare label text
+    `splitCategoryDisplay()` already extracts for the Category row.
+    Falls back to the same "unknown" silhouette the map itself falls back
+    to when the category can't be determined.
+  - **Group icons** (`GROUP_ICONS`, one per `.detail-group`, not per
+    field): Material Design Icons (pictogrammers.com/MaterialDesign,
+    Apache-2.0) — copied verbatim from the MDI source repo rather than
+    hand-approximated, vendored the same no-build-step way as every other
+    icon set in this app (inline SVG string constants, no external
+    request). `renderGroup(title, rows, iconKey)` gained a third param
+    that prepends the icon into `.detail-group-title` when given.
+  - **Category row**: `splitCategoryDisplay()` splits the previously
+    always-inline "A1 — Light (<15,500 lbs)" into a compact "A1 · Light"
+    (middot, matching the same "homogeneous values, middot-separated"
+    convention the route confidence detail text also uses) with the
+    parenthetical weight-range explanation moved into a tooltip —
+    `CATEGORY_DESCRIPTIONS` adds one genuinely informative sentence per
+    DO-260B category (not just the weight range) keyed by that same bare
+    label text, so `OK-SWC`-style "just the code" rows became "code +
+    label, explanation on demand" instead of one long always-visible string.
+  - **Unified tooltip mechanism** (`.info-tip`, `infoTipHtml()` in
+    `render-details.js`): the Category and route-confidence explanations
+    reuse the exact same click-to-toggle `#source-tooltip` popover the
+    per-source dev-mode badges already used, rather than introducing a
+    third tooltip pattern (native `title`, a `wireHelpPopover()`-style
+    popover, and this would have been a third). `main.js`'s shared click
+    listener was widened from `sidebarDetailsEl` to `sidebarEl` (so it
+    also covers the header/route containers) and now matches
+    `.source-badge, .info-tip` — `.info-tip`'s `data-detail` is shown
+    directly (no source-name prefix, unlike `.source-badge`).
+  - **Gallery tuning**: `.gallery-image-wrap` no longer has a flat gray
+    `background` or a forced `aspect-ratio: 4/3` box — a photo whose real
+    aspect ratio wasn't exactly 4:3 (nearly all of them) used to show
+    visible gray bars where the box was larger than the actual rendered
+    image; now the wrap just sizes to its image (capped by `max-height`
+    for the rare very-tall/very-wide case). Prev/next nav buttons went
+    through three iterations: first an opaque dark circle absolutely
+    positioned at the image's vertical middle (obscured photo content
+    there); then a light glass pill moved to the top corners (still sat
+    visibly on top of photo content/watermarks); settled on the original
+    vertical-middle position but with **no background shape at all** —
+    just the bare chevron glyph plus a `drop-shadow` for legibility, which
+    reads as "part of the photo's own UI" rather than "a control placed on
+    top of it." `.gallery-credit` gained its own `padding-top` (rather than
+    relying on `.gallery-dots`' padding for the only vertical gap above
+    it) — a lone photo has no dots row at all, so the credit line used to
+    sit flush against the image with zero gap. Its link itself is
+    underlined only on hover now (was always underlined), to read as less
+    visually noisy.
+  OpenSky may have no track for a given
   aircraft (`/api/track` 404s) — common for rotorcraft, whose short/local
   flights often aren't segmented into a continuous "flight" by OpenSky's
   history system. `loadTrack()` then falls back to the small in-browser

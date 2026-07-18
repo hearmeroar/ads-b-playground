@@ -102,7 +102,8 @@ test('live values are never overwritten by enrichment, even a contradicting one 
   await page.click('#toggle-dev-mode');
   await selectAircraft(page, 'dddddd', 'opensky');
 
-  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+  // Registration is #sidebar-header's title now; Country stays in #sidebar-details.
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar').textContent);
   expect(sidebarText).toContain('Testland');
   expect(sidebarText).toContain('OO-DUP');
   expect(sidebarText).not.toContain('Decoyland');
@@ -116,7 +117,9 @@ test('live values are never overwritten by enrichment, even a contradicting one 
   // "dddddd"'s registration is independently reported by adsb.fi and
   // airplanes.live too (see fixtures) — the point here is just that
   // 'flywme' is appended last, after whichever live sources already won.
-  const regSources = await badgeSourcesForLabel(page, 'Registration:');
+  // Registration's badges are on #sidebar-header's title now (no <b> label).
+  const regSources = await page.evaluate(() =>
+    [...document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')].map((b) => b.dataset.source));
   expect(regSources[regSources.length - 1]).toBe('flywme');
   expect(regSources.length).toBeGreaterThan(1);
 
@@ -155,7 +158,7 @@ test('a live-sourced country still gets a flag when the backend recognizes its n
   expect(await badgeSourcesForLabel(page, 'Country:')).toEqual(['opensky']);
 });
 
-test('Registration is excluded from the Unknown-treatment: hidden/shown by the normal rule, not forced', async ({ page }) => {
+test('Registration is excluded from the Unknown-treatment: it\'s the header now, not an identityRow', async ({ page }) => {
   // Default all-null identity mock from beforeEach/mockAllSources.
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
@@ -167,7 +170,9 @@ test('Registration is excluded from the Unknown-treatment: hidden/shown by the n
   expect(sidebarText).toContain('Manufacturer: Unknown');
   expect(sidebarText).toContain('Model: Unknown');
   expect(sidebarText).toContain('Year built: Unknown');
-  // Registration has a live value here, so it renders normally (not "Unknown").
-  expect(sidebarText).toContain('F-UNIQ');
-  expect(sidebarText).not.toContain('Registration: Unknown');
+  // Registration has a live value here, and lives in #sidebar-header (the
+  // masthead title) rather than an identityRow — no "Unknown" treatment
+  // applies to it at all any more, by construction.
+  const headerText = await page.evaluate(() => document.querySelector('#sidebar-header').textContent);
+  expect(headerText).toContain('F-UNIQ');
 });

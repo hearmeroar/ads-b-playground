@@ -205,20 +205,26 @@ document.addEventListener('click', closeHelpPopovers);
 // than folded into helpPopovers/closeHelpPopovers, since that mechanism is
 // built for a fixed set of statically-known popovers, not one dynamic,
 // differently-positioned tooltip.
+// One shared click-to-toggle tooltip element for every small inline
+// "there's more info here" trigger in the sidebar: dev-mode source badges
+// (.source-badge — which source supplied a field) and general explanatory
+// triggers (.info-tip — the Category row's category description, the
+// route confidence badge's score breakdown). One consistent tooltip
+// pattern app-wide rather than a bespoke one per feature. Delegated on
+// #sidebar itself (not just #sidebar-details) so it also covers the
+// header and route card, which live in their own sibling containers.
 const sourceTooltipEl = document.getElementById('source-tooltip');
-sidebarDetailsEl.addEventListener('click', (e) => {
-  // .route-confidence-dot shares this same click-to-toggle tooltip
-  // mechanism but conveys a different concept (how much to trust an
-  // adsbdb route's geometry, not which source populated a field) — its
-  // data-detail is already the complete message, no source-name prefix.
-  const badge = e.target.closest('.source-badge, .route-confidence-dot');
+sidebarEl.addEventListener('click', (e) => {
+  const badge = e.target.closest('.source-badge, .info-tip');
   if (!badge) { sourceTooltipEl.setAttribute('hidden', ''); return; }
   e.stopPropagation();
-  if (badge.classList.contains('route-confidence-dot')) {
-    sourceTooltipEl.textContent = badge.dataset.detail;
-  } else {
+  if (badge.classList.contains('source-badge')) {
     sourceTooltipEl.textContent = SOURCE_DISPLAY_NAMES[badge.dataset.source] || badge.dataset.source;
     if (badge.dataset.detail) sourceTooltipEl.textContent += ' — ' + badge.dataset.detail;
+  } else {
+    // .info-tip: data-detail is already the complete message, no
+    // source-name prefix needed.
+    sourceTooltipEl.textContent = badge.dataset.detail;
   }
   const r = badge.getBoundingClientRect();
   sourceTooltipEl.style.left = (r.left + window.scrollX) + 'px';

@@ -29,8 +29,9 @@ test('overlapping aircraft is deduped (not drawn twice) and its OpenSky sidebar 
   });
   await page.waitForTimeout(300);
 
-  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Registration'); // OpenSky's own vector has no such field
+  // Registration/Aircraft type live in #sidebar-header now (OpenSky's own
+  // vector has no such fields — both are adsb.fi/airplanes.live enrichment).
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar').textContent);
   expect(sidebarText).toContain('OO-DUP');
   expect(sidebarText).toContain('AIRBUS A-320');
 

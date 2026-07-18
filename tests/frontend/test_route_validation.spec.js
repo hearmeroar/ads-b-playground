@@ -45,18 +45,11 @@ async function selectAircraft(page, hex, markerMapName) {
   await page.waitForTimeout(100);
 }
 
-function rowHtml(page, label) {
-  return page.evaluate((lbl) => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
-    if (!b) return null;
-    let html = '';
-    let node = b.nextSibling;
-    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
-      html += node.nodeType === 1 ? node.outerHTML : node.textContent;
-      node = node.nextSibling;
-    }
-    return html;
-  }, label);
+// Route is its own visual card (#sidebar-route), not a detailRow inside
+// #sidebar-details any more — its whole innerHTML is the equivalent of the
+// old rowHtml() helper's per-row fragment.
+function routeHtml(page) {
+  return page.evaluate(() => document.querySelector('#sidebar-route')?.innerHTML || null);
 }
 
 test.describe('pure geometry functions (route-validation.js)', () => {
@@ -138,9 +131,11 @@ test.describe('Route row end-to-end', () => {
     await page.waitForSelector('.leaflet-marker-icon');
     await selectAircraft(page, 'aaaaaa', 'opensky');
 
-    const html = await rowHtml(page, 'Route:');
-    expect(html).toContain('West Airport (AAA)');
-    expect(html).toContain('East Airport (BBB)');
+    const html = await routeHtml(page);
+    expect(html).toContain('AAA');
+    expect(html).toContain('West Airport');
+    expect(html).toContain('BBB');
+    expect(html).toContain('East Airport');
     expect(html).not.toContain('route-warning');
     expect(html).not.toContain('⚠');
   });
@@ -159,8 +154,8 @@ test.describe('Route row end-to-end', () => {
     await page.waitForSelector('.leaflet-marker-icon');
     await selectAircraft(page, 'aaaaaa', 'opensky');
 
-    const html = await rowHtml(page, 'Route:');
-    expect(html).toContain('route-not-confirmed');
+    const html = await routeHtml(page);
+    expect(html).toContain('route-card-unconfirmed');
     expect(html).toContain('Not confirmed');
     expect(html).not.toContain('Far Origin Airport');
     expect(html).not.toContain('route-warning');
@@ -183,8 +178,9 @@ test.describe('Route row end-to-end', () => {
     await page.waitForSelector('.leaflet-marker-icon');
     await selectAircraft(page, 'aaaaaa', 'opensky');
 
-    const html = await rowHtml(page, 'Route:');
-    expect(html).toContain('route-warning');
+    const html = await routeHtml(page);
+    expect(html).toContain('route-card-tag');
+    expect(html).toContain('Unverified');
     expect(html).toContain('⚠');
     expect(html).toContain('West Airport');
     expect(html).not.toContain('Not confirmed');
@@ -198,16 +194,13 @@ test.describe('Route row end-to-end', () => {
     await page.waitForSelector('.leaflet-marker-icon');
     await selectAircraft(page, 'aaaaaa', 'opensky');
 
-    // Visible and clickable without dev mode.
-    await page.evaluate(() => {
-      const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Route:');
-      let node = b.nextSibling;
-      while (node && !(node.nodeType === 1 && node.classList.contains('route-confidence-dot'))) node = node.nextSibling;
-      node.click();
-    });
+    // Visible and clickable without dev mode — the confidence badge is its
+    // own .info-tip trigger inside #sidebar-route (the small colored dot is
+    // purely decorative, nested inside it, not independently clickable).
+    await page.click('#sidebar-route .info-tip');
     const tooltip = await page.textContent('#source-tooltip');
     expect(tooltip).toContain('Reject confidence');
     expect(tooltip).toContain('km off route');
-    expect(tooltip).toContain('% progress');
+    expect(tooltip).toContain('% along route');
   });
 });

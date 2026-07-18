@@ -27,10 +27,14 @@ later if a real need for it shows up.
   source for a cycle rather than breaking the map.
 - **Sidebar enrichment** — clicking a marker opens a details sidebar with
   48 fields grouped into sections (identity, position, speed & heading,
-  autopilot, weather, status, signal quality). OpenSky's own data has no
-  registration/aircraft type; the other sources fill that in automatically
-  when they see the same aircraft, without duplicating fields every source
-  agrees on. Groups with nothing to show are omitted. A crosshair button
+  autopilot, weather, status, signal quality), each section headed by its
+  own icon. OpenSky's own data has no registration/aircraft type; the
+  other sources fill that in automatically when they see the same
+  aircraft, without duplicating fields every source agrees on. Groups
+  with nothing to show are omitted. The sidebar leads with a masthead —
+  registration/ICAO as the title, callsign and aircraft type below it,
+  each tappable for a plain-English explanation of what it is — rather
+  than burying those fields in the field list below. A crosshair button
   re-centers the map on the selected aircraft's current position at any
   time, keeping the current zoom level.
 - **Flight history on click** — draws an aircraft's actual track (not just
@@ -41,7 +45,17 @@ later if a real need for it shows up.
   [Planespotters](https://www.planespotters.net/photo/api) (primary) topped
   up from [airport-data.com](https://airport-data.com/), with the
   photographer attribution both require. Loads asynchronously, only on
-  click, and is cached client-side.
+  click, and is cached client-side. Photos display at their natural aspect
+  ratio (no forced letterboxing), with unobtrusive prev/next arrows
+  overlaid directly on the image.
+- **Route card** — when a route is known (from FlightAware or the adsbdb
+  lookup below), it renders as its own card: large origin/destination
+  airport codes with city names underneath, a directional icon between
+  them (the aircraft's own category glyph), and a confidence indicator
+  when the route came from the adsbdb geometric hypothesis (see below) —
+  tap it for a plain-English breakdown of why it's trusted or not. A
+  route judged implausible is shown as "Not confirmed" rather than naming
+  a likely-wrong airport pair.
 - **Filters**: airborne/on-ground, aircraft category (unified across
   OpenSky's numeric codes and the other sources' letter+digit codes), a
   metric/imperial unit toggle, and a "hide non-aircraft" toggle (off by

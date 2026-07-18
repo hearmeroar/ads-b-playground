@@ -42,6 +42,19 @@ function badgeSourcesForLabel(page, label) {
   }, label);
 }
 
+// Registration/Callsign/Aircraft type live in #sidebar-header now (no <b>
+// label wrapper — rowText can't see them there). Route is its own visual
+// card (#sidebar-route), not a detailRow at all.
+function headerText(page) {
+  return page.evaluate(() => document.querySelector('#sidebar-header')?.textContent || '');
+}
+function routeCardText(page) {
+  return page.evaluate(() => document.querySelector('#sidebar-route')?.textContent || '');
+}
+function routeCardDevBadgeSources(page) {
+  return page.evaluate(() => [...document.querySelectorAll('#sidebar-route .source-badge')].map((b) => b.dataset.source));
+}
+
 const AIRCRAFT_UNIQUE = {
   type: 'Boeing 737-800', icao_type: 'B738', manufacturer: 'Boeing',
   mode_s: 'EEEEEE', registration: 'F-UNIQ',
@@ -98,15 +111,22 @@ test('adsbdb fills Registered Owner, Operator and Route when the live feed has n
 
   expect(await rowText(page, 'Registered Owner:')).toBe('Falcon Landing LLC');
   expect(await rowText(page, 'Operator:')).toBe('Unique Air');
-  expect(await rowText(page, 'Route:')).toBe('London Heathrow Airport (LHR) → Hamad International Airport (DOH)');
+  // Route is its own visual card now: big codes + small city names, not a
+  // single combined "Name (CODE) → Name (CODE)" string.
+  const routeText = await routeCardText(page);
+  expect(routeText).toContain('LHR');
+  expect(routeText).toContain('London Heathrow Airport');
+  expect(routeText).toContain('DOH');
+  expect(routeText).toContain('Hamad International Airport');
 
   expect(await badgeSourcesForLabel(page, 'Registered Owner:')).toEqual(['adsbdb']);
   expect(await badgeSourcesForLabel(page, 'Operator:')).toEqual(['adsbdb']);
-  expect(await badgeSourcesForLabel(page, 'Route:')).toEqual(['adsbdb']);
+  expect(await routeCardDevBadgeSources(page)).toEqual(['adsbdb']);
 
   // Registration is already live (F-UNIQ from adsb.fi) — adsbdb's own
-  // registration value for this aircraft must not override it.
-  expect(await rowText(page, 'Registration:')).toBe('F-UNIQ');
+  // registration value for this aircraft must not override it. It's in
+  // #sidebar-header now, with no <b>Registration:</b> label wrapper.
+  expect(await headerText(page)).toContain('F-UNIQ');
 });
 
 test('Flywme\'s own guess co-displays alongside adsbdb when both resolve the same field', async ({ page }) => {
@@ -142,11 +162,12 @@ test('a live registration is never overwritten by adsbdb, even a contradicting o
   await page.click('#toggle-dev-mode');
   await selectAircraft(page, 'dddddd', 'opensky');
 
-  expect(await rowText(page, 'Registration:')).toBe('OO-DUP');
+  // Registration is the header's title now (dddddd has one), no <b> label.
+  expect(await headerText(page)).toContain('OO-DUP');
   // "dddddd" is independently reported by adsb.fi and airplanes.live too
   // (see fixtures) — the point of this test is just that 'adsbdb' isn't
   // among them, since the live value must win over adsbdb's contradicting one.
-  const sources = await badgeSourcesForLabel(page, 'Registration:');
+  const sources = await page.evaluate(() => [...document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')].map((b) => b.dataset.source));
   expect(sources).not.toContain('adsbdb');
   expect(sources.length).toBeGreaterThan(0);
 });

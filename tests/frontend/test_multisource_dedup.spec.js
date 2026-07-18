@@ -64,12 +64,13 @@ test('enrichment from a lower-priority source disappears when that source is tog
     if (m && m._icon) m._icon.click();
   });
   await page.waitForTimeout(300);
-  let sidebar = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebar).toContain('LOL-ONLY'); // enriched from adsb.lol
+  // Registration (LOL-ONLY) is #sidebar-header's title now, not #sidebar-details.
+  let header = await page.evaluate(() => document.querySelector('#sidebar-header').textContent);
+  expect(header).toContain('LOL-ONLY'); // enriched from adsb.lol
 
   // Turn adsb.lol off: it triggers an immediate poll, the open sidebar re-renders.
   await page.click('#toggle-adsblol');
   await page.waitForTimeout(600);
-  sidebar = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebar).not.toContain('LOL-ONLY'); // the only enricher is gone
+  header = await page.evaluate(() => document.querySelector('#sidebar-header').textContent);
+  expect(header).not.toContain('LOL-ONLY'); // the only enricher is gone
 });

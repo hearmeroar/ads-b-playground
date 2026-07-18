@@ -215,6 +215,23 @@ html, body { margin: 0; padding: 0; height: 100%; }
    obvious single-character glyph the way "close" has "×". */
 #sidebar-center-map { left: 10px; }
 #sidebar-center-map:hover { background: rgba(255, 255, 255, 1); }
+
+/* Header masthead: identity essentials (registration/ICAO, callsign,
+   aircraft type) at a glance, above the gallery. #sidebar-close/
+   #sidebar-center-map (28px circles, top:10px) float over the top of this
+   block — padding-top is large enough (40px) that the title text starts
+   entirely *below* both buttons rather than sharing their vertical band
+   (the two used to nearly touch). Empty (no margin/padding) when nothing
+   is selected yet, so it doesn't leave a visible gap. */
+#sidebar-header {
+  padding: 40px 18px 10px 18px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+#sidebar-header:empty { padding: 0; }
+.sidebar-header-title { font-size: 18px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+.sidebar-header-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.sidebar-header-sep { opacity: .6; padding: 0 1px; }
+
 #sidebar-details {
   padding: 16px 18px 20px;
   font: 13px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
@@ -222,29 +239,60 @@ html, body { margin: 0; padding: 0; height: 100%; }
 }
 #sidebar-details b { display: inline-block; min-width: 96px; color: var(--muted); font-weight: 600; }
 #sidebar-details .emergency { color: #dc2626; font-weight: 700; }
-/* Amber, not red — red is reserved for emergency/alert fields above. Flags
-   a low-confidence adsbdb route (Layer 2 geometric validation scored it
-   below the Medium threshold), shown in both normal and dev mode since a
-   likely-wrong route is misleading either way. */
-#sidebar-details .route-warning { color: #b45309; font-weight: 600; }
-/* Reject-band adsbdb routes (~a quarter of them, per live research) don't
-   name specific likely-wrong airports at all. */
-#sidebar-details .route-not-confirmed { color: var(--muted); font-style: italic; }
-/* Slightly larger than .source-badge (9px vs 7px) so the two read as
-   distinct concepts at a glance — this conveys confidence, not which
-   source populated the field — despite sharing the same click-tooltip
-   mechanism (see main.js) and dot shape. Always visible (not gated by
-   dev mode, unlike .source-badge). */
-#sidebar-details .route-confidence-dot {
-  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
-  margin-left: 5px; cursor: pointer; vertical-align: middle;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
-}
 #sidebar-details .detail-group { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 #sidebar-details .detail-group:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 #sidebar-details .detail-group-title {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
   color: var(--muted); margin-bottom: 5px;
+  display: flex; align-items: center; gap: 5px;
+}
+/* One icon per detail *group* (Material Design Icons, see GROUP_ICONS in
+   render-details.js) — not per field, which would be too busy at this
+   density. Inherits the title's own muted color via currentColor. */
+.detail-group-icon { display: inline-flex; flex: none; opacity: .75; }
+
+/* Route card — its own visual block between the gallery and the rest of
+   the details (#sidebar-route, a sibling of #sidebar-details, not a
+   .detail-group inside it), so a resolved route reads as a distinct,
+   glanceable unit rather than one more text row in a field list: big
+   airport codes, small city names, a direction arrow between them. */
+#sidebar-route:empty { display: none; }
+.route-card {
+  margin: 0 18px 14px; padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.035);
+  border: 1px solid var(--border); border-radius: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+.route-card-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.route-card-tag { font-size: 10px; font-weight: 700; text-transform: none; letter-spacing: 0; color: #b45309; }
+.route-card-unconfirmed .route-card-tag, .route-card-unconfirmed .route-card-title { color: var(--muted); }
+.route-card-endpoints { display: flex; align-items: flex-start; }
+.route-card-endpoint { flex: 1 1 0; min-width: 0; }
+.route-card-endpoint:last-child { text-align: right; }
+.route-card-code {
+  font-size: 22px; font-weight: 700; letter-spacing: .01em; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+/* Wraps rather than truncating — an airport name cut off mid-word ("Skiathos
+   Island ...") reads as broken/unfinished, and there's no real space
+   pressure that truncation was solving here (the card is free to grow
+   taller). */
+.route-card-city { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.route-card-arrow {
+  flex: 0 0 auto; color: var(--muted); padding: 0 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.route-card-empty-text { font-size: 13px; color: var(--muted); }
+.route-card-footer:not(:empty) { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.route-confidence { font-size: 11px; color: var(--muted); }
+.route-confidence-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 5px; vertical-align: middle;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
 }
 
 /* Country flag (flag-icons SVG library, see static/flag-icons/) inline
@@ -262,21 +310,36 @@ html, body { margin: 0; padding: 0; height: 100%; }
   border-radius: 2px;
 }
 
-/* Dev mode: per-field source provenance dots + their click-to-toggle tooltip */
-#sidebar-details .source-badge {
+/* Dev mode: per-field source provenance dots + their click-to-toggle
+   tooltip. Scoped to all three sidebar containers now, not just
+   #sidebar-details — ICAO/Callsign/Registration/Aircraft type moved to
+   #sidebar-header and Route to #sidebar-route, and their badges rendered
+   invisibly (no size/shape at all) until this rule covered those
+   containers too. */
+#sidebar-details .source-badge, #sidebar-header .source-badge, #sidebar-route .source-badge {
   display: inline-block; width: 7px; height: 7px; border-radius: 50%;
   margin-left: 4px; cursor: pointer; vertical-align: middle;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
 }
 #source-tooltip {
-  position: absolute; z-index: 1200; padding: 4px 8px;
+  position: absolute; z-index: 1200; padding: 6px 10px;
+  max-width: 260px; white-space: normal;
   background: var(--card-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border); border-radius: 8px;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
-  font: 11px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font: 11px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   color: var(--ink); pointer-events: none;
 }
 #source-tooltip[hidden] { display: none; }
+/* Shared click-to-toggle tooltip trigger for inline informational content
+   (category explanations, route confidence detail) — the same
+   #source-tooltip popover every other tooltip in this app uses, so there's
+   one consistent tooltip pattern rather than several. A dotted underline
+   signals "there's more info here" the way source-badge dots signal
+   provenance. */
+#sidebar-details .info-tip, #sidebar-route .info-tip, #sidebar-header .info-tip {
+  cursor: pointer; border-bottom: 1px dotted var(--muted);
+}
 
 /* Dev-mode "all aircraft" table — a debugging aid. A tall, narrow vertical
    column (mirrors #sidebar's own footprint on the same left edge — #sidebar
@@ -326,21 +389,26 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #dev-aircraft-table tbody tr:hover { background: rgba(15, 23, 42, 0.05); }
 #dev-aircraft-table tbody td[title] { cursor: help; }
 
-/* Photo gallery */
+/* Photo gallery. No flat background on the wrap itself any more — it used
+   to be a fixed 4:3 box with a solid gray fill behind it, so any photo
+   whose real aspect ratio wasn't exactly 4:3 (nearly all of them) showed
+   visible gray bars on the sides or top/bottom. Now the wrap just sizes to
+   its image (capped by max-height for the rare very-tall/very-wide case,
+   with object-fit: contain only kicking in then), so there's nothing
+   behind the photo to show through. */
 .gallery-image-wrap {
-  position: relative; background: #e3e6ea;
+  position: relative;
   display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
 }
 .gallery-image-wrap img { display: block; }
-/* Planespotters (good resolution): fill the card width, never crop — letterbox instead. */
-.gallery-image-wrap.stretch { aspect-ratio: 4 / 3; }
-.gallery-image-wrap.stretch img { width: 100%; height: 100%; object-fit: contain; }
+.gallery-image-wrap.stretch img { width: 100%; height: auto; max-height: 280px; object-fit: contain; }
 /* Degraded state: a reconstructed airport-data.com full-size URL 404'd and
-   the photo fell back to its original ~150px thumbnail — shown at native
-   resolution, centered with padding, since stretching it would just look
-   blurry for no benefit. */
-.gallery-image-wrap.native { min-height: 140px; padding: 14px 0; }
-.gallery-image-wrap.native img { max-width: 100%; }
+   the photo fell back to its original ~150px thumbnail (or this is
+   adsbdb's thumbnail-only last-resort photo) — shown at native resolution
+   rather than stretched, since that would just look blurry for no benefit. */
+.gallery-image-wrap.native { padding: 10px 0; }
+.gallery-image-wrap.native img { max-width: 100%; max-height: 220px; }
 .gallery-placeholder {
   display: flex; align-items: center; justify-content: center;
   height: 180px; background: #f2f4f6; color: var(--muted); font-size: 12px;
@@ -372,22 +440,33 @@ html, body { margin: 0; padding: 0; height: 100%; }
   border: 3px solid #e3e6ea; border-top-color: #1a73e8;
   animation: gallery-spin .8s linear infinite;
 }
+/* Overlaid on the image, vertically centered — but with no background
+   shape behind them at all, just the bare chevron glyph plus a subtle
+   drop-shadow for legibility over any photo. Two earlier attempts (a
+   filled dark circle, then a light glass pill; also tried a separate row
+   below the image) all either sat visibly "on top of" the photo or looked
+   out of place in this layout — a shape-less glyph avoids that while
+   staying in the expected carousel position. */
 .gallery-nav {
   position: absolute; top: 50%; transform: translateY(-50%);
-  width: 30px; height: 30px; border-radius: 50%; border: none;
-  background: rgba(28, 33, 40, 0.45); color: #fff; font-size: 18px; line-height: 1;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border: none; background: none;
+  color: #fff; font-size: 22px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
 }
-.gallery-nav:hover { background: rgba(28, 33, 40, 0.65); }
-.gallery-prev { left: 8px; }
-.gallery-next { right: 8px; }
-.gallery-dots { display: flex; justify-content: center; gap: 6px; padding: 8px 0; }
+.gallery-prev { left: 4px; }
+.gallery-next { right: 4px; }
+.gallery-dots { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 0; }
 .gallery-dot {
   width: 6px; height: 6px; border-radius: 50%; background: #d7dbe1; cursor: pointer;
 }
 .gallery-dot.active { background: #1a73e8; }
-.gallery-credit { font-size: 11px; color: var(--muted); padding: 0 18px 14px; }
-.gallery-credit a { color: inherit; }
+/* padding-top here (not just relying on .gallery-dots' own padding) since
+   a lone photo has no dots row at all — without this the credit line sat
+   flush against the image with no gap. */
+.gallery-credit { font-size: 11px; color: var(--muted); padding: 8px 18px 14px; }
+.gallery-credit a { color: inherit; text-decoration: none; }
+.gallery-credit a:hover { text-decoration: underline; }
 #sidebar-icon-credit { font-size: 11px; color: var(--muted); padding: 10px 18px 14px; border-top: 1px solid var(--border); text-align: left; }
 #sidebar-icon-credit a { color: var(--muted); text-decoration: underline; }
 #sidebar-icon-credit a:hover { color: var(--ink); }

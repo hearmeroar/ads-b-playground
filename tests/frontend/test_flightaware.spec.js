@@ -149,20 +149,25 @@ test('matching callsigns are deduplicated and enriched', async ({ page }) => {
   );
   expect(hasFlightAware).toBe(false);
 
-  // But the OpenSky marker should have the Route row enriched from FlightAware
-  const details = await page.evaluate(() => {
+  // But the OpenSky marker should have the route card enriched from
+  // FlightAware — its own dedicated #sidebar-route block now, not a text
+  // row inside #sidebar-details. The card splits "Name (CODE)" back into
+  // a big code + a small city name, rather than showing the combined string.
+  const routeText = await page.evaluate(() => {
     const marker = openskyMarkers.get('aaaaaa');
     if (marker && marker._icon) {
       marker._icon.click();
-      return document.querySelector('#sidebar-details')?.textContent || '';
+      return document.querySelector('#sidebar-route')?.textContent || '';
     }
     return '';
   });
   await page.waitForTimeout(300);
 
-  expect(details).toContain('Route');
-  expect(details).toContain('Catania-Fontanarossa Airport (CTA)');
-  expect(details).toContain('Belgrade Nikola Tesla Int\'l (BEG)');
+  expect(routeText).toContain('Route');
+  expect(routeText).toContain('CTA');
+  expect(routeText).toContain('Catania-Fontanarossa Airport');
+  expect(routeText).toContain('BEG');
+  expect(routeText).toContain('Belgrade Nikola Tesla Int\'l');
 });
 
 test('FlightAware sidebar shows Route row with origin/destination', async ({ page }) => {
@@ -209,11 +214,13 @@ test('FlightAware sidebar shows Route row with origin/destination', async ({ pag
 
   await page.waitForTimeout(300);
   const sidebarText = await page.evaluate(() => {
-    return document.querySelector('#sidebar-details')?.textContent || '';
+    return document.querySelector('#sidebar-route')?.textContent || '';
   });
   expect(sidebarText).toContain('Route');
-  expect(sidebarText).toContain('Catania-Fontanarossa Airport (CTA)');
-  expect(sidebarText).toContain('Belgrade Nikola Tesla Int\'l (BEG)');
+  expect(sidebarText).toContain('CTA');
+  expect(sidebarText).toContain('Catania-Fontanarossa Airport');
+  expect(sidebarText).toContain('BEG');
+  expect(sidebarText).toContain('Belgrade Nikola Tesla Int\'l');
 });
 
 test('FlightAware marker click shows live fallback track when API unavailable', async ({ page }) => {

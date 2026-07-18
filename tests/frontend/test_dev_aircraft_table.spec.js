@@ -71,8 +71,9 @@ test('clicking a table row selects that aircraft, same as clicking its marker', 
     row.click();
   });
   await expect(page.locator('#sidebar')).toHaveClass(/open/);
-  const sidebarText = await page.textContent('#sidebar-details');
-  expect(sidebarText).toContain('F-UNIQ');
+  // Registration lives in #sidebar-header now, not #sidebar-details.
+  const headerText = await page.textContent('#sidebar-header');
+  expect(headerText).toContain('F-UNIQ');
 });
 
 test('disabling a source removes its rows from the table', async ({ page }) => {

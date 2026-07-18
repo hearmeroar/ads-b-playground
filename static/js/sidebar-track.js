@@ -6,8 +6,10 @@
 // out from under an in-flight photo fetch: the gallery here is never rebuilt
 // by a poll, only by an actual new selection.
 const sidebarEl = document.getElementById('sidebar');
+const sidebarHeaderEl = document.getElementById('sidebar-header');
 const sidebarDetailsEl = document.getElementById('sidebar-details');
 const sidebarGalleryEl = document.getElementById('sidebar-gallery');
+const sidebarRouteEl = document.getElementById('sidebar-route');
 const sidebarCloseBtn = document.getElementById('sidebar-close');
 const sidebarCenterMapBtn = document.getElementById('sidebar-center-map');
 
@@ -160,7 +162,10 @@ function buildMergedDetails(icao24) {
 function renderSelectedDetails() {
   if (selectedIcao24 == null || !detailsById.has(selectedIcao24)) return;
   const m = buildMergedDetails(selectedIcao24);
-  sidebarDetailsEl.innerHTML = renderDetailsHtml(m.info, m.fieldSources, m.fieldConfidence, m.fieldComputationBasis, m.routeValidation);
+  const rendered = renderDetailsHtml(m.info, m.fieldSources, m.fieldConfidence, m.fieldComputationBasis, m.routeValidation);
+  sidebarHeaderEl.innerHTML = rendered.header;
+  sidebarRouteEl.innerHTML = rendered.route;
+  sidebarDetailsEl.innerHTML = rendered.body;
 }
 
 let selectedIcao24 = null;
@@ -497,7 +502,13 @@ function selectAircraft(icao24) {
   loadTrack(icao24);
 
   const details = detailsById.get(icao24);
-  if (details) renderSelectedDetails(); else sidebarDetailsEl.innerHTML = '';
+  if (details) {
+    renderSelectedDetails();
+  } else {
+    sidebarHeaderEl.innerHTML = '';
+    sidebarRouteEl.innerHTML = '';
+    sidebarDetailsEl.innerHTML = '';
+  }
   sidebarEl.classList.add('open');
   loadGallery(icao24, details && details.registration);
   loadIdentityEnrichment(icao24, details && details.info);
@@ -686,6 +697,14 @@ function renderGallery(photos) {
     return active === -1 ? 0 : active;
   }
 
+  // Prev/next overlay the image itself, vertically centered — but with no
+  // background shape behind them at all (just the bare chevron glyph plus
+  // a subtle drop-shadow for legibility over any photo). Two earlier
+  // versions had a filled circle background (first dark, then a light
+  // glass pill) that read as sitting "on top of" the photo; a separate row
+  // below the image (flanking the dots) was tried too but looked wrong in
+  // this layout. A shape-less glyph avoids the "sits on top of the photo"
+  // feel while staying in the natural, expected carousel position.
   if (photos.length > 1) {
     const prevBtn = document.createElement('button');
     prevBtn.type = 'button'; prevBtn.className = 'gallery-nav gallery-prev'; prevBtn.textContent = '‹';

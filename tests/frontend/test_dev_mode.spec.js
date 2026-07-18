@@ -22,11 +22,14 @@ async function selectDddddd(page) {
 
 test('dev mode off matches today\'s exact rendering (no regression)', async ({ page }) => {
   await selectDddddd(page);
+  // Registration is #sidebar-header's title now, no <b>Registration:</b>
+  // label wrapper anywhere.
+  const headerText = await page.evaluate(() => document.querySelector('#sidebar-header').textContent);
+  expect(headerText).toContain('OO-DUP');
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Registration');
-  expect(sidebarText).toContain('OO-DUP');
   expect(sidebarText).not.toContain('—'); // no dash placeholders when off
-  const badgeCount = await page.evaluate(() => document.querySelectorAll('#sidebar-details .source-badge').length);
+  const badgeCount = await page.evaluate(() =>
+    document.querySelectorAll('#sidebar-header .source-badge, #sidebar-details .source-badge, #sidebar-route .source-badge').length);
   expect(badgeCount).toBe(0);
 });
 
@@ -101,28 +104,21 @@ test('a field independently reported by several enabled sources shows one badge 
   // Fixture "dddddd" is reported by both adsb.fi and airplanes.live (both
   // enabled by default), each with its own "OO-DUP" registration record —
   // dev mode must show a badge for each, not just the one whose value won.
-  const sources = await badgeSourcesForLabel(page, 'Registration:');
+  // Registration is the header's title now, badges attach there directly
+  // (no <b>Registration:</b> label wrapper).
+  const sources = await page.evaluate(() =>
+    [...document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')].map((b) => b.dataset.source));
   expect(sources).toEqual(['airplaneslive', 'adsbfi']);
 
   // Each badge opens its own tooltip independently.
   await page.evaluate(() => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration:');
-    let node = b.nextSibling;
-    while (node && !(node.nodeType === 1 && node.classList.contains('source-badge'))) node = node.nextSibling;
-    node.click(); // first badge = airplanes.live
+    document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')[0].click(); // airplanes.live
   });
   await page.waitForTimeout(100);
   expect(await page.textContent('#source-tooltip')).toBe('airplanes.live');
 
   await page.evaluate(() => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration:');
-    const badges = [];
-    let node = b.nextSibling;
-    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
-      if (node.nodeType === 1 && node.classList.contains('source-badge')) badges.push(node);
-      node = node.nextSibling;
-    }
-    badges[1].click(); // second badge = adsb.fi
+    document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')[1].click(); // adsb.fi
   });
   await page.waitForTimeout(100);
   expect(await page.textContent('#source-tooltip')).toBe('adsb.fi');
@@ -133,10 +129,11 @@ test('toggling dev mode off restores the exact non-dev-mode markup', async ({ pa
   await selectDddddd(page);
   await page.click('#toggle-dev-mode'); // off again, sidebar still open
 
+  const headerText = await page.evaluate(() => document.querySelector('#sidebar-header').textContent);
+  expect(headerText).toContain('OO-DUP');
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Registration');
-  expect(sidebarText).toContain('OO-DUP');
   expect(sidebarText).not.toContain('—');
-  const badgeCount = await page.evaluate(() => document.querySelectorAll('#sidebar-details .source-badge').length);
+  const badgeCount = await page.evaluate(() =>
+    document.querySelectorAll('#sidebar-header .source-badge, #sidebar-details .source-badge, #sidebar-route .source-badge').length);
   expect(badgeCount).toBe(0);
 });

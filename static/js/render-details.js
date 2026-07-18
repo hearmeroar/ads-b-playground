@@ -110,6 +110,104 @@ function formatAdsbExchangeCategory(category) {
   return label ? category + ' — ' + label : category;
 }
 
+// Reverse lookup from a category's bare label text (no parenthetical) back
+// to its categoryGroup ('light'/'large'/'rotorcraft'/...), so the route
+// card can pick the same per-category glyph the map marker itself uses
+// (CATEGORY_GLYPHS, static/js/icons.js) even though categoryGroup itself
+// only ever lives on the per-poll render item (parsers.js), never on
+// `info`/detailsById — built once from the label/group tables already
+// available (OPENSKY_CATEGORY_GROUP/ADSBEXCHANGE_CATEGORY_GROUP,
+// static/js/state-filters.js, loaded before this file).
+const CATEGORY_LABEL_TO_GROUP = {};
+for (const [num, label] of Object.entries(OPENSKY_CATEGORY_LABELS)) {
+  const group = OPENSKY_CATEGORY_GROUP[num];
+  if (group) CATEGORY_LABEL_TO_GROUP[label.replace(/\s*\(.+\)$/, '')] = group;
+}
+for (const [code, label] of Object.entries(ADSBEXCHANGE_CATEGORY_LABELS)) {
+  const group = ADSBEXCHANGE_CATEGORY_GROUP[code];
+  if (group) CATEGORY_LABEL_TO_GROUP[label.replace(/\s*\(.+\)$/, '')] = group;
+}
+
+// The same per-category glyph the map marker uses (CATEGORY_GLYPHS,
+// static/js/icons.js) — neutral gray (not source-colored, this is a
+// decorative direction indicator, not a data-provenance signal) and
+// rotated 90° (the same 0°=north/up convention every rotating marker on
+// the map uses, so 90° points right — origin to destination reads
+// left-to-right). Falls back to the same "unknown" silhouette the map
+// itself falls back to when the category can't be determined at all.
+function routeArrowIconHtml(categoryGroup) {
+  const glyphTemplate = (categoryGroup && CATEGORY_GLYPHS[categoryGroup]) || UNKNOWN_GLYPH;
+  const glyph = glyphTemplate.replace(/COLOR/g, '#6b7280');
+  return '<div style="transform: rotate(90deg); display: flex;">'
+    + '<svg width="22" height="22" viewBox="0 0 200 200">' + glyph + '</svg></div>';
+}
+
+// One small icon per detail *group* (not per field) — Material Design
+// Icons (pictogrammers.com/MaterialDesign, Apache-2.0), vendored the same
+// way as every other icon set in this app (inline SVG, no build step, no
+// external request): copied verbatim from the MDI source repo rather than
+// hand-approximated, so the geometry is exactly right at this size.
+const GROUP_ICONS = {
+  identity: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M22,3H2C0.91,3.04 0.04,3.91 0,5V19C0.04,20.09 0.91,20.96 2,21H22C23.09,20.96 23.96,20.09 24,19V5C23.96,3.91 23.09,3.04 22,3M22,19H2V5H22V19M14,17V15.75C14,14.09 10.66,13.25 9,13.25C7.34,13.25 4,14.09 4,15.75V17H14M9,7A2.5,2.5 0 0,0 6.5,9.5A2.5,2.5 0 0,0 9,12A2.5,2.5 0 0,0 11.5,9.5A2.5,2.5 0 0,0 9,7M14,7V8H20V7H14M14,9V10H20V9H14M14,11V12H18V11H14"/></svg>',
+  position: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12,2C15.31,2 18,4.66 18,7.95C18,12.41 12,19 12,19C12,19 6,12.41 6,7.95C6,4.66 8.69,2 12,2M12,6A2,2 0 0,0 10,8A2,2 0 0,0 12,10A2,2 0 0,0 14,8A2,2 0 0,0 12,6M20,19C20,21.21 16.42,23 12,23C7.58,23 4,21.21 4,19C4,17.71 5.22,16.56 7.11,15.83L7.75,16.74C6.67,17.19 6,17.81 6,18.5C6,19.88 8.69,21 12,21C15.31,21 18,19.88 18,18.5C18,17.81 17.33,17.19 16.25,16.74L16.89,15.83C18.78,16.56 20,17.71 20,19Z"/></svg>',
+  speedHeading: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12,16A3,3 0 0,1 9,13C9,11.88 9.61,10.9 10.5,10.39L20.21,4.77L14.68,14.35C14.18,15.33 13.17,16 12,16M12,3C13.81,3 15.5,3.5 16.97,4.32L14.87,5.53C14,5.19 13,5 12,5A8,8 0 0,0 4,13C4,15.21 4.89,17.21 6.34,18.65H6.35C6.74,19.04 6.74,19.67 6.35,20.06C5.96,20.45 5.32,20.45 4.93,20.07V20.07C3.12,18.26 2,15.76 2,13A10,10 0 0,1 12,3M22,13C22,15.76 20.88,18.26 19.07,20.07V20.07C18.68,20.45 18.05,20.45 17.66,20.06C17.27,19.67 17.27,19.04 17.66,18.65V18.65C19.11,17.2 20,15.21 20,13C20,12 19.81,11 19.46,10.1L20.67,8C21.5,9.5 22,11.18 22,13Z"/></svg>',
+  autopilot: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M13,19.92C14.8,19.7 16.35,18.95 17.65,17.65C18.95,16.35 19.7,14.8 19.92,13H16.92C16.7,14 16.24,14.84 15.54,15.54C14.84,16.24 14,16.7 13,16.92V19.92M10,8H14L17,11H19.92C19.67,9.05 18.79,7.38 17.27,6C15.76,4.66 14,4 12,4C10,4 8.24,4.66 6.73,6C5.21,7.38 4.33,9.05 4.08,11H7L10,8M11,19.92V16.92C10,16.7 9.16,16.24 8.46,15.54C7.76,14.84 7.3,14 7.08,13H4.08C4.3,14.77 5.05,16.3 6.35,17.6C7.65,18.9 9.2,19.67 11,19.92M12,2C14.75,2 17.1,3 19.05,4.95C21,6.9 22,9.25 22,12C22,14.75 21,17.1 19.05,19.05C17.1,21 14.75,22 12,22C9.25,22 6.9,21 4.95,19.05C3,17.1 2,14.75 2,12C2,9.25 3,6.9 4.95,4.95C6.9,3 9.25,2 12,2Z"/></svg>',
+  weather: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12.74,5.47C15.1,6.5 16.35,9.03 15.92,11.46C17.19,12.56 18,14.19 18,16V16.17C18.31,16.06 18.65,16 19,16A3,3 0 0,1 22,19A3,3 0 0,1 19,22H6A4,4 0 0,1 2,18A4,4 0 0,1 6,14H6.27C5,12.45 4.6,10.24 5.5,8.26C6.72,5.5 9.97,4.24 12.74,5.47M11.93,7.3C10.16,6.5 8.09,7.31 7.31,9.07C6.85,10.09 6.93,11.22 7.41,12.13C8.5,10.83 10.16,10 12,10C12.7,10 13.38,10.12 14,10.34C13.94,9.06 13.18,7.86 11.93,7.3M13.55,3.64C13,3.4 12.45,3.23 11.88,3.12L14.37,1.82L15.27,4.71C14.76,4.29 14.19,3.93 13.55,3.64M6.09,4.44C5.6,4.79 5.17,5.19 4.8,5.63L4.91,2.82L7.87,3.5C7.25,3.71 6.65,4.03 6.09,4.44M18,9.71C17.91,9.12 17.78,8.55 17.59,8L19.97,9.5L17.92,11.73C18.03,11.08 18.05,10.4 18,9.71M3.04,11.3C3.11,11.9 3.24,12.47 3.43,13L1.06,11.5L3.1,9.28C3,9.93 2.97,10.61 3.04,11.3M19,18H16V16A4,4 0 0,0 12,12A4,4 0 0,0 8,16H6A2,2 0 0,0 4,18A2,2 0 0,0 6,20H19A1,1 0 0,0 20,19A1,1 0 0,0 19,18Z"/></svg>',
+  status: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M11,15H13V17H11V15M11,7H13V13H11V7M12,2C6.47,2 2,6.5 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20Z"/></svg>',
+  signalQuality: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M4,6V4H4.1C12.9,4 20,11.1 20,19.9V20H18V19.9C18,12.2 11.8,6 4,6M4,10V8A12,12 0 0,1 16,20H14A10,10 0 0,0 4,10M4,14V12A8,8 0 0,1 12,20H10A6,6 0 0,0 4,14M4,16A4,4 0 0,1 8,20H4V16Z"/></svg>',
+};
+
+// Splits a pre-joined categoryDisplay string ("A1 — Light (<15,500 lbs)",
+// adsb.fi/airplanes.live; or just "Light (<15,500 lbs)", OpenSky — it has
+// no short code of its own) into a compact "code · label" pair for the
+// row itself, with the parenthetical weight-range explanation moved into
+// the shared info-tip tooltip instead of shown inline every time.
+function splitCategoryDisplay(display) {
+  if (!display) return null;
+  const codeMatch = /^(\S+) — (.+)$/.exec(display);
+  const code = codeMatch ? codeMatch[1] : null;
+  const rest = codeMatch ? codeMatch[2] : display;
+  const parenMatch = /^(.*?)\s*(\(.+\))\s*$/.exec(rest);
+  const label = parenMatch ? parenMatch[1] : rest;
+  const tooltip = parenMatch ? parenMatch[2] : null;
+  return { code, label, tooltip };
+}
+
+// One genuinely informative sentence per DO-260B emitter category — keyed
+// by the exact English label text OPENSKY_CATEGORY_LABELS/
+// ADSBEXCHANGE_CATEGORY_LABELS already use before any parenthetical, so
+// one table serves both encodings. Deliberately skips the handful of
+// labels with nothing substantive to say ("No info", "Reserved", etc.).
+const CATEGORY_DESCRIPTIONS = {
+  'Light': 'Any aircraft with maximum takeoff weight (MTOW) under 15,500 lbs (~7,031 kg). Covers most general aviation aircraft (e.g. Cessna 172, Piper PA-28) and light sport aircraft.',
+  'Small': 'MTOW between 15,500 and 75,000 lbs (~7,031–34,019 kg) — typical of regional turboprops and light business jets (e.g. Embraer EMB 120, Cessna Citation).',
+  'Large': 'MTOW between 75,000 and 300,000 lbs (~34,019–136,078 kg) — most narrow-body airliners fall here (e.g. Boeing 737, Airbus A320).',
+  'High vortex large': 'A large aircraft (75,000–300,000 lbs) that generates unusually strong wingtip vortices, requiring extra wake-turbulence separation from following traffic (e.g. Boeing 757).',
+  'Heavy': 'MTOW over 300,000 lbs (~136,078 kg) — wide-body airliners and large freighters (e.g. Boeing 777, Airbus A380).',
+  'High performance': 'Capable of sustained accelerations above 5g and speeds over 400 knots — mostly military fast jets and aerobatic aircraft.',
+  'Rotorcraft': 'A helicopter or other rotary-wing aircraft, lifted and propelled by one or more powered rotors rather than fixed wings.',
+  'Glider / sailplane': 'A fixed-wing aircraft with no engine (or only a small sustainer motor), designed to fly using rising air currents.',
+  'Lighter-than-air': 'An airship or powered balloon that stays aloft using buoyant gas rather than aerodynamic lift.',
+  'Parachutist / skydiver': 'A person (or their transponder-equipped gear) descending by parachute — tracked as its own category for airspace safety.',
+  'Ultralight / hang-glider / paraglider': 'A very light, low-speed recreational aircraft, typically single-seat and only lightly regulated.',
+  'Unmanned aerial vehicle': 'A remotely piloted or fully autonomous aircraft with no pilot on board, from small consumer drones to large military UAVs.',
+  'Space / trans-atmospheric vehicle': 'A vehicle designed to operate above the atmosphere, or to transition between space and atmospheric flight.',
+  'Surface vehicle — emergency': 'A ground vehicle (e.g. a fire/rescue truck) broadcasting an ADS-B-like signal at an airport — not an aircraft.',
+  'Surface vehicle — service': 'A ground service vehicle (e.g. a tow tractor or fuel truck) broadcasting an ADS-B-like signal at an airport — not an aircraft.',
+  'Point obstacle': 'A fixed, single-point ground obstacle (e.g. a tower) broadcasting a reference position — not an aircraft.',
+  'Cluster obstacle': 'A group of closely-spaced fixed ground obstacles broadcast as one reference position — not an aircraft.',
+  'Line obstacle': 'An extended linear ground obstacle (e.g. a power line span) broadcast as a reference position — not an aircraft.',
+};
+
+// Generic clickable trigger for the shared #source-tooltip popover (see
+// main.js) — the same tooltip mechanism used everywhere else in this app
+// (source badges, route confidence), rather than a one-off native `title`
+// or a differently-styled popover just for this.
+function infoTipHtml(triggerHtml, detailText) {
+  if (!detailText) return triggerHtml;
+  return '<span class="info-tip" data-detail="' + detailText.replace(/"/g, '&quot;') + '">' + triggerHtml + '</span>';
+}
+
 // Renders one normalized info object (see normalizeOpenSky/
 // normalizeAdsbExchange) into the sidebar's grouped HTML. Each group is
 // omitted entirely when none of its fields are populated — e.g. an
@@ -136,29 +234,39 @@ const ROUTE_CONFIDENCE_BAND_COLORS = {
   very_high: '#16a34a', high: '#65a30d', medium: '#f59e0b', low: '#ea580c', reject: '#dc2626',
 };
 
-// Human-readable breakdown for the route confidence dot's tooltip — shown
-// in both normal and dev mode (unlike the per-source badges, which stay
-// dev-mode-only), since knowing *why* a route was flagged is useful
-// regardless of dev mode.
+// Human-readable breakdown for the route confidence badge's tooltip —
+// shown in both normal and dev mode (unlike the per-source badges, which
+// stay dev-mode-only), since knowing *why* a route was flagged is useful
+// regardless of dev mode. Middot-separated, matching the same "homogeneous
+// values, middot-separated" convention as the Category row.
 function routeConfidenceDetail(rv) {
   const c = rv.checks;
   const parts = [];
-  if (c.trackAlignment.diffDeg != null) parts.push('track diff ' + c.trackAlignment.diffDeg.toFixed(0) + '°');
-  parts.push(c.distanceToRoute.distanceKm.toFixed(0) + 'km off route');
-  parts.push(c.routeProgress.percent.toFixed(0) + '% progress');
+  if (c.trackAlignment.diffDeg != null) parts.push(c.trackAlignment.diffDeg.toFixed(0) + '° off heading');
+  parts.push(c.distanceToRoute.distanceKm.toFixed(0) + ' km off route');
+  parts.push(c.routeProgress.percent.toFixed(0) + '% along route');
   return (ROUTE_CONFIDENCE_BAND_LABELS[rv.band] || rv.band) + ' confidence ('
-    + rv.score.toFixed(0) + '/100): ' + parts.join(', ');
+    + rv.score.toFixed(0) + '/100) — ' + parts.join(' · ');
 }
 
-// Always-visible (not dev-mode-gated) colored dot conveying Layer 2's
-// confidence band for an adsbdb-sourced route — clicking it reuses the
-// same shared #source-tooltip click mechanism as the per-source badges
-// (see main.js), distinguished there by the .route-confidence-dot class.
-function routeConfidenceDotHtml(routeValidation) {
+// Always-visible (not dev-mode-gated) confidence pill for Layer 2's
+// adsbdb-route validation — a colored dot plus its band name, the whole
+// thing wrapped in the same shared .info-tip click-tooltip trigger every
+// other inline explanation in this app uses (see main.js), rather than a
+// bespoke tooltip just for this.
+function routeConfidenceBadgeHtml(routeValidation) {
   const color = ROUTE_CONFIDENCE_BAND_COLORS[routeValidation.band] || '#6b7280';
-  const detail = routeConfidenceDetail(routeValidation);
-  return '<span class="route-confidence-dot" style="background:' + color + '" data-detail="'
-    + detail.replace(/"/g, '&quot;') + '" title="' + (ROUTE_CONFIDENCE_BAND_LABELS[routeValidation.band] || routeValidation.band) + '"></span>';
+  const label = ROUTE_CONFIDENCE_BAND_LABELS[routeValidation.band] || routeValidation.band;
+  const dot = '<span class="route-confidence-dot" style="background:' + color + '"></span>';
+  return infoTipHtml('<span class="route-confidence">' + dot + label + ' confidence</span>', routeConfidenceDetail(routeValidation));
+}
+
+// "LHR (London Heathrow Airport)" -style strings (built by buildMergedDetails/
+// parseFlightAware as "{name} ({code})") split back apart for the route
+// card's big-code/small-name layout.
+function splitAirportString(s) {
+  const m = /^(.*)\s\(([A-Za-z0-9]{2,4})\)$/.exec(s || '');
+  return m ? { name: m[1], code: m[2] } : { name: s, code: null };
 }
 
 function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation) {
@@ -193,10 +301,11 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) : '';
     return '<b>' + label + ':</b> ' + (has ? value : 'Unknown') + badge;
   }
-  function renderGroup(title, rows) {
+  function renderGroup(title, rows, iconKey) {
     const filtered = rows.filter((r) => r != null);
     if (!filtered.length) return '';
-    return '<div class="detail-group"><div class="detail-group-title">' + title + '</div>' +
+    const icon = iconKey && GROUP_ICONS[iconKey] ? '<span class="detail-group-icon">' + GROUP_ICONS[iconKey] + '</span>' : '';
+    return '<div class="detail-group"><div class="detail-group-title">' + icon + title + '</div>' +
       filtered.join('<br>') + '</div>';
   }
   // Flag always leads the country name, rendered via flagHtml() from
@@ -225,54 +334,36 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const registeredOwnerValue = info.registeredOwner
     ? (registeredOwnerFlagHtml ? registeredOwnerFlagHtml + ' ' + info.registeredOwner : info.registeredOwner)
     : null;
-  // Route gets bespoke handling rather than a plain detailRow. A
-  // Layer-2-validated (adsbdb-sourced) route always carries a colored
-  // confidence dot (see routeConfidenceDotHtml — always visible, not
-  // dev-mode-gated, since knowing how much to trust a route matters
-  // regardless of dev mode). Reject-band routes (~a quarter of adsbdb's
-  // routes on live research — a wrong historical callsign match, not just
-  // a slightly-off one) don't name specific, likely-wrong airports at all;
-  // "Low" still shows the real route text with the existing ⚠ warning,
-  // since it's plausibly right, just imperfect.
-  const routeHas = info.originAirport && info.destinationAirport;
-  const isReject = routeValidation && routeValidation.band === 'reject';
-  const isLow = routeValidation && routeValidation.band === 'low';
-  let routeValueHtml = null;
-  if (isReject) {
-    routeValueHtml = '<span class="route-not-confirmed">Not confirmed</span>';
-  } else if (routeHas) {
-    const routeText = info.originAirport + ' → ' + info.destinationAirport;
-    routeValueHtml = isLow
-      ? '<span class="route-warning" title="Low-confidence route (adsbdb): validate before trusting">⚠ ' + routeText + '</span>'
-      : routeText;
+  // Category: compact "code · label" (or just "label" for OpenSky, which
+  // has no short code of its own) — the parenthetical weight-range
+  // explanation moves into the shared info-tip tooltip instead of showing
+  // inline every time, alongside one genuinely informative sentence about
+  // what that category actually means (CATEGORY_DESCRIPTIONS).
+  const categoryParts = splitCategoryDisplay(info.categoryDisplay);
+  let categoryValue = null;
+  if (categoryParts) {
+    const trigger = categoryParts.code ? categoryParts.code + ' · ' + categoryParts.label : categoryParts.label;
+    const description = CATEGORY_DESCRIPTIONS[categoryParts.label];
+    const detail = description
+      ? (categoryParts.code ? categoryParts.code + ' (' + categoryParts.label + ')' : categoryParts.label) + ' — ' + description
+      : null;
+    categoryValue = infoTipHtml(trigger, detail);
   }
-  const routeConfidenceDot = routeValidation ? routeConfidenceDotHtml(routeValidation) : '';
-  const routeSourceBadge = currentDevMode
-    ? sourceBadgeHtml(['originAirport', 'destinationAirport'], fieldSources, fieldConfidence, fieldComputationBasis)
-    : '';
-  const routeRow = (routeHas || currentDevMode)
-    ? '<b>Route:</b> ' + (routeValueHtml || dash) + routeConfidenceDot + routeSourceBadge
-    : null;
   const identity = renderGroup('Identity', [
-    detailRow('ICAO', info.icao24 ? info.icao24.toUpperCase() : null, 'icao24'),
-    detailRow('Callsign', info.callsign || '—', 'callsign'),
-    detailRow('Registration', info.registration, 'registration'),
-    detailRow('Aircraft', info.aircraftType, 'aircraftType'),
     identityRow('Manufacturer', info.manufacturer, 'manufacturer'),
     identityRow('Model', info.model, 'model'),
     identityRow('Year built', info.manufactureYear, 'manufactureYear'),
     identityRow('Operator', operatorValue, 'operator'),
     identityRow('Registered Owner', registeredOwnerValue, 'registeredOwner'),
     identityRow('Country', countryValue, 'originCountry'),
-    detailRow('Category', info.categoryDisplay, 'categoryDisplay'),
-    routeRow,
-  ]);
+    detailRow('Category', categoryValue, 'categoryDisplay'),
+  ], 'identity');
   const position = renderGroup('Position', [
     detailRow('Altitude', formatAltitude(info.altitudeM), 'altitudeM'),
     detailRow('Geo altitude', formatAltitude(info.altGeomM), 'altGeomM'),
     detailRow('Vertical rate', formatVerticalRateUnit(info.verticalRateMs), 'verticalRateMs'),
     detailRow('Position source', info.positionSource, 'positionSource'),
-  ]);
+  ], 'position');
   const speedHeading = renderGroup('Speed &amp; Heading', [
     detailRow('Speed', formatSpeedKmh(info.speedKmh), 'speedKmh'),
     detailRow('IAS', formatSpeedKt(info.iasKt), 'iasKt'),
@@ -283,25 +374,25 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     detailRow('Heading (true)', info.trueHeadingDeg != null ? Math.round(info.trueHeadingDeg) + '°' : null, 'trueHeadingDeg'),
     detailRow('Turn rate', info.turnRateDegPerSec != null ? info.turnRateDegPerSec.toFixed(1) + '°/s' : null, 'turnRateDegPerSec'),
     detailRow('Roll', info.rollDeg != null ? info.rollDeg.toFixed(1) + '°' : null, 'rollDeg'),
-  ]);
+  ], 'speedHeading');
   const autopilot = renderGroup('Autopilot', [
     detailRow('Selected altitude', formatAltitude(info.navAltitudeM), 'navAltitudeM'),
     detailRow('Selected heading', info.navHeadingDeg != null ? Math.round(info.navHeadingDeg) + '°' : null, 'navHeadingDeg'),
     detailRow('QNH', info.navQnh != null ? Math.round(info.navQnh) + ' hPa' : null, 'navQnh'),
     detailRow('Modes', info.navModes ? info.navModes.join(', ') : null, 'navModes'),
-  ]);
+  ], 'autopilot');
   const weather = renderGroup('Weather', [
     detailRow('Wind', (info.windDirDeg != null && info.windSpeedKt != null)
       ? Math.round(info.windDirDeg) + '° / ' + formatSpeedKt(info.windSpeedKt) : null, ['windDirDeg', 'windSpeedKt']),
     detailRow('Outside air temp', info.oatC != null ? Math.round(info.oatC) + ' °C' : null, 'oatC'),
     detailRow('Total air temp', info.tatC != null ? Math.round(info.tatC) + ' °C' : null, 'tatC'),
-  ]);
+  ], 'weather');
   const status = renderGroup('Status', [
     detailRow('Squawk', formatSquawk(info.squawk), 'squawk'),
     specialRow('Emergency', !!info.emergency, '<span class="emergency">Emergency: ' + info.emergency + '</span>', 'emergency'),
     specialRow('Alert', !!info.hasAlert, '<span class="emergency">Alert</span>', 'hasAlert'),
     detailRow('Last update', formatRelativeSeconds(info.secondsSinceContact), 'secondsSinceContact'),
-  ]);
+  ], 'status');
   // adsb.fi/airplanes.live only — no OpenSky equivalent for any of these
   // (DO-260B navigation accuracy/integrity categories, receiver-relative
   // signal metadata). Absent entirely for an OpenSky-only aircraft, same as
@@ -321,6 +412,82 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     detailRow('Messages received', info.messageCount, 'messageCount'),
     detailRow('Signal strength', info.signalStrengthDbm != null ? info.signalStrengthDbm.toFixed(1) + ' dBm' : null, 'signalStrengthDbm'),
     detailRow('Last position update', formatRelativeSeconds(info.secondsSincePositionUpdate), 'secondsSincePositionUpdate'),
-  ]);
-  return identity + position + speedHeading + autopilot + weather + status + signalQuality;
+  ], 'signalQuality');
+  function badgeFor(key) {
+    return currentDevMode ? sourceBadgeHtml(key, fieldSources, fieldConfidence, fieldComputationBasis) : '';
+  }
+  // --- Header: identity essentials at a glance, promoted out of the
+  // Identity group into their own masthead so the sidebar reads
+  // title-first (a callsign/registration, not a bare field list) —
+  // rendered into its own #sidebar-header element (see sidebar-track.js),
+  // not part of the group list above. Each piece explains itself via the
+  // same shared .info-tip mechanism as Category/route confidence — a
+  // first-time viewer has no other way to know "TC-LGY" is a registration
+  // and "THY1RT" is a callsign, not two arbitrary codes.
+  const HEADER_FIELD_EXPLANATIONS = {
+    registration: 'Registration — the aircraft’s unique tail number, assigned by its country of registration (painted on the fuselage).',
+    icao24: 'ICAO24 — the aircraft’s permanent 24-bit Mode S transponder address (hex), tied to the airframe for life, unlike its registration or callsign.',
+    callsign: 'Callsign — the flight identifier transmitted by the transponder, usually the airline’s code plus a flight number (changes per flight).',
+    aircraftType: 'Aircraft type — the airframe’s make and model.',
+  };
+  function headerPiece(value, key) {
+    return infoTipHtml(value + badgeFor(key), HEADER_FIELD_EXPLANATIONS[key]);
+  }
+  const headerTitle = info.registration
+    ? headerPiece(info.registration, 'registration')
+    : (info.icao24 ? headerPiece(info.icao24.toUpperCase(), 'icao24') : 'Unknown aircraft');
+  const headerSubtitleParts = [];
+  if (info.callsign) headerSubtitleParts.push(headerPiece(info.callsign, 'callsign'));
+  if (info.aircraftType) headerSubtitleParts.push(headerPiece(info.aircraftType, 'aircraftType'));
+  if (info.registration && info.icao24) headerSubtitleParts.push(headerPiece(info.icao24.toUpperCase(), 'icao24'));
+  const header = '<div class="sidebar-header-title">' + headerTitle + '</div>'
+    + (headerSubtitleParts.length
+      ? '<div class="sidebar-header-subtitle">' + headerSubtitleParts.join(' <span class="sidebar-header-sep">·</span> ') + '</div>'
+      : '');
+
+  // --- Route card: its own visual block (see #sidebar-route in
+  // sidebar-track.js) rather than a text row inside Identity — big airport
+  // codes, small city names, a direction arrow between them, and (for an
+  // adsbdb-sourced route) the Layer 2 confidence badge. Reject-band routes
+  // (~a quarter of adsbdb's routes on live research — a wrong historical
+  // callsign match, not just a slightly-off one) don't name specific,
+  // likely-wrong airports at all; "Low" still shows the real airports with
+  // a warning tag, since it's plausibly right, just imperfect.
+  const routeHas = info.originAirport && info.destinationAirport;
+  const isReject = routeValidation && routeValidation.band === 'reject';
+  const isLow = routeValidation && routeValidation.band === 'low';
+  const routeDevBadge = currentDevMode
+    ? sourceBadgeHtml(['originAirport', 'destinationAirport'], fieldSources, fieldConfidence, fieldComputationBasis)
+    : '';
+  const routeConfidenceBadge = routeValidation ? routeConfidenceBadgeHtml(routeValidation) : '';
+  const routeCategoryGroup = categoryParts ? CATEGORY_LABEL_TO_GROUP[categoryParts.label] : null;
+  let route = '';
+  if (routeHas) {
+    if (isReject) {
+      route = '<div class="route-card route-card-unconfirmed">'
+        + '<div class="route-card-title">Route <span class="route-card-tag">Not confirmed</span></div>'
+        + '<div class="route-card-footer">' + routeConfidenceBadge + routeDevBadge + '</div>'
+        + '</div>';
+    } else {
+      const origin = splitAirportString(info.originAirport);
+      const dest = splitAirportString(info.destinationAirport);
+      route = '<div class="route-card' + (isLow ? ' route-card-low' : '') + '">'
+        + '<div class="route-card-title">Route' + (isLow ? ' <span class="route-card-tag">⚠ Unverified</span>' : '') + '</div>'
+        + '<div class="route-card-endpoints">'
+        + '<div class="route-card-endpoint"><div class="route-card-code">' + (origin.code || '—') + '</div><div class="route-card-city">' + origin.name + '</div></div>'
+        + '<div class="route-card-arrow">' + routeArrowIconHtml(routeCategoryGroup) + '</div>'
+        + '<div class="route-card-endpoint"><div class="route-card-code">' + (dest.code || '—') + '</div><div class="route-card-city">' + dest.name + '</div></div>'
+        + '</div>'
+        + '<div class="route-card-footer">' + routeConfidenceBadge + routeDevBadge + '</div>'
+        + '</div>';
+    }
+  } else if (currentDevMode) {
+    route = '<div class="route-card route-card-empty"><div class="route-card-title">Route</div><div class="route-card-empty-text">' + dash + '</div></div>';
+  }
+
+  return {
+    header,
+    route,
+    body: identity + position + speedHeading + autopilot + weather + status + signalQuality,
+  };
 }
