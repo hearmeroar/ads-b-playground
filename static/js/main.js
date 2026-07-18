@@ -1,0 +1,367 @@
+// --- Polling ---
+
+for (const name of Object.keys(sourceToggles)) {
+  sourceToggles[name].addEventListener('change', () => {
+    if (!sourceToggles[name].checked) {
+      clearAllMarkers(markerMapsBySource[name]);
+      if (name === 'opensky') {
+        // Quota line and any pending warning describe a source that's no
+        // longer being polled — don't leave them frozen on screen.
+        document.getElementById('quota').textContent = '';
+        openskyStatusMessage = null;
+      }
+    } else {
+      showSourceCountSpinner(name);
+    }
+    poll(); // refresh right away instead of waiting for the next 12s tick
+  });
+}
+hideJunkToggle.addEventListener('change', poll);
+
+// Shown from the moment a source is enabled until the poll it triggers lands.
+// No "pending" state is tracked: updateCounts() runs at the end of every poll
+// and rewrites the slot, which is what clears the spinner — including when the
+// source failed and its real count turns out to be 0.
+function showSourceCountSpinner(name) {
+  const el = document.getElementById('count-' + name);
+  el.textContent = ''; // drops any previous number or spinner
+  el.classList.add('loading');
+  const spinner = document.createElement('span');
+  spinner.className = 'count-spinner';
+  el.appendChild(spinner);
+}
+
+function updateCounts(counts) {
+  let total = 0;
+  for (const name of Object.keys(sourceToggles)) {
+    const enabled = isSourceEnabled(name);
+    const n = enabled ? (counts[name] || 0) : 0;
+    total += n;
+    const el = document.getElementById('count-' + name);
+    el.classList.remove('loading');
+    el.textContent = enabled ? String(n) : ''; // also removes the spinner child
+  }
+  document.getElementById('count').textContent = total;
+}
+
+// Fetches raw data only (no rendering) — rendering is deferred until all
+// sources have arrived, since OpenSky's popup enrichment needs adsb.fi/
+// airplanes.live's parsed data, and their dedup needs OpenSky's (and each
+// other's) rendered marker sets.
+// OpenSky's warning states are stashed here rather than written to #status
+// directly: poll() owns that line (it must keep ticking with OpenSky off,
+// the default) and shows this message instead of "updated" when set.
+let openskyStatusMessage = null;
+
+// A single stalled upstream (observed: adsb.lol occasionally hanging for tens
+// of seconds) must never block the other sources or leave the app on the
+// loading state forever. fetch() has no built-in timeout, so bound every source
+// request with an AbortController — a source that doesn't answer in time is
+// treated as failed (null), exactly like an error, and the rest render anyway.
+const SOURCE_FETCH_TIMEOUT_MS = 8000; // under POLL_INTERVAL_MS so polls never overlap on a hang
+async function fetchJson(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SOURCE_FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    return await resp.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// --- OpenSky daily-quota lockout ---------------------------------------------
+// When OpenSky's daily quota is fully spent it stops being useful (every
+// request just 429s and re-serves stale cache), so auto-disable the source:
+// uncheck AND disable its toggle so it can't be turned back on while dead,
+// clear its markers/quota line, and reveal a "(?)" whose tooltip says why and
+// when it returns — mirroring the track endpoint's "available in Xh Ym Zs". A
+// 1s ticker keeps the countdown live and auto-restores the source the moment
+// the reset time passes (we're not polling OpenSky while locked, so this timer
+// is the only thing that can lift the lock).
+let openskyQuotaLock = null;   // { resetAt: ms, precise: bool } while locked
+let openskyQuotaTimer = null;
+
+function nextUtcMidnight() {
+  const d = new Date();
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0);
+}
+
+function refreshOpenSkyQuotaHelp() {
+  if (!openskyQuotaLock) return;
+  const secs = Math.max(0, Math.round((openskyQuotaLock.resetAt - Date.now()) / 1000));
+  const when = openskyQuotaLock.precise
+    ? 'available in ' + formatRetryTime(secs)
+    : 'available after the daily quota resets';
+  document.getElementById('opensky-help-popover').textContent =
+    'OpenSky auto-disabled: daily map-data quota exhausted (' + when + '). '
+    + 'The historical-track quota is separate and tracked per aircraft.';
+}
+
+function refreshDevModeHelp() {
+  document.getElementById('dev-mode-help-popover').textContent =
+    'Shows every sidebar field, even ones normally hidden because they’re empty '
+    + '(shown as —). A colored dot on a populated field shows which source supplied '
+    + 'it — click the dot for its name. Enrichment: OpenSky’s own fields (position, '
+    + 'speed, squawk, etc.) always win when OpenSky is on; gaps are filled from whichever '
+    + 'adsb.fi/adsb.lol/adsb.one/airplanes.live response has that aircraft (one radius '
+    + 'source per field, highest-priority match wins); FlightAware’s route data is '
+    + 'merged in separately by matching callsigns, not by ICAO24.';
+}
+
+// A "(?)" icon is click-to-toggle (works on touch, unlike a hover title): it
+// opens a small popover explaining a source/track quota state, and a click
+// anywhere else closes it — same pattern as the category dropdown. Both the
+// OpenSky lockout and the track status use this, so the two quota stories are
+// told identically. `refresh` repaints the text just before opening, which is
+// what keeps a countdown correct even if the popover sat closed for minutes.
+const helpPopovers = [];
+function wireHelpPopover(btnId, popoverId, refresh) {
+  const popover = document.getElementById(popoverId);
+  helpPopovers.push(popover);
+  document.getElementById(btnId).addEventListener('click', (e) => {
+    e.stopPropagation();
+    const wasHidden = popover.hasAttribute('hidden');
+    closeHelpPopovers(); // only ever one open at a time
+    if (wasHidden) {
+      refresh();
+      popover.removeAttribute('hidden');
+    }
+  });
+}
+function closeHelpPopovers() {
+  for (const p of helpPopovers) p.setAttribute('hidden', '');
+}
+wireHelpPopover('opensky-help', 'opensky-help-popover', refreshOpenSkyQuotaHelp);
+wireHelpPopover('track-help', 'track-help-popover', refreshTrackHelp);
+wireHelpPopover('dev-mode-help', 'dev-mode-help-popover', refreshDevModeHelp);
+document.addEventListener('click', closeHelpPopovers);
+
+// Dev-mode source badges (.source-badge) are freshly regenerated HTML every
+// time sidebarDetailsEl.innerHTML is rewritten (each render), so a
+// wireHelpPopover-style listener attached directly to a badge would be
+// destroyed on the next render. Event delegation on the stable
+// sidebarDetailsEl container, plus a single shared tooltip element
+// repositioned per click, avoids that — kept as its own listener rather
+// than folded into helpPopovers/closeHelpPopovers, since that mechanism is
+// built for a fixed set of statically-known popovers, not one dynamic,
+// differently-positioned tooltip.
+const sourceTooltipEl = document.getElementById('source-tooltip');
+sidebarDetailsEl.addEventListener('click', (e) => {
+  const badge = e.target.closest('.source-badge');
+  if (!badge) { sourceTooltipEl.setAttribute('hidden', ''); return; }
+  e.stopPropagation();
+  sourceTooltipEl.textContent = SOURCE_DISPLAY_NAMES[badge.dataset.source] || badge.dataset.source;
+  if (badge.dataset.detail) sourceTooltipEl.textContent += ' — ' + badge.dataset.detail;
+  const r = badge.getBoundingClientRect();
+  sourceTooltipEl.style.left = (r.left + window.scrollX) + 'px';
+  sourceTooltipEl.style.top = (r.bottom + window.scrollY + 6) + 'px';
+  sourceTooltipEl.removeAttribute('hidden');
+});
+document.addEventListener('click', () => sourceTooltipEl.setAttribute('hidden', ''));
+
+function tickOpenSkyQuota() {
+  if (!openskyQuotaLock) { clearInterval(openskyQuotaTimer); openskyQuotaTimer = null; return; }
+  if (Date.now() >= openskyQuotaLock.resetAt) clearOpenSkyQuotaLockout();
+  else refreshOpenSkyQuotaHelp();
+}
+
+function applyOpenSkyQuotaLockout(retryAfterSeconds) {
+  const resetAt = retryAfterSeconds != null
+    ? Date.now() + retryAfterSeconds * 1000
+    : nextUtcMidnight();
+  openskyQuotaLock = { resetAt, precise: retryAfterSeconds != null };
+
+  const toggle = sourceToggles.opensky;
+  toggle.checked = false;
+  toggle.disabled = true;
+  clearAllMarkers(openskyMarkers);
+  document.getElementById('quota').textContent = '';
+  openskyStatusMessage = null;
+  document.getElementById('source-opensky').classList.add('locked');
+  document.getElementById('opensky-help').style.display = '';
+  refreshOpenSkyQuotaHelp();
+  if (!openskyQuotaTimer) openskyQuotaTimer = setInterval(tickOpenSkyQuota, 1000);
+}
+
+function clearOpenSkyQuotaLockout() {
+  if (!openskyQuotaLock) return;
+  openskyQuotaLock = null;
+  if (openskyQuotaTimer) { clearInterval(openskyQuotaTimer); openskyQuotaTimer = null; }
+  const toggle = sourceToggles.opensky;
+  toggle.disabled = false;
+  toggle.checked = true;
+  document.getElementById('source-opensky').classList.remove('locked');
+  document.getElementById('opensky-help').style.display = 'none';
+  document.getElementById('opensky-help-popover').setAttribute('hidden', '');
+  showSourceCountSpinner('opensky'); // re-enabled, numbers pending — as if toggled on
+  poll(); // resume immediately now that the quota window should have reset
+}
+
+async function fetchOpenSkyStates() {
+  const quotaEl = document.getElementById('quota');
+  try {
+    const data = await fetchJson('/api/states');
+
+    // Daily quota gone (429 rate-limited, or the last 200 hit zero remaining):
+    // lock the source out instead of polling a bucket that only returns stale.
+    if (data.error === 'rate_limited' || data.rate_limit_remaining === 0) {
+      applyOpenSkyQuotaLockout(data.retry_after_seconds != null ? data.retry_after_seconds : null);
+      return null;
+    }
+
+    if (data.stale) {
+      openskyStatusMessage = 'OpenSky: unreachable, showing stale data';
+    } else {
+      openskyStatusMessage = null;
+    }
+
+    // Remaining daily OpenSky quota (X-Rate-Limit-Remaining header, forwarded
+    // by the backend as rate_limit_remaining).
+    quotaEl.textContent = data.rate_limit_remaining != null
+      ? 'requests left: ' + data.rate_limit_remaining
+      : '';
+
+    return data.states || [];
+  } catch (e) {
+    openskyStatusMessage = 'OpenSky: failed to load data';
+    return null; // signals failure — keep whatever markers are already shown
+  }
+}
+
+async function fetchRadiusSourceAircraft(endpoint) {
+  try {
+    const data = await fetchJson(endpoint);
+    return data.ac || [];
+  } catch (e) {
+    return null;
+  }
+}
+
+async function fetchFlightAwareFlights() {
+  try {
+    const data = await fetchJson('/api/flightaware');
+    return data.flights || [];
+  } catch (e) {
+    return null;
+  }
+}
+
+async function poll() {
+  const [openskyStates, adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft, flightawareFlights] =
+    await Promise.all([
+      isSourceEnabled('opensky') ? fetchOpenSkyStates() : Promise.resolve(null),
+      isSourceEnabled('adsbfi') ? fetchRadiusSourceAircraft('/api/adsbfi') : Promise.resolve(null),
+      isSourceEnabled('adsblol') ? fetchRadiusSourceAircraft('/api/adsblol') : Promise.resolve(null),
+      isSourceEnabled('adsbone') ? fetchRadiusSourceAircraft('/api/adsbone') : Promise.resolve(null),
+      isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
+      isSourceEnabled('flightaware') ? fetchFlightAwareFlights() : Promise.resolve(null),
+    ]);
+
+  // Each source fetches independently: fetchRadiusSourceAircraft swallows its
+  // own failure into null, so one source erroring out (e.g. adsb.one's
+  // Cloudflare block) never blocks the others from rendering this cycle.
+  const radiusLists = [adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft];
+  recordLiveTrails(openskyStates, radiusLists);
+
+  // The generic "updated" timestamp lives here, not in fetchOpenSkyStates()
+  // — an OpenSky warning (rate limit/stale/unreachable) takes its place for
+  // that cycle when the source is enabled and struggling.
+  if (isSourceEnabled('opensky') && openskyStatusMessage) {
+    document.getElementById('status').textContent = openskyStatusMessage;
+  } else if (openskyStates || radiusLists.some((l) => l)) {
+    document.getElementById('status').textContent =
+      'updated ' + new Date().toLocaleTimeString('en-GB');
+  }
+
+  // FlightAware enrichment lookup: callsign → {originAirport, destinationAirport}.
+  // Used to enrich matching aircraft from other sources and to suppress
+  // FlightAware's own marker when a match is found.
+  const flightawareByCallsign = new Map();
+  const matchedFlightawareCallsigns = new Set();
+  if (flightawareFlights) {
+    for (const raw of flightawareFlights) {
+      const f = parseFlightAware(raw);
+      const key = normalizeCallsignKey(f.callsign);
+      if (key) flightawareByCallsign.set(key, f);
+    }
+  }
+
+  // Enrichment lookup for OpenSky's sidebar, and dev mode's per-field
+  // provenance: when several radius sources have the same aircraft, the
+  // higher-priority one's value wins for display (iterating lowest→highest
+  // priority, so the highest is pushed last — array[length-1] is that
+  // winner, consistent with the marker dedup order below), but EVERY
+  // source that reported the aircraft is kept, not just the winner, so dev
+  // mode can show a badge per source that independently supplied a field.
+  const radiusRecordsByHex = new Map(); // icao24 -> Array<{ source, data }>
+  for (const [name, list] of [
+    ['airplaneslive', airplanesliveAircraft], ['adsbone', adsboneAircraft],
+    ['adsblol', adsblolAircraft], ['adsbfi', adsbfiAircraft],
+  ]) {
+    if (!list) continue;
+    for (const raw of list) {
+      const a = parseAdsbExchangeAircraft(raw);
+      if (!a.icao24) continue;
+      const arr = radiusRecordsByHex.get(a.icao24) || [];
+      arr.push({ source: name, data: a });
+      radiusRecordsByHex.set(a.icao24, arr);
+    }
+  }
+
+  // Render priority: OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live.
+  // Each later source only contributes aircraft no earlier source covers — its
+  // exclude set is the union of every higher-priority source's rendered keys.
+  let openskyCount = openskyMarkers.size;
+  if (isSourceEnabled('opensky') && openskyStates) {
+    openskyCount = updateOpenSkyMarkers(openskyStates, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns);
+  }
+
+  const counts = { opensky: openskyCount };
+  const radiusSources = [
+    ['adsbfi', adsbfiMarkers, adsbfiAircraft],
+    ['adsblol', adsblolMarkers, adsblolAircraft],
+    ['adsbone', adsboneMarkers, adsboneAircraft],
+    ['airplaneslive', airplanesliveMarkers, airplanesliveAircraft],
+  ];
+  const excludeIds = new Set(openskyMarkers.keys());
+  for (const [name, markerMap, aircraft] of radiusSources) {
+    if (isSourceEnabled(name) && aircraft) {
+      counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name], name, flightawareByCallsign, matchedFlightawareCallsigns, radiusRecordsByHex);
+    } else {
+      counts[name] = markerMap.size;
+    }
+    // Later sources must not re-render what this one just claimed.
+    for (const key of markerMap.keys()) excludeIds.add(key);
+  }
+
+  // FlightAware: after OpenSky/radius sources, render only those flights that
+  // weren't matched to another source's callsign (matched ones had their data
+  // merged into the other source's sidebar).
+  if (isSourceEnabled('flightaware') && flightawareFlights) {
+    counts.flightaware = updateFlightAwareMarkers(flightawareFlights, matchedFlightawareCallsigns);
+  } else {
+    counts.flightaware = flightawareMarkers.size;
+  }
+
+  updateCounts(counts);
+
+  // Do not spend OpenSky track credits every 12 seconds for an already-open
+  // sidebar. When its historical endpoint is unavailable, keep the local
+  // fallback path live from the positions collected by this poll instead.
+  if (selectedIcao24 && trackUsesLiveFallback) {
+    drawTrack(liveTrailById.get(selectedIcao24));
+  }
+}
+
+// The first poll is the same "enabled, no numbers yet" state as a toggle-on,
+// so the sources that ship enabled get the same spinner rather than an empty
+// slot (the #map-loader overlay covers the map, not the HUD).
+for (const name of Object.keys(sourceToggles)) {
+  if (isSourceEnabled(name)) showSourceCountSpinner(name);
+}
+
+// Hide the initial-load overlay once the first poll resolves (data in, or all
+// sources failed — either way there's nothing more to wait for).
+poll().finally(() => document.getElementById('map-loader').classList.add('hidden'));
+setInterval(poll, POLL_INTERVAL_MS);

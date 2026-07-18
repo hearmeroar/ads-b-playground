@@ -125,8 +125,10 @@ A handful of plain files carry all the logic:
   placeholder database, callsign decoding, aircraft type normalization)
   that fill identity gaps the live feeds don't cover, served via
   `/api/identity/<icao24>`. No external API, no database.
-- `static/index.html` — the entire frontend: Leaflet map, polling, marker
-  rendering, filters, and the photo/track features, all inline JS.
+- `static/index.html` — the frontend markup (map container, HUD, sidebar).
+- `static/js/` — the frontend logic (Leaflet map, polling, marker rendering,
+  filters, photo/track features) as eight plain classic `<script src>` files
+  loaded in a fixed order — still no framework and no build step.
 - `static/style.css` — the frontend's styling, linked from `index.html`.
 - `static/flag-icons/` — the [flag-icons](https://github.com/lipis/flag-icons)
   SVG library (CSS + `flags/4x3/`), vendored as plain files (via `npm install

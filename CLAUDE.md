@@ -9,8 +9,17 @@ independent data sources — OpenSky Network, adsb.fi, adsb.lol,
 adsb.one, airplanes.live, and FlightAware AeroAPI — and a static Leaflet
 page polls the enabled ones and renders aircraft as rotated, color-coded
 markers. Backend logic lives in `app.py`; the frontend is
-`static/index.html` (markup + inline JS) plus `static/style.css` — no
-framework, no build step, `style.css` is just a plain `<link>`ed stylesheet.
+`static/index.html` (markup) plus `static/js/*.js` (eight plain classic
+`<script src>` files, loaded in a fixed order) and `static/style.css` — no
+framework, no build step, all of it just plain `<link>`/`<script>`-included
+static files. The JS files share one global scope (deliberately NOT ES
+modules: the Playwright tests reach top-level names like `openskyMarkers`
+via `page.evaluate`, and load-time statements rely on the original
+execution order), so their `<script>` order in `index.html` is load-bearing:
+`map-init` → `constants` → `state-filters` → `sidebar-track` → `icons` →
+`render-details` → `parsers` → `main`. Where this file says
+"`static/index.html`" about a JS function, read "the frontend JS" — the
+function now lives in one of those `static/js/*.js` files.
 The `enrichment/` package (see Identity enrichment below) is the one
 exception to "`app.py` is the whole backend" — a small set of local static
 lookup modules, still no framework/database, just organized into their own
@@ -227,7 +236,7 @@ re-render work. Building the gallery DOM with `createElement`/property
 assignment rather than string-concatenated HTML matters here specifically
 because photographer name and photo URL come from an external API.
 
-**Frontend state (`static/index.html`, all in one inline `<script>`):**
+**Frontend state (`static/js/*.js`, classic scripts sharing one global scope):**
 - Five independent `Map<icao24, L.Marker>` objects — `openskyMarkers`,
   `adsbfiMarkers`, `adsblolMarkers`, `adsboneMarkers`,
   `airplanesliveMarkers`, reachable by name via `markerMapsBySource` — each
