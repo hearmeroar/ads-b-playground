@@ -226,7 +226,14 @@ AREA_RADIUS_NM = 220
 # authenticated access economical.
 MIN_INTERVAL = 10
 _cache = {"data": None, "ts": 0.0}
-_token = {"value": None, "expires_at": 0.0}
+_token = {"value": None, "expires_at": 0.0, "retry_at": 0.0}
+
+# If the OAuth2 token endpoint is unreachable (observed in production:
+# auth.opensky-network.org connect-timing-out from some hosting networks
+# while opensky-network.org itself stays reachable), don't retry it on every
+# single request — each attempt costs a full connect-timeout (10s) and would
+# otherwise stall every poll. Back off for this long before trying again.
+TOKEN_RETRY_COOLDOWN = 60
 
 # Per-aircraft cache for /api/track/<icao24>. OpenSky's /tracks/* endpoint has
 # its own, far stingier credit bucket than /states/* (one charge per aircraft
@@ -488,7 +495,9 @@ def _airportdata_fullsize_url(raw_photo):
 
 def get_access_token():
     """Returns a bearer token for authenticated access, or None if no client
-    is configured (in which case we hit OpenSky anonymously)."""
+    is configured or the token endpoint can't be reached (in which case we
+    hit OpenSky anonymously — same degradation as the "unconfigured" case,
+    just triggered by a network failure instead of missing credentials)."""
     if not (CLIENT_ID and CLIENT_SECRET):
         return None
 
@@ -496,17 +505,25 @@ def get_access_token():
     if _token["value"] and now < _token["expires_at"] - 30:
         return _token["value"]
 
-    resp = requests.post(
-        TOKEN_URL,
-        data={
-            "grant_type": "client_credentials",
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-        },
-        timeout=10,
-    )
-    resp.raise_for_status()
-    payload = resp.json()
+    if now < _token["retry_at"]:
+        return None
+
+    try:
+        resp = requests.post(
+            TOKEN_URL,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+    except requests.RequestException:
+        _token["retry_at"] = now + TOKEN_RETRY_COOLDOWN
+        return None
+
     _token["value"] = payload["access_token"]
     _token["expires_at"] = now + payload.get("expires_in", 1800)
     return _token["value"]

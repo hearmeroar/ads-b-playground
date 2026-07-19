@@ -157,7 +157,8 @@ Copy `.env.example` to `.env` to enable:
 - `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` — OAuth2 credentials from
   your [OpenSky account](https://opensky-network.org/my-opensky/account)
   (API Client section). Raises the daily quota well above anonymous access.
-  Without these, the app just falls back to anonymous requests.
+  Without these, or if OpenSky's auth server is unreachable, the app just
+  falls back to anonymous requests.
 - `PLANESPOTTERS_USER_AGENT` — Planespotters requires a descriptive
   User-Agent with contact info; a working default is already set, but you
   can point it at your own contact per their terms.

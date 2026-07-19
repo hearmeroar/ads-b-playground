@@ -140,6 +140,19 @@ above, retrying once on a 401 (token invalidated early). Without those env
 vars it silently falls back to anonymous requests. The remaining daily quota
 is read from the `X-Rate-Limit-Remaining` response header and forwarded to
 the frontend as `rate_limit_remaining`.
+**The same fallback also applies when the token endpoint is unreachable**,
+not just when it's unconfigured — found via a real production incident
+(2026-07-19) where `auth.opensky-network.org` connect-timed-out from the
+Northflank hosting network while `opensky-network.org` itself (the actual
+states/tracks API) stayed reachable; `get_access_token()` used to let that
+exception propagate all the way up through `fetch_opensky()`, failing
+`/api/states`/`/api/track` outright (502) even though anonymous access would
+have worked fine. It now catches `requests.RequestException` around the
+token POST and returns `None` (anonymous) instead, and remembers the failure
+for `TOKEN_RETRY_COOLDOWN` (60s) so a genuinely down auth server isn't
+retried — and its 10s connect-timeout re-eaten — on every single poll from
+every client; the next call after the cooldown tries again in case the
+server recovered.
 
 **The four radius sources** — adsb.fi (`/api/adsbfi` →
 `opendata.adsb.fi/api/v3/lat/.../lon/.../dist/...`, see

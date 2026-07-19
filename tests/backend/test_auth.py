@@ -1,3 +1,5 @@
+import requests
+
 import app
 from conftest import make_response
 
@@ -45,3 +47,32 @@ def test_fetch_opensky_anonymous_when_no_credentials(mock_get):
     assert resp.status_code == 200
     _, kwargs = mock_get.call_args
     assert kwargs["headers"] == {}
+
+
+def test_falls_back_to_anonymous_when_token_endpoint_unreachable(monkeypatch, mock_get, mock_post):
+    # Reproduces the production incident: auth.opensky-network.org
+    # connect-timed-out while opensky-network.org itself stayed reachable.
+    # Losing the token must not fail the whole request — it should degrade
+    # to an anonymous one, same as having no credentials configured at all.
+    monkeypatch.setattr(app, "CLIENT_ID", "id")
+    monkeypatch.setattr(app, "CLIENT_SECRET", "secret")
+    mock_post.side_effect = requests.exceptions.ConnectTimeout("timed out")
+    mock_get.return_value = make_response(json_data={"ok": True})
+
+    assert app.get_access_token() is None
+
+    resp = app.fetch_opensky("https://example.test", {})
+    assert resp.status_code == 200
+    _, kwargs = mock_get.call_args
+    assert kwargs["headers"] == {}
+
+
+def test_token_endpoint_failure_is_not_retried_within_cooldown(monkeypatch, mock_post):
+    monkeypatch.setattr(app, "CLIENT_ID", "id")
+    monkeypatch.setattr(app, "CLIENT_SECRET", "secret")
+    mock_post.side_effect = requests.exceptions.ConnectTimeout("timed out")
+
+    assert app.get_access_token() is None
+    assert app.get_access_token() is None
+
+    mock_post.assert_called_once()  # second call skipped the still-cooling-down endpoint
