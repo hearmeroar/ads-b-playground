@@ -21,10 +21,11 @@ jobs:
       - image: cimg/python:3.8-node
     steps:
       - checkout
-      - python/install-packages
+      - python/install-packages:
+          pip-dependency-file: requirements-dev.txt
       - run:
           name: Run tests
-          command: pytest --junitxml=junit.xml || ((($? == 5)) && echo 'Did not find any tests to run.')
+          command: python -m pytest tests/backend --junitxml=junit.xml || ((($? == 5)) && echo 'Did not find any tests to run.')
       - store_test_results:
           path: junit.xml
   deploy:
