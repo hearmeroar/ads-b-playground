@@ -1,0 +1,25 @@
+# Fly.io configuration for ADS-B Playground
+app = "ads-b-playground"
+primary_region = "ams"
+
+[env]
+PORT = "8080"
+
+[build]
+builder = "pacer"
+
+[http_service]
+internal_port = 8080
+force_https = true
+auto_stop_machines = true
+auto_start_machines = true
+min_machines_running = 1
+
+[[services]]
+protocol = "tcp"
+internal_port = 8080
+
+[services.concurrency]
+type = "connections"
+hard_limit = 1000
+soft_limit = 100
