@@ -172,6 +172,25 @@ error/stale-cache response immediately, instead of each independently
 re-discovering the same outage. Shared between the two routes rather than
 tracked per-route, since they're the same host/network path — an outage on
 one reliably means the other will fail the same way.
+**Root cause identified (2026-07-19), and accepted as permanent, not a bug
+to keep chasing**: this app's Northflank deployment runs on Google Cloud
+(confirmed via the pod's own egress IP, `34.32.227.125` — a GCP range),
+and OpenSky's own FAQ states outright that they "may block AWS and other
+hyperscalers due to generalized abuse from these IPs," explicitly asking
+not to be contacted about whitelisting cloud-hosted dashboards/trackers.
+Diagnosed from inside the running pod: DNS for `opensky-network.org`
+resolves fine, and unrelated hosts (`google.com`, `opendata.adsb.fi`) both
+connect in under 0.1s over the same egress path — but a raw TCP connect to
+`opensky-network.org` times out identically on both port 443 and port 80,
+meaning packets to that specific host are being silently dropped at
+OpenSky's end, not a DNS/routing/app-level problem on this side. Decision:
+leave it as-is rather than chase a static-IP/proxy workaround — the four
+radius sources (adsb.fi/adsb.lol/adsb.one/airplanes.live) already cover the
+same area with no such block, and the circuit breaker above already keeps
+a blocked OpenSky from degrading the rest of the app. If this deployment
+ever moves off a hyperscaler's IP range, OpenSky may start working again
+with zero code changes — the auth-fallback and outage-breaker logic above
+stay correct either way.
 
 **The four radius sources** — adsb.fi (`/api/adsbfi` →
 `opendata.adsb.fi/api/v3/lat/.../lon/.../dist/...`, see

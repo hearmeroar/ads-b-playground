@@ -83,7 +83,16 @@
       "Bash(/private/tmp/claude-501/-Users-alex-Documents-ADS-B-playgrund/501e2f3d-cb76-43b9-b468-878b600a21ba/scratchpad/nf-cli/node_modules/.bin/northflank list *)",
       "Bash(/private/tmp/claude-501/-Users-alex-Documents-ADS-B-playgrund/501e2f3d-cb76-43b9-b468-878b600a21ba/scratchpad/nf-cli/node_modules/.bin/northflank create *)",
       "Bash(npx @northflank/cli *)",
-      "Bash(npx --yes @northflank/cli *)"
+      "Bash(npx --yes @northflank/cli *)",
+      "Bash(npx --yes @northflank/cli exec service *)",
+      "Bash(npx --yes @northflank/cli exec *)",
+      "Bash(npx --yes @northflank/cli upload *)",
+      "Bash(npx --yes @northflank/cli upload service *)",
+      "Bash(npx --yes @northflank/cli download *)",
+      "Bash(npx --yes @northflank/cli download service *)",
+      "Bash(for *)",
+      "Bash(rmdir *)",
+      "Bash(echo *)"
     ],
     "deny": [
       "Bash(rm -rf *)",
