@@ -10,6 +10,7 @@
       "Bash(git checkout *)",
       "Bash(git pull)",
       "Bash(git push)",
+      "Bash(git push *)",
       "Bash(npm install)",
       "Bash(npm run *)",
       "Bash(npm test)",
@@ -92,7 +93,17 @@
       "Bash(npx --yes @northflank/cli download service *)",
       "Bash(for *)",
       "Bash(rmdir *)",
-      "Bash(echo *)"
+      "Bash(echo *)",
+      "Bash(python3 *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(.venv/bin/pip *)",
+      "Bash(/Users/alex/Documents/ADS-B_playgrund/.venv/bin/python *)",
+      "Bash(/Users/alex/Documents/ADS-B_playgrund/.venv/bin/pip *)",
+      "Bash(sips *)",
+      "Bash(qlmanage *)",
+      "Bash(file *)",
+      "Bash(diff *)",
+      "Bash(cp *)"
     ],
     "deny": [
       "Bash(rm -rf *)",
