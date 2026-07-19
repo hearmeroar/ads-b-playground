@@ -540,7 +540,7 @@ def health():
 
 @app.route("/")
 def index():
-    return send_from_directory(app.static_folder, "index.html")
+    return "<h1>Hello from Railway!</h1>"
 
 
 @app.route("/api/config")
