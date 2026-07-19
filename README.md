@@ -178,6 +178,33 @@ Copy `.env.example` to `.env` to enable:
   authorized redirect URIs. Without these, `/api/login/google` returns
   `not_configured` instead of starting the OAuth flow.
 
+## Deployment
+
+The `Dockerfile` targets [Northflank](https://northflank.com/) (port 7860,
+gunicorn with gthread workers). Signed-in state and the aircraft collection
+are already shared across devices — Google login and saved cards are keyed
+by account, not by device — as long as every device talks to the same
+running backend.
+
+What isn't automatic is surviving a redeploy or restart: `USERS_FILE`,
+`COLLECTIONS_FILE`, `TRACK_CACHE_FILE`, `IDENTITY_CACHE_FILE`, and
+`IDENTITY_HISTORY_FILE` all default to plain files written next to `app.py`,
+inside the container's own writable layer. Without a persistent volume
+mounted there, a redeploy wipes logins, saved collections, and the cached
+track/identity data. To persist them, mount a volume on the deployment and
+point each of those env vars at a path inside it, e.g.:
+
+```
+COLLECTIONS_FILE=/data/.collections.jsonl
+USERS_FILE=/data/.users.jsonl
+TRACK_CACHE_FILE=/data/.track_cache.json
+IDENTITY_CACHE_FILE=/data/.aircraft_identity_cache.jsonl
+IDENTITY_HISTORY_FILE=/data/.identity_history.jsonl
+```
+
+No code change is required — every one of these already reads its path from
+the environment.
+
 ## Tests
 
 ```bash

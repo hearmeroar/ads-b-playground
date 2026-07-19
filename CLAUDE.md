@@ -1619,6 +1619,24 @@ because photographer name and photo URL come from an external API.
     new aircraft) — this is what makes the sidebar's save button a simple
     filled/outline toggle rather than an ambiguous "which of N saved
     copies" question.
+  - **Persistence across devices and deploys**: `_users`/`_collections`
+    (like `_track_cache`/`_identity_cache` above) are keyed by account
+    (`user_id`, Google's `sub`), not by device or session — logging in
+    from any device against the *same running backend* already sees the
+    same collection, with no extra work needed. The actual persistence
+    boundary is the backend process's own local disk: `USERS_FILE`/
+    `COLLECTIONS_FILE` (like every other `*_FILE` env var in this app —
+    `TRACK_CACHE_FILE`, `IDENTITY_CACHE_FILE`, `IDENTITY_HISTORY_FILE`)
+    default to a plain relative path (`.users.jsonl`, `.collections.jsonl`,
+    ...) written next to `app.py`. On an ephemeral container platform —
+    this app's `Dockerfile` targets Northflank — that path lives inside the
+    container's own writable layer, with no volume mounted onto it, so a
+    redeploy or even a plain restart wipes every one of these files. Fix is
+    infrastructure, not code: mount a persistent volume on the deployment
+    and point each `*_FILE` env var at a path inside it (e.g.
+    `COLLECTIONS_FILE=/data/.collections.jsonl`) — every one of these
+    stores already reads its path from the environment, so no code change
+    is needed, only the volume + env var configuration on the host.
   - **Snapshot, not live-refetch, by design**: a card stores `SNAPSHOT_FIELDS`
     (`registration`, `aircraftType`, `manufacturer`, `model`,
     `manufactureYear`, `operator`, `operatorCountry`/`operatorCountryIso`,
