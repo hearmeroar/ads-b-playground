@@ -2159,6 +2159,31 @@ because photographer name and photo URL come from an external API.
 
 **Testing:** [test-icon.html](static/test-icon.html) demonstrates Icon 2 and Icon 3 (from `a1.svg` and `a2.svg`) with this approach across three sizes (80px, 120px, 200px). Icon 1 (without viewBox) is included as a counter-example showing clipping/misalignment.
 
+## Favicon
+
+`/favicon.svg` (`app.py`) is a Flask route, not a static file, specifically
+so it can be colored per-environment — the whole point, per the project
+owner: local and prod tabs need to be tellable apart at a glance without
+reading the URL. It reuses the exact "large" (cat4) glyph
+`static/js/icons.js`'s `LARGE_GLYPH` already draws for on-map markers
+(same path data, same `vector-effect="non-scaling-stroke"` white outline
+that keeps the stroke a constant device pixel wide regardless of the icon's
+render size) rather than a new hand-drawn icon, wrapped in a bare `<svg
+viewBox="0 0 200 200">` with `fill="{color}"` templated in. `APP_ENV` (env
+var, defaults to `"development"`) selects the color via `FAVICON_COLORS` —
+`"development"` → orange `#f97316`, `"production"` → blue `#2563eb`; an
+unrecognized value falls back to the dev color rather than erroring.
+`static/index.html`'s `<head>` links it as `<link rel="icon"
+type="image/svg+xml" href="/favicon.svg">`. Registering `/favicon.svg` as
+an explicit route works cleanly alongside Flask's own static route even
+though `static_url_path=""` makes every other static file (e.g.
+`/style.css`) resolve at the root too — Werkzeug's routing always prefers
+a literal rule over the static blueprint's `/<path:filename>` converter
+rule, regardless of registration order, so there's no route-ordering
+pitfall here. The Northflank deployment has `APP_ENV=production` set in
+its service env vars so its tab shows blue; nothing needs setting locally,
+since the code's own default already is the dev color.
+
 ## Conventions
 
 - All UI text and code comments are in English, regardless of the language

@@ -181,6 +181,10 @@ Copy `.env.example` to `.env` to enable:
   `http://127.0.0.1:5050/api/login/google/callback` (test runner) as
   authorized redirect URIs. Without these, `/api/login/google` returns
   `not_configured` instead of starting the OAuth flow.
+- `APP_ENV` — set to `production` on the real deployment to color the
+  favicon blue instead of the local default orange, so a prod tab is
+  tellable apart from a dev one at a glance. Purely cosmetic; nothing else
+  reads this var.
 
 ## Deployment
 
