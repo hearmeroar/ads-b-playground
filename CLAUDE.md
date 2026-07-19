@@ -2185,21 +2185,43 @@ narrower feature) has a history of being inconsistent across versions, so
 rather than chase which exact WebKit quirk was responsible, the fix was to
 drop SVG entirely and use PNG — the one favicon format every browser,
 including every Safari version, has always supported without caveats.
-`static/favicon-dev.png`/`static/favicon-prod.png` are the same glyph
-rendered once **offline** (macOS `qlmanage -t -s 180 <file>.svg`, a
-Quick-Look-thumbnail trick, not a project dependency) at 180×180 with a
-transparent background, then committed as plain binary assets — the same
-"vendored, not generated at request time" pattern already used for
-`static/ADS-B_Radar_Free_Aircraft_SVG_Icons/`/`static/flag-icons/`.
 `app.py` has no SVG-to-PNG conversion of its own and no new dependency for
-this (no Pillow/cairosvg) — regenerate the two PNGs by hand (same
-`qlmanage` command, or any SVG-to-PNG tool) if the glyph or colors ever
-change. Registering `/favicon.png` as an explicit route works cleanly
-alongside Flask's own static route even though `static_url_path=""` makes
-every other static file (e.g. `/style.css`) resolve at the root too —
-Werkzeug's routing always prefers a literal rule over the static
-blueprint's `/<path:filename>` converter rule, regardless of registration
-order, so there's no route-ordering pitfall here.
+this (no Pillow/cairosvg). Registering `/favicon.png` as an explicit route
+works cleanly alongside Flask's own static route even though
+`static_url_path=""` makes every other static file (e.g. `/style.css`)
+resolve at the root too — Werkzeug's routing always prefers a literal rule
+over the static blueprint's `/<path:filename>` converter rule, regardless
+of registration order, so there's no route-ordering pitfall here.
+
+**Artwork, second iteration**: the very first PNGs were just the on-map
+marker glyph recolored solid orange/blue on a transparent background — the
+project owner then asked for a filled colored background, a white
+silhouette, and specifically a *takeoff* pose (plane climbing away from
+the ground), not the flat top-down marker glyph. Rebuilt as a 200×200
+rounded-square (`rx="40"`, i.e. ~20% corner radius, the standard flat
+"app icon" look) filled with the same per-environment color, with
+[Pictogrammers MDI](https://pictogrammers.com/library/mdi/icon/airplane-takeoff/)'s
+`airplane-takeoff` glyph (Apache-2.0, fetched from
+`unpkg.com/@mdi/svg/svg/airplane-takeoff.svg` — the same icon family
+already vendored in this app for `GROUP_ICONS`, see the sidebar section
+above) in solid white, nested via a child `<svg x y width height
+viewBox="0 0 24 24">` inside the outer 200×200 one so the 24-unit glyph
+auto-scales/centers into a padded 132×132 region (34px inset each side)
+with no manual coordinate math. Its diagonal climb-away-from-a-ground-line
+shape reads clearly even shrunk to an actual 32×32 favicon (checked before
+finalizing, via `qlmanage -t -s 32`) — the deciding factor over the
+project's own hand-drawn marker glyphs, none of which depict a takeoff
+pose. `static/favicon-dev.png`/`static/favicon-prod.png` are this design
+rendered once **offline** (macOS `qlmanage -t -s 180 <file>.svg`, a
+Quick-Look-thumbnail trick, not a project dependency — any SVG-to-PNG tool
+works) at 180×180 with a transparent surround (the rounded corners aren't
+opaque), then committed as plain binary assets — the same "vendored, not
+generated at request time" pattern already used for
+`static/ADS-B_Radar_Free_Aircraft_SVG_Icons/`/`static/flag-icons/`.
+Regenerate them by hand (edit the source `<rect>`/`<path>` SVG, re-run the
+same `qlmanage` command) if the glyph, colors, or corner radius ever
+change — there's no build step or script for this checked into the repo,
+consistent with the rest of the project's "no build step" convention.
 
 ## Conventions
 
