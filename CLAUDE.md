@@ -2161,28 +2161,45 @@ because photographer name and photo URL come from an external API.
 
 ## Favicon
 
-`/favicon.svg` (`app.py`) is a Flask route, not a static file, specifically
-so it can be colored per-environment — the whole point, per the project
-owner: local and prod tabs need to be tellable apart at a glance without
-reading the URL. It reuses the exact "large" (cat4) glyph
-`static/js/icons.js`'s `LARGE_GLYPH` already draws for on-map markers
-(same path data, same `vector-effect="non-scaling-stroke"` white outline
-that keeps the stroke a constant device pixel wide regardless of the icon's
-render size) rather than a new hand-drawn icon, wrapped in a bare `<svg
-viewBox="0 0 200 200">` with `fill="{color}"` templated in. `APP_ENV` (env
-var, defaults to `"development"`) selects the color via `FAVICON_COLORS` —
-`"development"` → orange `#f97316`, `"production"` → blue `#2563eb`; an
-unrecognized value falls back to the dev color rather than erroring.
-`static/index.html`'s `<head>` links it as `<link rel="icon"
-type="image/svg+xml" href="/favicon.svg">`. Registering `/favicon.svg` as
-an explicit route works cleanly alongside Flask's own static route even
-though `static_url_path=""` makes every other static file (e.g.
-`/style.css`) resolve at the root too — Werkzeug's routing always prefers
-a literal rule over the static blueprint's `/<path:filename>` converter
-rule, regardless of registration order, so there's no route-ordering
-pitfall here. The Northflank deployment has `APP_ENV=production` set in
-its service env vars so its tab shows blue; nothing needs setting locally,
-since the code's own default already is the dev color.
+Colored per-environment — the whole point, per the project owner: local
+and prod tabs need to be tellable apart at a glance without reading the
+URL. `/favicon.png` (`app.py`) is a Flask route, not a static `<link>`
+straight at a file, so it can pick which file to serve based on `APP_ENV`
+(env var, defaults to `"development"`) — `FAVICON_FILES` maps
+`"development"` → `static/favicon-dev.png` (orange) and `"production"` →
+`static/favicon-prod.png` (blue); an unrecognized value falls back to the
+dev file rather than erroring. `static/index.html`'s `<head>` links it as
+`<link rel="icon" type="image/png" href="/favicon.png">`. The Northflank
+deployment has `APP_ENV=production` set in its service env vars so its tab
+shows blue; nothing needs setting locally, since the code's own default
+already is the dev color.
+
+**PNG, not SVG, and why**: the first version served a runtime-templated
+inline SVG (recoloring the exact "large"/cat4 glyph `static/js/icons.js`'s
+`LARGE_GLYPH` already draws for on-map markers) from `/favicon.svg` — it
+worked immediately in Chrome, but never rendered in Safari even after
+clearing Safari's own favicon cache (`~/Library/Safari/Favicon Cache/`),
+which ruled out simple caching as the cause. Safari's support for colored
+`rel="icon"` SVGs (as opposed to monochrome `rel="mask-icon"`, a different,
+narrower feature) has a history of being inconsistent across versions, so
+rather than chase which exact WebKit quirk was responsible, the fix was to
+drop SVG entirely and use PNG — the one favicon format every browser,
+including every Safari version, has always supported without caveats.
+`static/favicon-dev.png`/`static/favicon-prod.png` are the same glyph
+rendered once **offline** (macOS `qlmanage -t -s 180 <file>.svg`, a
+Quick-Look-thumbnail trick, not a project dependency) at 180×180 with a
+transparent background, then committed as plain binary assets — the same
+"vendored, not generated at request time" pattern already used for
+`static/ADS-B_Radar_Free_Aircraft_SVG_Icons/`/`static/flag-icons/`.
+`app.py` has no SVG-to-PNG conversion of its own and no new dependency for
+this (no Pillow/cairosvg) — regenerate the two PNGs by hand (same
+`qlmanage` command, or any SVG-to-PNG tool) if the glyph or colors ever
+change. Registering `/favicon.png` as an explicit route works cleanly
+alongside Flask's own static route even though `static_url_path=""` makes
+every other static file (e.g. `/style.css`) resolve at the root too —
+Werkzeug's routing always prefers a literal rule over the static
+blueprint's `/<path:filename>` converter rule, regardless of registration
+order, so there's no route-ordering pitfall here.
 
 ## Conventions
 

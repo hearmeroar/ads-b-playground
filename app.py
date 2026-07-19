@@ -584,26 +584,29 @@ def index():
         return f.read()
 
 
-# Favicon: same "large" (cat4) aircraft glyph static/js/icons.js uses for
-# on-map markers, kept as one inline SVG so no build step/extra file is
-# needed. Colored by APP_ENV — set APP_ENV=production on the real
+# Favicon: colored by APP_ENV — set APP_ENV=production on the real
 # deployment (defaults to the dev color otherwise) so a local tab and a
 # prod tab are visually distinguishable at a glance, without reading the
-# URL. `vector-effect="non-scaling-stroke"` keeps the white outline a
-# constant device pixel wide at favicon sizes, same as on the map markers.
+# URL. Started as a runtime-templated inline SVG (same "large"/cat4 glyph
+# static/js/icons.js draws for on-map markers), but Safari's support for
+# colored `rel="icon"` SVGs proved unreliable in practice (worked in
+# Chrome, never rendered in Safari even after clearing its favicon cache)
+# — switched to two pre-rendered PNGs instead, the one favicon format every
+# browser has always supported without caveats. static/favicon-dev.png
+# (orange) and static/favicon-prod.png (blue) are the same plane glyph
+# rendered once offline (macOS `qlmanage -t`) at 180×180 and committed as
+# plain binary assets, the same "vendored, not generated at request time"
+# pattern as static/ADS-B_Radar_Free_Aircraft_SVG_Icons/ and
+# static/flag-icons/ — regenerate them by hand if the glyph or colors ever
+# change, there's no runtime SVG-to-PNG conversion in app.py.
 APP_ENV = os.environ.get("APP_ENV", "development")
-FAVICON_COLORS = {"production": "#2563eb", "development": "#f97316"}
-FAVICON_COLOR = FAVICON_COLORS.get(APP_ENV, FAVICON_COLORS["development"])
-FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="{color}" stroke="#fff" stroke-width="1" vector-effect="non-scaling-stroke">
-<path d="M 147.119 -35.254 C 147.119 -41.846000000000004 138.086 -46.68 127.344 -46.68 L 103.125 -46.68 C 100.049 -46.68 98.877 -47.168 96.924 -49.268 L 90.503 -56.217 L 90.503 -66.571 L 81.002 -66.571 L 59.277 -90.478 C 58.057 -91.797 56.592 -92.529 55.029 -92.529 L 48.438 -92.529 C 46.973 -92.529 46.143 -91.211 46.875 -89.648 L 66.26 -46.68 L 34.912 -43.555 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 34.912 -26.953 L 66.26 -23.877 L 46.875 19.141 C 46.143 20.654 46.973 21.973 48.438 21.973 L 55.029 21.973 C 56.592 21.973 58.057 21.24 59.277 19.922 L 81.069 -3.904 L 90.503 -3.927 L 90.503 -14.345 L 96.924 -21.24 C 98.877 -23.389 100.049 -23.877 103.125 -23.877 L 127.344 -23.877 C 138.086 -23.877 147.119 -28.662 147.119 -35.254 Z"/>
-</g>
-</svg>"""
+FAVICON_FILES = {"production": "favicon-prod.png", "development": "favicon-dev.png"}
+FAVICON_FILE = FAVICON_FILES.get(APP_ENV, FAVICON_FILES["development"])
 
 
-@app.route("/favicon.svg")
+@app.route("/favicon.png")
 def favicon():
-    return FAVICON_SVG.format(color=FAVICON_COLOR), 200, {"Content-Type": "image/svg+xml"}
+    return send_from_directory("static", FAVICON_FILE, mimetype="image/png")
 
 
 @app.route("/api/config")
