@@ -534,6 +534,10 @@ def fetch_states():
     return fetch_opensky(OPENSKY_URL, {**BBOX, "extended": 1})
 
 
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
+
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")
