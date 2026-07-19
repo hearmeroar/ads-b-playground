@@ -7,11 +7,20 @@ orbs:
 jobs:
   test-node:
     # Install node dependencies and run tests
-    executor: node/default
+    docker:
+      - image: cimg/python:3.11-node
     steps:
       - checkout
       - node/install-packages:
           pkg-manager: npm
+      - run:
+          name: Install Playwright browsers
+          command: npx playwright install chromium --with-deps
+      - run:
+          name: Set up Python venv
+          command: |
+            python3 -m venv .venv
+            .venv/bin/pip install -r requirements.txt
       - run:
           name: Run tests
           command: npm test --passWithNoTests
