@@ -48,26 +48,30 @@ not HTTP proxying) from everything else in `app.py`.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python app.py        # runs on http://127.0.0.1:5000
+.venv/bin/python app.py        # runs on http://127.0.0.1:5051
 ```
 
-**Ports 5000 and 5050 are not arbitrary — Google Sign-In's redirect URI is
-locked to them.** The Google Cloud Console OAuth client backing
-`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (see "Aircraft collection" below)
-has its Authorized redirect URIs and JavaScript origins registered for
-exactly `127.0.0.1`/`localhost` on `5000` (the app's normal port) and `5050`
-(the Playwright test port) and no others:
-- Redirect URIs: `http://127.0.0.1:5000/api/login/google/callback`,
+**Ports 5051 and 5050 are not arbitrary — Google Sign-In's redirect URI is
+locked to them.** (The app's default used to be 5000, but that's permanently
+occupied on macOS by ControlCenter's AirPlay Receiver — and often 5001 too,
+a second port AirPlay/ASP.NET Core/Synology can claim — so the app's real
+port was moved to 5051, adjacent to the existing 5050 test port.) The
+Google Cloud Console OAuth client backing `GOOGLE_CLIENT_ID`/
+`GOOGLE_CLIENT_SECRET` (see "Aircraft collection" below) has its Authorized
+redirect URIs and JavaScript origins registered for exactly
+`127.0.0.1`/`localhost` on `5051` (the app's normal port) and `5050` (the
+Playwright test port) and no others:
+- Redirect URIs: `http://127.0.0.1:5051/api/login/google/callback`,
   `http://127.0.0.1:5050/api/login/google/callback`,
-  `http://localhost:5000/api/login/google/callback`,
+  `http://localhost:5051/api/login/google/callback`,
   `http://localhost:5050/api/login/google/callback`
-- JavaScript origins: `http://127.0.0.1:5000`, `http://127.0.0.1:5050`,
-  `http://localhost:5000`, `http://localhost:5050`
+- JavaScript origins: `http://127.0.0.1:5051`, `http://127.0.0.1:5050`,
+  `http://localhost:5051`, `http://localhost:5050`
 
-Running `app.py` on any other port (e.g. via `PORT=5001` or picking a free
+Running `app.py` on any other port (e.g. via `PORT=6000` or picking a free
 port automatically) makes Google's OAuth consent screen reject the
-callback — always launch it on 5000 (or let `playwright.config.js` launch
-it on 5050 for tests), never a different port, even if 5000 looks busy.
+callback — always launch it on 5051 (or let `playwright.config.js` launch
+it on 5050 for tests), never a different port, even if 5051 looks busy.
 
 No linter or build step exists in this project. Tests:
 
@@ -1585,7 +1589,7 @@ because photographer name and photo URL come from an external API.
     below for the same restart-vs-reloader distinction), silently logs
     everyone out; set `SECRET_KEY` for logins to survive restarts.
     **The OAuth client's redirect URI/JS origins are registered for ports
-    5000 and 5050 only** — see the "Commands" section at the top of this
+    5051 and 5050 only** — see the "Commands" section at the top of this
     file for the exact list; running the app on any other port breaks
     the Google login flow even though everything else about the app
     works fine on an arbitrary port.
@@ -1822,7 +1826,7 @@ because photographer name and photo URL come from an external API.
   `openskyMarkers.get('aaaaaa')._icon.click()` when the actual click handler
   needs to fire. This is more reliable than pixel-coordinate clicking, which
   can land on a different, overlapping marker at low zoom levels.
-- Runs on port 5050, not 5000 — see the Commands section above.
+- Runs on port 5050, not 5051 — see the Commands section above.
 - `test_track.spec.js` targets an adsb.fi marker for the successful track
   path (OpenSky is nevertheless the first-priority source), asserts the
   actual `trackLayerGroup` rather than a fixed stroke color, and covers

@@ -148,7 +148,7 @@ python3 -m venv .venv
 .venv/bin/python app.py
 ```
 
-Open http://127.0.0.1:5000.
+Open http://127.0.0.1:5051.
 
 ## Configuration (optional)
 
@@ -173,7 +173,7 @@ Copy `.env.example` to `.env` to enable:
   "Sign in with Google" (the aircraft collection feature). Create an OAuth
   client in the [Google Cloud Console](https://console.cloud.google.com/)
   (APIs & Services → Credentials → OAuth client ID → Web application), and
-  add both `http://127.0.0.1:5000/api/login/google/callback` (dev) and
+  add both `http://127.0.0.1:5051/api/login/google/callback` (dev) and
   `http://127.0.0.1:5050/api/login/google/callback` (test runner) as
   authorized redirect URIs. Without these, `/api/login/google` returns
   `not_configured` instead of starting the OAuth flow.

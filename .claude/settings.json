@@ -60,7 +60,11 @@
       "Bash(gh run *)",
       "Bash(flyctl auth *)",
       "Bash(git rm *)",
-      "Bash(git revert *)"
+      "Bash(git revert *)",
+      "Bash(lsof -nP -iTCP:5001 -sTCP:LISTEN)",
+      "Bash(lsof -nP -iTCP:8080 -sTCP:LISTEN)",
+      "Bash(lsof -nP -iTCP -sTCP:LISTEN)",
+      "Bash(lsof -ti:5001)"
     ],
     "deny": [
       "Bash(rm -rf *)",

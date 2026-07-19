@@ -1236,7 +1236,10 @@ if __name__ == "__main__":
     _start_identity_backfill_thread()
 
     # Port is configurable (PORT env var) so the test suite can run on a
-    # different one — 5000 is macOS's AirPlay Receiver port by default, which
-    # can confuse a health-checking test runner even though Flask itself
-    # binds fine alongside it.
-    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+    # different one. The default is 5051, not 5000 — 5000 (and often 5001)
+    # is permanently occupied on macOS by ControlCenter's AirPlay Receiver,
+    # which can't be disabled without giving up AirPlay entirely. 5051 sits
+    # next to the Playwright test port (5050) and has no known common
+    # claimant (not AirPlay, ASP.NET Core, Synology, or any typical local
+    # dev/db default).
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5051)))
