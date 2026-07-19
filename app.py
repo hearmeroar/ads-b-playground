@@ -538,6 +538,10 @@ def fetch_states():
 def health():
     return jsonify({"status": "ok"})
 
+@app.route("/test")
+def test():
+    return "<h1>Test works!</h1>"
+
 @app.route("/")
 def index():
     print("GET / called", flush=True)
