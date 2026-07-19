@@ -48,6 +48,7 @@ from urllib.parse import quote
 import requests
 from authlib.integrations.flask_client import OAuth
 from flask import Flask, jsonify, redirect, request, send_from_directory, session, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from enrichment.aircraft_enrichment import enrich_identity
 
@@ -66,6 +67,12 @@ app = Flask(__name__, static_folder="static", static_url_path="")
 # further down for the same restart-vs-reloader distinction) invalidates all
 # existing sessions; set SECRET_KEY in .env for logins to survive restarts.
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
+
+# ProxyFix for Fly.io (and other reverse proxies): read X-Forwarded-Proto
+# and X-Forwarded-Host headers so Flask knows the real HTTPS scheme and
+# hostname, not what the proxy sees. This fixes OAuth redirect_uri_mismatch
+# errors where Flask was generating http:// instead of https://.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # --- Google OAuth (Sign in with Google) ---
 # The one new external-auth dependency in this codebase: hand-rolling
