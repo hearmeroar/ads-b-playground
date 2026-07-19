@@ -68,7 +68,7 @@ app = Flask(__name__, static_folder="static", static_url_path="")
 # existing sessions; set SECRET_KEY in .env for logins to survive restarts.
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
 
-# ProxyFix for Fly.io (and other reverse proxies): read X-Forwarded-Proto
+# ProxyFix for reverse proxies (e.g. Northflank): read X-Forwarded-Proto
 # and X-Forwarded-Host headers so Flask knows the real HTTPS scheme and
 # hostname, not what the proxy sees. This fixes OAuth redirect_uri_mismatch
 # errors where Flask was generating http:// instead of https://.
@@ -578,23 +578,10 @@ def fetch_states():
 def health():
     return jsonify({"status": "ok"})
 
-@app.route("/test")
-def test():
-    return "<h1>Test works!</h1>"
-
 @app.route("/")
 def index():
-    print("GET / called", flush=True)
-    try:
-        with open("static/index.html", "r") as f:
-            print("Returning index.html", flush=True)
-            return f.read()
-    except FileNotFoundError as e:
-        print(f"FileNotFoundError: {e}", flush=True)
-        return "<h1>Hello from Railway!</h1><p>static/index.html not found</p>"
-    except Exception as e:
-        print(f"Error: {e}", flush=True)
-        return f"<h1>Error</h1><p>{e}</p>"
+    with open("static/index.html", "r") as f:
+        return f.read()
 
 
 @app.route("/api/config")
