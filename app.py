@@ -1239,4 +1239,4 @@ if __name__ == "__main__":
     # different one — 5000 is macOS's AirPlay Receiver port by default, which
     # can confuse a health-checking test runner even though Flask itself
     # binds fine alongside it.
-    app.run(debug=True, port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
