@@ -49,7 +49,9 @@
       "Bash(awk '/<div id=\"hud\">/{print NR\": \"$0; depth=1; next} depth{ n=gsub\\(/<div/,\"<div\"\\); c=gsub\\(/<\\\\/div>/,\"</div>\"\\); depth+=n-c; print NR\": \"$0; if\\(depth==0\\){print \"CLOSES AT \"NR; exit} }' /Users/alex/Documents/ADS-B_playgrund/static/index.html)",
       "Bash(git reset *)",
       "WebFetch(domain:pictogrammers.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(.venv/bin/gunicorn app:app --bind 127.0.0.1:5000)",
+      "Bash(.venv/bin/gunicorn app:app --bind 127.0.0.1:5001)"
     ],
     "deny": [
       "Bash(rm -rf *)",
