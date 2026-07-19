@@ -16,8 +16,11 @@ later if a real need for it shows up.
   - [adsb.fi](https://github.com/adsbfi/opendata) — red
   - [adsb.lol](https://adsb.lol/) — purple *(upstream is occasionally
     unstable, but a failing cycle just degrades rather than breaking the map)*
-  - [adsb.one](https://adsb.one/) — amber *(off by default: currently
-    behind a Cloudflare block)*
+  - [adsb.one](https://adsb.one/) — amber *(hidden from the HUD, not just
+    off by default: its whole `api.adsb.one` subdomain is behind a
+    Cloudflare anti-bot block — confirmed from two independent networks,
+    unaffected by request headers, so no toggle would ever work. Still
+    fully wired up server- and client-side; only its HUD row is hidden)*
   - [airplanes.live](https://airplanes.live/api-guide/) — green
   - [FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/) —
     teal *(requires API key, paid/metered so off by default; matched to other

@@ -32,7 +32,11 @@ test('enabling a source shows a spinner until its first count lands, then the pi
   // Off: no pill, no spinner.
   expect(await slotState(page, 'adsbone')).toEqual({ text: '', spinning: false, loading: false });
 
-  await page.click('#toggle-adsbone');
+  // adsb.one's row is hidden in the HUD (Cloudflare block on the upstream —
+  // see CLAUDE.md). page.click() can't target a display:none element at all
+  // (no layout box, even with force: true), so invoke the native DOM click
+  // directly; the toggle/wiring underneath are otherwise untouched.
+  await page.evaluate(() => document.getElementById('toggle-adsbone').click());
 
   // On, data still in flight: spinner stands in for the pill.
   await page.waitForFunction(() => !!document.querySelector('#count-adsbone .count-spinner'));
@@ -60,7 +64,10 @@ test('a source that returns nothing settles on 0 rather than spinning forever', 
 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  await page.click('#toggle-adsbone');
+  // adsb.one's row is hidden in the HUD (Cloudflare block — see CLAUDE.md).
+  // page.click() can't target a display:none element (no layout box, even
+  // with force: true), so invoke the native DOM click directly instead.
+  await page.evaluate(() => document.getElementById('toggle-adsbone').click());
 
   await page.waitForFunction(
     () => document.getElementById('count-adsbone').textContent === '0',

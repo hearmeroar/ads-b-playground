@@ -121,7 +121,20 @@
         <span class="switch-track"></span>
       </label>
     </div>
-    <div class="source-row" title="Off by default — its api.adsb.one is currently behind a Cloudflare block. Only shown where not already covered by OpenSky, adsb.fi or adsb.lol">
+    <!-- Hidden from the HUD (2026-07-19), not just off by default: api.adsb.one
+         is behind a blanket Cloudflare anti-bot block on the whole subdomain,
+         confirmed live from both a local IP and this app's own Northflank/GCP
+         pod — every path 403s regardless of User-Agent/Origin, so there's no
+         header fix, and no toggle would ever do anything if shown. See
+         CLAUDE.md's adsb.one section for the full investigation. display:none
+         (not an HTML comment) is deliberate: state-filters.js's sourceToggles/
+         markerMapsBySource and several Object.keys(sourceToggles) loops in
+         main.js (wiring, isSourceEnabled(), the count spinner) all dereference
+         document.getElementById('toggle-adsbone') directly — removing the
+         element from the DOM entirely would null-crash those on page load.
+         Backend route and JS wiring are otherwise untouched (still defaults to
+         unchecked/off), so this is a one-line revert if the block ever lifts. -->
+    <div class="source-row" style="display:none" title="Hidden — its api.adsb.one is behind a Cloudflare block affecting the whole subdomain, not just this app">
       <span class="swatch" style="background:#f9a825"></span>
       <span class="source-name">adsb.one</span>
       <span class="source-count" id="count-adsbone"></span>

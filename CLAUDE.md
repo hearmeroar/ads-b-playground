@@ -213,22 +213,59 @@ entry's `center` approximates the same area as `BBOX`. All return the same
 ADSBExchange-compatible JSON shape (altitude in feet, speed in knots —
 converted client-side to match OpenSky's units), which is why one parser
 (`parseAdsbExchangeAircraft()`) serves all four.
-**adsb.one is off by default** in the HUD: its upstream is currently behind a
-Cloudflare block. adsb.lol shipped off for the same kind of reason (its
-upstream had intermittent multi-second hangs) but was switched to **on by
-default** (2026-07-17, explicit re-approval) despite that known instability —
-a failing/slow source degrades to `null` for that cycle rather than breaking
-the poll, so the occasional hang costs one cycle, not the map. Both are wired
-up and working either way; the `RADIUS_SOURCES` entries and the shared
-`cached_radius_source()` plumbing don't distinguish "on by default" from
-"off by default" — it's purely a frontend checkbox default.
+**adsb.one's HUD row is hidden entirely** (`static/index.html`,
+`display:none` on the `.source-row`, since 2026-07-19) rather than merely
+unchecked-by-default: its upstream, `api.adsb.one`, sits behind a blanket
+Cloudflare anti-bot block on the *whole subdomain*, confirmed live from two
+independent networks — a local residential IP and this app's own
+Northflank/GCP production pod (via `northflank exec`) both got an identical
+403 "Sorry, you have been blocked" page on every path tried
+(`/v2/point/...`, `/robots.txt`, `/v2/openapi.json`), regardless of
+`User-Agent`/`Origin`/`Referer` spoofing (tested with a real Chrome UA and
+an `Origin`/`Referer` matching adsb.one's own frontend, `globe.adsb.one` —
+still 403). This rules out a header fix or an IP-specific ban — it's
+Cloudflare's bot-management layer keying off TLS/HTTP client fingerprint
+(JA3/JA4), which no plain HTTP client (curl, `requests`, this app's own
+`fetch_opensky`-style proxying) can pass, only a real browser (or a
+Cloudflare-verified bot) can. ADSB-One is a volunteer feeder-network project
+(`ADSB-One/feedclient`, `mlat-server`, `readsb`, `tar1090` on GitHub — the
+same stack as adsb.fi/adsb.lol), and its sibling project `adsb.lol`
+documents the same family's actual policy in its own repo README: anonymous
+scripted API access is exactly what's being blocked, and the intended path
+is either the project's own web frontend or an API key earned by *feeding*
+the network — not a bug to work around, but the upstream's deliberate
+anti-scraping stance. Since no toggle would ever do anything useful even if
+shown, hiding the row (rather than leaving a checkbox that always silently
+fails) was the right call. `display:none` was used instead of an HTML
+comment deliberately: `state-filters.js`'s `sourceToggles`/
+`markerMapsBySource` and several `Object.keys(sourceToggles)` loops in
+`main.js` (toggle wiring, `isSourceEnabled()`, the startup count spinner)
+all call `document.getElementById('toggle-adsbone')` directly and
+dereference it unconditionally — actually removing the element from the DOM
+would null-crash all of those on page load, taking down the whole app, not
+just adsb.one. The checkbox itself, `RADIUS_SOURCES['adsbone']`, the
+`/api/adsbone` backend route, and every line of JS wiring above are
+otherwise completely untouched (still defaults to unchecked/off under the
+hood) — restoring the row to visible is a one-line revert (drop the
+`display:none`) if the Cloudflare block ever lifts.
+adsb.lol shipped off for a related but lesser reason (its upstream had
+intermittent multi-second hangs, not a hard block) and was switched to **on
+by default** (2026-07-17, explicit re-approval) despite that known
+instability — a failing/slow source degrades to `null` for that cycle
+rather than breaking the poll, so the occasional hang costs one cycle, not
+the map. Both are wired up in the backend either way; the `RADIUS_SOURCES`
+entries and the shared `cached_radius_source()` plumbing don't distinguish
+"hidden"/"off by default" from "on by default" — that distinction is purely
+a frontend concern (a checkbox default for adsb.lol, a hidden row for
+adsb.one).
 
 > **Shorthand:** the rest of this file often says "adsb.fi/airplanes.live"
 > where it means *any* radius source — they share one JSON shape, one parser,
 > and one set of extra fields, so a claim about one holds for all four.
-> adsb.fi and airplanes.live are named because they're two of the three that
-> ship enabled (alongside adsb.lol); adsb.one — the one still off by default —
-> behaves identically wherever the phrase appears.
+> adsb.fi and airplanes.live are named because they're two of the three whose
+> HUD row ships enabled (alongside adsb.lol); adsb.one — the one whose row is
+> now hidden from the HUD entirely — behaves identically at the backend/JS
+> level wherever the phrase appears; only its visibility in the UI differs.
 
 **FlightAware AeroAPI (`/api/flightaware` → `aeroapi.flightaware.com/aeroapi/flights/search`):**
 This sixth source is structurally unlike the four radius sources in three critical ways.
@@ -242,8 +279,9 @@ altitude is in hundreds of feet (e.g., `8` = 800 ft). Origin/destination airport
 `destinationAirport` fields. Third, it's **metered/paid** — the user polls it at 10s (same as
 free sources) when enabled, accepting the cost tradeoff. It originally shipped **enabled by
 default**; the user later gave explicit re-approval (2026-07-17) to switch it to **off by
-default** instead, so it now ships unchecked like adsb.one — still fully wired up and
-working, just an opt-in toggle rather than a default one. Any further change to this default
+default** instead, so it now ships unchecked (visible, but off, unlike
+adsb.one's hidden row) — still fully wired up and working, just an opt-in
+toggle rather than a default one. Any further change to this default
 (or to its poll interval) needs the same kind of explicit re-approval, not a unilateral
 "optimization."
 **Dedup strategy:** Since FlightAware has no ICAO24, it uses **callsign-based dedup** against the
@@ -550,8 +588,10 @@ because photographer name and photo URL come from an external API.
   `poll()` (rather than waiting up to `POLL_INTERVAL_MS` for the next tick) —
   both on and off toggles re-run `poll()` so counts/markers never sit stale
   after a toggle. **OpenSky, adsb.fi, adsb.lol and airplanes.live ship
-  checked**; adsb.one and FlightAware ship off (see above). Turning OpenSky
-  off clears the quota line and any pending OpenSky warning message.
+  checked**; FlightAware ships off (see above); adsb.one's row is hidden
+  from the HUD entirely (see above) rather than shipping an always-off
+  checkbox. Turning OpenSky off clears the quota line and any pending
+  OpenSky warning message.
 - **HUD counts** (`updateCounts()`) render as a pill per source, collapsed via
   `.source-count:empty` when the source is off. Between enabling a source and
   the poll it triggers landing, the slot holds a `.count-spinner` instead

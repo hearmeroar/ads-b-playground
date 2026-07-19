@@ -21,9 +21,14 @@ test('same ICAO24 from 4 radius sources renders one marker, from the highest-pri
 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  // adsb.one ships off by default (Cloudflare block) — enable it so all four
-  // radius sources are live for this dedup check (adsb.lol ships on already).
-  await page.click('#toggle-adsbone');
+  // adsb.one's row is hidden in the HUD (Cloudflare block on the whole
+  // upstream subdomain — see CLAUDE.md) but its toggle/wiring still exist
+  // underneath. Playwright's page.click() (even with force: true) can't
+  // click a display:none element at all — it has no layout box to compute
+  // coordinates from — so invoke the native DOM click directly instead.
+  // Enabling it puts all four radius sources live for this dedup check
+  // (adsb.lol ships on already).
+  await page.evaluate(() => document.getElementById('toggle-adsbone').click());
   await page.waitForTimeout(600);
 
   // Priority OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live: adsb.fi
