@@ -12,3 +12,4 @@ playwright-report/
 .identity_history.jsonl
 .users.jsonl
 .collections.jsonl
+PROD_INFRA_NOTES.md
