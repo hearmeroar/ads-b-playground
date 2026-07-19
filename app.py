@@ -540,7 +540,11 @@ def health():
 
 @app.route("/")
 def index():
-    return "<h1>Hello from Railway!</h1>"
+    try:
+        with open("static/index.html", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "<h1>Hello from Railway!</h1><p>static/index.html not found</p>"
 
 
 @app.route("/api/config")
