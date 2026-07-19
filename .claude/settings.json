@@ -51,7 +51,16 @@
       "WebFetch(domain:pictogrammers.com)",
       "WebSearch",
       "Bash(.venv/bin/gunicorn app:app --bind 127.0.0.1:5000)",
-      "Bash(.venv/bin/gunicorn app:app --bind 127.0.0.1:5001)"
+      "Bash(.venv/bin/gunicorn app:app --bind 127.0.0.1:5001)",
+      "Bash(killall ControlCenter)",
+      "Bash(defaults read *)",
+      "Bash(blueutil off *)",
+      "Bash(launchctl unload *)",
+      "Bash(killall ControlCenter SystemUIServer)",
+      "Bash(gh run *)",
+      "Bash(flyctl auth *)",
+      "Bash(git rm *)",
+      "Bash(git revert *)"
     ],
     "deny": [
       "Bash(rm -rf *)",
