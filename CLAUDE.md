@@ -2197,31 +2197,57 @@ of registration order, so there's no route-ordering pitfall here.
 marker glyph recolored solid orange/blue on a transparent background — the
 project owner then asked for a filled colored background, a white
 silhouette, and specifically a *takeoff* pose (plane climbing away from
-the ground), not the flat top-down marker glyph. Rebuilt as a 200×200
-rounded-square (`rx="40"`, i.e. ~20% corner radius, the standard flat
-"app icon" look) filled with the same per-environment color, with
+the ground), not the flat top-down marker glyph. Rebuilt as a rounded
+square (~20% corner radius, the standard flat "app icon" look) filled with
+the per-environment color, with
 [Pictogrammers MDI](https://pictogrammers.com/library/mdi/icon/airplane-takeoff/)'s
 `airplane-takeoff` glyph (Apache-2.0, fetched from
 `unpkg.com/@mdi/svg/svg/airplane-takeoff.svg` — the same icon family
 already vendored in this app for `GROUP_ICONS`, see the sidebar section
-above) in solid white, nested via a child `<svg x y width height
-viewBox="0 0 24 24">` inside the outer 200×200 one so the 24-unit glyph
-auto-scales/centers into a padded 132×132 region (34px inset each side)
-with no manual coordinate math. Its diagonal climb-away-from-a-ground-line
-shape reads clearly even shrunk to an actual 32×32 favicon (checked before
-finalizing, via `qlmanage -t -s 32`) — the deciding factor over the
-project's own hand-drawn marker glyphs, none of which depict a takeoff
-pose. `static/favicon-dev.png`/`static/favicon-prod.png` are this design
-rendered once **offline** (macOS `qlmanage -t -s 180 <file>.svg`, a
-Quick-Look-thumbnail trick, not a project dependency — any SVG-to-PNG tool
-works) at 180×180 with a transparent surround (the rounded corners aren't
-opaque), then committed as plain binary assets — the same "vendored, not
-generated at request time" pattern already used for
-`static/ADS-B_Radar_Free_Aircraft_SVG_Icons/`/`static/flag-icons/`.
-Regenerate them by hand (edit the source `<rect>`/`<path>` SVG, re-run the
-same `qlmanage` command) if the glyph, colors, or corner radius ever
-change — there's no build step or script for this checked into the repo,
-consistent with the rest of the project's "no build step" convention.
+above) in solid white — its diagonal climb-away-from-a-ground-line shape
+reads clearly even shrunk to an actual 32×32 favicon (checked before
+finalizing at every stage), the deciding factor over the project's own
+hand-drawn marker glyphs, none of which depict a takeoff pose.
+
+**Artwork, third iteration — rendering pipeline swap, not a design
+change**: the second iteration was first rendered via macOS's `qlmanage -t`
+(a Quick-Look-thumbnail trick, chosen because it needs no new dependency)
+— but `qlmanage` turned out to **flatten the transparent corners to opaque
+white** instead of preserving alpha (confirmed by sampling corner pixels:
+`(255,255,255,255)`, not `(0,0,0,0)`), which the project owner spotted as a
+visible white halo around the icon in the browser tab. `qlmanage` is a
+Quick-Look thumbnailer, not a real asset-export tool, and apparently
+composites onto a white backdrop regardless of the source SVG's own
+transparency — not something any SVG/PNG flag fixes. Separately, the
+project owner also asked for a bigger glyph relative to the background.
+Both prompted swapping the render step to a **from-scratch Python
+rasterizer** (Pillow + `svgelements`, `pip install`ed into `.venv` — the
+only two new dependencies this feature has ever needed, and only for
+**offline asset generation**, never imported by `app.py` at runtime):
+`svgelements.Path` parses the MDI glyph's `d` attribute and flattens its
+line/cubic-bezier segments into polygons (`ImageDraw.polygon`, sampled at
+24 points per curve — plenty smooth at this size); the rounded-square
+background is drawn with `ImageDraw.rounded_rectangle` directly into a
+**true RGBA canvas** (`Image.new("RGBA", ..., (0,0,0,0))`) so the corners
+outside the rounded rect stay genuinely alpha-0, not merely "look
+transparent in one previewer." Everything is rendered at 4× supersampling
+(800×800) and downsampled with `Image.LANCZOS` for antialiased edges, then
+resized to the final 180×180. The glyph now fills ~74% of the canvas
+(`icon_scale_pct=0.74` in the render script, up from the second
+iteration's ~66%) per the "plane can be bigger" request — sized against
+the smallest real target (a 32×32 favicon) before finalizing, same
+discipline as the previous iteration. `static/favicon-dev.png`/
+`static/favicon-prod.png` are this script's output, committed as plain
+binary assets — the same "vendored, not generated at request time" pattern
+already used for `static/ADS-B_Radar_Free_Aircraft_SVG_Icons/`/
+`static/flag-icons/`; the render script itself is a scratch tool, not
+checked into the repo (consistent with the project's "no build step"
+convention — regenerating these two PNGs is a rare, manual, by-hand
+operation, not something the running app or its test suite ever needs to
+do). Regenerate by hand (recreate the Pillow/svgelements script, or use
+any SVG-to-PNG tool that honestly preserves alpha — verify with a corner
+pixel sample before trusting it) if the glyph, colors, corner radius, or
+scale ever change again.
 
 ## Conventions
 
