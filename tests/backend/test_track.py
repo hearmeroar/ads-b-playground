@@ -63,6 +63,31 @@ def test_network_error_no_cache_returns_502(client, mock_get):
     assert resp.status_code == 502
 
 
+def test_network_error_opens_outage_breaker_for_subsequent_requests(client, mock_get):
+    mock_get.side_effect = requests.ConnectionError("boom")
+    client.get("/api/track/xyz")
+    assert mock_get.call_count == 1
+
+    resp = client.get("/api/track/xyz")
+    assert resp.status_code == 502
+    assert resp.get_json()["error"] == "opensky_unreachable"
+    mock_get.assert_called_once()  # second request didn't touch the network at all
+
+
+def test_outage_breaker_is_shared_with_states_endpoint(client, mock_get):
+    # /api/states and /api/track/<icao24> hit the same opensky-network.org
+    # host, so a failure on one should back off the other too, not just
+    # requests to the same route.
+    mock_get.side_effect = requests.ConnectionError("boom")
+    client.get("/api/states")
+    assert mock_get.call_count == 1
+
+    resp = client.get("/api/track/xyz")
+    assert resp.status_code == 502
+    assert resp.get_json()["error"] == "opensky_unreachable"
+    mock_get.assert_called_once()  # track request also skipped the network
+
+
 def test_successful_fetch_persists_to_disk(client, mock_get):
     mock_get.return_value = make_response(json_data={"path": [[1, 2, 3]]})
     client.get("/api/track/abc123")

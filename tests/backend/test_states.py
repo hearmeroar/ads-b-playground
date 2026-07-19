@@ -86,3 +86,35 @@ def test_network_error_no_cache_returns_502(client, mock_get):
     mock_get.side_effect = requests.ConnectionError("boom")
     resp = client.get("/api/states")
     assert resp.status_code == 502
+
+
+def test_network_error_opens_outage_breaker_for_subsequent_requests(client, mock_get):
+    # A real production incident (2026-07-19): opensky-network.org itself
+    # was unreachable, and every incoming poll re-attempted the network call
+    # (the cache timestamp is never bumped on failure) — each one blocking a
+    # gunicorn thread for a full connect-timeout, which exhausted the thread
+    # pool under concurrent load. After one failure, later requests within
+    # the cooldown must skip the network call entirely.
+    mock_get.side_effect = requests.ConnectionError("boom")
+    client.get("/api/states")
+    assert mock_get.call_count == 1
+
+    resp = client.get("/api/states")
+    assert resp.status_code == 502
+    assert resp.get_json()["error"] == "opensky_unreachable"
+    mock_get.assert_called_once()  # second request didn't touch the network at all
+
+
+def test_outage_breaker_recovers_after_cooldown(client, mock_get, monkeypatch):
+    mock_get.side_effect = requests.ConnectionError("boom")
+    client.get("/api/states")
+    assert mock_get.call_count == 1
+
+    app._opensky_outage["until"] = 0.0  # simulate the cooldown having elapsed
+    mock_get.side_effect = None
+    mock_get.return_value = make_response(json_data={"states": [["recovered"]]})
+
+    resp = client.get("/api/states")
+    assert resp.status_code == 200
+    assert resp.get_json()["states"][0][0] == "recovered"
+    assert mock_get.call_count == 2

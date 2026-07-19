@@ -153,6 +153,25 @@ for `TOKEN_RETRY_COOLDOWN` (60s) so a genuinely down auth server isn't
 retried — and its 10s connect-timeout re-eaten — on every single poll from
 every client; the next call after the cooldown tries again in case the
 server recovered.
+**The same production incident also turned out to affect `opensky-network.org`
+itself**, not just the auth subdomain — once the auth fallback above shipped,
+`/api/states` started failing with a *different* connect-timeout, this time
+to `opensky-network.org` (the states/tracks API host), while the four radius
+sources on entirely different hosts kept responding normally. Since neither
+`_cache["ts"]` nor `_track_cache[icao24]["ts"]` is updated on a failed fetch,
+every single incoming poll from every open tab re-attempted the network call
+in parallel, each blocking a gunicorn thread for up to 10s — concurrent
+enough to exhaust the whole thread pool and make the app unresponsive well
+beyond just the OpenSky-backed endpoints. `_opensky_outage`/
+`_opensky_unreachable()`/`_mark_opensky_outage()` add the same circuit-
+breaker one level up: a failed `/api/states` or `/api/track` fetch opens a
+shared `OPENSKY_OUTAGE_COOLDOWN` (30s) window — shorter than the token's 60s
+since states polling drives visible UI and should recover faster — during
+which *both* routes skip the network call entirely and return the
+error/stale-cache response immediately, instead of each independently
+re-discovering the same outage. Shared between the two routes rather than
+tracked per-route, since they're the same host/network path — an outage on
+one reliably means the other will fail the same way.
 
 **The four radius sources** — adsb.fi (`/api/adsbfi` →
 `opendata.adsb.fi/api/v3/lat/.../lon/.../dist/...`, see

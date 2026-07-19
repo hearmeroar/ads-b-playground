@@ -235,6 +235,29 @@ _token = {"value": None, "expires_at": 0.0, "retry_at": 0.0}
 # otherwise stall every poll. Back off for this long before trying again.
 TOKEN_RETRY_COOLDOWN = 60
 
+# Same circuit-breaker idea, one level up: if opensky-network.org itself
+# (not just the auth subdomain) is unreachable, /api/states and /api/track
+# share this cooldown so neither keeps re-attempting the network call (and
+# eating its own 10s connect-timeout) on every single incoming request while
+# it's down. Observed in production (2026-07-19): with the cache never
+# updating on failure, every poll from every open tab kept retrying in
+# parallel, each blocking a gunicorn thread for up to 10s — enough
+# concurrent stuck requests exhausted the thread pool and made the whole
+# app (including the unrelated radius sources) unresponsive, not just the
+# OpenSky-backed endpoints. Shared between states and track since they're
+# the same host/network path — an outage on one means the other will fail
+# the same way.
+OPENSKY_OUTAGE_COOLDOWN = 30
+_opensky_outage = {"until": 0.0}
+
+
+def _opensky_unreachable(now):
+    return now < _opensky_outage["until"]
+
+
+def _mark_opensky_outage(now):
+    _opensky_outage["until"] = now + OPENSKY_OUTAGE_COOLDOWN
+
 # Per-aircraft cache for /api/track/<icao24>. OpenSky's /tracks/* endpoint has
 # its own, far stingier credit bucket than /states/* (one charge per aircraft
 # per fetch, vs. one shared charge for the whole map), so the track quota drains
@@ -583,12 +606,33 @@ def api_config():
     return jsonify({"center": AREA_CENTER, "zoom": AREA_ZOOM, "radius_nm": AREA_RADIUS_NM})
 
 
+def _states_error_response(message):
+    if _cache["data"] is not None:
+        stale = dict(_cache["data"])
+        stale["stale"] = True
+        stale["error"] = message
+        return jsonify(stale)
+    return jsonify({"states": [], "error": message}), 502
+
+
+def _track_error_response(cached, message):
+    if cached:
+        stale = dict(cached["data"])
+        stale["stale"] = True
+        stale["error"] = message
+        return jsonify(stale)
+    return jsonify({"path": [], "error": message}), 502
+
+
 @app.route("/api/states")
 def api_states():
     now = time.time()
 
     if _cache["data"] is not None and now - _cache["ts"] < MIN_INTERVAL:
         return jsonify(_cache["data"])
+
+    if _opensky_unreachable(now):
+        return _states_error_response("opensky_unreachable")
 
     try:
         resp = fetch_states()
@@ -621,12 +665,8 @@ def api_states():
         return jsonify(payload)
 
     except requests.RequestException as exc:
-        if _cache["data"] is not None:
-            stale = dict(_cache["data"])
-            stale["stale"] = True
-            stale["error"] = str(exc)
-            return jsonify(stale)
-        return jsonify({"states": [], "error": str(exc)}), 502
+        _mark_opensky_outage(now)
+        return _states_error_response(str(exc))
 
 
 @app.route("/api/track/<icao24>")
@@ -636,6 +676,9 @@ def api_track(icao24):
 
     if cached and now - cached["ts"] < TRACK_MIN_INTERVAL:
         return jsonify(cached["data"])
+
+    if _opensky_unreachable(now):
+        return _track_error_response(cached, "opensky_unreachable")
 
     try:
         # time=0 asks OpenSky for the track of the flight currently (or most
@@ -672,12 +715,8 @@ def api_track(icao24):
         return jsonify(payload)
 
     except requests.RequestException as exc:
-        if cached:
-            stale = dict(cached["data"])
-            stale["stale"] = True
-            stale["error"] = str(exc)
-            return jsonify(stale)
-        return jsonify({"path": [], "error": str(exc)}), 502
+        _mark_opensky_outage(now)
+        return _track_error_response(cached, str(exc))
 
 
 def cached_radius_source(url, cache, min_interval, headers=None, params=None, empty_payload=None):

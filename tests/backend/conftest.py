@@ -21,6 +21,8 @@ def reset_caches(monkeypatch, tmp_path):
     app._cache.update({"data": None, "ts": 0.0})
     app._token.clear()
     app._token.update({"value": None, "expires_at": 0.0, "retry_at": 0.0})
+    app._opensky_outage.clear()
+    app._opensky_outage.update({"until": 0.0})
     app._track_cache.clear()
     # Redirect the persistent track cache to a throwaway file so tests never
     # touch (or accumulate into) the repo's real .track_cache.json.
