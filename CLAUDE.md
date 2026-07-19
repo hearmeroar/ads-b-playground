@@ -191,6 +191,15 @@ a blocked OpenSky from degrading the rest of the app. If this deployment
 ever moves off a hyperscaler's IP range, OpenSky may start working again
 with zero code changes — the auth-fallback and outage-breaker logic above
 stay correct either way.
+**Update, same day**: confirmed OpenSky reachable again from this exact
+Northflank deployment a few hours later — a live `/api/states` request
+returned real state vectors and `rate_limit_remaining`, no stale/error
+flags. The hyperscaler block is evidently intermittent on OpenSky's end,
+not a fixed, permanent property of this deployment as first assumed —
+treat "accepted as permanent" above as superseded. Don't rule out OpenSky
+when debugging just because of this history, and don't be surprised if it
+goes silent again later — that's exactly the scenario the auth-fallback
+and outage-breaker logic above already handle gracefully either way.
 
 **The four radius sources** — adsb.fi (`/api/adsbfi` →
 `opendata.adsb.fi/api/v3/lat/.../lon/.../dist/...`, see

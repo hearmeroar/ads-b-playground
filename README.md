@@ -209,16 +209,21 @@ IDENTITY_HISTORY_FILE=/data/.identity_history.jsonl
 No code change is required — every one of these already reads its path from
 the environment.
 
-**OpenSky specifically won't work from Northflank (or any Google Cloud/AWS/
-other hyperscaler-hosted deployment)**: OpenSky's own FAQ states they may
-block hyperscaler IP ranges outright due to abuse, and this was confirmed
-live from a Northflank pod — DNS resolves fine and unrelated hosts connect
-in well under a second, but a raw TCP connect to `opensky-network.org`
-times out on both port 80 and 443, meaning the connection is being dropped
-at OpenSky's end, not failing locally. The app degrades gracefully (see
-`app.py`'s outage circuit-breaker) rather than this taking the rest of the
-app down with it, but the OpenSky source itself will simply stay empty on
-a hyperscaler deployment. It works fine running locally or on non-
+**OpenSky may be intermittently blocked from Northflank (or any Google
+Cloud/AWS/other hyperscaler-hosted deployment)**: OpenSky's own FAQ states
+they may block hyperscaler IP ranges outright due to abuse, and this was
+confirmed live from a Northflank pod — DNS resolves fine and unrelated
+hosts connect in well under a second, but a raw TCP connect to
+`opensky-network.org` timed out on both port 80 and 443, meaning the
+connection was being dropped at OpenSky's end, not failing locally. The
+app degrades gracefully (see `app.py`'s outage circuit-breaker) rather than
+this taking the rest of the app down with it, so the OpenSky source simply
+goes empty rather than breaking anything else when this happens. That said,
+the block is evidently intermittent, not permanent: the same deployment was
+confirmed reachable again a few hours after being diagnosed as blocked, on
+the same day — so treat "OpenSky is down" and "OpenSky is up" as both
+possible on a hyperscaler deployment at any given time, not a fixed
+one-or-the-other verdict. It's unaffected running locally or on non-
 hyperscaler hosting; the other five sources (adsb.fi, adsb.lol, adsb.one,
 airplanes.live, FlightAware) are unaffected everywhere.
 
