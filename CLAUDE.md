@@ -89,6 +89,12 @@ npx playwright install chromium   # one-time
 npx playwright test
 ```
 
+Both suites also run automatically on every push/PR via GitHub Actions
+(`.github/workflows/tests.yml`, added 2026-07-20) — before this, 300+
+already-written tests existed but nothing ran them without a human
+remembering to, at a commit cadence (dozens/day during active work) where
+that's an easy thing to forget.
+
 ## Architecture
 
 **Why there's a backend at all:** OpenSky does not send CORS headers for
@@ -592,6 +598,115 @@ API key:
   refreshFunction)` to attach the click-to-toggle listener alongside the
   existing weather layer wiring. Follow the Precipitation/Forecast/SIGMET/METAR
   implementation as a template.
+
+**Airports layer** (`#toggle-airports` in the HUD, `static/js/map-init.js`'s
+Airports section, `enrichment/airports.py`'s `list_map_airports()`/
+`airports_in_bbox()`, `/api/airports` in `app.py`): renders every airport —
+large/medium/small airports, heliports, seaplane bases, balloonports —
+worldwide as map markers, off by default like every other optional overlay.
+- **Source: [OurAirports](https://ourairports.com/data/)**, not the
+  OpenFlights table `enrichment/airports.py` already used for the
+  collection's nearest-airport lookup — chosen specifically because
+  OurAirports classifies each row's `type` (`large_airport`/
+  `medium_airport`/`small_airport`/`heliport`/`seaplane_base`/
+  `balloonport`/`closed`), which OpenFlights' `airports.dat` doesn't, and
+  that classification is what lets the layer size/style markers by real
+  significance and skip defunct airports. Public domain (CC0), updated
+  nightly, plain CSV on GitHub
+  (`https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv`)
+  — no signup, no API key, the same constraint that has picked every other
+  data source in this app. Vendored as `enrichment/data/ourairports.json`
+  (85,776 entries, ~16 MB, generated the same one-off/uncommitted-script
+  convention as `opensky_year_built.json`) — see
+  `enrichment/airports.py`'s module docstring for the exact regeneration
+  steps and field list (`ident, type, name, lat, lon, elevation_ft,
+  country, municipality, iata, icao`).
+- **Global by explicit product decision, not trimmed to this app's own
+  coverage area**: an earlier draft of this feature pre-filtered the
+  *stored* dataset to a 600 km radius around `AREA_CENTER`, matching every
+  other area-scoped feature in this app — reverted after the project owner
+  asked for every airport to be available, not a curated regional slice.
+  This makes `ourairports.json` by far the largest vendored dataset here
+  (~16 MB vs. `opensky_year_built.json`'s 3.3 MB, the previous largest).
+  `list_map_airports(include_closed=False)` drops `closed` airports by
+  default (showing a defunct airport as if active would be misleading) —
+  a judgment call the function makes so callers don't have to remember it.
+  Each entry's raw `country` field is OurAirports' own 2-letter ISO code,
+  not a display name — `list_map_airports()` adds a `country_name` key via
+  `country_by_iso()` (`enrichment/countries.py`, the same lookup the
+  aircraft sidebar's own country rows already use), so the map popup below
+  isn't stuck showing a bare code next to the flag.
+- **What reaches the browser is scoped to the current viewport, not the
+  whole dataset**: `/api/airports` accepts a `bbox` query param
+  (`lamin,lomin,lamax,lomax`, same shape this app's own `BBOX` constant
+  already uses for outbound METAR/SIGMET calls) and calls
+  `airports_in_bbox()`, falling back to this app's own home-region `BBOX`
+  when `bbox` is missing/malformed. The frontend sends `map.getBounds()`
+  on toggle-on and again on every `moveend` (debounced
+  `AIRPORTS_FETCH_DEBOUNCE_MS`, 500ms, so a drag/zoom gesture doesn't
+  hammer the backend mid-gesture) — panning from one region to another
+  swaps in that region's airports, the same "only load what's in view" idea
+  as any tile layer, without ever shipping the ~16 MB global dataset to the
+  browser at once. Airport positions don't change during a session, so
+  there's no periodic refresh timer here (unlike the weather layers above)
+  — only the viewport moving triggers a re-fetch. No caching on the
+  backend side either: `airports_in_bbox()` makes zero I/O calls (a plain
+  in-memory list comprehension), the same "nothing external to protect
+  with a TTL" rationale as `/api/identity/<icao24>`.
+- **Marker clustering is still needed even with viewport scoping**: a
+  zoomed-out view (a whole country or continent) can still hold thousands
+  of airports/heliports in view at once. `Leaflet.markercluster` (MIT,
+  vendored at `static/leaflet-markercluster/` — `leaflet.markercluster.js`
+  + `MarkerCluster.css` + `MarkerCluster.Default.css` + `LICENSE`, same
+  one-time-copy-from-the-npm-package convention as `static/leaflet/`
+  itself) groups nearby markers into a numbered bubble that expands as the
+  user zooms in. `airportsState.clusterGroup` is one
+  `L.markerClusterGroup({ clusterPane: 'airportPane', maxClusterRadius: 60
+  })`, cleared and repopulated on every `refreshAirportsInView()` call
+  rather than diffed/reused like `syncMarkers()` does for aircraft — airport
+  data for a given viewport is small and fetched fresh each time, so there's
+  no per-marker state (heading, selection) worth preserving across a refresh.
+- **Dedicated Leaflet pane** (`airportPane`, z-index 460): sits between
+  `overlayPane` (400, scan-radius rings/SIGMET polygons/METAR markers) and
+  `groundPane` (450, ground-vehicle markers) below, and `markerPane` (600,
+  real aircraft) above — an airport pin should never visually compete with
+  an aircraft actually sitting over it. Both individual airport markers
+  (`pane: 'airportPane'` in their own options) and the cluster group's own
+  bubble icon (`clusterPane: 'airportPane'`) use it — `clusterPane` only
+  covers the *cluster* icon; child markers keep whatever pane their own
+  marker options specify, so both had to be set explicitly.
+- **Icons** (`static/js/icons.js`): two Material Design Icons glyphs
+  (pictogrammers.com/MaterialDesign, Apache-2.0, same vendoring convention
+  as `GROUP_ICONS`/the favicon) — a generic airport pin (`AIRPORT_GLYPH`)
+  for every type except heliports, and a distinct helicopter glyph
+  (`HELIPORT_GLYPH`) for `heliport` — visually and operationally different
+  enough to want telling apart at a glance rather than reusing the same
+  pin. Fixed neutral slate color (`AIRPORT_MARKER_COLOR`, `#475569`), not
+  source-colored — like `towerIcon()`, an airport is static ground
+  infrastructure, not a "source" of aircraft data. Never rotated (`0`
+  heading, same idiom `towerIcon()` already uses). Icon size scales with
+  real-world significance (`AIRPORT_ICON_SIZES` — large airports render
+  biggest, small strips/heliports/balloonports smallest) rather than every
+  type looking identical regardless of size, the same idea as varying line
+  weight on a paper aviation chart. `.plane-icon:not(.surface-obstacle-icon):not(.airport-icon)`
+  in `style.css` opts airport markers out of the drop-shadow filter every
+  rotating aircraft icon gets — a cast shadow reads oddly on a flat ground
+  marker.
+- **Popup, not a sidebar**: clicking an airport marker opens a plain
+  Leaflet popup (`airportPopupHtml()`) with the name, type label, IATA/ICAO
+  codes, municipality/country (with a flag via the existing `flagHtml()`
+  from `render-details.js`), and elevation — the same pattern METAR/SIGMET
+  markers already use, not the aircraft sidebar (`#sidebar`), since an
+  airport isn't a trackable, selectable entity the way an aircraft is.
+  Values are HTML-escaped (`escapeHtml()`) before interpolation, since
+  `name`/`municipality` originate from a community-maintained external
+  dataset.
+- **Help popover**: follows the same required `(?)` click-to-toggle pattern
+  as the weather layers (`#airports-help`/`#airports-help-popover`,
+  `refreshAirportsHelp()` in `main.js`, wired via the shared
+  `wireHelpPopover()`) even though this isn't a weather layer — the pattern
+  is the house style for any toggleable map layer with source/caveat
+  details worth explaining on demand, not weather-specific.
 
 **Aircraft photos, two sources, Planespotters primary + airport-data.com
 top-up** (`app.py`):
@@ -1240,44 +1355,24 @@ because photographer name and photo URL come from an external API.
   `env.allow_update` config and their own `Authorization` token, which this
   app has no access to and no reason to seek), not something a consumer of
   their read API can use.
-  - **Persistent aircraft-identity cache** (`_identity_cache`,
-    `IDENTITY_CACHE_FILE`/`.aircraft_identity_cache.jsonl`,
-    `IDENTITY_HISTORY_FILE`/`.identity_history.jsonl`): a backend-only
-    side-effect persistence layer (its only frontend-visible surface is
-    the dev-mode stats line below, not a full API) — the deliberately
-    narrow slice of a much broader "aircraft
-    identity intelligence layer" idea (persistent identity + history +
-    observations graph) discussed and rejected at that full scope for this
-    project (no ground truth registry to validate confidence against, no
-    relational query need yet, and the space is already occupied by
-    entrenched players like ch-aviation/Cirium/airframes.org who have
-    decades of curation and registry licensing this project doesn't).
-    What survives: whenever `fetch_adsbdb()` resolves a real `aircraft`
-    object on a fresh (non-cached) upstream fetch, `_update_identity_cache()`
-    merges four *airframe-level* fields — `registration`, `manufacturer`,
-    `type`, `registered_owner` — into `_identity_cache[icao24]`, persisted
-    to disk with the same atomic-write pattern as `_track_cache`/
-    `TRACK_CACHE_FILE` (`_load_identity_cache()` runs at import,
-    `_save_identity_cache()` rewrites the file after each update), just
+  - **Persistent aircraft-identity cache** (`storage.py`'s `identity_cache`/
+    `identity_history` SQLite tables): a backend-only side-effect
+    persistence layer (its only frontend-visible surface is the dev-mode
+    stats line below, not a full API) — the deliberately narrow slice of a
+    much broader "aircraft identity intelligence layer" idea (persistent
+    identity + history + observations graph) discussed and rejected at
+    that full scope for this project (no ground truth registry to validate
+    confidence against, no relational query need yet, and the space is
+    already occupied by entrenched players like ch-aviation/Cirium/
+    airframes.org who have decades of curation and registry licensing this
+    project doesn't). What survives: whenever `fetch_adsbdb()` resolves a
+    real `aircraft` object on a fresh (non-cached) upstream fetch,
+    `storage.update_identity()` merges four *airframe-level* fields —
+    `registration`, `manufacturer`, `type`, `registered_owner` — into that
+    aircraft's row, upserted via SQLite's `ON CONFLICT ... DO UPDATE`, just
     without a TTL — identity facts don't expire the way a flight track
-    does, so the file only grows by one entry per distinct aircraft ever
-    resolved, not per poll. **One JSON object per line** (`{"icao24":,
-    ...fields}`), not one giant single-line blob like `_track_cache`'s own
-    file — the same readable/diffable-by-hand JSONL convention
-    `IDENTITY_HISTORY_FILE` already used, applied here too after the
-    project owner asked for it explicitly. **Refactored 2026-07-20**: this
-    atomic-write idiom (tmp file + `os.replace`, parse-and-skip-corrupt-lines
-    on read) used to be copy-pasted three times — here, in `_load_users`/
-    `_save_users`, and in `_load_collections`/`_save_collections` — each
-    with its own hand-written `open()`/`readlines()`/`json.loads()` loop.
-    Factored into two shared helpers, `_read_jsonl(path)` (returns a list of
-    parsed dicts, `[]` for a missing file, skipping corrupt lines) and
-    `_write_jsonl(path, records)` (the atomic write) — each `_load_*`/
-    `_save_*` function keeps its own per-entry validation and key shape
-    (`_identity_cache`/`_users` are dicts keyed by `icao24`/`sub`;
-    `_collections` is a plain list), since that part genuinely differs
-    between the three stores; only the file IO itself was actually
-    duplicated. `flightroute`'s own fields
+    does, so the table only grows by one row per distinct aircraft ever
+    resolved, not per poll. `flightroute`'s own fields
     (`registered_owner_country_name`, and especially `airline`/operator)
     are deliberately excluded from this cache — they're properties of a
     specific flight/callsign, not the airframe itself, and can legitimately
@@ -1285,21 +1380,31 @@ because photographer name and photo URL come from an external API.
     plane" with "who's operating this particular flight." A null incoming
     value never overwrites a previously known one (adsbdb responses are
     sometimes partial). When a tracked field *does* change to a different
-    non-null value, one line is appended to `IDENTITY_HISTORY_FILE`
-    (`{icao24, field, old, new, ts}`) before the cache is overwritten —
-    the only "history" this layer keeps, a flat append-only log rather
-    than a versioned entity graph. This is intentionally the entire scope
-    of Phase 1 from that discussion; phases 2 (merging in external
-    registries) and 3 (a full identity-graph product) are not planned.
-    **`/api/identity/stats`** (a static route registered ahead of the
-    dynamic `/api/identity/<icao24>` below, though Werkzeug would resolve
-    the static path correctly either way) exposes this layer's two raw
-    counters — `identity_count` (`len(_identity_cache)`) and
-    `history_count` (a line count of `IDENTITY_HISTORY_FILE`, recomputed
-    from disk on each request rather than kept as a separately-maintained
-    in-memory counter that could drift) — for the dev-mode-only frontend
-    panel below. Deliberately uncached, same rationale as
-    `/api/identity/<icao24>` itself.
+    non-null value, one row is inserted into `identity_history`
+    (`icao24, field, old_value, new_value, ts`) before the `identity_cache`
+    row is overwritten — the only "history" this layer keeps, a flat
+    append-only log rather than a versioned entity graph. This is
+    intentionally the entire scope of Phase 1 from that discussion; phases
+    2 (merging in external registries) and 3 (a full identity-graph
+    product) are not planned. **`/api/identity/stats`** (a static route
+    registered ahead of the dynamic `/api/identity/<icao24>` below, though
+    Werkzeug would resolve the static path correctly either way) exposes
+    this layer's two raw counters — `identity_count`
+    (`storage.identity_count()`, a `SELECT COUNT(*)`) and `history_count`
+    (`storage.identity_history_count()`, same) — for the dev-mode-only
+    frontend panel below. Deliberately uncached, same rationale as
+    `/api/identity/<icao24>` itself — a local SQLite `COUNT(*)` on a table
+    this small costs nothing worth caching.
+    **Migrated off JSONL files to SQLite (2026-07-20)** — see "Durable
+    storage is SQLite, not per-store JSONL files" further down (in the
+    Aircraft collection section) for the full rationale: this table used
+    to be a per-process Python dict (`_identity_cache`) loaded once from
+    `.aircraft_identity_cache.jsonl` at import and rewritten whole on every
+    update, which silently diverged between this app's two gunicorn worker
+    processes. `migrate_jsonl_to_sqlite.py` is the one-off script that
+    imports an existing deployment's old JSONL files (including
+    `.identity_history.jsonl`) into the new database; see the Aircraft
+    collection section for how to run it.
   - **Background identity backfill** (`_collect_visible_icao24s()`,
     `_backfill_queue`, `_identity_backfill_tick()`,
     `_start_identity_backfill_thread()`): the cache above only ever grew
@@ -1314,21 +1419,22 @@ because photographer name and photo URL come from an external API.
     radius sources), which the frontend's own poll cycle keeps warm anyway;
     FlightAware's cache is skipped (flight-centric, no ICAO24 field).
     `_identity_backfill_tick()` refills `_backfill_queue` from that set
-    minus whatever's already in `_identity_cache` whenever the queue runs
-    dry, and resolves exactly one aircraft per call via `_resolve_adsbdb()`
-    (the plain, non-Flask-response half of `fetch_adsbdb()` — split
-    specifically so this can be called from a background thread with no
-    request/app context) — skipping it instead if a real click already
-    resolved it since being queued. `_start_identity_backfill_thread()`
-    runs this once every `IDENTITY_BACKFILL_INTERVAL` seconds (env var,
-    default 5; `<= 0` disables the whole feature) in a daemon thread — a
-    few seconds apart, so it never competes meaningfully with real user
-    traffic to adsbdb. **Only ever started from the `if __name__ ==
-    "__main__":` block**, immediately before `app.run(...)` — never at
-    plain module import time (unlike `_load_track_cache()`/
-    `_load_identity_cache()`, which are harmless file reads) — so
-    importing `app` in the test suite never spins up a real thread hitting
-    the network. Guarded by `_should_start_background_thread()` against
+    minus whatever `storage.identity_known_icaos()` already has whenever
+    the queue runs dry, and resolves exactly one aircraft per call via
+    `_resolve_adsbdb()` (the plain, non-Flask-response half of
+    `fetch_adsbdb()` — split specifically so this can be called from a
+    background thread with no request/app context) — skipping it instead
+    if a real click already resolved it since being queued. `_start_
+    identity_backfill_thread()` runs this once every
+    `IDENTITY_BACKFILL_INTERVAL` seconds (env var, default 5; `<= 0`
+    disables the whole feature) in a daemon thread — a few seconds apart,
+    so it never competes meaningfully with real user traffic to adsbdb.
+    **Only ever started from the `if __name__ == "__main__":` block**,
+    immediately before `app.run(...)` — never at plain module import time
+    (unlike `_load_track_cache()`/`storage.init_db()`, which are harmless
+    file/schema reads) — so importing `app` in the test suite never spins
+    up a real thread hitting the network. Guarded by
+    `_should_start_background_thread()` against
     Flask's debug-mode reloader, which re-execs the whole process into a
     "watcher" parent (imports `app.py`, `app.debug` True, `WERKZEUG_RUN_MAIN`
     unset — starts nothing) and a child that actually serves requests
@@ -2057,50 +2163,95 @@ because photographer name and photo URL come from an external API.
     file for the exact list; running the app on any other port breaks
     the Google login flow even though everything else about the app
     works fine on an arbitrary port.
-  - **Users store** (`_users`, `USERS_FILE`/`.users.jsonl`): same atomic
-    tmp-file-then-`os.replace` JSONL idiom as `_identity_cache`/
-    `IDENTITY_CACHE_FILE` above — `_load_users()`/`_save_users()` mirror
-    `_load_identity_cache()`/`_save_identity_cache()` line for line, just
-    keyed by Google's `sub` (a stable unique id) rather than `icao24`.
-    **No password is ever stored** — Google's own consent screen is the
-    only credential check; the stored record is just `{sub, email, name,
-    picture, created_ts}`. `/api/login/google/callback` creates or updates
-    that record on every successful login (so a changed Google display
-    name/photo is picked up next login) and sets `session["user_id"]`;
-    `/api/logout` clears it; `/api/me` reflects the current session's user
-    (or `{"user": null}` when logged out).
-  - **Collection store** (`_collections`, `COLLECTIONS_FILE`/
-    `.collections.jsonl`): one shared JSONL file (not split per user),
-    filtered by `user_id` on read — mirrors `_identity_cache`'s "one dict,
-    filter per request" shape rather than multiplying file-handling code
-    across N per-user files. Each card is `{id, user_id, icao24, saved_at,
-    snapshot, photo_url, photo_link, photo_photographer}`; `id` is a
-    server-generated `uuid.uuid4().hex`. **One `icao24` = one card per
-    user** (re-approved 2026-07-18, superseding the original "each save is
-    its own card" design): `api_collection_save()` looks up an existing
-    card by `(user_id, icao24)` and updates its snapshot/photo/`saved_at`
-    in place (200) rather than appending a duplicate (201 only for a truly
-    new aircraft) — this is what makes the sidebar's save button a simple
-    filled/outline toggle rather than an ambiguous "which of N saved
-    copies" question.
-  - **Persistence across devices and deploys**: `_users`/`_collections`
-    (like `_track_cache`/`_identity_cache` above) are keyed by account
-    (`user_id`, Google's `sub`), not by device or session — logging in
-    from any device against the *same running backend* already sees the
-    same collection, with no extra work needed. The actual persistence
-    boundary is the backend process's own local disk: `USERS_FILE`/
-    `COLLECTIONS_FILE` (like every other `*_FILE` env var in this app —
-    `TRACK_CACHE_FILE`, `IDENTITY_CACHE_FILE`, `IDENTITY_HISTORY_FILE`)
-    default to a plain relative path (`.users.jsonl`, `.collections.jsonl`,
-    ...) written next to `app.py`. On an ephemeral container platform —
-    this app's `Dockerfile` targets Northflank — that path lives inside the
-    container's own writable layer, with no volume mounted onto it, so a
-    redeploy or even a plain restart wipes every one of these files. Fix is
-    infrastructure, not code: mount a persistent volume on the deployment
-    and point each `*_FILE` env var at a path inside it (e.g.
-    `COLLECTIONS_FILE=/data/.collections.jsonl`) — every one of these
-    stores already reads its path from the environment, so no code change
-    is needed, only the volume + env var configuration on the host.
+  - **Durable storage is SQLite, not per-store JSONL files (migrated
+    2026-07-20)**: `storage.py` — a new root-level module, sibling to
+    `app.py` — holds `users`, `collections`, `identity_cache`, and
+    `identity_history` as tables in one SQLite database file (`DB_FILE`,
+    default `.app.db`), opened in WAL (write-ahead log) mode. This
+    replaced the original design (a per-process Python dict/list per
+    store, loaded once from a JSONL file at import via `_load_users()`/
+    `_load_collections()`/`_load_identity_cache()`, rewritten whole to
+    disk on every save) after a real architectural bug was found, not
+    hypothetically: this app's `Dockerfile` runs gunicorn with
+    `--workers 2` — two independent OS processes, each with its own copy
+    of that in-memory state. A save in one process updated its own dict
+    and the file on disk, but never the sibling process's already-loaded
+    copy, and gunicorn distributes requests across processes
+    unpredictably — so a user could save a collection card via one
+    process and then not see it moments later via a request served by the
+    other. That's a silent, hard-to-reproduce data-consistency bug (would
+    present as "sometimes my saved aircraft aren't there, refreshing
+    sometimes helps"), not a performance nitpick. SQLite's WAL mode gives
+    correct concurrent reads/writes across multiple processes sharing one
+    file, with no separate database server — `sqlite3` is in Python's
+    standard library, so this is the one place in the project where "no
+    database" (see Conventions at the bottom of this file) was
+    deliberately retired for the stores that actually need cross-process
+    consistency; every ephemeral, short-TTL request cache elsewhere
+    (`_cache`, the four `RADIUS_SOURCES` caches, `_track_cache`,
+    `_photo_cache`, `_adsbdb_cache`, ...) stays exactly as it was — those
+    duplicating per gunicorn process only costs a little extra upstream
+    traffic, never a correctness bug, so there was no reason to move them.
+    `storage.get_connection()` keeps one connection per thread
+    (`threading.local`), matching gunicorn's `--threads 8` model — a
+    sqlite3 connection isn't safe to share across threads without its own
+    locking. `storage.init_db()` runs at `app.py` import time
+    (`CREATE TABLE IF NOT EXISTS`, safe on every process start) rather
+    than only from `if __name__ == "__main__":`, unlike the identity
+    backfill thread — creating tables is a harmless, idempotent schema
+    operation, not something that spawns background work or touches the
+    network, so it's fine (and necessary) for the test suite's plain
+    `import app` to trigger it too. `migrate_jsonl_to_sqlite.py` (repo
+    root) is a one-off, not-run-automatically script (same "regenerate/run
+    by hand" convention as this project's other one-off scripts) for
+    importing an existing deployment's old `.users.jsonl`/
+    `.collections.jsonl`/`.aircraft_identity_cache.jsonl`/
+    `.identity_history.jsonl` files into the new database — idempotent
+    (every insert is an upsert), safe to re-run, never deletes anything.
+  - **Users table** (`storage.get_user()`/`storage.upsert_user()`): keyed
+    by Google's `sub` (a stable unique id). **No password is ever
+    stored** — Google's own consent screen is the only credential check;
+    the stored record is just `{sub, email, name, picture, created_ts}`.
+    `/api/login/google/callback` creates or updates that record on every
+    successful login (so a changed Google display name/photo is picked up
+    next login, `created_ts` preserved across the update) and sets
+    `session["user_id"]`; `/api/logout` clears it; `/api/me` reflects the
+    current session's user (or `{"user": null}` when logged out).
+  - **Collections table** (`storage.list_collections()`/
+    `storage.save_collection()`/`storage.get_collection_by_icao()`/
+    `storage.delete_collection()`): one shared table (not split per user),
+    filtered by `user_id` in the `WHERE` clause on read. Each card is
+    `{id, user_id, icao24, saved_at, snapshot, location, photo_url,
+    photo_link, photo_photographer}` (`snapshot`/`location` stored as JSON
+    text columns, decoded back into dicts by `storage._row_to_card()`);
+    `id` is a server-generated `uuid.uuid4().hex`. **One `icao24` = one
+    card per user** (re-approved 2026-07-18, superseding the original
+    "each save is its own card" design) is now a **database-enforced
+    invariant**, not just an application-level check-then-write: a unique
+    index on `(user_id, icao24)` backs `storage.save_collection()`'s
+    `INSERT ... ON CONFLICT (user_id, icao24) DO UPDATE`, whose `UPDATE`
+    branch deliberately never touches the `id` column — `api_collection_save()`
+    still looks up the existing card first (`storage.get_collection_by_icao()`)
+    purely to decide the HTTP status code (200 update vs. 201 create); the
+    upsert itself would preserve the right id either way.
+  - **Persistence across devices and deploys**: users/collections/identity
+    rows are keyed by account (`user_id`, Google's `sub`) or by `icao24`,
+    not by device or session — logging in from any device against the
+    *same running backend* already sees the same collection, with no
+    extra work needed. The actual persistence boundary is the backend
+    process's own local disk: `DB_FILE` (like `TRACK_CACHE_FILE`, the one
+    other durable store this app has) defaults to a plain relative path
+    (`.app.db`) written next to `app.py`. On an ephemeral container
+    platform — this app's `Dockerfile` targets Northflank — that path
+    lives inside the container's own writable layer, with no volume
+    mounted onto it, so a redeploy or even a plain restart wipes it. Fix
+    is infrastructure, not code: mount a persistent volume on the
+    deployment and point `DB_FILE` (and `TRACK_CACHE_FILE`) at a path
+    inside it (e.g. `DB_FILE=/data/app.db`) — both already read their path
+    from the environment, so no code change is needed, only the volume +
+    env var configuration on the host (plus, for an already-deployed
+    volume still holding the old JSONL files, running
+    `migrate_jsonl_to_sqlite.py` once against it — see above).
   - **Snapshot, not live-refetch, by design**: a card stores `SNAPSHOT_FIELDS`
     (`registration`, `aircraftType`, `manufacturer`, `model`,
     `manufactureYear`, `operator`, `operatorCountry`/`operatorCountryIso`,
@@ -2496,17 +2647,19 @@ because photographer name and photo URL come from an external API.
   that a network error returns 502 *without* caching. `conftest.py`'s
   `reset_caches` gained a `_adsbdb_cache.clear()` entry.
 - `tests/backend/test_identity_cache.py` covers the persistent
-  aircraft-identity cache: a fresh fetch populates `_identity_cache` with
-  the four tracked fields; a later fetch (different callsign, so a fresh
-  upstream request rather than a cache hit) with a changed field both
-  updates the cache and appends exactly one line to
-  `IDENTITY_HISTORY_FILE`; a null field in a later response never erases a
-  previously known value (and logs nothing); the cache persists to and
-  reloads from disk (same style as `test_track.py`'s restart test); an
-  unknown (404) aircraft never touches the cache at all. `conftest.py`'s
-  `reset_caches` redirects `IDENTITY_CACHE_FILE`/`IDENTITY_HISTORY_FILE` to
-  throwaway files, same rationale as the existing `TRACK_CACHE_FILE`
-  redirect. Also covers `/api/identity/stats`: zero counts on an empty
+  aircraft-identity cache: a fresh fetch populates `storage.get_identity()`
+  with the four tracked fields; a later fetch (different callsign, so a
+  fresh upstream request rather than a cache hit) with a changed field
+  both updates the row and appends exactly one entry to
+  `storage.identity_history()`; a null field in a later response never
+  erases a previously known value (and logs nothing); the row persists
+  across a fresh `storage.reset_connection()` (simulating a process
+  restart against the same `DB_FILE`, same intent as `test_track.py`'s
+  restart test); an unknown (404) aircraft never touches the cache at
+  all. `conftest.py`'s `reset_caches` points `storage.DB_FILE` at a fresh
+  throwaway SQLite file per test (and resets the thread-local connection),
+  same rationale as the existing `TRACK_CACHE_FILE` redirect. Also covers
+  `/api/identity/stats`: zero counts on an empty
   cache, and both counters incrementing correctly after a fetch followed
   by a field change. Also covers the background backfill helpers directly
   (never the real thread/sleep loop, which would be slow and flaky to
@@ -2608,6 +2761,30 @@ because photographer name and photo URL come from an external API.
   `geom: "AREAS"` (multi-polygon) SIGMET's nested-rings coordinate shape,
   which the first version 500'd on since it assumed every SIGMET's
   `coords` was a flat list.
+- `tests/backend/test_airports.py` also covers the Airports-layer dataset
+  (`list_map_airports()`/`airports_in_bbox()`/`/api/airports`), alongside
+  its pre-existing `nearest_airport()` tests — a genuinely different
+  dataset (OurAirports, not the OpenFlights table `nearest_airport()`
+  uses), reusing Belgrade Nikola Tesla (BEG/LYBE) as the same worked
+  example since it's a real, stable entry in both tables: `list_map_airports()`
+  finds it with the right `type`/`country`/`country_name`/`municipality` and excludes
+  `closed` airports by default (proven against the same dataset with
+  `include_closed=True`); `airports_in_bbox()` filters correctly by bounds
+  and degrades to an empty list (not an exception) for non-numeric or
+  degenerate boxes; and the `/api/airports` route is covered end-to-end
+  with an explicit `bbox`, no `bbox` at all (falls back to this app's own
+  home-region `BBOX`), and a malformed `bbox` (same fallback).
+- `test_airports_layer.spec.js` covers the frontend layer: off by default
+  with zero fetches; enabling it fetches `/api/airports` with a `bbox` query
+  param derived from the current viewport and renders every returned
+  airport into `airportsState.clusterGroup`; panning the map re-fetches for
+  the new viewport (debounced); disabling removes the cluster layer and
+  stops further fetches on subsequent pans; a marker's popup contains the
+  name/IATA/ICAO/type text, and a heliport fixture gets the distinct
+  `airport-icon-heliport` class while a regular airport gets
+  `airport-icon-large-airport`; and the `(?)` popover opens with explanatory
+  text and closes on an outside click, the same mechanism the weather
+  layers use.
 - `tests/backend/test_flightradar24.py` mocks the `FlightRadarAPI` SDK
   directly (`monkeypatch.setattr(app._fr24_client, "get_flights", ...)`) —
   the first backend test file that isn't mocking `app.requests.get`/`.post`,
@@ -2782,10 +2959,18 @@ scale ever change again.
 - All UI text and code comments are in English, regardless of the language
   used in conversation.
 - Keep this to a handful of plain files (backend, markup+JS, stylesheet) —
-  no framework, no build step, no database. This is an intentional MVP
-  constraint, not an oversight. `static/style.css` is a `<link>`ed
-  stylesheet, not a build artifact, so it doesn't violate "no build step."
-  Not a hard requirement, though — the project isn't attached to staying
-  build-step-free forever. If a future need (bundling, minification,
-  TypeScript, whatever) makes a build step the better tradeoff, adopt one;
-  this convention just reflects that nothing so far has justified it.
+  no framework, no build step. This is an intentional MVP constraint, not
+  an oversight. `static/style.css` is a `<link>`ed stylesheet, not a build
+  artifact, so it doesn't violate "no build step." Not a hard requirement,
+  though — the project isn't attached to staying build-step-free forever.
+  If a future need (bundling, minification, TypeScript, whatever) makes a
+  build step the better tradeoff, adopt one; this convention just reflects
+  that nothing so far has justified it. **"No database" was the same kind
+  of soft convention, and was retired 2026-07-20** for the state that
+  actually needed a database's guarantees: `storage.py`'s SQLite file
+  (accounts, saved collections, the identity cache/history log) — see the
+  Aircraft collection section above for the concrete cross-process
+  consistency bug that justified it. Every short-lived request cache
+  elsewhere in `app.py` stays a plain in-memory dict; this wasn't a
+  wholesale "add a database" decision, just retiring the "no database"
+  rule specifically where it was costing correctness.

@@ -4,6 +4,7 @@ import pytest
 import requests
 
 import app
+import storage
 
 
 @pytest.fixture
@@ -42,18 +43,15 @@ def reset_caches(monkeypatch, tmp_path):
     app._photo_cache.clear()
     app._airportdata_cache.clear()
     app._adsbdb_cache.clear()
-    app._identity_cache.clear()
-    # Redirect the persistent identity cache/history log to throwaway files
-    # too, same rationale as the TRACK_CACHE_FILE redirect above.
-    monkeypatch.setattr(app, "IDENTITY_CACHE_FILE", str(tmp_path / "identity_cache.jsonl"))
-    monkeypatch.setattr(app, "IDENTITY_HISTORY_FILE", str(tmp_path / "identity_history.jsonl"))
     app._backfill_queue.clear()
-    app._users.clear()
-    # Redirect the persistent users store to a throwaway file, same rationale
-    # as the TRACK_CACHE_FILE/IDENTITY_CACHE_FILE redirects above.
-    monkeypatch.setattr(app, "USERS_FILE", str(tmp_path / "users.jsonl"))
-    app._collections.clear()
-    monkeypatch.setattr(app, "COLLECTIONS_FILE", str(tmp_path / "collections.jsonl"))
+    # Durable state (users, collections, identity cache/history) now lives
+    # in SQLite (storage.py) instead of module-level dicts/lists backed by
+    # JSONL files — point every test at a fresh throwaway database file and
+    # make sure no stale thread-local connection from a previous test (or a
+    # previous DB_FILE value) survives, then (re)create the schema in it.
+    monkeypatch.setattr(storage, "DB_FILE", str(tmp_path / "test.db"))
+    storage.reset_connection()
+    storage.init_db()
     app._metar_cache.clear()
     app._metar_cache.update({"data": None, "ts": 0.0})
     app._sigmet_cache.clear()

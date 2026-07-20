@@ -51,6 +51,7 @@ from FlightRadarAPI import FlightRadar24API
 from flask import Flask, jsonify, redirect, request, send_from_directory, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+import storage
 from enrichment.aircraft_enrichment import enrich_identity
 from enrichment.airports import nearest_airport
 
@@ -96,68 +97,13 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-# Users store: one JSONL line per user, keyed by Google's `sub` (a stable
-# unique id — unlike email, which a user can change on their Google
-# account). No password is ever stored; Google handles the actual
-# credential check. Same load/save idiom as _identity_cache below (atomic
-# tmp-file + os.replace, best-effort on a missing/corrupt file).
-_users = {}  # sub -> {"sub":, "email":, "name":, "picture":, "created_ts":}
-USERS_FILE = os.environ.get("USERS_FILE", ".users.jsonl")
-
-
-def _read_jsonl(path):
-    """Reads a JSONL file into a list of parsed dicts. A missing file (never
-    written yet) is treated as empty, and a corrupt line is skipped rather
-    than failing the whole load — every JSONL store in this app (_users,
-    _identity_cache, _collections) is a durability optimization, not a
-    source of truth, so a bad file degrades gracefully instead of crashing
-    the app. Shared by all three _load_*() functions below, which each
-    still own their own per-entry validation/key-shape logic (dict vs. list,
-    which field the entry is keyed by) — only the file IO itself is common."""
-    try:
-        with open(path, "r") as f:
-            lines = f.readlines()
-    except OSError:
-        return []
-    records = []
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            records.append(json.loads(line))
-        except ValueError:
-            continue
-    return records
-
-
-def _write_jsonl(path, records):
-    """Atomically rewrites a JSONL file (tmp file + os.replace), one JSON
-    object per line — best-effort, same idiom shared by all three
-    _save_*() functions below. A write failure (e.g. read-only filesystem)
-    is ignored, for the same reason _read_jsonl() ignores a missing file."""
-    tmp = path + ".tmp"
-    try:
-        with open(tmp, "w") as f:
-            for record in records:
-                f.write(json.dumps(record) + "\n")
-        os.replace(tmp, path)
-    except OSError:
-        pass
-
-
-def _load_users():
-    for entry in _read_jsonl(USERS_FILE):
-        sub = entry.get("sub")
-        if sub:
-            _users[sub] = entry
-
-
-def _save_users():
-    _write_jsonl(USERS_FILE, _users.values())
-
-
-_load_users()
+# Durable, cross-process state (user accounts, saved-aircraft collections,
+# the resolved-identity cache/history log) lives in SQLite now — see
+# storage.py for why a per-process in-memory dict/list backed by a JSONL
+# file broke under this app's multi-process gunicorn deployment. Creating
+# the schema here (not just in storage.py) makes sure it exists before the
+# very first request, on a fresh deploy with no .app.db yet.
+storage.init_db()
 
 
 def _current_user_id():
@@ -181,15 +127,7 @@ def api_login_google_callback():
     sub = userinfo.get("sub")
     if not sub:
         return jsonify({"error": "google_auth_failed"}), 502
-    existing = _users.get(sub, {})
-    _users[sub] = {
-        "sub": sub,
-        "email": userinfo.get("email"),
-        "name": userinfo.get("name"),
-        "picture": userinfo.get("picture"),
-        "created_ts": existing.get("created_ts", time.time()),
-    }
-    _save_users()
+    storage.upsert_user(sub, userinfo.get("email"), userinfo.get("name"), userinfo.get("picture"))
     session["user_id"] = sub
     return redirect("/")
 
@@ -202,7 +140,7 @@ def api_logout():
 
 @app.route("/api/me")
 def api_me():
-    user = _users.get(_current_user_id())
+    user = storage.get_user(_current_user_id())
     return jsonify({"user": user})
 
 OPENSKY_URL = "https://opensky-network.org/api/states/all"
@@ -510,70 +448,9 @@ _adsbdb_cache = {}  # "<icao24>:<callsign-or-empty>" -> {"aircraft": ..., "fligh
 # legitimately differ by callsign/lease) across restarts, and logging when
 # one of those fields is later seen with a different value — a minimal,
 # free-standing changelog rather than a full history/observations graph.
-# Same persistence shape as _track_cache/TRACK_CACHE_FILE below, just
-# without a TTL: identity facts don't expire the way a flight track does.
-_identity_cache = {}  # icao24 -> {"registration":, "manufacturer":, "type":, "registered_owner":, "updated_ts":}
-IDENTITY_CACHE_FILE = os.environ.get("IDENTITY_CACHE_FILE", ".aircraft_identity_cache.jsonl")
-IDENTITY_HISTORY_FILE = os.environ.get("IDENTITY_HISTORY_FILE", ".identity_history.jsonl")
-IDENTITY_TRACKED_FIELDS = ("registration", "manufacturer", "type", "registered_owner")
-
-
-def _load_identity_cache():
-    """Best-effort: populate _identity_cache from disk via _read_jsonl(). One
-    JSON object per line (icao24 + its fields), same readable JSONL
-    convention as IDENTITY_HISTORY_FILE, rather than one giant single-line
-    blob — easier to scan/diff/grep by hand. A line missing "icao24" is
-    skipped, same as a missing file or a corrupt line already are inside
-    _read_jsonl() — like the track cache, this is an optimization/history
-    layer, not a source of truth."""
-    for entry in _read_jsonl(IDENTITY_CACHE_FILE):
-        icao24 = entry.pop("icao24", None)
-        if icao24:
-            _identity_cache[icao24] = entry
-
-
-def _save_identity_cache():
-    """Best-effort atomic write of the whole cache, one aircraft per line.
-    Identity resolutions are infrequent (per user click, or one every
-    IDENTITY_BACKFILL_INTERVAL seconds in the background), so rewriting the
-    whole file each time via _write_jsonl() is cheap."""
-    _write_jsonl(
-        IDENTITY_CACHE_FILE,
-        ({"icao24": icao24, **entry} for icao24, entry in _identity_cache.items()),
-    )
-
-
-def _update_identity_cache(icao24, aircraft):
-    """Merges a freshly-fetched adsbdb aircraft record into the persistent
-    identity cache. A null incoming value never overwrites a previously
-    known one (adsbdb sometimes has partial data). A changed non-null value
-    is recorded to IDENTITY_HISTORY_FILE before being overwritten — the
-    only "history" this layer keeps, deliberately just a flat append-only
-    log rather than a full versioned entity graph."""
-    existing = _identity_cache.get(icao24, {})
-    updated = dict(existing)
-    now = time.time()
-    for field in IDENTITY_TRACKED_FIELDS:
-        new_value = aircraft.get(field)
-        if new_value is None:
-            continue
-        old_value = existing.get(field)
-        if old_value is not None and old_value != new_value:
-            try:
-                with open(IDENTITY_HISTORY_FILE, "a") as f:
-                    f.write(json.dumps({
-                        "icao24": icao24, "field": field,
-                        "old": old_value, "new": new_value, "ts": now,
-                    }) + "\n")
-            except OSError:
-                pass
-        updated[field] = new_value
-    updated["updated_ts"] = now
-    _identity_cache[icao24] = updated
-    _save_identity_cache()
-
-
-_load_identity_cache()
+# Lives in SQLite now (storage.py's identity_cache/identity_history
+# tables) rather than a per-process dict + JSONL file — see storage.py's
+# module docstring for why.
 
 
 def _airportdata_fullsize_url(raw_photo):
@@ -1039,7 +916,7 @@ def _resolve_adsbdb(icao24, callsign):
         }
         _adsbdb_cache[cache_key] = result
         if result["aircraft"]:
-            _update_identity_cache(icao24, result["aircraft"])
+            storage.update_identity(icao24, result["aircraft"])
         return result, 200
 
     except requests.RequestException as exc:
@@ -1093,12 +970,12 @@ def _identity_backfill_tick():
     cached aircraft. Refills _backfill_queue from the currently-visible set
     whenever it runs dry, rather than recomputing candidates every tick."""
     if not _backfill_queue:
-        candidates = _collect_visible_icao24s() - set(_identity_cache.keys())
+        candidates = _collect_visible_icao24s() - storage.identity_known_icaos()
         _backfill_queue.extend(sorted(candidates))
     if not _backfill_queue:
         return
     icao24 = _backfill_queue.popleft()
-    if icao24 in _identity_cache:
+    if storage.get_identity(icao24) is not None:
         return  # resolved via a real click since being queued
     _resolve_adsbdb(icao24, None)  # no callsign needed — aircraft-only lookup
 
@@ -1129,25 +1006,14 @@ def _start_identity_backfill_thread():
     threading.Thread(target=_loop, daemon=True, name="identity-backfill").start()
 
 
-def _count_identity_history():
-    """Line count of IDENTITY_HISTORY_FILE (0 if missing) — cheap enough to
-    just re-read on each dev-mode-only stats request rather than keep a
-    separately-maintained in-memory counter that could drift from the file."""
-    try:
-        with open(IDENTITY_HISTORY_FILE, "r") as f:
-            return sum(1 for line in f if line.strip())
-    except OSError:
-        return 0
-
-
 @app.route("/api/identity/stats")
 def api_identity_stats():
     # Dev-mode-only diagnostic for the persistent identity cache/history log
-    # (see _identity_cache above) — pure local reads, no I/O worth caching,
-    # same rationale as /api/identity/<icao24>'s own uncached status.
+    # (see storage.py) — pure local SQLite COUNT(*) queries, no I/O worth
+    # caching, same rationale as /api/identity/<icao24>'s own uncached status.
     return jsonify({
-        "identity_count": len(_identity_cache),
-        "history_count": _count_identity_history(),
+        "identity_count": storage.identity_count(),
+        "history_count": storage.identity_history_count(),
     })
 
 
@@ -1173,11 +1039,10 @@ def api_identity(icao24):
 
 
 # --- Aircraft collection ("save aircraft you like, browse as cards") ---
-# One shared JSONL file (same atomic-write idiom as _identity_cache above),
-# filtered by user_id on read rather than split into per-user files — keeps
-# the load/save code to one file/one dict, same as the identity cache.
-_collections = []  # list of card dicts, see SNAPSHOT_FIELDS below
-COLLECTIONS_FILE = os.environ.get("COLLECTIONS_FILE", ".collections.jsonl")
+# Lives in SQLite now (storage.py's collections table, one row per card,
+# a unique (user_id, icao24) index enforcing "one card per icao24 per
+# user") rather than a per-process list + JSONL file — see storage.py's
+# module docstring for why.
 
 # Single source of truth for which `info` fields a saved card snapshots.
 # Deliberately excludes live telemetry (altitude/speed/squawk/...) — those
@@ -1192,27 +1057,12 @@ SNAPSHOT_FIELDS = (
 )
 
 
-def _load_collections():
-    for entry in _read_jsonl(COLLECTIONS_FILE):
-        if entry.get("id") and entry.get("user_id"):
-            _collections.append(entry)
-
-
-def _save_collections():
-    _write_jsonl(COLLECTIONS_FILE, _collections)
-
-
-_load_collections()
-
-
 @app.route("/api/collection", methods=["GET"])
 def api_collection_list():
     user_id = _current_user_id()
     if not user_id:
         return jsonify({"error": "not_authenticated"}), 401
-    cards = [c for c in _collections if c["user_id"] == user_id]
-    cards.sort(key=lambda c: c["saved_at"], reverse=True)
-    return jsonify({"cards": cards})
+    return jsonify({"cards": storage.list_collections(user_id)})
 
 
 @app.route("/api/collection", methods=["POST"])
@@ -1252,18 +1102,13 @@ def api_collection_save():
     # refreshes its snapshot/photo/timestamp in place rather than appending
     # a duplicate — this is what makes a simple filled/outline toggle icon
     # in the sidebar unambiguous (no "which of N saved copies" question).
-    existing = next(
-        (c for c in _collections if c["user_id"] == user_id and c["icao24"] == icao24), None
-    )
-    if existing:
-        existing["snapshot"] = snapshot
-        existing["saved_at"] = time.time()
-        existing.update(photo_fields)
-        existing["location"] = location
-        _save_collections()
-        return jsonify(existing), 200
+    # storage.save_collection() upserts on the (user_id, icao24) unique
+    # index either way; checking existence first only decides the HTTP
+    # status code (200 update vs. 201 create) and lets the id below get
+    # silently discarded by the upsert's own id-preserving UPDATE branch.
+    existing = storage.get_collection_by_icao(user_id, icao24)
     card = {
-        "id": uuid.uuid4().hex,
+        "id": existing["id"] if existing else uuid.uuid4().hex,
         "user_id": user_id,
         "icao24": icao24,
         "saved_at": time.time(),
@@ -1271,9 +1116,8 @@ def api_collection_save():
         "location": location,
         **photo_fields,
     }
-    _collections.append(card)
-    _save_collections()
-    return jsonify(card), 201
+    saved = storage.save_collection(card)
+    return jsonify(saved), (200 if existing else 201)
 
 
 @app.route("/api/collection/<card_id>", methods=["DELETE"])
@@ -1281,13 +1125,8 @@ def api_collection_delete(card_id):
     user_id = _current_user_id()
     if not user_id:
         return jsonify({"error": "not_authenticated"}), 401
-    before = len(_collections)
-    _collections[:] = [
-        c for c in _collections if not (c["id"] == card_id and c["user_id"] == user_id)
-    ]
-    if len(_collections) == before:
+    if not storage.delete_collection(card_id, user_id):
         return jsonify({"error": "not_found"}), 404
-    _save_collections()
     return jsonify({"ok": True})
 
 

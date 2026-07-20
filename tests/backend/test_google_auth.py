@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import app
+import storage
 from conftest import login_as
 
 
@@ -48,8 +49,8 @@ def test_callback_creates_user_and_sets_session(client, monkeypatch):
     )
     resp = client.get("/api/login/google/callback")
     assert resp.status_code in (302, 303)
-    assert "google-sub-123" in app._users
-    assert app._users["google-sub-123"]["email"] == "pilot@example.com"
+    assert storage.get_user("google-sub-123") is not None
+    assert storage.get_user("google-sub-123")["email"] == "pilot@example.com"
 
     me = client.get("/api/me")
     assert me.get_json()["user"]["sub"] == "google-sub-123"
@@ -72,14 +73,14 @@ def test_me_reports_logged_out_by_default(client):
 
 
 def test_login_as_helper_reflected_in_me(client):
-    app._users["u1"] = {"sub": "u1", "email": "a@b.com", "name": "A", "picture": None, "created_ts": 0}
+    storage.upsert_user("u1", "a@b.com", "A", None)
     login_as(client, "u1")
     resp = client.get("/api/me")
     assert resp.get_json()["user"]["sub"] == "u1"
 
 
 def test_logout_clears_session(client):
-    app._users["u1"] = {"sub": "u1", "email": "a@b.com", "name": "A", "picture": None, "created_ts": 0}
+    storage.upsert_user("u1", "a@b.com", "A", None)
     login_as(client, "u1")
     resp = client.post("/api/logout")
     assert resp.get_json() == {"ok": True}
@@ -87,14 +88,16 @@ def test_logout_clears_session(client):
 
 
 def test_users_persist_to_disk_and_reload(client, monkeypatch, tmp_path):
-    users_file = tmp_path / "users_roundtrip.jsonl"
-    monkeypatch.setattr(app, "USERS_FILE", str(users_file))
-    app._users["u1"] = {
-        "sub": "u1", "email": "a@b.com", "name": "A", "picture": None, "created_ts": 1.0,
-    }
-    app._save_users()
-    assert users_file.exists()
+    # Simulates a process restart: a fresh connection to the same DB_FILE
+    # must still see a user saved by a previous connection — this is the
+    # exact cross-process consistency guarantee SQLite/WAL gives that the
+    # old per-process dict + JSONL file didn't (see storage.py).
+    db_file = tmp_path / "users_roundtrip.db"
+    monkeypatch.setattr(storage, "DB_FILE", str(db_file))
+    storage.reset_connection()
+    storage.init_db()
+    storage.upsert_user("u1", "a@b.com", "A", None)
+    assert db_file.exists()
 
-    app._users.clear()
-    app._load_users()
-    assert app._users["u1"]["email"] == "a@b.com"
+    storage.reset_connection()
+    assert storage.get_user("u1")["email"] == "a@b.com"

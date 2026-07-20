@@ -1,6 +1,5 @@
-import json
-
 import app
+import storage
 from conftest import make_response
 
 AIRCRAFT_V1 = {
@@ -12,19 +11,11 @@ AIRCRAFT_V1 = {
 }
 
 
-def _read_history(path):
-    try:
-        with open(path) as f:
-            return [json.loads(line) for line in f if line.strip()]
-    except FileNotFoundError:
-        return []
-
-
 def test_fresh_fetch_populates_identity_cache(client, mock_get):
     mock_get.return_value = make_response(json_data={"response": {"aircraft": AIRCRAFT_V1}})
     client.get("/api/adsbdb/a835af")
 
-    entry = app._identity_cache["a835af"]
+    entry = storage.get_identity("a835af")
     assert entry["registration"] == "N628TS"
     assert entry["manufacturer"] == "Gulfstream Aerospace"
     assert entry["type"] == "G650 ER"
@@ -42,8 +33,8 @@ def test_changed_field_is_logged_and_updated(client, mock_get):
     # upstream fetch rather than served from the existing cache entry.
     client.get("/api/adsbdb/a835af?callsign=TEST123")
 
-    assert app._identity_cache["a835af"]["registration"] == "N999ZZ"
-    history = _read_history(app.IDENTITY_HISTORY_FILE)
+    assert storage.get_identity("a835af")["registration"] == "N999ZZ"
+    history = storage.identity_history("a835af")
     assert len(history) == 1
     assert history[0] == {
         "icao24": "a835af", "field": "registration",
@@ -59,39 +50,36 @@ def test_null_field_does_not_erase_known_value(client, mock_get):
     mock_get.return_value = make_response(json_data={"response": {"aircraft": partial}})
     client.get("/api/adsbdb/a835af?callsign=TEST123")
 
-    assert app._identity_cache["a835af"]["registered_owner"] == "Falcon Landing LLC"
-    history = _read_history(app.IDENTITY_HISTORY_FILE)
-    assert history == []
+    assert storage.get_identity("a835af")["registered_owner"] == "Falcon Landing LLC"
+    assert storage.identity_history("a835af") == []
 
 
 def test_identity_cache_persists_to_disk(client, mock_get):
     mock_get.return_value = make_response(json_data={"response": {"aircraft": AIRCRAFT_V1}})
     client.get("/api/adsbdb/a835af")
 
-    # One JSON object per line (icao24 + its fields) — readable/diffable by
-    # hand, same JSONL convention as IDENTITY_HISTORY_FILE, not a single
-    # giant blob.
-    with open(app.IDENTITY_CACHE_FILE) as f:
-        lines = [json.loads(line) for line in f if line.strip()]
-    assert lines == [{
+    entry = storage.get_identity("a835af")
+    assert entry == {
         "icao24": "a835af", "registration": "N628TS", "manufacturer": "Gulfstream Aerospace",
-        "type": "G650 ER", "registered_owner": "Falcon Landing LLC", "updated_ts": lines[0]["updated_ts"],
-    }]
+        "type": "G650 ER", "registered_owner": "Falcon Landing LLC", "updated_ts": entry["updated_ts"],
+    }
 
 
-def test_identity_cache_survives_restart_via_disk(client, mock_get):
+def test_identity_cache_survives_restart_via_disk(client, mock_get, monkeypatch):
     mock_get.return_value = make_response(json_data={"response": {"aircraft": AIRCRAFT_V1}})
     client.get("/api/adsbdb/a835af")
 
-    app._identity_cache.clear()
-    app._load_identity_cache()
-    assert app._identity_cache["a835af"]["registration"] == "N628TS"
+    # Simulates a process restart against the same DB file: a fresh
+    # connection must still see it, rather than the old "reload from a
+    # JSONL file this process happened to write" behavior.
+    storage.reset_connection()
+    assert storage.get_identity("a835af")["registration"] == "N628TS"
 
 
 def test_no_identity_update_on_unknown_aircraft(client, mock_get):
     mock_get.return_value = make_response(status_code=404)
     client.get("/api/adsbdb/deadbe")
-    assert "deadbe" not in app._identity_cache
+    assert storage.get_identity("deadbe") is None
 
 
 def test_identity_stats_endpoint(client, mock_get):
@@ -131,14 +119,14 @@ def test_backfill_tick_resolves_one_uncached_aircraft(client, mock_get):
 
     app._identity_backfill_tick()
 
-    assert app._identity_cache["a835af"]["registration"] == "N628TS"
+    assert storage.get_identity("a835af")["registration"] == "N628TS"
     assert mock_get.call_count == 1
 
 
 def test_backfill_tick_is_a_noop_when_nothing_new_is_visible(client, mock_get):
     app._identity_backfill_tick()  # empty caches -> empty queue -> no-op
     assert mock_get.call_count == 0
-    assert app._identity_cache == {}
+    assert storage.identity_count() == 0
 
 
 def test_backfill_tick_skips_an_aircraft_resolved_by_a_real_click_meanwhile(client, mock_get):

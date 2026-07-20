@@ -1,11 +1,15 @@
 # ADS-B Playground
 
 A single-page live aircraft tracker for Serbia and its neighboring region.
-No build step, no database — a Flask backend proxies five free ADS-B data
-sources plus FlightAware AeroAPI, and a static Leaflet page polls them and
-renders aircraft as color-coded markers. The no-build-step choice fits the
+No build step — a Flask backend proxies five free ADS-B data sources plus
+FlightAware AeroAPI, and a static Leaflet page polls them and renders
+aircraft as color-coded markers. The no-build-step choice fits the
 project's current size and isn't a hard rule — it's fine to introduce one
-later if a real need for it shows up.
+later if a real need for it shows up. Durable state (accounts, saved
+collections, the resolved-identity cache) lives in a single embedded
+SQLite file (`storage.py`) — no separate database server, just Python's
+standard library; every short-lived request cache elsewhere stays a plain
+in-memory dict.
 
 ## Features
 
@@ -229,24 +233,28 @@ are already shared across devices — Google login and saved cards are keyed
 by account, not by device — as long as every device talks to the same
 running backend.
 
-What isn't automatic is surviving a redeploy or restart: `USERS_FILE`,
-`COLLECTIONS_FILE`, `TRACK_CACHE_FILE`, `IDENTITY_CACHE_FILE`, and
-`IDENTITY_HISTORY_FILE` all default to plain files written next to `app.py`,
+What isn't automatic is surviving a redeploy or restart: `DB_FILE` (accounts,
+saved collections, the identity cache/history log — see `storage.py`) and
+`TRACK_CACHE_FILE` both default to plain files written next to `app.py`,
 inside the container's own writable layer. Without a persistent volume
 mounted there, a redeploy wipes logins, saved collections, and the cached
 track/identity data. To persist them, mount a volume on the deployment and
-point each of those env vars at a path inside it, e.g.:
+point both env vars at a path inside it, e.g.:
 
 ```
-COLLECTIONS_FILE=/data/.collections.jsonl
-USERS_FILE=/data/.users.jsonl
+DB_FILE=/data/app.db
 TRACK_CACHE_FILE=/data/.track_cache.json
-IDENTITY_CACHE_FILE=/data/.aircraft_identity_cache.jsonl
-IDENTITY_HISTORY_FILE=/data/.identity_history.jsonl
 ```
 
-No code change is required — every one of these already reads its path from
-the environment.
+No code change is required — both already read their path from the
+environment. **Migrating an existing deployment** that still has the old
+`.users.jsonl`/`.collections.jsonl`/`.aircraft_identity_cache.jsonl`/
+`.identity_history.jsonl` files on its volume: run
+`python3 migrate_jsonl_to_sqlite.py` once against that volume (with
+`USERS_FILE`/`COLLECTIONS_FILE`/`IDENTITY_CACHE_FILE`/`IDENTITY_HISTORY_FILE`/
+`DB_FILE` pointed at the same paths the running app uses) before switching
+over — it's idempotent, safe to run more than once, and never deletes the
+old files.
 
 **OpenSky may be intermittently blocked from Northflank (or any Google
 Cloud/AWS/other hyperscaler-hosted deployment)**: OpenSky's own FAQ states
@@ -280,12 +288,19 @@ npx playwright install chromium   # one-time
 npx playwright test
 ```
 
+Both suites also run automatically on every push/PR via GitHub Actions
+(`.github/workflows/tests.yml`).
+
 ## Project layout
 
 A handful of plain files carry all the logic:
 
 - `app.py` — Flask backend; proxies every external API (mainly to work
   around CORS/User-Agent restrictions) with short-lived caching.
+- `storage.py` — SQLite-backed persistence for durable, cross-process state
+  (accounts, saved-aircraft collections, the resolved-identity cache/history
+  log). `migrate_jsonl_to_sqlite.py` is a one-off script for importing the
+  old per-store JSONL files a pre-SQLite deployment may still have on disk.
 - `enrichment/` — local static lookup tables (registration prefix, ICAO24
   placeholder database, callsign decoding, aircraft type normalization,
   MTOW-derived aircraft category) that fill identity gaps the live feeds

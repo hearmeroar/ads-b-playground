@@ -1,4 +1,4 @@
-import app
+import storage
 from conftest import login_as
 
 
@@ -222,16 +222,20 @@ def test_resaving_updates_location(client):
 
 
 def test_collections_persist_to_disk_and_reload(monkeypatch, tmp_path):
-    collections_file = tmp_path / "collections_roundtrip.jsonl"
-    monkeypatch.setattr(app, "COLLECTIONS_FILE", str(collections_file))
-    app._collections.append({
+    # Simulates a process restart: a fresh connection to the same DB_FILE
+    # must still see a card saved by a previous connection — the exact
+    # cross-process consistency guarantee SQLite/WAL gives that the old
+    # per-process list + JSONL file didn't (see storage.py).
+    db_file = tmp_path / "collections_roundtrip.db"
+    monkeypatch.setattr(storage, "DB_FILE", str(db_file))
+    storage.reset_connection()
+    storage.init_db()
+    storage.save_collection({
         "id": "card1", "user_id": "u1", "icao24": "aaa111", "saved_at": 1.0,
-        "snapshot": {"registration": "X"}, "photo_url": None,
+        "snapshot": {"registration": "X"}, "location": None, "photo_url": None,
         "photo_link": None, "photo_photographer": None,
     })
-    app._save_collections()
-    assert collections_file.exists()
+    assert db_file.exists()
 
-    app._collections.clear()
-    app._load_collections()
-    assert app._collections[0]["icao24"] == "aaa111"
+    storage.reset_connection()
+    assert storage.list_collections("u1")[0]["icao24"] == "aaa111"

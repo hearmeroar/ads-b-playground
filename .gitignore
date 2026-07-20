@@ -12,4 +12,7 @@ playwright-report/
 .identity_history.jsonl
 .users.jsonl
 .collections.jsonl
+.app.db
+.app.db-wal
+.app.db-shm
 PROD_INFRA_NOTES.md
