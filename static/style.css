@@ -334,6 +334,16 @@ html, body { margin: 0; padding: 0; height: 100%; }
   border-radius: 2px;
 }
 
+/* Airline logo (see airlineLogoHtml(), static/airline-logos/) leading the
+   Operator row — sized/aligned consistently with the .fi flag above it so
+   both read as one visual family of "small icon before a text value" rows. */
+#sidebar-details .airline-logo {
+  width: 18px; height: 18px;
+  vertical-align: middle;
+  margin-right: 2px;
+  object-fit: contain;
+}
+
 /* Dev mode: per-field source provenance dots + their click-to-toggle
    tooltip. Scoped to all three sidebar containers now, not just
    #sidebar-details — ICAO/Callsign/Registration/Aircraft type moved to
@@ -559,6 +569,12 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #sidebar-icon-credit { font-size: 11px; color: var(--muted); padding: 10px 18px 14px; border-top: 1px solid var(--border); text-align: left; }
 #sidebar-icon-credit a { color: var(--muted); text-decoration: underline; }
 #sidebar-icon-credit a:hover { color: var(--ink); }
+
+/* Airline logo source credit (static/airline-logos/, see airlineLogoHtml())
+   — same small muted footer-text treatment as #sidebar-icon-credit above. */
+#sidebar-attribution { font-size: 11px; color: var(--muted); padding: 10px 18px 14px; border-top: 1px solid var(--border); text-align: left; }
+#sidebar-attribution a { color: var(--muted); text-decoration: underline; }
+#sidebar-attribution a:hover { color: var(--ink); }
 
 /* Scan-radius range ring labels (map-init.js's L.divIcon markers) —
    pointer-events:none so they never intercept map clicks/drags. */

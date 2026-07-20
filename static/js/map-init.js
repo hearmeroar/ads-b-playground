@@ -85,6 +85,20 @@ fetch('/api/config')
   })
   .catch(() => {}); // fallback view above already stands if this fails
 
+// Airline logo manifest (ICAO 3-letter designator -> vendored logo file per
+// tier, see render-details.js's airlineLogoHtml()): static, not backend-
+// generated, so a plain fetch of the vendored JSON is enough — no /api
+// round trip needed. Starts as {} so an aircraft selected before this
+// resolves just renders no logo, same graceful-degradation as a genuinely
+// unrecognized ICAO code; nothing re-renders once it lands, but the async
+// window is normally far shorter than the time it takes a user to open a
+// sidebar.
+let AIRLINE_LOGO_MANIFEST = {};
+fetch('airline-logos/manifest.json')
+  .then((resp) => resp.json())
+  .then((manifest) => { AIRLINE_LOGO_MANIFEST = manifest; })
+  .catch(() => {});
+
 // Ground/tower markers render on a lower pane so aircraft always appear above them
 map.createPane('groundPane');
 map.getPane('groundPane').style.zIndex = 450;

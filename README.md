@@ -9,7 +9,7 @@ later if a real need for it shows up.
 
 ## Features
 
-- **Six independent live sources**: five ADS-B sources deduplicated against
+- **Seven independent live sources**: six ADS-B sources deduplicated against
   each other by ICAO24/hex address (each one only shows what the sources above it
   don't already cover), plus FlightAware AeroAPI deduplicated by callsign.
   - [OpenSky Network](https://opensky-network.org/) — blue
@@ -22,6 +22,11 @@ later if a real need for it shows up.
     unaffected by request headers, so no toggle would ever work. Still
     fully wired up server- and client-side; only its HUD row is hidden)*
   - [airplanes.live](https://airplanes.live/api-guide/) — green
+  - FlightRadar24 (via the unofficial [FlightRadarAPI](https://github.com/JeanExtreme002/FlightRadarAPI)
+    SDK) — brown *(free, no key, but talks to FlightRadar24's private web API,
+    not their official paid one — may stop working without warning if
+    FlightRadar24 tightens its anti-bot protection, so it ships off by
+    default and lowest priority among the ICAO24-keyed sources)*
   - [FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/) —
     teal *(requires API key, paid/metered so off by default; matched to other
     sources by callsign, when matched its route data enriches the main marker)*
@@ -115,7 +120,16 @@ later if a real need for it shows up.
   vendored locally — no build step). In dev mode, a computed value gets a
   black "Flywme" dot (this application, as a data source in its own right)
   whose tooltip names the technique and confidence behind it.
-- **adsbdb.com lookup** — a seventh source, queried lazily on click (not
+- **Airline logos** — a small logo next to Operator, looked up from the
+  callsign's own 3-letter ICAO airline designator rather than from however
+  the operator name resolved, so it can show even when the name itself
+  didn't. Two vendored, priority-ordered sources (same "try tier 1 first,
+  fall back to tier 2" shape as everything else here):
+  [soaring-symbols](https://github.com/anhthang/soaring-symbols) (MIT,
+  curated) first, then [airframesio/airline-images](https://github.com/airframesio/airline-images)
+  (broader coverage, unlicensed/scraped, used only as a fallback) — logos
+  remain the trademark/property of their respective airlines.
+- **adsbdb.com lookup** — an eighth source, queried lazily on click (not
   per-poll, no markers of its own) for whatever the live feeds and local
   enrichment still don't have: a **Registered Owner** field (the private/
   corporate registrant — a new concept, distinct from the operating

@@ -1,0 +1,3400 @@
+{
+  "AAA": {
+    "airframes": "AAA.png"
+  },
+  "AAG": {
+    "airframes": "AAG.png"
+  },
+  "AAH": {
+    "airframes": "AAH.png"
+  },
+  "AAJ": {
+    "airframes": "AAJ.png"
+  },
+  "AAL": {
+    "airframes": "AAL.png"
+  },
+  "AAM": {
+    "airframes": "AAM.png"
+  },
+  "AAR": {
+    "airframes": "AAR.png",
+    "soaring": "AAR.svg"
+  },
+  "AAT": {
+    "airframes": "AAT.png"
+  },
+  "AAV": {
+    "airframes": "AAV.png"
+  },
+  "AAW": {
+    "airframes": "AAW.png"
+  },
+  "AAY": {
+    "airframes": "AAY.png"
+  },
+  "ABB": {
+    "airframes": "ABB.png"
+  },
+  "ABD": {
+    "airframes": "ABD.png"
+  },
+  "ABJ": {
+    "airframes": "ABJ.png"
+  },
+  "ABL": {
+    "airframes": "ABL.png"
+  },
+  "ABN": {
+    "airframes": "ABN.png",
+    "soaring": "ABN.svg"
+  },
+  "ABP": {
+    "airframes": "ABP.png"
+  },
+  "ABQ": {
+    "airframes": "ABQ.png"
+  },
+  "ABR": {
+    "airframes": "ABR.png"
+  },
+  "ABS": {
+    "airframes": "ABS.png"
+  },
+  "ABV": {
+    "airframes": "ABV.png"
+  },
+  "ABW": {
+    "airframes": "ABW.png"
+  },
+  "ABX": {
+    "airframes": "ABX.png"
+  },
+  "ABY": {
+    "airframes": "ABY.png"
+  },
+  "ACA": {
+    "airframes": "ACA.png",
+    "soaring": "ACA.svg"
+  },
+  "ACH": {
+    "airframes": "ACH.png"
+  },
+  "ACI": {
+    "airframes": "ACI.png"
+  },
+  "ACJ": {
+    "airframes": "ACJ.png"
+  },
+  "ACK": {
+    "airframes": "ACK.png"
+  },
+  "ACL": {
+    "airframes": "ACL.png"
+  },
+  "ACN": {
+    "airframes": "ACN.png"
+  },
+  "ACP": {
+    "airframes": "ACP.png"
+  },
+  "ACY": {
+    "airframes": "ACY.png"
+  },
+  "ADB": {
+    "airframes": "ADB.png"
+  },
+  "ADO": {
+    "airframes": "ADO.png"
+  },
+  "ADY": {
+    "airframes": "ADY.png"
+  },
+  "ADZ": {
+    "airframes": "ADZ.png"
+  },
+  "AEA": {
+    "airframes": "AEA.png",
+    "soaring": "AEA.svg"
+  },
+  "AEE": {
+    "airframes": "AEE.png",
+    "soaring": "AEE.svg"
+  },
+  "AEG": {
+    "airframes": "AEG.png"
+  },
+  "AEH": {
+    "airframes": "AEH.png"
+  },
+  "AER": {
+    "airframes": "AER.png"
+  },
+  "AEZ": {
+    "airframes": "AEZ.png"
+  },
+  "AFF": {
+    "airframes": "AFF.png"
+  },
+  "AFG": {
+    "airframes": "AFG.png"
+  },
+  "AFL": {
+    "airframes": "AFL.png"
+  },
+  "AFR": {
+    "airframes": "AFR.png",
+    "soaring": "AFR.svg"
+  },
+  "AFW": {
+    "airframes": "AFW.png"
+  },
+  "AGF": {
+    "airframes": "AGF.png"
+  },
+  "AGU": {
+    "airframes": "AGU.png"
+  },
+  "AHK": {
+    "airframes": "AHK.png"
+  },
+  "AHW": {
+    "airframes": "AHW.png"
+  },
+  "AHY": {
+    "airframes": "AHY.png",
+    "soaring": "AHY.svg"
+  },
+  "AIA": {
+    "airframes": "AIA.png"
+  },
+  "AIC": {
+    "airframes": "AIC.png",
+    "soaring": "AIC.svg"
+  },
+  "AIE": {
+    "airframes": "AIE.png"
+  },
+  "AIH": {
+    "airframes": "AIH.png"
+  },
+  "AIJ": {
+    "airframes": "AIJ.png"
+  },
+  "AIP": {
+    "airframes": "AIP.png"
+  },
+  "AIQ": {
+    "airframes": "AIQ.png"
+  },
+  "AIZ": {
+    "airframes": "AIZ.png"
+  },
+  "AJA": {
+    "airframes": "AJA.png"
+  },
+  "AJK": {
+    "airframes": "AJK.png"
+  },
+  "AJM": {
+    "airframes": "AJM.png"
+  },
+  "AJT": {
+    "airframes": "AJT.png"
+  },
+  "AJX": {
+    "airframes": "AJX.png"
+  },
+  "AKJ": {
+    "airframes": "AKJ.png",
+    "soaring": "AKJ.svg"
+  },
+  "AKK": {
+    "airframes": "AKK.png"
+  },
+  "AKL": {
+    "airframes": "AKL.png"
+  },
+  "AKT": {
+    "airframes": "AKT.png"
+  },
+  "AKX": {
+    "airframes": "AKX.png"
+  },
+  "ALK": {
+    "airframes": "ALK.png"
+  },
+  "ALV": {
+    "airframes": "ALV.png"
+  },
+  "AMB": {
+    "airframes": "AMB.png"
+  },
+  "AMC": {
+    "airframes": "AMC.png"
+  },
+  "AMF": {
+    "airframes": "AMF.png"
+  },
+  "AMM": {
+    "airframes": "AMM.png"
+  },
+  "AMP": {
+    "airframes": "AMP.png"
+  },
+  "AMS": {
+    "airframes": "AMS.png"
+  },
+  "AMT": {
+    "airframes": "AMT.png"
+  },
+  "AMU": {
+    "airframes": "AMU.png"
+  },
+  "AMV": {
+    "airframes": "AMV.png"
+  },
+  "AMW": {
+    "airframes": "AMW.png"
+  },
+  "AMX": {
+    "airframes": "AMX.png",
+    "soaring": "AMX.svg"
+  },
+  "ANA": {
+    "airframes": "ANA.png",
+    "soaring": "ANA.svg"
+  },
+  "ANE": {
+    "airframes": "ANE.png"
+  },
+  "ANG": {
+    "airframes": "ANG.png"
+  },
+  "ANK": {
+    "airframes": "ANK.png"
+  },
+  "ANO": {
+    "airframes": "ANO.png"
+  },
+  "ANS": {
+    "airframes": "ANS.png"
+  },
+  "ANT": {
+    "airframes": "ANT.png"
+  },
+  "ANZ": {
+    "airframes": "ANZ.png",
+    "soaring": "ANZ.svg"
+  },
+  "APC": {
+    "airframes": "APC.png"
+  },
+  "APF": {
+    "airframes": "APF.png"
+  },
+  "APG": {
+    "airframes": "APG.png"
+  },
+  "APJ": {
+    "airframes": "APJ.png",
+    "soaring": "APJ.svg"
+  },
+  "APQ": {
+    "airframes": "APQ.png"
+  },
+  "APZ": {
+    "airframes": "APZ.png"
+  },
+  "ARA": {
+    "airframes": "ARA.png"
+  },
+  "ARC": {
+    "airframes": "ARC.png"
+  },
+  "ARE": {
+    "airframes": "ARE.png"
+  },
+  "ARG": {
+    "airframes": "ARG.png",
+    "soaring": "ARG.svg"
+  },
+  "ART": {
+    "airframes": "ART.png"
+  },
+  "ARU": {
+    "airframes": "ARU.png"
+  },
+  "ASA": {
+    "airframes": "ASA.png",
+    "soaring": "ASA.svg"
+  },
+  "ASD": {
+    "airframes": "ASD.png"
+  },
+  "ASH": {
+    "airframes": "ASH.png"
+  },
+  "ASL": {
+    "airframes": "ASL.png",
+    "soaring": "ASL.svg"
+  },
+  "ASO": {
+    "airframes": "ASO.png"
+  },
+  "ASQ": {
+    "airframes": "ASQ.png"
+  },
+  "ASR": {
+    "airframes": "ASR.png"
+  },
+  "AST": {
+    "airframes": "AST.png"
+  },
+  "ASV": {
+    "airframes": "ASV.png"
+  },
+  "ATC": {
+    "airframes": "ATC.png"
+  },
+  "ATG": {
+    "airframes": "ATG.png"
+  },
+  "ATN": {
+    "airframes": "ATN.png"
+  },
+  "ATX": {
+    "airframes": "ATX.png"
+  },
+  "AUA": {
+    "airframes": "AUA.png"
+  },
+  "AUI": {
+    "airframes": "AUI.png"
+  },
+  "AUL": {
+    "airframes": "AUL.png"
+  },
+  "AUR": {
+    "airframes": "AUR.png"
+  },
+  "AVA": {
+    "airframes": "AVA.png",
+    "soaring": "AVA.svg"
+  },
+  "AVJ": {
+    "airframes": "AVJ.png"
+  },
+  "AVN": {
+    "airframes": "AVN.png"
+  },
+  "AVR": {
+    "airframes": "AVR.png"
+  },
+  "AWC": {
+    "airframes": "AWC.png"
+  },
+  "AWE": {
+    "airframes": "AWE.png"
+  },
+  "AWG": {
+    "airframes": "AWG.png"
+  },
+  "AWI": {
+    "airframes": "AWI.png"
+  },
+  "AWQ": {
+    "airframes": "AWQ.png"
+  },
+  "AWT": {
+    "airframes": "AWT.png"
+  },
+  "AWU": {
+    "airframes": "AWU.png"
+  },
+  "AXB": {
+    "airframes": "AXB.png"
+  },
+  "AXE": {
+    "airframes": "AXE.png"
+  },
+  "AXK": {
+    "airframes": "AXK.png"
+  },
+  "AXL": {
+    "airframes": "AXL.png"
+  },
+  "AXM": {
+    "airframes": "AXM.png",
+    "soaring": "AXM.svg"
+  },
+  "AYK": {
+    "airframes": "AYK.png"
+  },
+  "AYN": {
+    "airframes": "AYN.png"
+  },
+  "AZA": {
+    "airframes": "AZA.png"
+  },
+  "AZB": {
+    "airframes": "AZB.png"
+  },
+  "AZG": {
+    "airframes": "AZG.png"
+  },
+  "AZM": {
+    "airframes": "AZM.png"
+  },
+  "AZN": {
+    "airframes": "AZN.png"
+  },
+  "AZP": {
+    "airframes": "AZP.png",
+    "soaring": "AZP.svg"
+  },
+  "AZQ": {
+    "airframes": "AZQ.png"
+  },
+  "AZS": {
+    "airframes": "AZS.png"
+  },
+  "AZU": {
+    "airframes": "AZU.png"
+  },
+  "AZV": {
+    "airframes": "AZV.png"
+  },
+  "AZW": {
+    "airframes": "AZW.png"
+  },
+  "AZY": {
+    "airframes": "AZY.png"
+  },
+  "BAV": {
+    "airframes": "BAV.png",
+    "soaring": "BAV.svg"
+  },
+  "BAW": {
+    "airframes": "BAW.png",
+    "soaring": "BAW.svg"
+  },
+  "BAY": {
+    "airframes": "BAY.png"
+  },
+  "BBC": {
+    "airframes": "BBC.png"
+  },
+  "BBD": {
+    "airframes": "BBD.png"
+  },
+  "BBZ": {
+    "airframes": "BBZ.png"
+  },
+  "BCI": {
+    "airframes": "BCI.png"
+  },
+  "BCS": {
+    "airframes": "BCS.png"
+  },
+  "BCV": {
+    "airframes": "BCV.png"
+  },
+  "BCY": {
+    "airframes": "BCY.png"
+  },
+  "BDA": {
+    "airframes": "BDA.png"
+  },
+  "BDR": {
+    "airframes": "BDR.png"
+  },
+  "BEE": {
+    "airframes": "BEE.png"
+  },
+  "BEL": {
+    "airframes": "BEL.png",
+    "soaring": "BEL.svg"
+  },
+  "BER": {
+    "airframes": "BER.png"
+  },
+  "BES": {
+    "airframes": "BES.png"
+  },
+  "BFL": {
+    "airframes": "BFL.png"
+  },
+  "BFO": {
+    "airframes": "BFO.png"
+  },
+  "BGA": {
+    "airframes": "BGA.png"
+  },
+  "BGH": {
+    "airframes": "BGH.png"
+  },
+  "BGL": {
+    "airframes": "BGL.png"
+  },
+  "BHA": {
+    "airframes": "BHA.png"
+  },
+  "BHS": {
+    "airframes": "BHS.png"
+  },
+  "BJK": {
+    "airframes": "BJK.png"
+  },
+  "BKP": {
+    "airframes": "BKP.png",
+    "soaring": "BKP.svg"
+  },
+  "BLB": {
+    "airframes": "BLB.png"
+  },
+  "BLC": {
+    "airframes": "BLC.png"
+  },
+  "BLS": {
+    "airframes": "BLS.png"
+  },
+  "BLX": {
+    "airframes": "BLX.png"
+  },
+  "BMA": {
+    "airframes": "BMA.png"
+  },
+  "BML": {
+    "airframes": "BML.png"
+  },
+  "BNL": {
+    "airframes": "BNL.png"
+  },
+  "BNZ": {
+    "airframes": "BNZ.png"
+  },
+  "BOE": {
+    "airframes": "BOE.png"
+  },
+  "BOI": {
+    "airframes": "BOI.png"
+  },
+  "BOL": {
+    "airframes": "BOL.png"
+  },
+  "BOS": {
+    "airframes": "BOS.png"
+  },
+  "BOT": {
+    "airframes": "BOT.png"
+  },
+  "BOV": {
+    "airframes": "BOV.png"
+  },
+  "BOX": {
+    "airframes": "BOX.png"
+  },
+  "BRD": {
+    "airframes": "BRD.png"
+  },
+  "BRG": {
+    "airframes": "BRG.png"
+  },
+  "BRP": {
+    "airframes": "BRP.png"
+  },
+  "BRQ": {
+    "airframes": "BRQ.png"
+  },
+  "BRU": {
+    "airframes": "BRU.png"
+  },
+  "BRX": {
+    "airframes": "BRX.png"
+  },
+  "BSC": {
+    "airframes": "BSC.png"
+  },
+  "BTI": {
+    "airframes": "BTI.png",
+    "soaring": "BTI.svg"
+  },
+  "BTK": {
+    "airframes": "BTK.png"
+  },
+  "BTN": {
+    "airframes": "BTN.png"
+  },
+  "BTQ": {
+    "airframes": "BTQ.png"
+  },
+  "BTZ": {
+    "airframes": "BTZ.png"
+  },
+  "BUC": {
+    "airframes": "BUC.png"
+  },
+  "BUG": {
+    "airframes": "BUG.png"
+  },
+  "BVN": {
+    "airframes": "BVN.png"
+  },
+  "BVT": {
+    "airframes": "BVT.png"
+  },
+  "BWA": {
+    "airframes": "BWA.png"
+  },
+  "BYA": {
+    "airframes": "BYA.png"
+  },
+  "CAD": {
+    "airframes": "CAD.png"
+  },
+  "CAI": {
+    "airframes": "CAI.png"
+  },
+  "CAL": {
+    "airframes": "CAL.png"
+  },
+  "CAO": {
+    "airframes": "CAO.png"
+  },
+  "CAP": {
+    "airframes": "CAP.png"
+  },
+  "CAT": {
+    "airframes": "CAT.png"
+  },
+  "CAV": {
+    "airframes": "CAV.png"
+  },
+  "CAY": {
+    "airframes": "CAY.png"
+  },
+  "CBJ": {
+    "airframes": "CBJ.png"
+  },
+  "CCA": {
+    "airframes": "CCA.png",
+    "soaring": "CCA.svg"
+  },
+  "CCD": {
+    "airframes": "CCD.png"
+  },
+  "CCM": {
+    "airframes": "CCM.png"
+  },
+  "CDC": {
+    "airframes": "CDC.png"
+  },
+  "CDG": {
+    "airframes": "CDG.png"
+  },
+  "CEB": {
+    "airframes": "CEB.png"
+  },
+  "CES": {
+    "airframes": "CES.png"
+  },
+  "CFE": {
+    "airframes": "CFE.png"
+  },
+  "CFG": {
+    "airframes": "CFG.png"
+  },
+  "CFS": {
+    "airframes": "CFS.png"
+  },
+  "CFV": {
+    "airframes": "CFV.png"
+  },
+  "CGA": {
+    "airframes": "CGA.png"
+  },
+  "CGH": {
+    "airframes": "CGH.png"
+  },
+  "CGN": {
+    "airframes": "CGN.png"
+  },
+  "CHB": {
+    "airframes": "CHB.png"
+  },
+  "CHG": {
+    "airframes": "CHG.png"
+  },
+  "CHH": {
+    "airframes": "CHH.png"
+  },
+  "CHI": {
+    "airframes": "CHI.png"
+  },
+  "CHZ": {
+    "airframes": "CHZ.png"
+  },
+  "CIN": {
+    "airframes": "CIN.png"
+  },
+  "CIW": {
+    "airframes": "CIW.png"
+  },
+  "CJT": {
+    "airframes": "CJT.png"
+  },
+  "CKK": {
+    "airframes": "CKK.png"
+  },
+  "CKL": {
+    "airframes": "CKL.png"
+  },
+  "CKS": {
+    "airframes": "CKS.png"
+  },
+  "CLG": {
+    "airframes": "CLG.png"
+  },
+  "CLH": {
+    "airframes": "CLH.png"
+  },
+  "CLX": {
+    "airframes": "CLX.png"
+  },
+  "CMA": {
+    "airframes": "CMA.png"
+  },
+  "CMM": {
+    "airframes": "CMM.png"
+  },
+  "CMP": {
+    "airframes": "CMP.png",
+    "soaring": "CMP.svg"
+  },
+  "CMS": {
+    "airframes": "CMS.png"
+  },
+  "CND": {
+    "airframes": "CND.png"
+  },
+  "CNM": {
+    "airframes": "CNM.png"
+  },
+  "CNW": {
+    "airframes": "CNW.png"
+  },
+  "COA": {
+    "airframes": "COA.png"
+  },
+  "COY": {
+    "airframes": "COY.png"
+  },
+  "CPA": {
+    "airframes": "CPA.png",
+    "soaring": "CPA.svg"
+  },
+  "CPJ": {
+    "airframes": "CPJ.png"
+  },
+  "CPN": {
+    "airframes": "CPN.png"
+  },
+  "CPR": {
+    "airframes": "CPR.png"
+  },
+  "CQH": {
+    "airframes": "CQH.png"
+  },
+  "CQN": {
+    "airframes": "CQN.png"
+  },
+  "CRA": {
+    "airframes": "CRA.png"
+  },
+  "CRC": {
+    "airframes": "CRC.png"
+  },
+  "CRE": {
+    "airframes": "CRE.png"
+  },
+  "CRK": {
+    "airframes": "CRK.png"
+  },
+  "CRL": {
+    "airframes": "CRL.png"
+  },
+  "CRQ": {
+    "airframes": "CRQ.png"
+  },
+  "CRR": {
+    "airframes": "CRR.png"
+  },
+  "CSA": {
+    "airframes": "CSA.png"
+  },
+  "CSC": {
+    "airframes": "CSC.png"
+  },
+  "CSH": {
+    "airframes": "CSH.png"
+  },
+  "CSN": {
+    "airframes": "CSN.png",
+    "soaring": "CSN.svg"
+  },
+  "CSQ": {
+    "airframes": "CSQ.png"
+  },
+  "CSS": {
+    "airframes": "CSS.png"
+  },
+  "CSV": {
+    "airframes": "CSV.png"
+  },
+  "CSW": {
+    "airframes": "CSW.png"
+  },
+  "CSZ": {
+    "airframes": "CSZ.png"
+  },
+  "CTE": {
+    "airframes": "CTE.png"
+  },
+  "CTL": {
+    "airframes": "CTL.png"
+  },
+  "CTN": {
+    "airframes": "CTN.png"
+  },
+  "CTV": {
+    "airframes": "CTV.png"
+  },
+  "CTW": {
+    "airframes": "CTW.png"
+  },
+  "CUA": {
+    "airframes": "CUA.png"
+  },
+  "CUB": {
+    "airframes": "CUB.png"
+  },
+  "CUH": {
+    "airframes": "CUH.png"
+  },
+  "CVA": {
+    "airframes": "CVA.png"
+  },
+  "CVK": {
+    "airframes": "CVK.png"
+  },
+  "CWN": {
+    "airframes": "CWN.png"
+  },
+  "CXA": {
+    "airframes": "CXA.png",
+    "soaring": "CXA.svg"
+  },
+  "CXE": {
+    "airframes": "CXE.png"
+  },
+  "CXI": {
+    "airframes": "CXI.png"
+  },
+  "CYF": {
+    "airframes": "CYF.png"
+  },
+  "CYL": {
+    "airframes": "CYL.png"
+  },
+  "CYP": {
+    "airframes": "CYP.png"
+  },
+  "CYZ": {
+    "airframes": "CYZ.png"
+  },
+  "DAE": {
+    "airframes": "DAE.png"
+  },
+  "DAH": {
+    "airframes": "DAH.png",
+    "soaring": "DAH.svg"
+  },
+  "DAL": {
+    "airframes": "DAL.png",
+    "soaring": "DAL.svg"
+  },
+  "DAN": {
+    "airframes": "DAN.png"
+  },
+  "DAO": {
+    "airframes": "DAO.png"
+  },
+  "DAP": {
+    "airframes": "DAP.png"
+  },
+  "DAT": {
+    "airframes": "DAT.png"
+  },
+  "DAV": {
+    "airframes": "DAV.png"
+  },
+  "DHA": {
+    "airframes": "DHA.png"
+  },
+  "DHK": {
+    "airframes": "DHK.png"
+  },
+  "DHX": {
+    "airframes": "DHX.png"
+  },
+  "DJT": {
+    "airframes": "DJT.png"
+  },
+  "DJU": {
+    "airframes": "DJU.png"
+  },
+  "DKH": {
+    "airframes": "DKH.png"
+  },
+  "DLA": {
+    "airframes": "DLA.png",
+    "soaring": "DLA.svg"
+  },
+  "DLH": {
+    "airframes": "DLH.png",
+    "soaring": "DLH.svg"
+  },
+  "DNA": {
+    "airframes": "DNA.png"
+  },
+  "DNU": {
+    "airframes": "DNU.png"
+  },
+  "DOC": {
+    "airframes": "DOC.png"
+  },
+  "DQA": {
+    "airframes": "DQA.png"
+  },
+  "DRK": {
+    "airframes": "DRK.png"
+  },
+  "DRU": {
+    "airframes": "DRU.png"
+  },
+  "DTA": {
+    "airframes": "DTA.png"
+  },
+  "DTH": {
+    "airframes": "DTH.png"
+  },
+  "DTR": {
+    "airframes": "DTR.png"
+  },
+  "EAF": {
+    "airframes": "EAF.png"
+  },
+  "EAK": {
+    "airframes": "EAK.png"
+  },
+  "EAL": {
+    "airframes": "EAL.png"
+  },
+  "EAN": {
+    "airframes": "EAN.png"
+  },
+  "EDR": {
+    "airframes": "EDR.png"
+  },
+  "EDV": {
+    "airframes": "EDV.png"
+  },
+  "EDW": {
+    "airframes": "EDW.png"
+  },
+  "EFW": {
+    "airframes": "EFW.png"
+  },
+  "EGF": {
+    "airframes": "EGF.png"
+  },
+  "EGU": {
+    "airframes": "EGU.png"
+  },
+  "EIN": {
+    "airframes": "EIN.png",
+    "soaring": "EIN.svg"
+  },
+  "EJA": {
+    "airframes": "EJA.png"
+  },
+  "EJU": {
+    "airframes": "EJU.png"
+  },
+  "EKA": {
+    "airframes": "EKA.png"
+  },
+  "ELW": {
+    "airframes": "ELW.png"
+  },
+  "ELY": {
+    "airframes": "ELY.png"
+  },
+  "EMT": {
+    "airframes": "EMT.png"
+  },
+  "ENT": {
+    "airframes": "ENT.png"
+  },
+  "ENY": {
+    "airframes": "ENY.png"
+  },
+  "EOK": {
+    "airframes": "EOK.png"
+  },
+  "EPA": {
+    "airframes": "EPA.png"
+  },
+  "EPE": {
+    "airframes": "EPE.png"
+  },
+  "ERF": {
+    "airframes": "ERF.png"
+  },
+  "ERO": {
+    "airframes": "ERO.png"
+  },
+  "ERT": {
+    "airframes": "ERT.png"
+  },
+  "ESF": {
+    "airframes": "ESF.png"
+  },
+  "ESR": {
+    "airframes": "ESR.png"
+  },
+  "EST": {
+    "airframes": "EST.png"
+  },
+  "ETD": {
+    "airframes": "ETD.png",
+    "soaring": "ETD.svg"
+  },
+  "ETH": {
+    "airframes": "ETH.png",
+    "soaring": "ETH.svg"
+  },
+  "EUK": {
+    "airframes": "EUK.png"
+  },
+  "EVA": {
+    "airframes": "EVA.png",
+    "soaring": "EVA.svg"
+  },
+  "EVE": {
+    "airframes": "EVE.png"
+  },
+  "EWG": {
+    "airframes": "EWG.png",
+    "soaring": "EWG.svg"
+  },
+  "EWL": {
+    "airframes": "EWL.png"
+  },
+  "EWR": {
+    "airframes": "EWR.png",
+    "soaring": "EWR.svg"
+  },
+  "EXA": {
+    "airframes": "EXA.png"
+  },
+  "EXP": {
+    "airframes": "EXP.png"
+  },
+  "EXS": {
+    "airframes": "EXS.png"
+  },
+  "EXV": {
+    "airframes": "EXV.png"
+  },
+  "EXZ": {
+    "airframes": "EXZ.png"
+  },
+  "EZE": {
+    "airframes": "EZE.png"
+  },
+  "EZS": {
+    "airframes": "EZS.png"
+  },
+  "EZY": {
+    "airframes": "EZY.png"
+  },
+  "FAB": {
+    "airframes": "FAB.png"
+  },
+  "FAC": {
+    "airframes": "FAC.png"
+  },
+  "FAD": {
+    "airframes": "FAD.png"
+  },
+  "FAH": {
+    "airframes": "FAH.png"
+  },
+  "FAT": {
+    "airframes": "FAT.png"
+  },
+  "FBA": {
+    "airframes": "FBA.png"
+  },
+  "FBU": {
+    "airframes": "FBU.png"
+  },
+  "FBZ": {
+    "airframes": "FBZ.png"
+  },
+  "FDA": {
+    "airframes": "FDA.png"
+  },
+  "FDB": {
+    "airframes": "FDB.png"
+  },
+  "FDR": {
+    "airframes": "FDR.png"
+  },
+  "FDX": {
+    "airframes": "FDX.png"
+  },
+  "FDY": {
+    "airframes": "FDY.png"
+  },
+  "FEG": {
+    "airframes": "FEG.png"
+  },
+  "FEI": {
+    "airframes": "FEI.png"
+  },
+  "FFM": {
+    "airframes": "FFM.png",
+    "soaring": "FFM.svg"
+  },
+  "FFT": {
+    "airframes": "FFT.png"
+  },
+  "FHY": {
+    "airframes": "FHY.png"
+  },
+  "FIA": {
+    "airframes": "FIA.png"
+  },
+  "FIE": {
+    "airframes": "FIE.png"
+  },
+  "FIN": {
+    "airframes": "FIN.png",
+    "soaring": "FIN.svg"
+  },
+  "FJI": {
+    "airframes": "FJI.png",
+    "soaring": "FJI.svg"
+  },
+  "FJL": {
+    "airframes": "FJL.png"
+  },
+  "FLA": {
+    "airframes": "FLA.png"
+  },
+  "FLE": {
+    "airframes": "FLE.png"
+  },
+  "FLG": {
+    "airframes": "FLG.png"
+  },
+  "FLI": {
+    "airframes": "FLI.png",
+    "soaring": "FLI.svg"
+  },
+  "FLN": {
+    "airframes": "FLN.png"
+  },
+  "FLZ": {
+    "airframes": "FLZ.png"
+  },
+  "FNA": {
+    "airframes": "FNA.png"
+  },
+  "FNX": {
+    "airframes": "FNX.png"
+  },
+  "FOX": {
+    "airframes": "FOX.png"
+  },
+  "FPO": {
+    "airframes": "FPO.png"
+  },
+  "FPY": {
+    "airframes": "FPY.png"
+  },
+  "FQA": {
+    "airframes": "FQA.png"
+  },
+  "FRE": {
+    "airframes": "FRE.png"
+  },
+  "FRF": {
+    "airframes": "FRF.png"
+  },
+  "FRG": {
+    "airframes": "FRG.png"
+  },
+  "FSU": {
+    "airframes": "FSU.png"
+  },
+  "FTL": {
+    "airframes": "FTL.png"
+  },
+  "FWI": {
+    "airframes": "FWI.png"
+  },
+  "FWR": {
+    "airframes": "FWR.png"
+  },
+  "FXI": {
+    "airframes": "FXI.png"
+  },
+  "FXT": {
+    "airframes": "FXT.png"
+  },
+  "GAA": {
+    "airframes": "GAA.png"
+  },
+  "GAI": {
+    "airframes": "GAI.png"
+  },
+  "GAK": {
+    "airframes": "GAK.png"
+  },
+  "GAL": {
+    "airframes": "GAL.png"
+  },
+  "GAP": {
+    "airframes": "GAP.png"
+  },
+  "GBB": {
+    "airframes": "GBB.png"
+  },
+  "GBX": {
+    "airframes": "GBX.png"
+  },
+  "GCR": {
+    "airframes": "GCR.png"
+  },
+  "GCS": {
+    "airframes": "GCS.png"
+  },
+  "GEC": {
+    "airframes": "GEC.png"
+  },
+  "GFA": {
+    "airframes": "GFA.png"
+  },
+  "GGN": {
+    "airframes": "GGN.png"
+  },
+  "GHN": {
+    "airframes": "GHN.png"
+  },
+  "GIA": {
+    "airframes": "GIA.png",
+    "soaring": "GIA.svg"
+  },
+  "GJS": {
+    "airframes": "GJS.png"
+  },
+  "GLG": {
+    "airframes": "GLG.png"
+  },
+  "GLO": {
+    "airframes": "GLO.png"
+  },
+  "GLR": {
+    "airframes": "GLR.png"
+  },
+  "GMS": {
+    "airframes": "GMS.png"
+  },
+  "GMT": {
+    "airframes": "GMT.png"
+  },
+  "GNA": {
+    "airframes": "GNA.png"
+  },
+  "GOA": {
+    "airframes": "GOA.png"
+  },
+  "GOW": {
+    "airframes": "GOW.png"
+  },
+  "GPD": {
+    "airframes": "GPD.png"
+  },
+  "GRG": {
+    "airframes": "GRG.png"
+  },
+  "GRL": {
+    "airframes": "GRL.png"
+  },
+  "GSW": {
+    "airframes": "GSW.png"
+  },
+  "GTI": {
+    "airframes": "GTI.png"
+  },
+  "GTV": {
+    "airframes": "GTV.png"
+  },
+  "GTX": {
+    "airframes": "GTX.png"
+  },
+  "GUG": {
+    "airframes": "GUG.png"
+  },
+  "GUM": {
+    "airframes": "GUM.png"
+  },
+  "GUN": {
+    "airframes": "GUN.png"
+  },
+  "GUY": {
+    "airframes": "GUY.png"
+  },
+  "GWI": {
+    "airframes": "GWI.png"
+  },
+  "GZP": {
+    "airframes": "GZP.png"
+  },
+  "HAG": {
+    "airframes": "HAG.png"
+  },
+  "HAL": {
+    "airframes": "HAL.png"
+  },
+  "HAS": {
+    "airframes": "HAS.png"
+  },
+  "HAT": {
+    "airframes": "HAT.png"
+  },
+  "HBH": {
+    "airframes": "HBH.png"
+  },
+  "HFM": {
+    "airframes": "HFM.png"
+  },
+  "HFY": {
+    "airframes": "HFY.png"
+  },
+  "HGA": {
+    "airframes": "HGA.png"
+  },
+  "HGB": {
+    "airframes": "HGB.png"
+  },
+  "HHN": {
+    "airframes": "HHN.png"
+  },
+  "HIM": {
+    "airframes": "HIM.png"
+  },
+  "HKC": {
+    "airframes": "HKC.png"
+  },
+  "HKE": {
+    "airframes": "HKE.png",
+    "soaring": "HKE.svg"
+  },
+  "HKS": {
+    "airframes": "HKS.png"
+  },
+  "HLF": {
+    "airframes": "HLF.png"
+  },
+  "HLI": {
+    "airframes": "HLI.png"
+  },
+  "HOG": {
+    "airframes": "HOG.png"
+  },
+  "HOP": {
+    "airframes": "HOP.png"
+  },
+  "HTL": {
+    "airframes": "HTL.png"
+  },
+  "HVN": {
+    "airframes": "HVN.png",
+    "soaring": "HVN.svg"
+  },
+  "HVY": {
+    "airframes": "HVY.png"
+  },
+  "HXA": {
+    "airframes": "HXA.png"
+  },
+  "HYA": {
+    "airframes": "HYA.png"
+  },
+  "HYM": {
+    "airframes": "HYM.png"
+  },
+  "HYS": {
+    "airframes": "HYS.png"
+  },
+  "IAD": {
+    "airframes": "IAD.png"
+  },
+  "IAE": {
+    "airframes": "IAE.png"
+  },
+  "IAR": {
+    "airframes": "IAR.png"
+  },
+  "IAW": {
+    "airframes": "IAW.png"
+  },
+  "IBB": {
+    "airframes": "IBB.png"
+  },
+  "IBE": {
+    "airframes": "IBE.png",
+    "soaring": "IBE.svg"
+  },
+  "IBS": {
+    "airframes": "IBS.png"
+  },
+  "IBX": {
+    "airframes": "IBX.png"
+  },
+  "ICE": {
+    "airframes": "ICE.png",
+    "soaring": "ICE.svg"
+  },
+  "ICL": {
+    "airframes": "ICL.png"
+  },
+  "ICN": {
+    "airframes": "ICN.png"
+  },
+  "ICV": {
+    "airframes": "ICV.png"
+  },
+  "IFA": {
+    "airframes": "IFA.png"
+  },
+  "IFL": {
+    "airframes": "IFL.png"
+  },
+  "IGA": {
+    "airframes": "IGA.png"
+  },
+  "IGO": {
+    "airframes": "IGO.png",
+    "soaring": "IGO.svg"
+  },
+  "IJW": {
+    "airframes": "IJW.png"
+  },
+  "IMX": {
+    "airframes": "IMX.png"
+  },
+  "IOA": {
+    "airframes": "IOA.png"
+  },
+  "IOS": {
+    "airframes": "IOS.png"
+  },
+  "IRA": {
+    "airframes": "IRA.png"
+  },
+  "IRB": {
+    "airframes": "IRB.png"
+  },
+  "IRC": {
+    "airframes": "IRC.png"
+  },
+  "IRM": {
+    "airframes": "IRM.png"
+  },
+  "IRU": {
+    "airframes": "IRU.png"
+  },
+  "IRZ": {
+    "airframes": "IRZ.png"
+  },
+  "ISR": {
+    "airframes": "ISR.png"
+  },
+  "ISS": {
+    "airframes": "ISS.png"
+  },
+  "ITY": {
+    "airframes": "ITY.png"
+  },
+  "IWY": {
+    "airframes": "IWY.png"
+  },
+  "IYE": {
+    "airframes": "IYE.png"
+  },
+  "IZA": {
+    "airframes": "IZA.png"
+  },
+  "IZG": {
+    "airframes": "IZG.png"
+  },
+  "IZM": {
+    "airframes": "IZM.png"
+  },
+  "JAC": {
+    "airframes": "JAC.png"
+  },
+  "JAF": {
+    "airframes": "JAF.png"
+  },
+  "JAG": {
+    "airframes": "JAG.png"
+  },
+  "JAL": {
+    "airframes": "JAL.png",
+    "soaring": "JAL.svg"
+  },
+  "JAP": {
+    "airframes": "JAP.png"
+  },
+  "JAT": {
+    "airframes": "JAT.png"
+  },
+  "JAV": {
+    "airframes": "JAV.png"
+  },
+  "JAW": {
+    "airframes": "JAW.png"
+  },
+  "JBA": {
+    "airframes": "JBA.png"
+  },
+  "JBU": {
+    "airframes": "JBU.png",
+    "soaring": "JBU.svg"
+  },
+  "JCC": {
+    "airframes": "JCC.png"
+  },
+  "JEC": {
+    "airframes": "JEC.png"
+  },
+  "JES": {
+    "airframes": "JES.png"
+  },
+  "JIA": {
+    "airframes": "JIA.png"
+  },
+  "JJA": {
+    "airframes": "JJA.png"
+  },
+  "JJP": {
+    "airframes": "JJP.png"
+  },
+  "JKK": {
+    "airframes": "JKK.png"
+  },
+  "JMC": {
+    "airframes": "JMC.png"
+  },
+  "JMP": {
+    "airframes": "JMP.png"
+  },
+  "JNA": {
+    "airframes": "JNA.png"
+  },
+  "JOS": {
+    "airframes": "JOS.png"
+  },
+  "JSA": {
+    "airframes": "JSA.png"
+  },
+  "JST": {
+    "airframes": "JST.png",
+    "soaring": "JST.svg"
+  },
+  "JSX": {
+    "airframes": "JSX.png"
+  },
+  "JTA": {
+    "airframes": "JTA.png"
+  },
+  "JTD": {
+    "airframes": "JTD.png"
+  },
+  "JTE": {
+    "airframes": "JTE.png"
+  },
+  "JTM": {
+    "airframes": "JTM.png"
+  },
+  "JTN": {
+    "airframes": "JTN.png"
+  },
+  "JUB": {
+    "airframes": "JUB.png"
+  },
+  "JUS": {
+    "airframes": "JUS.png"
+  },
+  "JYH": {
+    "airframes": "JYH.png"
+  },
+  "JZA": {
+    "airframes": "JZA.png"
+  },
+  "JZR": {
+    "airframes": "JZR.png"
+  },
+  "KAC": {
+    "airframes": "KAC.png",
+    "soaring": "KAC.svg"
+  },
+  "KAL": {
+    "airframes": "KAL.png",
+    "soaring": "KAL.svg"
+  },
+  "KAP": {
+    "airframes": "KAP.png"
+  },
+  "KAR": {
+    "airframes": "KAR.png"
+  },
+  "KBA": {
+    "airframes": "KBA.png"
+  },
+  "KEM": {
+    "airframes": "KEM.png"
+  },
+  "KEN": {
+    "airframes": "KEN.png"
+  },
+  "KFA": {
+    "airframes": "KFA.png"
+  },
+  "KGB": {
+    "airframes": "KGB.png"
+  },
+  "KHH": {
+    "airframes": "KHH.png"
+  },
+  "KHO": {
+    "airframes": "KHO.png"
+  },
+  "KHV": {
+    "airframes": "KHV.png"
+  },
+  "KIS": {
+    "airframes": "KIS.png"
+  },
+  "KLC": {
+    "airframes": "KLC.png"
+  },
+  "KLM": {
+    "airframes": "KLM.png",
+    "soaring": "KLM.svg"
+  },
+  "KMA": {
+    "airframes": "KMA.png"
+  },
+  "KME": {
+    "airframes": "KME.png"
+  },
+  "KMF": {
+    "airframes": "KMF.png"
+  },
+  "KMI": {
+    "airframes": "KMI.png"
+  },
+  "KNA": {
+    "airframes": "KNA.png"
+  },
+  "KNE": {
+    "airframes": "KNE.png",
+    "soaring": "KNE.svg"
+  },
+  "KOR": {
+    "airframes": "KOR.png"
+  },
+  "KOS": {
+    "airframes": "KOS.png"
+  },
+  "KQA": {
+    "airframes": "KQA.png",
+    "soaring": "KQA.svg"
+  },
+  "KRE": {
+    "airframes": "KRE.png"
+  },
+  "KRP": {
+    "airframes": "KRP.png"
+  },
+  "KTA": {
+    "airframes": "KTA.png"
+  },
+  "KTC": {
+    "airframes": "KTC.png"
+  },
+  "KTK": {
+    "airframes": "KTK.png"
+  },
+  "KZH": {
+    "airframes": "KZH.png"
+  },
+  "KZR": {
+    "airframes": "KZR.png",
+    "soaring": "KZR.svg"
+  },
+  "KZU": {
+    "airframes": "KZU.png"
+  },
+  "LAA": {
+    "airframes": "LAA.png"
+  },
+  "LAL": {
+    "airframes": "LAL.png"
+  },
+  "LAM": {
+    "airframes": "LAM.png"
+  },
+  "LAN": {
+    "airframes": "LAN.png",
+    "soaring": "LAN.svg"
+  },
+  "LAO": {
+    "airframes": "LAO.png"
+  },
+  "LAP": {
+    "airframes": "LAP.png"
+  },
+  "LAQ": {
+    "airframes": "LAQ.png"
+  },
+  "LAU": {
+    "airframes": "LAU.png"
+  },
+  "LAV": {
+    "airframes": "LAV.png"
+  },
+  "LBR": {
+    "airframes": "LBR.png"
+  },
+  "LBT": {
+    "airframes": "LBT.png"
+  },
+  "LCO": {
+    "airframes": "LCO.png"
+  },
+  "LCT": {
+    "airframes": "LCT.png"
+  },
+  "LDA": {
+    "airframes": "LDA.png"
+  },
+  "LDE": {
+    "airframes": "LDE.png"
+  },
+  "LER": {
+    "airframes": "LER.png"
+  },
+  "LGL": {
+    "airframes": "LGL.png"
+  },
+  "LHA": {
+    "airframes": "LHA.png"
+  },
+  "LHX": {
+    "airframes": "LHX.png"
+  },
+  "LIA": {
+    "airframes": "LIA.png"
+  },
+  "LIL": {
+    "airframes": "LIL.png"
+  },
+  "LKA": {
+    "airframes": "LKA.png"
+  },
+  "LKE": {
+    "airframes": "LKE.png"
+  },
+  "LKN": {
+    "airframes": "LKN.png"
+  },
+  "LLL": {
+    "airframes": "LLL.png"
+  },
+  "LLM": {
+    "airframes": "LLM.png"
+  },
+  "LLR": {
+    "airframes": "LLR.png"
+  },
+  "LMU": {
+    "airframes": "LMU.png"
+  },
+  "LNE": {
+    "airframes": "LNE.png"
+  },
+  "LNI": {
+    "airframes": "LNI.png"
+  },
+  "LNK": {
+    "airframes": "LNK.png"
+  },
+  "LOF": {
+    "airframes": "LOF.png"
+  },
+  "LOG": {
+    "airframes": "LOG.png"
+  },
+  "LOT": {
+    "airframes": "LOT.png",
+    "soaring": "LOT.svg"
+  },
+  "LPE": {
+    "airframes": "LPE.png"
+  },
+  "LRC": {
+    "airframes": "LRC.png"
+  },
+  "LRS": {
+    "airframes": "LRS.png"
+  },
+  "LTD": {
+    "airframes": "LTD.png"
+  },
+  "LTU": {
+    "airframes": "LTU.png"
+  },
+  "LWA": {
+    "airframes": "LWA.png"
+  },
+  "LXP": {
+    "airframes": "LXP.png"
+  },
+  "LYC": {
+    "airframes": "LYC.png"
+  },
+  "LYM": {
+    "airframes": "LYM.png"
+  },
+  "LYX": {
+    "airframes": "LYX.png"
+  },
+  "LZB": {
+    "airframes": "LZB.png"
+  },
+  "MAA": {
+    "airframes": "MAA.png"
+  },
+  "MAC": {
+    "airframes": "MAC.png"
+  },
+  "MAI": {
+    "airframes": "MAI.png"
+  },
+  "MAL": {
+    "airframes": "MAL.png"
+  },
+  "MAR": {
+    "airframes": "MAR.png"
+  },
+  "MAS": {
+    "airframes": "MAS.png",
+    "soaring": "MAS.svg"
+  },
+  "MAU": {
+    "airframes": "MAU.png",
+    "soaring": "MAU.svg"
+  },
+  "MAV": {
+    "airframes": "MAV.png"
+  },
+  "MAY": {
+    "airframes": "MAY.png"
+  },
+  "MBB": {
+    "airframes": "MBB.png"
+  },
+  "MCM": {
+    "airframes": "MCM.png"
+  },
+  "MCS": {
+    "airframes": "MCS.png"
+  },
+  "MDA": {
+    "airframes": "MDA.png"
+  },
+  "MDF": {
+    "airframes": "MDF.png"
+  },
+  "MDG": {
+    "airframes": "MDG.png"
+  },
+  "MEA": {
+    "airframes": "MEA.png"
+  },
+  "MEC": {
+    "airframes": "MEC.png"
+  },
+  "MEM": {
+    "airframes": "MEM.png"
+  },
+  "MEP": {
+    "airframes": "MEP.png"
+  },
+  "MGE": {
+    "airframes": "MGE.png"
+  },
+  "MGL": {
+    "airframes": "MGL.png"
+  },
+  "MHV": {
+    "airframes": "MHV.png"
+  },
+  "MLA": {
+    "airframes": "MLA.png"
+  },
+  "MLD": {
+    "airframes": "MLD.png"
+  },
+  "MLN": {
+    "airframes": "MLN.png"
+  },
+  "MMA": {
+    "airframes": "MMA.png"
+  },
+  "MMD": {
+    "airframes": "MMD.png"
+  },
+  "MML": {
+    "airframes": "MML.png"
+  },
+  "MMX": {
+    "airframes": "MMX.png"
+  },
+  "MMZ": {
+    "airframes": "MMZ.png"
+  },
+  "MNB": {
+    "airframes": "MNB.png"
+  },
+  "MNE": {
+    "airframes": "MNE.png"
+  },
+  "MNG": {
+    "airframes": "MNG.png"
+  },
+  "MNS": {
+    "airframes": "MNS.png"
+  },
+  "MNT": {
+    "airframes": "MNT.png"
+  },
+  "MNU": {
+    "airframes": "MNU.png"
+  },
+  "MPH": {
+    "airframes": "MPH.png"
+  },
+  "MSA": {
+    "airframes": "MSA.png"
+  },
+  "MSC": {
+    "airframes": "MSC.png"
+  },
+  "MSI": {
+    "airframes": "MSI.png"
+  },
+  "MSJ": {
+    "airframes": "MSJ.png"
+  },
+  "MSR": {
+    "airframes": "MSR.png"
+  },
+  "MSX": {
+    "airframes": "MSX.png"
+  },
+  "MTL": {
+    "airframes": "MTL.png"
+  },
+  "MTN": {
+    "airframes": "MTN.png"
+  },
+  "MUI": {
+    "airframes": "MUI.png"
+  },
+  "MWG": {
+    "airframes": "MWG.png"
+  },
+  "MWI": {
+    "airframes": "MWI.png"
+  },
+  "MWM": {
+    "airframes": "MWM.png"
+  },
+  "MXA": {
+    "airframes": "MXA.png"
+  },
+  "MXD": {
+    "airframes": "MXD.png"
+  },
+  "MXS": {
+    "airframes": "MXS.png"
+  },
+  "MXY": {
+    "airframes": "MXY.png"
+  },
+  "MYD": {
+    "airframes": "MYD.png"
+  },
+  "MYI": {
+    "airframes": "MYI.png"
+  },
+  "MYM": {
+    "airframes": "MYM.png"
+  },
+  "MYP": {
+    "airframes": "MYP.png"
+  },
+  "MYW": {
+    "airframes": "MYW.png"
+  },
+  "MYX": {
+    "airframes": "MYX.png"
+  },
+  "NAB": {
+    "airframes": "NAB.png"
+  },
+  "NAC": {
+    "airframes": "NAC.png"
+  },
+  "NAE": {
+    "airframes": "NAE.png"
+  },
+  "NAI": {
+    "airframes": "NAI.png"
+  },
+  "NAN": {
+    "airframes": "NAN.png"
+  },
+  "NBT": {
+    "airframes": "NBT.png"
+  },
+  "NCA": {
+    "airframes": "NCA.png"
+  },
+  "NCB": {
+    "airframes": "NCB.png"
+  },
+  "NCR": {
+    "airframes": "NCR.png"
+  },
+  "NDA": {
+    "airframes": "NDA.png"
+  },
+  "NEA": {
+    "airframes": "NEA.png"
+  },
+  "NEF": {
+    "airframes": "NEF.png"
+  },
+  "NEL": {
+    "airframes": "NEL.png"
+  },
+  "NGE": {
+    "airframes": "NGE.png"
+  },
+  "NIA": {
+    "airframes": "NIA.png"
+  },
+  "NIG": {
+    "airframes": "NIG.png"
+  },
+  "NIN": {
+    "airframes": "NIN.png"
+  },
+  "NIS": {
+    "airframes": "NIS.png"
+  },
+  "NJE": {
+    "airframes": "NJE.png"
+  },
+  "NKP": {
+    "airframes": "NKP.png"
+  },
+  "NKS": {
+    "airframes": "NKS.png"
+  },
+  "NLA": {
+    "airframes": "NLA.png"
+  },
+  "NMA": {
+    "airframes": "NMA.png"
+  },
+  "NMB": {
+    "airframes": "NMB.png"
+  },
+  "NOK": {
+    "airframes": "NOK.png"
+  },
+  "NOS": {
+    "airframes": "NOS.png"
+  },
+  "NOV": {
+    "airframes": "NOV.png"
+  },
+  "NOZ": {
+    "airframes": "NOZ.png"
+  },
+  "NPT": {
+    "airframes": "NPT.png"
+  },
+  "NRL": {
+    "airframes": "NRL.png"
+  },
+  "NSE": {
+    "airframes": "NSE.png"
+  },
+  "NSO": {
+    "airframes": "NSO.png"
+  },
+  "NSS": {
+    "airframes": "NSS.png"
+  },
+  "NSZ": {
+    "airframes": "NSZ.png"
+  },
+  "NTA": {
+    "airframes": "NTA.png"
+  },
+  "NTG": {
+    "airframes": "NTG.png"
+  },
+  "NTH": {
+    "airframes": "NTH.png"
+  },
+  "NTR": {
+    "airframes": "NTR.png"
+  },
+  "NVD": {
+    "airframes": "NVD.png"
+  },
+  "NVQ": {
+    "airframes": "NVQ.png"
+  },
+  "NVR": {
+    "airframes": "NVR.png"
+  },
+  "NWA": {
+    "airframes": "NWA.png"
+  },
+  "NWG": {
+    "airframes": "NWG.png"
+  },
+  "NWL": {
+    "airframes": "NWL.png"
+  },
+  "NWS": {
+    "airframes": "NWS.png"
+  },
+  "NXA": {
+    "airframes": "NXA.png"
+  },
+  "NYL": {
+    "airframes": "NYL.png"
+  },
+  "NYS": {
+    "airframes": "NYS.png"
+  },
+  "NYT": {
+    "airframes": "NYT.png"
+  },
+  "OAE": {
+    "airframes": "OAE.png"
+  },
+  "OAL": {
+    "airframes": "OAL.png"
+  },
+  "OAO": {
+    "airframes": "OAO.png"
+  },
+  "OAW": {
+    "airframes": "OAW.png"
+  },
+  "OCN": {
+    "airframes": "OCN.png"
+  },
+  "OGN": {
+    "airframes": "OGN.png"
+  },
+  "OKA": {
+    "airframes": "OKA.png"
+  },
+  "OLA": {
+    "airframes": "OLA.png"
+  },
+  "OLC": {
+    "airframes": "OLC.png"
+  },
+  "OMA": {
+    "airframes": "OMA.png",
+    "soaring": "OMA.svg"
+  },
+  "OMD": {
+    "airframes": "OMD.png"
+  },
+  "OMS": {
+    "airframes": "OMS.png"
+  },
+  "OPS": {
+    "airframes": "OPS.png"
+  },
+  "OVA": {
+    "airframes": "OVA.png"
+  },
+  "OZW": {
+    "airframes": "OZW.png"
+  },
+  "PAC": {
+    "airframes": "PAC.png"
+  },
+  "PAG": {
+    "airframes": "PAG.png"
+  },
+  "PAL": {
+    "airframes": "PAL.png",
+    "soaring": "PAL.svg"
+  },
+  "PAM": {
+    "airframes": "PAM.png"
+  },
+  "PAO": {
+    "airframes": "PAO.png"
+  },
+  "PAS": {
+    "airframes": "PAS.png"
+  },
+  "PBD": {
+    "airframes": "PBD.png"
+  },
+  "PCO": {
+    "airframes": "PCO.png"
+  },
+  "PDT": {
+    "airframes": "PDT.png"
+  },
+  "PER": {
+    "airframes": "PER.png"
+  },
+  "PEV": {
+    "airframes": "PEV.png"
+  },
+  "PFY": {
+    "airframes": "PFY.png"
+  },
+  "PFZ": {
+    "airframes": "PFZ.png"
+  },
+  "PGA": {
+    "airframes": "PGA.png"
+  },
+  "PGT": {
+    "airframes": "PGT.png"
+  },
+  "PHA": {
+    "airframes": "PHA.png"
+  },
+  "PIA": {
+    "airframes": "PIA.png"
+  },
+  "PIC": {
+    "airframes": "PIC.png"
+  },
+  "PLM": {
+    "airframes": "PLM.png"
+  },
+  "PLR": {
+    "airframes": "PLR.png"
+  },
+  "PLS": {
+    "airframes": "PLS.png"
+  },
+  "PNP": {
+    "airframes": "PNP.png"
+  },
+  "PNX": {
+    "airframes": "PNX.png"
+  },
+  "POE": {
+    "airframes": "POE.png"
+  },
+  "PRF": {
+    "airframes": "PRF.png"
+  },
+  "PRX": {
+    "airframes": "PRX.png"
+  },
+  "PSC": {
+    "airframes": "PSC.png"
+  },
+  "PST": {
+    "airframes": "PST.png"
+  },
+  "PSV": {
+    "airframes": "PSV.png"
+  },
+  "PTB": {
+    "airframes": "PTB.png"
+  },
+  "PTK": {
+    "airframes": "PTK.png"
+  },
+  "PTR": {
+    "airframes": "PTR.png"
+  },
+  "PUE": {
+    "airframes": "PUE.png"
+  },
+  "PVG": {
+    "airframes": "PVG.png"
+  },
+  "PVL": {
+    "airframes": "PVL.png"
+  },
+  "PWD": {
+    "airframes": "PWD.png"
+  },
+  "QAI": {
+    "airframes": "QAI.png"
+  },
+  "QCL": {
+    "airframes": "QCL.png"
+  },
+  "QDA": {
+    "airframes": "QDA.png"
+  },
+  "QFA": {
+    "airframes": "QFA.png",
+    "soaring": "QFA.svg"
+  },
+  "QGA": {
+    "airframes": "QGA.png"
+  },
+  "QNT": {
+    "airframes": "QNT.png"
+  },
+  "QSM": {
+    "airframes": "QSM.png"
+  },
+  "QTR": {
+    "airframes": "QTR.png",
+    "soaring": "QTR.svg"
+  },
+  "QXE": {
+    "airframes": "QXE.png"
+  },
+  "RAC": {
+    "airframes": "RAC.png"
+  },
+  "RAE": {
+    "airframes": "RAE.png"
+  },
+  "RAM": {
+    "airframes": "RAM.png",
+    "soaring": "RAM.svg"
+  },
+  "RAN": {
+    "airframes": "RAN.png"
+  },
+  "RAR": {
+    "airframes": "RAR.png"
+  },
+  "RAX": {
+    "airframes": "RAX.png"
+  },
+  "RBA": {
+    "airframes": "RBA.png",
+    "soaring": "RBA.svg"
+  },
+  "RBG": {
+    "airframes": "RBG.png"
+  },
+  "RDS": {
+    "airframes": "RDS.png"
+  },
+  "REA": {
+    "airframes": "REA.png"
+  },
+  "REG": {
+    "airframes": "REG.png"
+  },
+  "RER": {
+    "airframes": "RER.png"
+  },
+  "REU": {
+    "airframes": "REU.png"
+  },
+  "RFD": {
+    "airframes": "RFD.png"
+  },
+  "RGR": {
+    "airframes": "RGR.png"
+  },
+  "RIV": {
+    "airframes": "RIV.png"
+  },
+  "RJA": {
+    "airframes": "RJA.png"
+  },
+  "RKA": {
+    "airframes": "RKA.png"
+  },
+  "RLH": {
+    "airframes": "RLH.png"
+  },
+  "RLU": {
+    "airframes": "RLU.png"
+  },
+  "RLX": {
+    "airframes": "RLX.png"
+  },
+  "RMX": {
+    "airframes": "RMX.png"
+  },
+  "RMY": {
+    "airframes": "RMY.png"
+  },
+  "RNA": {
+    "airframes": "RNA.png"
+  },
+  "RNG": {
+    "airframes": "RNG.png"
+  },
+  "ROI": {
+    "airframes": "ROI.png"
+  },
+  "ROJ": {
+    "airframes": "ROJ.png"
+  },
+  "RON": {
+    "airframes": "RON.png"
+  },
+  "ROT": {
+    "airframes": "ROT.png",
+    "soaring": "ROT.svg"
+  },
+  "ROU": {
+    "airframes": "ROU.png"
+  },
+  "RPA": {
+    "airframes": "RPA.png"
+  },
+  "RPB": {
+    "airframes": "RPB.png"
+  },
+  "RRV": {
+    "airframes": "RRV.png"
+  },
+  "RSB": {
+    "airframes": "RSB.png"
+  },
+  "RSI": {
+    "airframes": "RSI.png"
+  },
+  "RSP": {
+    "airframes": "RSP.png"
+  },
+  "RTM": {
+    "airframes": "RTM.png"
+  },
+  "RTU": {
+    "airframes": "RTU.png"
+  },
+  "RUC": {
+    "airframes": "RUC.png"
+  },
+  "RUK": {
+    "airframes": "RUK.png"
+  },
+  "RUN": {
+    "airframes": "RUN.png"
+  },
+  "RVF": {
+    "airframes": "RVF.png"
+  },
+  "RVP": {
+    "airframes": "RVP.png"
+  },
+  "RVV": {
+    "airframes": "RVV.png"
+  },
+  "RWD": {
+    "airframes": "RWD.png"
+  },
+  "RXA": {
+    "airframes": "RXA.png"
+  },
+  "RXI": {
+    "airframes": "RXI.png",
+    "soaring": "RXI.svg"
+  },
+  "RXP": {
+    "airframes": "RXP.png"
+  },
+  "RYA": {
+    "airframes": "RYA.png"
+  },
+  "RYL": {
+    "airframes": "RYL.png"
+  },
+  "RYR": {
+    "airframes": "RYR.png",
+    "soaring": "RYR.svg"
+  },
+  "RYS": {
+    "airframes": "RYS.png"
+  },
+  "RZO": {
+    "airframes": "RZO.png"
+  },
+  "SAA": {
+    "airframes": "SAA.png"
+  },
+  "SAQ": {
+    "airframes": "SAQ.png"
+  },
+  "SAS": {
+    "airframes": "SAS.png",
+    "soaring": "SAS.svg"
+  },
+  "SAT": {
+    "airframes": "SAT.png"
+  },
+  "SAU": {
+    "airframes": "SAU.png"
+  },
+  "SAW": {
+    "airframes": "SAW.png"
+  },
+  "SAX": {
+    "airframes": "SAX.png"
+  },
+  "SAY": {
+    "airframes": "SAY.png"
+  },
+  "SBI": {
+    "airframes": "SBI.png"
+  },
+  "SBK": {
+    "airframes": "SBK.png"
+  },
+  "SBL": {
+    "airframes": "SBL.png"
+  },
+  "SBO": {
+    "airframes": "SBO.png"
+  },
+  "SBS": {
+    "airframes": "SBS.png"
+  },
+  "SBU": {
+    "airframes": "SBU.png"
+  },
+  "SCE": {
+    "airframes": "SCE.png"
+  },
+  "SCJ": {
+    "airframes": "SCJ.png"
+  },
+  "SCW": {
+    "airframes": "SCW.png"
+  },
+  "SCX": {
+    "airframes": "SCX.png"
+  },
+  "SDA": {
+    "airframes": "SDA.png"
+  },
+  "SDG": {
+    "airframes": "SDG.png"
+  },
+  "SDM": {
+    "airframes": "SDM.png"
+  },
+  "SDR": {
+    "airframes": "SDR.png"
+  },
+  "SEH": {
+    "airframes": "SEH.png"
+  },
+  "SEJ": {
+    "airframes": "SEJ.png"
+  },
+  "SEK": {
+    "airframes": "SEK.png"
+  },
+  "SEN": {
+    "airframes": "SEN.png"
+  },
+  "SER": {
+    "airframes": "SER.png"
+  },
+  "SET": {
+    "airframes": "SET.png"
+  },
+  "SEU": {
+    "airframes": "SEU.png"
+  },
+  "SEY": {
+    "airframes": "SEY.png"
+  },
+  "SFJ": {
+    "airframes": "SFJ.png"
+  },
+  "SFR": {
+    "airframes": "SFR.png"
+  },
+  "SGD": {
+    "airframes": "SGD.png"
+  },
+  "SHA": {
+    "airframes": "SHA.png"
+  },
+  "SHH": {
+    "airframes": "SHH.png"
+  },
+  "SHS": {
+    "airframes": "SHS.png"
+  },
+  "SHU": {
+    "airframes": "SHU.png"
+  },
+  "SIA": {
+    "airframes": "SIA.png",
+    "soaring": "SIA.svg"
+  },
+  "SIL": {
+    "airframes": "SIL.png"
+  },
+  "SJB": {
+    "airframes": "SJB.png"
+  },
+  "SJO": {
+    "airframes": "SJO.png"
+  },
+  "SJX": {
+    "airframes": "SJX.png",
+    "soaring": "SJX.svg"
+  },
+  "SJY": {
+    "airframes": "SJY.png"
+  },
+  "SKK": {
+    "airframes": "SKK.png"
+  },
+  "SKP": {
+    "airframes": "SKP.png"
+  },
+  "SKU": {
+    "airframes": "SKU.png"
+  },
+  "SKV": {
+    "airframes": "SKV.png"
+  },
+  "SKW": {
+    "airframes": "SKW.png"
+  },
+  "SKX": {
+    "airframes": "SKX.png"
+  },
+  "SKY": {
+    "airframes": "SKY.png"
+  },
+  "SKZ": {
+    "airframes": "SKZ.png"
+  },
+  "SLI": {
+    "airframes": "SLI.png"
+  },
+  "SLM": {
+    "airframes": "SLM.png"
+  },
+  "SMA": {
+    "airframes": "SMA.png"
+  },
+  "SMK": {
+    "airframes": "SMK.png"
+  },
+  "SMR": {
+    "airframes": "SMR.png"
+  },
+  "SNA": {
+    "airframes": "SNA.png"
+  },
+  "SNC": {
+    "airframes": "SNC.png"
+  },
+  "SNG": {
+    "airframes": "SNG.png"
+  },
+  "SNJ": {
+    "airframes": "SNJ.png"
+  },
+  "SOL": {
+    "airframes": "SOL.png"
+  },
+  "SPA": {
+    "airframes": "SPA.png"
+  },
+  "SPM": {
+    "airframes": "SPM.png"
+  },
+  "SPQ": {
+    "soaring": "SPQ.svg"
+  },
+  "SQP": {
+    "airframes": "SQP.png"
+  },
+  "SRN": {
+    "airframes": "SRN.png"
+  },
+  "SRQ": {
+    "airframes": "SRQ.png"
+  },
+  "SRR": {
+    "airframes": "SRR.png"
+  },
+  "SRS": {
+    "airframes": "SRS.png"
+  },
+  "SRU": {
+    "airframes": "SRU.png"
+  },
+  "SRY": {
+    "airframes": "SRY.png"
+  },
+  "SSF": {
+    "airframes": "SSF.png"
+  },
+  "SSV": {
+    "airframes": "SSV.png"
+  },
+  "STK": {
+    "airframes": "STK.png"
+  },
+  "STT": {
+    "airframes": "STT.png"
+  },
+  "STW": {
+    "airframes": "STW.png"
+  },
+  "SUD": {
+    "airframes": "SUD.png"
+  },
+  "SUS": {
+    "airframes": "SUS.png"
+  },
+  "SUT": {
+    "airframes": "SUT.png"
+  },
+  "SUV": {
+    "airframes": "SUV.png"
+  },
+  "SVA": {
+    "airframes": "SVA.png",
+    "soaring": "SVA.svg"
+  },
+  "SVI": {
+    "airframes": "SVI.png"
+  },
+  "SVR": {
+    "airframes": "SVR.png"
+  },
+  "SVS": {
+    "airframes": "SVS.png"
+  },
+  "SWA": {
+    "airframes": "SWA.png",
+    "soaring": "SWA.svg"
+  },
+  "SWG": {
+    "airframes": "SWG.png"
+  },
+  "SWN": {
+    "airframes": "SWN.png"
+  },
+  "SWQ": {
+    "airframes": "SWQ.png"
+  },
+  "SWR": {
+    "airframes": "SWR.png",
+    "soaring": "SWR.svg"
+  },
+  "SWT": {
+    "airframes": "SWT.png"
+  },
+  "SWU": {
+    "airframes": "SWU.png"
+  },
+  "SWX": {
+    "airframes": "SWX.png"
+  },
+  "SXS": {
+    "airframes": "SXS.png"
+  },
+  "SYA": {
+    "airframes": "SYA.png"
+  },
+  "SYL": {
+    "airframes": "SYL.png"
+  },
+  "SYR": {
+    "airframes": "SYR.png"
+  },
+  "SZN": {
+    "airframes": "SZN.png"
+  },
+  "TAH": {
+    "airframes": "TAH.png"
+  },
+  "TAM": {
+    "airframes": "TAM.png"
+  },
+  "TAN": {
+    "airframes": "TAN.png"
+  },
+  "TAO": {
+    "airframes": "TAO.png"
+  },
+  "TAP": {
+    "airframes": "TAP.png",
+    "soaring": "TAP.svg"
+  },
+  "TAR": {
+    "airframes": "TAR.png"
+  },
+  "TAX": {
+    "airframes": "TAX.png"
+  },
+  "TAY": {
+    "airframes": "TAY.png"
+  },
+  "TBA": {
+    "airframes": "TBA.png"
+  },
+  "TBC": {
+    "airframes": "TBC.png"
+  },
+  "TBN": {
+    "airframes": "TBN.png"
+  },
+  "TBS": {
+    "airframes": "TBS.png"
+  },
+  "TCV": {
+    "airframes": "TCV.png"
+  },
+  "TDR": {
+    "airframes": "TDR.png"
+  },
+  "TDS": {
+    "airframes": "TDS.png"
+  },
+  "TEZ": {
+    "airframes": "TEZ.png"
+  },
+  "TFL": {
+    "airframes": "TFL.png"
+  },
+  "TGN": {
+    "airframes": "TGN.png"
+  },
+  "TGW": {
+    "airframes": "TGW.png",
+    "soaring": "TGW.svg"
+  },
+  "TGZ": {
+    "airframes": "TGZ.png"
+  },
+  "THA": {
+    "airframes": "THA.png",
+    "soaring": "THA.svg"
+  },
+  "THD": {
+    "airframes": "THD.png"
+  },
+  "THT": {
+    "airframes": "THT.png"
+  },
+  "THU": {
+    "airframes": "THU.png"
+  },
+  "THY": {
+    "airframes": "THY.png",
+    "soaring": "THY.svg"
+  },
+  "TIC": {
+    "airframes": "TIC.png"
+  },
+  "TIN": {
+    "airframes": "TIN.png"
+  },
+  "TIW": {
+    "airframes": "TIW.png"
+  },
+  "TJK": {
+    "airframes": "TJK.png"
+  },
+  "TJT": {
+    "airframes": "TJT.png"
+  },
+  "TKC": {
+    "airframes": "TKC.png"
+  },
+  "TKJ": {
+    "airframes": "TKJ.png"
+  },
+  "TLM": {
+    "airframes": "TLM.png"
+  },
+  "TLR": {
+    "airframes": "TLR.png"
+  },
+  "TMG": {
+    "airframes": "TMG.png"
+  },
+  "TMN": {
+    "airframes": "TMN.png"
+  },
+  "TMT": {
+    "airframes": "TMT.png"
+  },
+  "TNO": {
+    "airframes": "TNO.png"
+  },
+  "TNW": {
+    "airframes": "TNW.png"
+  },
+  "TOK": {
+    "airframes": "TOK.png"
+  },
+  "TOM": {
+    "airframes": "TOM.png"
+  },
+  "TON": {
+    "airframes": "TON.png"
+  },
+  "TOS": {
+    "airframes": "TOS.png"
+  },
+  "TOT": {
+    "airframes": "TOT.png"
+  },
+  "TOW": {
+    "airframes": "TOW.png"
+  },
+  "TPA": {
+    "airframes": "TPA.png"
+  },
+  "TPC": {
+    "airframes": "TPC.png"
+  },
+  "TQN": {
+    "airframes": "TQN.png"
+  },
+  "TRA": {
+    "airframes": "TRA.png",
+    "soaring": "TRA.svg"
+  },
+  "TRJ": {
+    "airframes": "TRJ.png"
+  },
+  "TRS": {
+    "airframes": "TRS.png"
+  },
+  "TSC": {
+    "airframes": "TSC.png",
+    "soaring": "TSC.svg"
+  },
+  "TSG": {
+    "airframes": "TSG.png"
+  },
+  "TSH": {
+    "airframes": "TSH.png"
+  },
+  "TTF": {
+    "airframes": "TTF.png"
+  },
+  "TTL": {
+    "airframes": "TTL.png"
+  },
+  "TTW": {
+    "airframes": "TTW.png"
+  },
+  "TUA": {
+    "airframes": "TUA.png"
+  },
+  "TUI": {
+    "airframes": "TUI.png"
+  },
+  "TUP": {
+    "airframes": "TUP.png"
+  },
+  "TUX": {
+    "airframes": "TUX.png"
+  },
+  "TVF": {
+    "airframes": "TVF.png"
+  },
+  "TVJ": {
+    "airframes": "TVJ.png"
+  },
+  "TVL": {
+    "airframes": "TVL.png"
+  },
+  "TVP": {
+    "airframes": "TVP.png"
+  },
+  "TVQ": {
+    "airframes": "TVQ.png"
+  },
+  "TVS": {
+    "airframes": "TVS.png"
+  },
+  "TWB": {
+    "airframes": "TWB.png",
+    "soaring": "TWB.svg"
+  },
+  "TWI": {
+    "airframes": "TWI.png"
+  },
+  "TWN": {
+    "airframes": "TWN.png"
+  },
+  "TYA": {
+    "airframes": "TYA.png"
+  },
+  "TZP": {
+    "airframes": "TZP.png"
+  },
+  "UAE": {
+    "airframes": "UAE.png",
+    "soaring": "UAE.svg"
+  },
+  "UAL": {
+    "airframes": "UAL.png",
+    "soaring": "UAL.svg"
+  },
+  "UBA": {
+    "airframes": "UBA.png",
+    "soaring": "UBA.svg"
+  },
+  "UBD": {
+    "airframes": "UBD.png"
+  },
+  "UBG": {
+    "airframes": "UBG.png"
+  },
+  "UBT": {
+    "airframes": "UBT.png"
+  },
+  "UCA": {
+    "airframes": "UCA.png"
+  },
+  "UCC": {
+    "airframes": "UCC.png"
+  },
+  "UCG": {
+    "airframes": "UCG.png"
+  },
+  "UEA": {
+    "airframes": "UEA.png"
+  },
+  "UGD": {
+    "airframes": "UGD.png"
+  },
+  "UIA": {
+    "airframes": "UIA.png"
+  },
+  "UKL": {
+    "airframes": "UKL.png"
+  },
+  "ULS": {
+    "airframes": "ULS.png"
+  },
+  "UPS": {
+    "airframes": "UPS.png"
+  },
+  "URF": {
+    "airframes": "URF.png"
+  },
+  "URG": {
+    "airframes": "URG.png"
+  },
+  "USC": {
+    "airframes": "USC.png"
+  },
+  "UTA": {
+    "airframes": "UTA.png"
+  },
+  "UTN": {
+    "airframes": "UTN.png"
+  },
+  "UTY": {
+    "airframes": "UTY.png"
+  },
+  "UVT": {
+    "airframes": "UVT.png"
+  },
+  "UZA": {
+    "airframes": "UZA.png"
+  },
+  "UZB": {
+    "airframes": "UZB.png"
+  },
+  "UZS": {
+    "airframes": "UZS.png"
+  },
+  "VAA": {
+    "airframes": "VAA.png"
+  },
+  "VAG": {
+    "airframes": "VAG.png"
+  },
+  "VAL": {
+    "airframes": "VAL.png"
+  },
+  "VAS": {
+    "airframes": "VAS.png"
+  },
+  "VAW": {
+    "airframes": "VAW.png"
+  },
+  "VBW": {
+    "airframes": "VBW.png"
+  },
+  "VCV": {
+    "airframes": "VCV.png"
+  },
+  "VDA": {
+    "airframes": "VDA.png"
+  },
+  "VEC": {
+    "airframes": "VEC.png"
+  },
+  "VES": {
+    "airframes": "VES.png"
+  },
+  "VFC": {
+    "airframes": "VFC.png"
+  },
+  "VGV": {
+    "airframes": "VGV.png"
+  },
+  "VID": {
+    "airframes": "VID.png"
+  },
+  "VIL": {
+    "airframes": "VIL.png"
+  },
+  "VIR": {
+    "airframes": "VIR.png",
+    "soaring": "VIR.svg"
+  },
+  "VIV": {
+    "airframes": "VIV.png"
+  },
+  "VIZ": {
+    "airframes": "VIZ.png"
+  },
+  "VJC": {
+    "airframes": "VJC.png",
+    "soaring": "VJC.svg"
+  },
+  "VJT": {
+    "airframes": "VJT.png"
+  },
+  "VKG": {
+    "airframes": "VKG.png"
+  },
+  "VLG": {
+    "airframes": "VLG.png"
+  },
+  "VNE": {
+    "airframes": "VNE.png"
+  },
+  "VOA": {
+    "airframes": "VOA.png"
+  },
+  "VOE": {
+    "airframes": "VOE.png"
+  },
+  "VOI": {
+    "airframes": "VOI.png"
+  },
+  "VOS": {
+    "airframes": "VOS.png"
+  },
+  "VOZ": {
+    "airframes": "VOZ.png",
+    "soaring": "VOZ.svg"
+  },
+  "VRD": {
+    "airframes": "VRD.png"
+  },
+  "VRE": {
+    "airframes": "VRE.png"
+  },
+  "VSV": {
+    "airframes": "VSV.png"
+  },
+  "VTA": {
+    "airframes": "VTA.png"
+  },
+  "VTE": {
+    "airframes": "VTE.png"
+  },
+  "VTI": {
+    "airframes": "VTI.png"
+  },
+  "VTM": {
+    "airframes": "VTM.png"
+  },
+  "VTS": {
+    "airframes": "VTS.png"
+  },
+  "VVA": {
+    "airframes": "VVA.png"
+  },
+  "VVC": {
+    "airframes": "VVC.png"
+  },
+  "VXP": {
+    "airframes": "VXP.png"
+  },
+  "WAA": {
+    "airframes": "WAA.png"
+  },
+  "WAE": {
+    "airframes": "WAE.png"
+  },
+  "WAF": {
+    "airframes": "WAF.png"
+  },
+  "WAL": {
+    "airframes": "WAL.png"
+  },
+  "WAV": {
+    "airframes": "WAV.png"
+  },
+  "WAZ": {
+    "airframes": "WAZ.png"
+  },
+  "WCC": {
+    "airframes": "WCC.png"
+  },
+  "WEN": {
+    "airframes": "WEN.png"
+  },
+  "WEW": {
+    "airframes": "WEW.png"
+  },
+  "WGN": {
+    "airframes": "WGN.png"
+  },
+  "WHT": {
+    "airframes": "WHT.png"
+  },
+  "WIA": {
+    "airframes": "WIA.png"
+  },
+  "WIF": {
+    "airframes": "WIF.png"
+  },
+  "WIG": {
+    "airframes": "WIG.png"
+  },
+  "WIN": {
+    "airframes": "WIN.png"
+  },
+  "WJA": {
+    "airframes": "WJA.png",
+    "soaring": "WJA.svg"
+  },
+  "WMT": {
+    "airframes": "WMT.png"
+  },
+  "WON": {
+    "airframes": "WON.png"
+  },
+  "WOW": {
+    "airframes": "WOW.png"
+  },
+  "WPT": {
+    "airframes": "WPT.png"
+  },
+  "WRF": {
+    "airframes": "WRF.png"
+  },
+  "WSG": {
+    "airframes": "WSG.png"
+  },
+  "WSN": {
+    "airframes": "WSN.png"
+  },
+  "WST": {
+    "airframes": "WST.png"
+  },
+  "WSW": {
+    "airframes": "WSW.png"
+  },
+  "WUK": {
+    "airframes": "WUK.png"
+  },
+  "WZZ": {
+    "airframes": "WZZ.png",
+    "soaring": "WZZ.svg"
+  },
+  "XAK": {
+    "airframes": "XAK.png"
+  },
+  "XAU": {
+    "airframes": "XAU.png"
+  },
+  "XAX": {
+    "airframes": "XAX.png"
+  },
+  "XLK": {
+    "airframes": "XLK.png"
+  },
+  "XOJ": {
+    "airframes": "XOJ.png"
+  },
+  "XRC": {
+    "airframes": "XRC.png"
+  },
+  "YZR": {
+    "airframes": "YZR.png"
+  },
+  "ZAV": {
+    "airframes": "ZAV.png"
+  }
+}

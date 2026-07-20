@@ -36,6 +36,29 @@ function flagHtml(iso2) {
   return '<span class="fi fi-' + code + '" aria-hidden="true"></span>';
 }
 
+// Renders a small airline logo prefix, looked up by the 3-letter ICAO
+// airline designator that leads a flight callsign (e.g. "RYR1234" ->
+// "RYR") — independent of however Operator's own name got resolved, so a
+// logo can show even when e.g. adsbdb resolved Operator but has no code of
+// its own. Two vendored tiers (static/airline-logos/, see
+// AIRLINE_LOGO_MANIFEST in map-init.js), tried in priority order and never
+// silently replaced once a higher tier has an answer, same
+// higher-tier-wins rule as every other enrichment field in this app:
+// soaring-symbols (MIT, curated) first, airframesio/airline-images
+// (broader but unlicensed, scraped from other trackers) as a fallback.
+// Missing/invalid input degrades to no logo, same as flagHtml().
+function airlineLogoHtml(callsign) {
+  if (!callsign || typeof callsign !== 'string') return '';
+  const code = callsign.trim().toUpperCase().slice(0, 3);
+  if (!/^[A-Z]{3}$/.test(code)) return '';
+  const entry = AIRLINE_LOGO_MANIFEST[code];
+  if (!entry) return '';
+  const src = entry.soaring
+    ? 'airline-logos/soaring/' + entry.soaring
+    : 'airline-logos/airframes/' + entry.airframes;
+  return '<img class="airline-logo" src="' + src + '" alt="">';
+}
+
 // --- Unit-aware formatters (metric ⇄ imperial, see currentUnitSystem) ---
 // Every value normalizeOpenSky()/normalizeAdsbExchange() produce is stored
 // in one canonical unit (meters, km/h, m/s, knots for airspeeds/wind — the
@@ -348,11 +371,21 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const countryValue = info.originCountry
     ? (countryFlagHtml ? countryFlagHtml + ' ' + info.originCountry : info.originCountry)
     : null;
-  // Operator is plain text — its country lives in its own dedicated
-  // "Operator Country" row/flag below, never smeared onto this row (same
-  // "one concept per row" pattern as Registered Owner having its own flag
-  // rather than decorating Operator).
-  const operatorValue = info.operator || null;
+  // Operator is plain text plus a leading airline logo (looked up from the
+  // callsign, not from however the operator name itself was resolved — see
+  // airlineLogoHtml()) — its country lives in its own dedicated "Operator
+  // Country" row/flag below, never smeared onto this row (same "one
+  // concept per row" pattern as Registered Owner having its own flag
+  // rather than decorating Operator). The logo can resolve even when the
+  // name itself didn't (no live/adsbdb/Flywme tier had an answer, but the
+  // callsign prefix still matches a vendored logo) — falls back to the
+  // literal "Unknown" text next to the logo rather than suppressing it,
+  // same as every other identityRow field's unresolved state.
+  const operatorLogoHtml = airlineLogoHtml(info.callsign);
+  const operatorText = info.operator || (operatorLogoHtml ? 'Unknown' : null);
+  const operatorValue = operatorText
+    ? (operatorLogoHtml ? operatorLogoHtml + ' ' + operatorText : operatorText)
+    : null;
   // Operator Country: adsbdb's flightroute.airline (name + ISO together) as
   // the primary tier, falling back to our own callsign-prefix enrichment
   // (enrichment/callsign.py's AIRLINE_OPERATORS table) when adsbdb has
