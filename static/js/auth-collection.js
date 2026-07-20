@@ -8,8 +8,19 @@
 // details.js/parsers.js/main.js, none of which depend on anything defined
 // here.
 
-const authStatusEl = document.getElementById('auth-status');
-const collectionToggleBtn = document.getElementById('collection-toggle');
+// Account widget: a "Sign in with Google" button (signed out) or an avatar
+// pill that opens a dropdown menu (signed in) — see index.html's
+// #account-bar, pinned to the top-right corner above #hud. Only one of
+// #google-signin-btn/#user-menu is ever shown at a time (toggled via the
+// `hidden` attribute in renderAuthStatus()).
+const googleSigninBtn = document.getElementById('google-signin-btn');
+const userMenuEl = document.getElementById('user-menu');
+const userMenuTrigger = document.getElementById('user-menu-trigger');
+const userAvatarEl = document.getElementById('user-avatar');
+const userMenuNameEl = document.getElementById('user-menu-name');
+const userMenuEmailEl = document.getElementById('user-menu-email');
+const userMenuCollectionBtn = document.getElementById('user-menu-collection');
+const userMenuLogoutBtn = document.getElementById('user-menu-logout');
 const collectionPanelEl = document.getElementById('collection-panel');
 const collectionPanelTitleEl = document.getElementById('collection-panel-title');
 const collectionPanelGridEl = document.getElementById('collection-panel-grid');
@@ -67,15 +78,33 @@ const BOOKMARK_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" aria-
 const EMPTY_STATE_ICON_SVG = '<svg viewBox="' + CATEGORY_ICON_SVGS.unknown.viewBox + '">' +
   CATEGORY_ICON_SVGS.unknown.inner + '</svg>';
 
+// A plain gray-silhouette placeholder for a signed-in user with no Google
+// profile photo (picture: null is a real, expected value, not an error) or
+// whose photo URL fails to load — an inline data: SVG, not a network
+// request, so it never itself needs a fallback.
+const DEFAULT_AVATAR_SVG = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+  '<circle cx="12" cy="12" r="12" fill="#cbd5e1"/>' +
+  '<circle cx="12" cy="9.5" r="4" fill="#fff"/>' +
+  '<path d="M4 21c1.4-4.2 5-6 8-6s6.6 1.8 8 6" fill="#fff"/></svg>');
+
 function renderAuthStatus() {
+  closeUserMenu();
   if (currentUser) {
-    authStatusEl.textContent = `Hi, ${currentUser.name || currentUser.email} · Logout`;
-    authStatusEl.classList.add('logged-in');
+    googleSigninBtn.hidden = true;
+    userMenuEl.hidden = false;
+    userAvatarEl.src = currentUser.picture || DEFAULT_AVATAR_SVG;
+    userMenuNameEl.textContent = currentUser.name || currentUser.email;
+    userMenuEmailEl.textContent = currentUser.email || '';
   } else {
-    authStatusEl.textContent = 'Sign in with Google';
-    authStatusEl.classList.remove('logged-in');
+    googleSigninBtn.hidden = false;
+    userMenuEl.hidden = true;
   }
   updateSaveButtonState();
+}
+
+function closeUserMenu() {
+  userMenuEl.classList.remove('open');
 }
 
 async function fetchCollectionCards() {
@@ -106,19 +135,37 @@ async function checkAuth() {
   }
 }
 
-authStatusEl.addEventListener('click', async () => {
-  if (currentUser) {
-    await fetch('/api/logout', { method: 'POST' });
-    currentUser = null;
-    savedCardsByIcao.clear();
-    removedCards.clear();
-    renderAuthStatus();
-    collectionPanelEl.setAttribute('hidden', '');
-  } else {
-    // A full-page navigation, not fetch() — OAuth needs a real browser
-    // redirect to Google's consent screen, not an XHR.
-    window.location.href = '/api/login/google';
-  }
+// A full-page navigation, not fetch() — OAuth needs a real browser redirect
+// to Google's consent screen, not an XHR.
+googleSigninBtn.addEventListener('click', () => {
+  window.location.href = '/api/login/google';
+});
+
+userAvatarEl.addEventListener('error', () => { userAvatarEl.src = DEFAULT_AVATAR_SVG; });
+
+// Same open/close-on-outside-click pattern as #category-filter/#basemap-filter
+// in state-filters.js — stopPropagation on the trigger so this click doesn't
+// immediately re-close the menu it just opened via the document listener.
+userMenuTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  userMenuEl.classList.toggle('open');
+});
+document.addEventListener('click', closeUserMenu);
+
+userMenuLogoutBtn.addEventListener('click', async () => {
+  closeUserMenu();
+  await fetch('/api/logout', { method: 'POST' });
+  currentUser = null;
+  savedCardsByIcao.clear();
+  removedCards.clear();
+  renderAuthStatus();
+  collectionPanelEl.setAttribute('hidden', '');
+});
+
+userMenuCollectionBtn.addEventListener('click', () => {
+  closeUserMenu();
+  collectionPanelEl.removeAttribute('hidden');
+  renderCollectionPanelFromState();
 });
 
 // --- Save-to-collection (sidebar button) ---
@@ -393,16 +440,6 @@ async function undoRemoveCard(card) {
   }
   renderCollectionPanelFromState();
 }
-
-collectionToggleBtn.addEventListener('click', () => {
-  const isHidden = collectionPanelEl.hasAttribute('hidden');
-  if (isHidden) {
-    collectionPanelEl.removeAttribute('hidden');
-    renderCollectionPanelFromState();
-  } else {
-    collectionPanelEl.setAttribute('hidden', '');
-  }
-});
 
 collectionPanelCloseBtn.addEventListener('click', () => {
   collectionPanelEl.setAttribute('hidden', '');

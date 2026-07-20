@@ -8,6 +8,13 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/me', (route) => route.fulfill({ json: { user: LOGGED_IN_USER } }));
 });
 
+// "My collection" now lives inside the avatar dropdown (#user-menu), not a
+// standalone always-visible button — open the menu, then click the item.
+async function openCollectionPanel(page) {
+  await page.click('#user-menu-trigger');
+  await page.click('#user-menu-collection');
+}
+
 test('saving the selected aircraft posts a snapshot and shows it as saved', async ({ page }) => {
   let postedBody = null;
   await page.route('**/api/collection', (route) => {
@@ -110,7 +117,7 @@ test('opens the collection panel and renders cards grouped by category', async (
 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  await page.click('#collection-toggle');
+  await openCollectionPanel(page);
 
   await expect(page.locator('#collection-panel')).not.toHaveAttribute('hidden', '');
   await expect(page.locator('#collection-panel-title')).toHaveText('My collection · 2');
@@ -129,7 +136,7 @@ test('shows a descriptive empty state with an icon when there is nothing saved',
   await page.route('**/api/collection', (route) => route.fulfill({ json: { cards: [] } }));
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  await page.click('#collection-toggle');
+  await openCollectionPanel(page);
 
   await expect(page.locator('#collection-panel-empty')).toBeVisible();
   await expect(page.locator('.collection-empty-icon svg')).toBeVisible();
@@ -161,7 +168,7 @@ test('removing a card dims it with an Undo action instead of deleting it outrigh
 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  await page.click('#collection-toggle');
+  await openCollectionPanel(page);
   await expect(page.locator('.collection-card')).toHaveCount(1);
 
   await page.click('.collection-card-icon-btn');
@@ -186,13 +193,13 @@ test('closing the panel hides it via the close button and Escape', async ({ page
   await page.route('**/api/collection', (route) => route.fulfill({ json: { cards: [] } }));
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  await page.click('#collection-toggle');
+  await openCollectionPanel(page);
   await expect(page.locator('#collection-panel')).toBeVisible();
 
   await page.click('#collection-panel-close');
   await expect(page.locator('#collection-panel')).toBeHidden();
 
-  await page.click('#collection-toggle');
+  await openCollectionPanel(page);
   await expect(page.locator('#collection-panel')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#collection-panel')).toBeHidden();
