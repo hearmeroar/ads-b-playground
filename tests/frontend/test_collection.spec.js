@@ -40,7 +40,40 @@ test('saving the selected aircraft posts a snapshot and shows it as saved', asyn
   expect(postedBody).not.toBeNull();
   expect(postedBody.icao24).toBe('aaaaaa');
   expect(postedBody.snapshot).toBeTruthy();
+  // aaaaaa's own lat/lon from states.json — proves the position captured at
+  // save time is actually sent, not just present on detailsById.
+  expect(postedBody.lat).toBeCloseTo(44.0, 1);
+  expect(postedBody.lon).toBeCloseTo(21.0, 1);
   await expect(page.locator('#sidebar-save-collection')).toHaveClass(/saved/);
+});
+
+test('the saved snapshot carries categoryGroup, not just Unknown (regression for the "always lands in Unknown" bug)', async ({ page }) => {
+  // dddddd is OpenSky category 4 ("large") per states.json — categoryGroup
+  // used to never reach the POST body at all (it lives as a sibling of
+  // detailsById's `info`, not inside it), so every saved card silently fell
+  // back to the panel's 'unknown' group regardless of the real aircraft.
+  let postedBody = null;
+  await page.route('**/api/collection', (route) => {
+    if (route.request().method() === 'POST') {
+      postedBody = route.request().postDataJSON();
+      route.fulfill({ status: 201, json: { id: 'card1', ...postedBody, saved_at: 1752835200 } });
+    } else {
+      route.fulfill({ json: { cards: [] } });
+    }
+  });
+
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await page.evaluate(() => {
+    const marker = openskyMarkers.get('dddddd');
+    if (marker && marker._icon) marker._icon.click();
+  });
+  await expect(page.locator('#sidebar')).toHaveClass(/open/);
+
+  await page.click('#sidebar-save-collection');
+  await page.waitForTimeout(150);
+
+  expect(postedBody.snapshot.categoryGroup).toBe('large');
 });
 
 test('re-selecting an already-saved aircraft shows the save button already filled', async ({ page }) => {
@@ -130,6 +163,95 @@ test('opens the collection panel and renders cards grouped by category', async (
 
   await expect(page.locator('.collection-card-title').first()).toHaveText('OO-DUP');
   await expect(page.locator('.collection-card-subtitle').first()).toHaveText('A320');
+});
+
+test('a card saved before the categoryGroup fix (no categoryGroup, only categoryDisplay) still groups correctly, not under Unknown', async ({ page }) => {
+  // Regression for a real report: cards saved prior to the categoryGroup
+  // snapshot fix already had a correct categoryDisplay (that field never
+  // had the bug), but no categoryGroup key at all — every one of them
+  // would otherwise sink into "Unknown / no info" forever, since nothing
+  // ever re-derives the group for a card already sitting in storage.
+  await page.route('**/api/collection', (route) => {
+    if (route.request().method() === 'GET') {
+      route.fulfill({ json: { cards: [{
+        id: 'card1', user_id: 'u1', icao24: 'dddddd', saved_at: 1752835200,
+        snapshot: {
+          registration: 'OO-DUP', aircraftType: 'A320',
+          categoryDisplay: 'A5 — Heavy (>300,000 lbs)',
+        },
+        photo_url: null, photo_link: null, photo_photographer: null,
+      }] } });
+    } else {
+      route.continue();
+    }
+  });
+
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await openCollectionPanel(page);
+
+  const groupHeaders = page.locator('.collection-group-header');
+  await expect(groupHeaders).toHaveCount(1);
+  await expect(groupHeaders.first()).toHaveText('Heavy · 1');
+});
+
+test('a card shows category, operator, operator country, manufacturer/model, saved date, and nearby airport', async ({ page }) => {
+  await page.route('**/api/collection', (route) => {
+    if (route.request().method() === 'GET') {
+      route.fulfill({ json: { cards: [{
+        id: 'card1', user_id: 'u1', icao24: 'dddddd', saved_at: 1752835200,
+        snapshot: {
+          registration: 'OO-DUP', aircraftType: 'A320', categoryGroup: 'large',
+          categoryDisplay: 'A3 — Large (75,000-300,000 lbs)',
+          operator: 'Test Air', operatorCountry: 'Switzerland', operatorCountryIso: 'CH',
+          manufacturer: 'Airbus', model: 'A320',
+        },
+        photo_url: null, photo_link: null, photo_photographer: null,
+        location: { lat: 44.8125, lon: 20.4612, nearest_airport: {
+          name: 'Belgrade Nikola Tesla Airport', city: 'Belgrade', country: 'Serbia',
+          iata: 'BEG', icao: 'LYBE', distance_km: 3.2,
+        } },
+      }] } });
+    } else {
+      route.continue();
+    }
+  });
+
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await openCollectionPanel(page);
+
+  await expect(page.locator('.collection-card-category')).toHaveText('A3 · Large');
+  await expect(page.locator('.collection-card-meta').nth(0)).toHaveText('Test Air');
+  await expect(page.locator('.collection-card-meta').nth(1)).toHaveText('Switzerland');
+  await expect(page.locator('.collection-card-meta').nth(1).locator('.fi')).toBeVisible();
+  await expect(page.locator('.collection-card-meta').nth(2)).toHaveText('Airbus A320');
+  await expect(page.locator('.collection-card-footer-row').nth(0)).toContainText('Saved');
+  await expect(page.locator('.collection-card-footer-row').nth(1)).toContainText('Belgrade Nikola Tesla Airport (BEG)');
+  await expect(page.locator('.collection-card-footer-row').nth(1)).toContainText('~3 km');
+});
+
+test('a card with no location falls back to plain coordinates, and omits rows for absent fields', async ({ page }) => {
+  await page.route('**/api/collection', (route) => {
+    if (route.request().method() === 'GET') {
+      route.fulfill({ json: { cards: [{
+        id: 'card1', user_id: 'u1', icao24: 'aaaaaa', saved_at: 1752835200,
+        snapshot: { registration: 'TC-LGY', aircraftType: 'A20N', categoryGroup: 'unknown' },
+        photo_url: null, photo_link: null, photo_photographer: null,
+        location: { lat: 44.0, lon: 21.0, nearest_airport: null },
+      }] } });
+    } else {
+      route.continue();
+    }
+  });
+
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await openCollectionPanel(page);
+
+  await expect(page.locator('.collection-card-category')).toHaveCount(0);
+  await expect(page.locator('.collection-card-meta')).toHaveCount(0);
+  await expect(page.locator('.collection-card-footer-row').nth(1)).toHaveText('44.00, 21.00');
 });
 
 test('shows a descriptive empty state with an icon when there is nothing saved', async ({ page }) => {

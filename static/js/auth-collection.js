@@ -209,11 +209,22 @@ async function saveCurrentAircraftToCollection() {
   const merged = buildMergedDetails(selectedIcao24);
   const photos = galleryCache.get(selectedIcao24) || [];
   const photo = photos[0];
+  // categoryGroup lives as a sibling of `info` on the detailsById entry
+  // (see icons.js), never inside `info` itself — merged.info alone would
+  // never carry it, which is what silently sank every saved card into the
+  // "Unknown / no info" group. Folded in by hand here, same idiom as the
+  // FlightAware route-merge callers use elsewhere for fields info doesn't
+  // natively have.
+  const snapshot = Object.assign({}, merged.info, {
+    categoryGroup: details && details.categoryGroup,
+  });
   const body = {
     icao24: selectedIcao24,
-    snapshot: merged.info,
+    snapshot: snapshot,
     category_code: details && details.categoryCode,
     is_ground_vehicle: !!(details && details.isGroundVehicle),
+    lat: details && details.lat,
+    lon: details && details.lon,
     photo_url: photo ? ((photo.thumbnail_large && photo.thumbnail_large.src) || null) : null,
     photo_link: photo ? (photo.link || null) : null,
     photo_photographer: photo ? (photo.photographer || null) : null,
@@ -259,6 +270,76 @@ if (sidebarSaveCollectionBtn) {
 
 // --- Collection panel ---
 
+// Appends a row of plain text, optionally prefixed with a small trusted
+// HTML fragment (flagHtml()/airlineLogoHtml() output only — both validate
+// their input against a strict code/callsign regex before building
+// markup, so this innerHTML use never touches an external free-text
+// value). The value itself always goes through textContent, never string
+// concatenation — same "don't trust external strings as markup"
+// discipline the rest of this file already applies to photographer
+// credits, since operator/manufacturer/airport names here also
+// ultimately trace back to adsbdb/live-feed data. Omits the row entirely
+// when there's no text, matching detailRow()'s "hide, don't show blank"
+// convention rather than a fixed set of always-present rows.
+function appendCardRow(parent, className, iconHtml, text) {
+  if (!text) return;
+  const row = document.createElement('div');
+  row.className = className;
+  if (iconHtml) {
+    const icon = document.createElement('span');
+    icon.className = 'collection-card-row-icon';
+    icon.innerHTML = iconHtml;
+    row.appendChild(icon);
+  }
+  const valueEl = document.createElement('span');
+  valueEl.textContent = text;
+  row.appendChild(valueEl);
+  parent.appendChild(row);
+  return row;
+}
+
+// Which weight-class group a card belongs in. Prefers the snapshot's own
+// categoryGroup (set at save time, see the fix above), but falls back to
+// deriving it from categoryDisplay's bare label (via splitCategoryDisplay()
+// + CATEGORY_LABEL_TO_GROUP, both globals from render-details.js) when
+// categoryGroup is missing — specifically so cards saved *before* that fix
+// shipped (which already had a correct categoryDisplay, just never
+// categoryGroup) self-heal into their real group the next time the panel
+// renders, rather than staying stuck in "Unknown / no info" forever until
+// someone manually re-saves every one of them.
+function categoryGroupForCard(card) {
+  const snapshot = card.snapshot || {};
+  if (snapshot.categoryGroup) return snapshot.categoryGroup;
+  const parts = splitCategoryDisplay(snapshot.categoryDisplay);
+  const derived = parts && CATEGORY_LABEL_TO_GROUP[parts.label];
+  return derived || 'unknown';
+}
+
+function formatCardSavedAt(savedAtSeconds) {
+  if (!savedAtSeconds) return null;
+  return 'Saved ' + new Date(savedAtSeconds * 1000).toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+// "What was nearby" — the nearest-airport lookup app.py resolves
+// server-side at save time (enrichment/airports.py, a local OpenFlights-
+// derived table, no network call per save). Falls back to bare
+// coordinates if the airports table had nothing (e.g. failed to load).
+function formatCardLocation(location) {
+  if (!location) return null;
+  const airport = location.nearest_airport;
+  if (airport) {
+    const code = airport.iata || airport.icao;
+    const place = code ? `${airport.name} (${code})` : airport.name;
+    return `Near ${place} · ~${Math.round(airport.distance_km)} km`;
+  }
+  if (location.lat != null && location.lon != null) {
+    return `${location.lat.toFixed(2)}, ${location.lon.toFixed(2)}`;
+  }
+  return null;
+}
+
 function renderCollectionCard(card) {
   const el = document.createElement('div');
   el.className = 'collection-card';
@@ -285,21 +366,50 @@ function renderCollectionCard(card) {
   }
   el.appendChild(photoWrap);
 
-  // Compact body: registration/ICAO as the title, aircraft type as the one
-  // subtitle line — photo + type are the two things this card is required
-  // to always show, so operator/etc are left out to keep it compact.
+  // Registration/ICAO as the title, aircraft type as the subtitle — the two
+  // things this card always shows. Everything below is added whenever the
+  // snapshot/location actually has it; no dedup against the subtitle is
+  // attempted yet (e.g. manufacturer/model can restate what aircraftType
+  // already implies) — deliberately deferred, not decided yet.
+  const snapshot = card.snapshot || {};
   const body = document.createElement('div');
   body.className = 'collection-card-body';
 
   const title = document.createElement('div');
   title.className = 'collection-card-title';
-  title.textContent = (card.snapshot && card.snapshot.registration) || card.icao24 || 'Unknown';
+  title.textContent = snapshot.registration || card.icao24 || 'Unknown';
   body.appendChild(title);
 
   const subtitle = document.createElement('div');
   subtitle.className = 'collection-card-subtitle';
-  subtitle.textContent = (card.snapshot && card.snapshot.aircraftType) || 'Unknown type';
+  subtitle.textContent = snapshot.aircraftType || 'Unknown type';
   body.appendChild(subtitle);
+
+  // Category — same "code · label" split the sidebar's own Category row
+  // uses, plus its one-sentence description as a small caption. Both
+  // splitCategoryDisplay()/CATEGORY_DESCRIPTIONS are globals defined in
+  // render-details.js, which — despite loading *after* this file in
+  // index.html's script order — has always finished executing by the
+  // time a card is actually rendered (a panel open/render only ever
+  // happens from a later user action, never at page-load time).
+  const categoryParts = splitCategoryDisplay(snapshot.categoryDisplay);
+  if (categoryParts) {
+    appendCardRow(body, 'collection-card-category', null,
+      categoryParts.code ? `${categoryParts.code} · ${categoryParts.label}` : categoryParts.label);
+    const description = CATEGORY_DESCRIPTIONS[categoryParts.label];
+    if (description) appendCardRow(body, 'collection-card-category-desc', null, description);
+  }
+
+  appendCardRow(body, 'collection-card-meta', airlineLogoHtml(snapshot.callsign), snapshot.operator);
+  appendCardRow(body, 'collection-card-meta', flagHtml(snapshot.operatorCountryIso), snapshot.operatorCountry);
+  const manufacturerModel = [snapshot.manufacturer, snapshot.model].filter(Boolean).join(' ');
+  appendCardRow(body, 'collection-card-meta', null, manufacturerModel);
+
+  const footer = document.createElement('div');
+  footer.className = 'collection-card-footer';
+  appendCardRow(footer, 'collection-card-footer-row', null, formatCardSavedAt(card.saved_at));
+  appendCardRow(footer, 'collection-card-footer-row', null, formatCardLocation(card.location));
+  if (footer.childElementCount) body.appendChild(footer);
 
   el.appendChild(body);
 
@@ -378,7 +488,7 @@ function renderCollectionPanel(cards, liveCount) {
 
   const byGroup = new Map();
   for (const card of cards) {
-    const group = (card.snapshot && card.snapshot.categoryGroup) || 'unknown';
+    const group = categoryGroupForCard(card);
     if (!byGroup.has(group)) byGroup.set(group, []);
     byGroup.get(group).push(card);
   }
@@ -425,6 +535,7 @@ async function undoRemoveCard(card) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         icao24: card.icao24, snapshot: card.snapshot,
+        lat: card.location && card.location.lat, lon: card.location && card.location.lon,
         photo_url: card.photo_url, photo_link: card.photo_link,
         photo_photographer: card.photo_photographer,
       }),

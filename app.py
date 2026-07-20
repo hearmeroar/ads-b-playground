@@ -52,6 +52,7 @@ from flask import Flask, jsonify, redirect, request, send_from_directory, sessio
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from enrichment.aircraft_enrichment import enrich_identity
+from enrichment.airports import nearest_airport
 
 try:
     from dotenv import load_dotenv
@@ -1238,6 +1239,15 @@ def api_collection_save():
         "photo_link": data.get("photo_link"),
         "photo_photographer": data.get("photo_photographer"),
     }
+    # Where/when the aircraft was actually seen — capture metadata, not
+    # identity data, so it stays out of SNAPSHOT_FIELDS/snapshot the same
+    # way photo_fields does. The nearest-airport lookup is resolved here,
+    # server-side, rather than trusting a client-computed value, since the
+    # airports table only exists in enrichment/airports.py.
+    lat, lon = data.get("lat"), data.get("lon")
+    location = None
+    if lat is not None and lon is not None:
+        location = {"lat": lat, "lon": lon, "nearest_airport": nearest_airport(lat, lon)}
     # One card per icao24 per user: re-saving an already-collected aircraft
     # refreshes its snapshot/photo/timestamp in place rather than appending
     # a duplicate — this is what makes a simple filled/outline toggle icon
@@ -1249,6 +1259,7 @@ def api_collection_save():
         existing["snapshot"] = snapshot
         existing["saved_at"] = time.time()
         existing.update(photo_fields)
+        existing["location"] = location
         _save_collections()
         return jsonify(existing), 200
     card = {
@@ -1257,6 +1268,7 @@ def api_collection_save():
         "icao24": icao24,
         "saved_at": time.time(),
         "snapshot": snapshot,
+        "location": location,
         **photo_fields,
     }
     _collections.append(card)

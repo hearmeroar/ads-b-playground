@@ -183,6 +183,44 @@ def test_delete_unknown_card_is_404(client):
     assert resp.status_code == 404
 
 
+def test_save_with_coordinates_resolves_nearest_airport(client):
+    # 44.8125, 20.4612 is right over Belgrade Nikola Tesla Airport (BEG) —
+    # a real, stable OpenFlights entry, not a fixture-only value.
+    login_as(client, "u1")
+    resp = client.post("/api/collection", json={
+        "icao24": "4b1805", "snapshot": {"registration": "HB-JXA"},
+        "lat": 44.8125, "lon": 20.4612,
+    })
+    card = resp.get_json()
+    assert card["location"]["lat"] == 44.8125
+    assert card["location"]["lon"] == 20.4612
+    airport = card["location"]["nearest_airport"]
+    assert airport["iata"] == "BEG"
+    assert airport["distance_km"] < 20
+
+
+def test_save_without_coordinates_has_no_location(client):
+    login_as(client, "u1")
+    resp = client.post("/api/collection", json={
+        "icao24": "4b1805", "snapshot": {"registration": "HB-JXA"},
+    })
+    assert resp.get_json()["location"] is None
+
+
+def test_resaving_updates_location(client):
+    login_as(client, "u1")
+    client.post("/api/collection", json={
+        "icao24": "4b1805", "snapshot": {"registration": "HB-JXA"},
+        "lat": 44.8125, "lon": 20.4612,
+    })
+    second = client.post("/api/collection", json={
+        "icao24": "4b1805", "snapshot": {"registration": "HB-JXA"},
+        "lat": 51.4700, "lon": -0.4543,  # London Heathrow
+    })
+    airport = second.get_json()["location"]["nearest_airport"]
+    assert airport["iata"] == "LHR"
+
+
 def test_collections_persist_to_disk_and_reload(monkeypatch, tmp_path):
     collections_file = tmp_path / "collections_roundtrip.jsonl"
     monkeypatch.setattr(app, "COLLECTIONS_FILE", str(collections_file))
