@@ -335,6 +335,31 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 
 - **Collection panel bulk operations** — Currently can save/unsave one aircraft at a time. Backlog idea: bulk export (JSON), bulk delete, filtering within collection. No firm priority.
 
+Collections: remove category description from card; improve "where spotted"
+
+Goal: simplify the per-card snapshot shown in the Collections panel by removing the opaque category description and replacing it with a clear, actionable "Where spotted" area that tells the user exactly where and when the airframe was seen in this session or when the snapshot was taken.
+
+Motivation: the current category description on saved cards (e.g. "A3 — Large (...)") is redundant and not the most useful snippet for a saved aircraft. Users asked for clearer location/context: nearest airport, distance, coordinates and time of the observed position — information that helps recall why the aircraft was saved.
+
+Acceptance criteria:
+ - The saved card UI no longer displays the long category description string. Instead, it shows a concise category badge (e.g. "A3 · Large") with no long parenthetical weight range.
+ - Each card shows a `Where spotted` line with the best-available capture context in this precedence order:
+	 1. `nearest_airport` (name + IATA/ICAO) + distance in km (when `location.nearest_airport` is available in the snapshot), e.g. "Near Belgrade Nikola Tesla (BEG) · ~12 km";
+	 2. Else: coordinates as `lat, lon` plus a humanized distance from the project's `AREA_CENTER` (e.g. "44.7866, 20.4489 · 12 km from center"); include the observed `ts`/`saved_at` timestamp formatted in local time if present.
+	 3. Also show the data source that provided the observed position (OpenSky / adsb.fi / adsbdb / local trail) as a small badge.
+ - Backend `POST /api/collection` continues to accept `location` as before, but the server must ensure the stored snapshot contains `location.nearest_airport` when valid (resolve server-side on save if `lat`/`lon` provided). If nearest airport cannot be resolved, store `location:{lat,lon}` only.
+ - Existing saved cards without `nearest_airport` self-heal in the UI: when the Collections panel opens, client-side logic derives and displays the best fallback (coordinates + distance) if `nearest_airport` is missing; no data loss.
+
+Implementation notes / next steps:
+1. Backend: modify `api_collection_save()` (`app.py`) to call `enrichment/airports.nearest_airport(lat, lon)` on save when `lat`/`lon` are present and augment the persisted `location` field with `nearest_airport` (name, iata, icao, distance_km). Keep `location` nullable when coordinates are absent.
+2. Frontend: update `auth-collection.js`'s `renderCollectionCard()` so it no longer prints the full `categoryDisplay` parenthetical text; instead render a compact badge plus a `Where spotted` row assembled from `card.location.nearest_airport` or `card.location.lat/lon` + `card.saved_at` and a small source badge.
+3. Ensure `SNAPSHOT_FIELDS`/`storage.save_collection()` allow `location.nearest_airport` through; when saving from the sidebar, include `lat`/`lon` (the sidebar already has them) so the backend can resolve the airport server-side rather than trusting client computation.
+4. Backfill: no mandatory migration — a saved card without `nearest_airport` displays fallback coordinates; optionally add a one-off background migration script later to enrich existing rows if desired.
+5. Tests: add backend unit test for `POST /api/collection` that supplies `lat`/`lon` and asserts `location.nearest_airport` is stored; add Playwright test verifying the Collections panel card shows the new `Where spotted` text for a saved card with `nearest_airport`, and falls back to coordinates when absent.
+
+Estimate: 0.25–0.5 dev days (backend augmentation + small frontend render change + tests).
+
+
 - **Dark mode** — Basemap picker already supports dark styles (CARTO Dark, Esri Dark), but sidebar/HUD don't adapt. CSS `prefers-color-scheme` media query support would help. Low priority.
 
 - **Sidebar search/filter** — Once collection grows large, searching within saved aircraft by callsign/type/operator would help. Not urgent for current use case.
@@ -409,6 +434,55 @@ Implementation notes:
 	 not required for this change.
 
 Estimate: 0.5–1 dev days (frontend work + one Playwright smoke test).
+
+Bug: локальный трек иногда не рисуется (intermittent local-track draw failure)
+
+Симптомы:
+- Иногда при выборе самолёта исторический трек не рисуется даже если в сессии
+	были собраны локальные точки (live trail) — ничего в `trackLayerGroup` не
+	появляется, либо виден только пустой контейнер без линий.
+
+Шаги воспроизведения (приближённо):
+1. Открой страницу с несколькими самолётами в зоне (стандартный fixture).
+2. Выберите самолёт, у которого `/api/track/<icao24>` возвращает 404 (нет
+	 серверного трека). Наблюдайте, как фронтенд собирает локальную историю из
+	 опросов (polls) в память во время нескольких итераций опроса.
+3. Закройте сайдбар и снова откройте тот же самолёт.
+4. Иногда трек не рисуется — поведение нестабильно, воспроизводится не всегда.
+
+Ожидаемое поведение:
+- Локальный трек (последние N точек из poll) всегда рисуется при открытии
+	сайдбара для самолёта, если серверный `/api/track` отсутствует.
+
+Критерии приёма / минимальный фикс:
+- Исправить причину пропуска отрисовки и добавить регрессионный тест
+	(Playwright): симулировать последовательные poll-обновления, закрыть/открыть
+	сайдбар и убедиться, что трек отрисован.
+- При невозможности восстановить полную причину — добавить защитный
+	fallback: если `trackLayerGroup` пуст и `localTrailCache[icao24]` не пуст,
+	форсированно построить polyline из кеша и логировать причину в консоль.
+
+Возможные причины (предварительная диагностика):
+- Гонка по состояниям: `localTrailCache` обновляется асинхронно и
+	`selectAircraft()` вызывается до того, как кеш сериализовался/популярен.
+- Капы/тримы: кеш обрезается/очищается при закрытии сайдбара из-за гонки
+	lifecycle handlers (debounce/clear). 
+- Редкая ошибка рендеринга Leaflet: polyline создаётся но сразу очищается
+	другим кодом (clear/re-sync) в той же итерации event loop.
+
+Отладочные шаги / быстрый план фикса:
+1. Добавить подробные временные логи (dev-mode) в `selectAircraft()` и в
+	 код, который читает `localTrailCache` при отрисовке трека; логировать
+	 количество точек и источник (local vs server).
+2. В `selectAircraft()` добавить синхронную проверку: если server track
+	 отсутствует и `localTrailCache[icao24]` есть — немедленно нарисовать
+	 полилинию как fallback (atomic path) перед любыми `clearStaleMarkers`/
+	 `syncMarkers()` вызовами, чтобы избежать гонок.
+3. Написать Playwright-спек: мокать `/api/track/<icao24>` → 404, мокать
+	 последовательные `/api/states` ответы с точками, затем закрыть/открыть
+	 сайдбар и assert на наличие `trackLayerGroup.getLayers().length > 0`.
+
+Оценка: 0.25–0.75 dev days (логирование + форсированный fallback + E2E тест).
 
 --
 
@@ -583,3 +657,21 @@ Implementation notes:
 	hrefs continue to be respected when desired.
 
 Estimate: 0.5–1 dev days (helper + replacements + license audit note + tests).
+
+UI: Replace airports layer checkboxes with toggles
+
+Motivation:
+ - HUD's airports layer currently uses checkboxes styled as rows; accessible toggles (on/off switches) provide clearer affordance, match other UI controls, and convey immediate state.
+
+Acceptance criteria:
+ - Replace the HUD `#toggle-airports` checkbox with a semantic toggle control (button role="switch" or input type="checkbox" with .toggle class) visually styled as a switch.
+ - Behavior unchanged: toggling on fetches `/api/airports` for current bbox; toggling off clears the cluster layer immediately and stops further fetches.
+ - Keyboard focusable, accessible ARIA states (`aria-checked`) and label.
+ - Playwright test: toggling shows/hides airports and preserves debounced fetch behavior.
+
+Implementation notes:
+1. Update `static/index.html` HUD markup: swap checkbox markup for a `button.role-switch` or keep input but apply `.toggle` class; ensure id remains `toggle-airports`.
+2. Update `static/style.css` with `.toggle` styles (no build step) and ensure `[hidden]` rules don't conflict.
+3. Update `static/js/state-filters.js` event wiring to treat the toggle as a switch: use `aria-checked` and `element.classList.toggle('on')`.
+4. Add Playwright test `tests/frontend/test_airports_toggle.spec.js` asserting toggle behavior.
+Estimate: 0.25 dev days (markup + CSS + wiring + E2E smoke).
