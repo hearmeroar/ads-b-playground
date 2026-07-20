@@ -4,6 +4,7 @@ short-circuiting at the first tier that produces a value. A live-feed value
 enrichment only ever fills a gap the live feeds didn't cover.
 """
 
+from .aircraft_category import category_for_aircraft
 from .aircraft_database import DEFAULT_AIRCRAFT_DATABASE, normalize_aircraft_type
 from .callsign import decode_callsign
 from .countries import country_iso_for_name
@@ -24,19 +25,26 @@ def enrich_identity(
     known_operator=None,
     known_manufacture_year=None,
 ):
-    """Returns a dict with all 7 keys always present: country, operator,
-    operator_country, registration, manufacturer, model, year_built. Each
-    is either None or {"value", "source", "confidence"} — "country" and
-    "operator_country" additionally carry "country_iso" whenever resolved,
-    so a flag can render regardless of which tier supplied the value (the
-    frontend renders it via the flag-icons SVG library; this module never
-    renders one itself). "country" always means the aircraft's country of
-    *registration* (ICAO Annex 7 nationality mark); "operator_country"
-    means the operating airline's home country — two distinct concepts,
-    never conflated under one field. "operator_country" has no live tier
-    (no live feed reports an operator's home country) — its only source is
-    callsign_decode, a byproduct of the same lookup that resolves
-    "operator" itself.
+    """Returns a dict with all 8 keys always present: country, operator,
+    operator_country, registration, manufacturer, model, year_built,
+    category. Each is either None or {"value", "source", "confidence"} —
+    "country" and "operator_country" additionally carry "country_iso"
+    whenever resolved, so a flag can render regardless of which tier
+    supplied the value (the frontend renders it via the flag-icons SVG
+    library; this module never renders one itself). "country" always means
+    the aircraft's country of *registration* (ICAO Annex 7 nationality
+    mark); "operator_country" means the operating airline's home country —
+    two distinct concepts, never conflated under one field. "operator_country"
+    has no live tier (no live feed reports an operator's home country) —
+    its only source is callsign_decode, a byproduct of the same lookup that
+    resolves "operator" itself. "category" likewise has no live tier (the
+    live ADS-B emitter category, when a source reports one, is resolved
+    entirely on the frontend from the poll data — this module never sees
+    it) — its value is the same "A1".."A7" DO-260B code the frontend's own
+    OpenSky/adsb.fi/airplanes.live category handling already speaks, derived
+    from whichever manufacturer/model this call resolved via
+    `aircraft_category.py`'s static MTOW-based table, the lowest-priority
+    fallback in the whole category chain.
     """
     db_record = DEFAULT_AIRCRAFT_DATABASE.lookup(icao24)
     reg_country = lookup_country_by_registration(registration)
@@ -136,6 +144,20 @@ def enrich_identity(
             "confidence": db_record["confidence"],
         }
 
+    # --- category (ADS-B emitter category, e.g. "A3") — the lowest-priority
+    # fallback in this app's whole category chain: only reached when the
+    # live feed reported no category at all *and* manufacturer+model were
+    # resolved by one of the tiers above. Confidence is below 1.0 (unlike
+    # the exact-match aircraft_type_db tier manufacturer/model themselves
+    # use) since a specific tail number's real certified MTOW can vary
+    # slightly by sub-variant/operator configuration in ways one
+    # representative-per-model table can't capture.
+    category = None
+    if manufacturer and model:
+        cat_code = category_for_aircraft(manufacturer["value"], model["value"])
+        if cat_code:
+            category = {"value": cat_code, "source": "aircraft_category_db", "confidence": 0.9}
+
     return {
         "country": country,
         "operator": operator,
@@ -144,4 +166,5 @@ def enrich_identity(
         "manufacturer": manufacturer,
         "model": model,
         "year_built": year_built,
+        "category": category,
     }

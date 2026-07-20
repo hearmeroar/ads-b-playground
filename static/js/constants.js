@@ -77,6 +77,7 @@ const SOURCE_DISPLAY_NAMES = {
 const ENRICHMENT_BASIS_LABELS = {
   registration_prefix: 'registration prefix', icao24_lookup: 'aircraft database lookup',
   callsign_decode: 'callsign decode', aircraft_type_db: 'aircraft type database',
+  aircraft_category_db: 'aircraft category database',
 };
 // Dev-mode field provenance: which source(s) populated a given `info`
 // field. OPENSKY_NATIVE_FIELDS are the ones OpenSky's own state vector

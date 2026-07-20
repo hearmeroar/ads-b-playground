@@ -1038,6 +1038,50 @@ because photographer name and photo URL come from an external API.
     a live value first (`source: "live"`) before ever touching a local
     table — enrichment only fills a gap the live feeds didn't cover, never
     overrides one.
+    **`aircraft_category.py`** is a small, standalone sibling module (not
+    folded into `aircraft_database.py`, since it's a genuinely different
+    concept from that file's ICAO24/type-code lookups): a static
+    `(manufacturer, model) → ADS-B emitter category code` table (`"A1"`
+    through `"A7"`), one entry per `TYPE_CODE_TABLE` pair (verified 1:1 by
+    `test_aircraft_category.py`, so it can never silently drift out of sync
+    as that table grows), each looked up from the real, publicly published
+    maximum takeoff weight (MTOW) of that aircraft type against the fixed
+    DO-260B/FAA weight thresholds (A1 <15,500 lb, A2 15,500–75,000 lb, A3
+    75,000–300,000 lb, A5 >300,000 lb; A7 for every rotorcraft
+    unconditionally, since DO-260B assigns that code by aircraft kind, not
+    weight; A4 only for the Boeing 757, the standard textbook "high vortex
+    large" example) — not guessed. Several of these turned out to be
+    genuinely counter-intuitive from general size class alone and were
+    confirmed by looking up each type's real MTOW rather than assumed: the
+    Airbus A320 and Boeing 737 families are both well past the 75,000 lb
+    Large threshold (~170,000+ lb) despite reading as "just a narrow-body",
+    while the Gulfstream G450 (74,600 lb, Small) and G550 (91,000 lb,
+    Large) sit on opposite sides of that exact threshold despite being
+    adjacent models in the same family. This is `enrich_identity()`'s
+    **lowest-priority tier in the whole category chain** — OpenSky's own
+    numeric category and adsb.fi/airplanes.live's letter+digit code (see
+    "Category" further below) always win when a live source actually
+    reports one; this table is only ever consulted once manufacturer and
+    model are already resolved (by one of the tiers above) *and* no live
+    source reported a category for that aircraft at all. Returned as
+    `category` in `enrich_identity()`'s result dict, `{"value": "A3",
+    "source": "aircraft_category_db", "confidence": 0.9}` — confidence
+    deliberately below the exact-match `aircraft_type_db` tier's 1.0, since
+    a specific tail number's real certified MTOW can vary slightly by
+    sub-variant/operator configuration in ways one representative-per-model
+    table can't capture. On the frontend, `buildMergedDetails()`
+    (`sidebar-track.js`) special-cases this field rather than folding it
+    into the generic `ENRICHMENT_FIELD_MAP` loop, since the backend's raw
+    code needs formatting into the same `"A3 — Large (...)"` shape a real
+    adsb.fi/airplanes.live response would produce before it can fill
+    `info.categoryDisplay` — done by calling `formatAdsbExchangeCategory()`
+    (`render-details.js`) directly, which is what lets the existing
+    `splitCategoryDisplay()`/`CATEGORY_LABEL_TO_GROUP` rendering machinery
+    handle a Flywme-sourced category with no changes of its own. Like every
+    other Flywme field, it only fills `categoryDisplay` when empty and
+    still co-displays its own badge alongside a live source's when one
+    already won, so the fallback stays visible/debuggable in dev mode
+    rather than silently disappearing.
   - **`/api/identity/<icao24>`** (`app.py`) is fetched lazily from
     `selectAircraft()` — same lazy-on-click pattern as `loadTrack`/
     `loadGallery`, never during the main poll, so the 50+ on-screen
@@ -1901,6 +1945,16 @@ because photographer name and photo URL come from an external API.
   radius source's own category instead). Both call sites now go through
   `openskyCategoryIsMeaningful(category)`, defined once next to
   `OPENSKY_CATEGORY_GROUP` itself so the two checks can't drift apart again.
+  **A third, even-lower-priority fallback** exists one level below both of
+  these — `enrichment/aircraft_category.py`'s static MTOW-derived
+  `(manufacturer, model) → category` table, wired into `enrich_identity()`
+  and consumed by `buildMergedDetails()` (see the Identity enrichment
+  section above) — but it only ever fills the sidebar's `categoryDisplay`
+  text when *neither* OpenSky nor a radius source reported anything at
+  all. Unlike the OpenSky/radius-source fallback above, it never touches
+  `categoryGroup`, the map marker icon, or the category filter dropdown —
+  those are all computed once per poll from live data only, before this
+  click-triggered enrichment tier has even run.
 - **Marker icon by category:** `iconFor(item, color)` dispatches on
   `item.categoryGroup` via the `ICON_BUILDERS` lookup table, which is built
   from `CATEGORY_GLYPHS` (a `{group: glyph}` table) by the shared
@@ -2068,6 +2122,60 @@ because photographer name and photo URL come from an external API.
     photographer}` shape, shared by Planespotters/airport-data.com — see
     the photo section above) — no new photo fetching or normalization
     logic.
+  - **Bug fixed 2026-07-20 — every saved card landed in "Unknown / no
+    info"**: `saveCurrentAircraftToCollection()` (`auth-collection.js`) sent
+    `snapshot: merged.info` verbatim, but `categoryGroup` (like `lat`/`lon`)
+    lives as a *sibling* of `info` on the `detailsById` entry (`icons.js`),
+    never nested inside it — `buildMergedDetails()` only ever spreads
+    `live.info`, so `merged.info.categoryGroup` was always `undefined`, the
+    key was dropped by `SNAPSHOT_FIELDS`'s own `is not None` filter before
+    it ever reached storage, and the panel's grouping code's `|| 'unknown'`
+    fallback fired for every card regardless of the real aircraft. Backend
+    and grouping code were already correct — the fix is purely client-side:
+    the snapshot sent is now `Object.assign({}, merged.info, {categoryGroup:
+    details && details.categoryGroup})`.
+    **Cards saved before this fix self-heal, no migration or re-save
+    needed**: `categoryDisplay` never had the bug (it was always a real key
+    inside `info`, copied through untouched), so an already-stored card has
+    a correct `categoryDisplay` but no `categoryGroup` at all — confirmed
+    via a real report where categories rendered correctly on every card
+    (`renderCollectionCard()`'s own badge, added in the same pass) yet every
+    one of them still landed in one "Unknown / no info" bucket.
+    `categoryGroupForCard(card)` (`auth-collection.js`, used by
+    `renderCollectionPanel()`'s grouping loop) prefers `snapshot.
+    categoryGroup` when present, but falls back to deriving it from
+    `splitCategoryDisplay(snapshot.categoryDisplay)`'s bare label via
+    `CATEGORY_LABEL_TO_GROUP` (both globals from `render-details.js`, the
+    same reverse lookup the route card's direction-icon already uses) —
+    so a pre-fix card groups correctly the very next time the panel
+    renders, without needing anyone to unsave/re-save it by hand.
+  - **Where/when it was seen**: `POST /api/collection` also accepts
+    top-level `lat`/`lon` (alongside the existing `photo_*` fields — capture
+    metadata, not identity data, so it stays out of `SNAPSHOT_FIELDS`/
+    `snapshot` the same way `photo_url` does; sourced from the same
+    `detailsById` sibling properties route validation already threads
+    through). When present, `api_collection_save()` resolves
+    `enrichment.airports.nearest_airport(lat, lon)` server-side (never
+    trusting a client-computed value) and stores `location: {lat, lon,
+    nearest_airport: {name, city, country, iata, icao, distance_km} | null}`
+    on the card — `null` only when the airports table itself failed to
+    load, not when a genuine nearest airport is merely far away (the lookup
+    is a global scan, not a bounded radius, so it always returns *something*
+    given valid coordinates). **`enrichment/airports.py`** is a new,
+    fourth local static lookup module (sibling to `countries.py`/
+    `registration.py`/`callsign.py`/`aircraft_database.py`), loading
+    `enrichment/data/airports.json` (7698 entries, generated the same
+    "one-off, uncommitted script" way as `opensky_year_built.json` from
+    OpenFlights' `data/airports.dat` — same project/license,
+    ODbL/DbCL, already used for `callsign.py`'s generated airline tier) and
+    doing a plain haversine nearest-neighbor scan — no bounding to this
+    app's own coverage area, since a flat Python loop over ~7700 rows costs
+    sub-millisecond and a collection save is a rare, click-driven event, not
+    a per-poll cost, so keeping the whole world's airports means the lookup
+    still works if `AREA_CENTER` ever moves. `undoRemoveCard()`'s re-POST
+    forwards the ghost's remembered `location.lat`/`.lon` the same way it
+    already forwards `photo_*`, so an undone card's location survives the
+    round trip.
   - **"C0" aircraft, and any ground vehicle/tower, can't be saved at all —
     and show no save button, not a disabled one**: `"C0"` is the literal
     ADS-B DO-260B letter+digit code (adsb.fi/airplanes.live's own encoding)
@@ -2112,7 +2220,7 @@ because photographer name and photo URL come from an external API.
     what catches everything else `looksLikeGroundVehicle()` flags.
   - **Routes**: `GET /api/collection` (401 if logged out; else the
     session's own cards, newest first), `POST /api/collection` (body
-    `{icao24, snapshot, category_code, photo_url, photo_link,
+    `{icao24, snapshot, category_code, lat, lon, photo_url, photo_link,
     photo_photographer}` → 201 for a new card, 200 for an upsert of an
     existing one, 400 for a rejected `"C0"` code), `DELETE
     /api/collection/<id>` (only deletes if `user_id` matches the session's
@@ -2191,16 +2299,39 @@ because photographer name and photo URL come from an external API.
       uses elsewhere, reused rather than inventing a second icon language)
       plus a title + hint line, rather than the original's plain-text-only
       placeholder.
-    - **Compact per-card view**: photo + registration/ICAO + aircraft type
-      only (operator and everything else in the snapshot is dropped from
-      the card body to stay compact — still persisted server-side, just
-      not surfaced in this view). Every card in this view is, by
-      definition, currently saved, so its toggle icon (`.collection-card-
-      icon-btn`, the same bookmark glyph/fill rule as the sidebar's) always
-      renders filled. `.collection-card-photo-wrap` uses the same fixed
-      `aspect-ratio: 16 / 9` + `object-fit: cover` treatment as the sidebar
-      gallery slider (see "Fixed 16:9 slider box" above) — one consistent
-      photo-box shape across every place this app shows an aircraft photo.
+    - **Per-card view** (reworked 2026-07-20 — originally photo +
+      registration/ICAO + aircraft type only): registration/ICAO title and
+      aircraft-type subtitle stay first, then whichever of the following
+      the snapshot/location actually has (each row simply omitted when
+      null, same "hide, don't show blank" rule as `detailRow()` — no dedup
+      is attempted yet against the subtitle, e.g. manufacturer/model can
+      restate what aircraftType already implies, left for a future pass):
+      a category badge (`"A3 · Large"`, `splitCategoryDisplay()` +
+      `CATEGORY_DESCRIPTIONS` reused verbatim from `render-details.js` —
+      both globals it can see by call time despite loading *after* this
+      file in index.html's script order, since a card is only ever
+      rendered from a later user action, never at page-load time) with its
+      one-sentence description as a caption; Operator (with
+      `airlineLogoHtml()`) and Operator Country (with `flagHtml()`), also
+      reused from `render-details.js`; a combined Manufacturer+Model line;
+      and a muted footer with the formatted saved date/time
+      (`toLocaleString()`) and the `location` line — nearest airport (`"Near
+      Belgrade Nikola Tesla Airport (BEG) · ~12 km"`) when resolved, else
+      bare `"lat, lon"`. Every value still goes through
+      `appendCardRow()` → `textContent`, never string-concatenated HTML —
+      only the small flag/logo fragment is trusted `innerHTML` (both
+      `flagHtml()`/`airlineLogoHtml()` validate their input against a
+      strict code/callsign regex before building any markup). Every card
+      in this view is, by definition, currently saved, so its toggle icon
+      (`.collection-card-icon-btn`, the same bookmark glyph/fill rule as
+      the sidebar's) always renders filled.
+      `.collection-card-photo-wrap` uses the same fixed `aspect-ratio: 16 /
+      9` + `object-fit: cover` treatment as the sidebar gallery slider (see
+      "Fixed 16:9 slider box" above) — one consistent photo-box shape
+      across every place this app shows an aircraft photo — at a wider
+      `minmax(320px, 1fr)` grid floor (`.collection-group-grid`, was
+      `240px`) so the larger card content above still reads comfortably,
+      per an explicit ask for bigger photos.
     - **"Elegant" soft delete + session-scoped Undo**: clicking a card's
       icon (`removeCardWithUndo()`) fires the real `DELETE` immediately —
       no confirmation dialog — but the card stays in the DOM, dimmed
@@ -2337,7 +2468,25 @@ because photographer name and photo URL come from an external API.
   `openskyMarkers`/`adsbfiMarkers` globals used elsewhere in this suite,
   since the source name needs to be a runtime string here; waits for
   `enrichmentById.has(hex)` before asserting, since the identity fetch is
-  async and lands after `selectAircraft()` returns.
+  async and lands after `selectAircraft()` returns. Also covers the
+  category fallback (`enrichment/aircraft_category.py`): a `flywme`-badged
+  Category row appears when neither OpenSky nor a radius source reported
+  one at all (`aaaaaa`, present in no radius fixture, with a non-meaningful
+  OpenSky category), and a real live category (`dddddd`, reported by
+  OpenSky and both enabled radius sources) is never overwritten by a
+  deliberately contradicting enrichment response, though Flywme's own
+  guess still co-displays as the last badge.
+- `tests/backend/test_aircraft_category.py` covers
+  `enrichment/aircraft_category.py` directly (spot-checks across all five
+  codes this table produces, including that A4 is applied only to the
+  Boeing 757 and that A7 covers both a light and a heavy helicopter
+  regardless of weight) and asserts its `(manufacturer, model)` keys match
+  `TYPE_CODE_TABLE`'s own pairs exactly (`==`, not `<=`/`>=` — catches
+  either a stale entry left behind after `TYPE_CODE_TABLE` changes, or a
+  new `TYPE_CODE_TABLE` entry this table forgot to cover), plus
+  `enrich_identity()`'s `category` tier end-to-end through both the
+  icao24-record and aircraft-type-code paths, and the `/api/identity`
+  route surfacing it.
 - `tests/backend/test_adsbdb.py` covers `/api/adsbdb/<icao24>`: the
   combined aircraft+callsign request and its exact upstream `params`,
   aircraft-only (no/unknown callsign, including adsbdb's "200 with just
@@ -2480,6 +2629,33 @@ because photographer name and photo URL come from an external API.
   that hex was already used by `airplaneslive.json`'s own fixture aircraft,
   so the "aircraft already covered" dedup logic was correctly excluding it
   the whole time; the bug was in the test's own fixture data, not the app.
+- `test_collection.spec.js` covers the aircraft collection panel, including
+  a 2026-07-20 regression test for the categoryGroup save bug: saving
+  `dddddd` (OpenSky category 4, a real "large") posts a snapshot whose
+  `categoryGroup` is actually `"large"`, not silently absent — the exact
+  condition that used to sink every saved card into "Unknown / no info"
+  regardless of its true category. Also covers: a save posts the selected
+  aircraft's own `lat`/`lon` (fixture position from `states.json`); a card
+  renders its category badge + description, Operator (with airline logo),
+  Operator Country (with flag), combined Manufacturer/Model, formatted
+  saved date, and nearest-airport location line when the snapshot/location
+  has them; and a card with no resolved `nearest_airport` falls back to
+  bare `lat, lon` text while omitting rows for fields that are absent
+  entirely (proving rows are conditionally rendered, not blank-padded).
+  Also covers `categoryGroupForCard()`'s self-healing fallback: a card with
+  only `categoryDisplay` (`"A5 — Heavy (>300,000 lbs)"`) and no
+  `categoryGroup` at all — the exact shape of every card saved before the
+  fix above shipped — still groups under "Heavy", not "Unknown / no info".
+  `tests/backend/test_collections.py` covers the matching server side:
+  `POST /api/collection` with `lat`/`lon` resolves and stores `location`
+  (using a real, stable OpenFlights entry — Belgrade Nikola Tesla, `BEG` —
+  not a fixture-only value) with `nearest_airport` correctly re-resolving
+  on a re-save to different coordinates (London Heathrow, `LHR`), and a
+  save with no coordinates stores `location: null`.
+  `tests/backend/test_airports.py` covers `enrichment/airports.py`'s
+  `nearest_airport()` directly (no HTTP mocking needed, same category as
+  `test_enrichment.py`): a close real match, distance ordering between a
+  near and far point, and `None` for missing/invalid coordinates.
 
 ## SVG Icon Rendering
 

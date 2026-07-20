@@ -159,6 +159,31 @@ function buildMergedDetails(icao24) {
       fieldConfidence[feKey] = resolved.confidence;
       fieldComputationBasis[feKey] = resolved.source;
     }
+
+    // Category is a special case, not part of ENRICHMENT_FIELD_MAP above:
+    // enrichment resolves a raw ADS-B code ("A3"), while `info` stores the
+    // already-formatted `categoryDisplay` string every live source also
+    // fills — formatAdsbExchangeCategory() (render-details.js) builds the
+    // exact same "A3 — Large (...)" shape a real adsb.fi/airplanes.live
+    // response would, so the existing splitCategoryDisplay()/
+    // CATEGORY_LABEL_TO_GROUP machinery (also render-details.js) needs no
+    // changes to render it. The lowest-priority tier in this app's whole
+    // category chain — only reached when neither the live feed nor
+    // adsb.fi/airplanes.live/OpenSky reported a category for this aircraft
+    // at all.
+    const resolvedCategory = enrichment.category;
+    if (resolvedCategory) {
+      const already = info.categoryDisplay != null && info.categoryDisplay !== '';
+      if (already) {
+        if (!fieldSources.categoryDisplay) fieldSources.categoryDisplay = [];
+        if (!fieldSources.categoryDisplay.includes('flywme')) fieldSources.categoryDisplay.push('flywme');
+      } else {
+        info.categoryDisplay = formatAdsbExchangeCategory(resolvedCategory.value);
+        fieldSources.categoryDisplay = ['flywme'];
+      }
+      fieldConfidence.categoryDisplay = resolvedCategory.confidence;
+      fieldComputationBasis.categoryDisplay = resolvedCategory.source;
+    }
   }
   return { info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation };
 }

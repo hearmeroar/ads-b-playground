@@ -236,3 +236,63 @@ test('Registration is excluded from the Unknown-treatment: it\'s the header now,
   const headerText = await page.evaluate(() => document.querySelector('#sidebar-header').textContent);
   expect(headerText).toContain('F-UNIQ');
 });
+
+// --- Category fallback (enrichment/aircraft_category.py, the lowest-
+// priority tier in the whole category chain — see enrich_identity()) ---
+
+test('category fallback: Flywme fills the Category row when no live source reported one at all', async ({ page }) => {
+  // "aaaaaa" is OpenSky-only (states.json's category index 17 is 1, "no
+  // ADS-B category info" — not meaningful) and absent from every radius
+  // fixture, so its live categoryDisplay is null — the exact gap this
+  // fallback exists for.
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null, operator: null, operator_country: null, registration: null,
+    manufacturer: { value: 'Boeing', source: 'aircraft_type_db', confidence: 1.0 },
+    model: { value: '737 MAX 8', source: 'aircraft_type_db', confidence: 1.0 },
+    year_built: null,
+    category: { value: 'A3', source: 'aircraft_category_db', confidence: 0.9 },
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, 'aaaaaa', 'opensky');
+
+  // Normal mode: the Category row appears (it was absent before this
+  // fallback, same as any other detailRow with no value at all) showing
+  // the derived code/label, with no visible badge outside dev mode.
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+  expect(sidebarText).toContain('A3');
+  expect(sidebarText).toContain('Large');
+
+  await page.click('#toggle-dev-mode');
+  expect(await badgeSourcesForLabel(page, 'Category:')).toEqual(['flywme']);
+  await clickBadge(page, 'Category:');
+  expect(await page.textContent('#source-tooltip'))
+    .toBe('Flywme — computed from aircraft category database, confidence 0.9');
+});
+
+test('category fallback: a live-sourced category is never overwritten, but Flywme\'s guess still co-displays', async ({ page }) => {
+  // "dddddd" is OpenSky's dedup winner with a meaningful live category
+  // (index 17 = 4, "large") — its own radius-source entries also report
+  // "A3", so either way this aircraft already has a real live category.
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null, operator: null, operator_country: null, registration: null,
+    manufacturer: null, model: null, year_built: null,
+    category: { value: 'A7', source: 'aircraft_category_db', confidence: 0.9 },
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await page.click('#toggle-dev-mode');
+  await selectAircraft(page, 'dddddd', 'opensky');
+
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+  expect(sidebarText).toContain('Large');
+  expect(sidebarText).not.toContain('Rotorcraft');
+
+  // "dddddd" independently reports a category on OpenSky *and* both
+  // enabled radius sources (adsbfi/airplaneslive fixtures both carry "A3"
+  // for this hex) — the point here is just that 'flywme' is appended last,
+  // after every real live source that already reported one.
+  const catSources = await badgeSourcesForLabel(page, 'Category:');
+  expect(catSources[catSources.length - 1]).toBe('flywme');
+  expect(catSources).toContain('opensky');
+});

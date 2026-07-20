@@ -108,10 +108,14 @@ later if a real need for it shows up.
   scrollable list of every visible aircraft's ICAO/callsign/registration/
   type/route, one line each, click any row to open its full sidebar.
 - **Identity enrichment** — fills gaps the live feeds leave (country,
-  operator, manufacturer/model, year built) from small local lookup tables
-  (registration-prefix nationality marks, a small curated ICAO24 database,
-  ICAO airline callsign designators, aircraft-type normalization) — no
-  external API, no database, and never overrides a value a live feed
+  operator, manufacturer/model, year built, and — as a last-resort
+  fallback below even those — the ADS-B emitter category, when
+  manufacturer/model are known but no source reported a category at all)
+  from small local lookup tables (registration-prefix nationality marks, a
+  small curated ICAO24 database, ICAO airline callsign designators,
+  aircraft-type normalization, and a static manufacturer/model → category
+  table derived from each type's real published maximum takeoff weight) —
+  no external API, no database, and never overrides a value a live feed
   already supplied. The callsign→operator table itself has ~5700 entries,
   merging a small hand-curated set of major/regional carriers (which always
   wins, since it's kept current for a few airlines the data below is
@@ -161,14 +165,18 @@ later if a real need for it shows up.
   anonymous access.
 - **Aircraft collection** — sign in with Google, then save any aircraft
   you're looking at (a bookmark toggle in the sidebar, filled once saved) as
-  a compact card: registration, type, and a photo, snapshotted at save time
-  so it stays meaningful long after the aircraft is gone from any live feed.
-  One card per aircraft — re-saving just refreshes it. Browse saved cards in
-  a fullscreen "My collection" panel (opened from the HUD), grouped by
-  category (light/small/large/heavy/etc). Removing a card is immediate but
-  forgiving — it dims in place with an Undo action for the rest of the
-  session. Aircraft with no usable category info at all (ADS-B code "C0")
-  can't be saved.
+  a card: registration, type, category, operator (with its airline logo/
+  country flag), manufacturer/model, and a larger photo — all snapshotted at
+  save time so it stays meaningful long after the aircraft is gone from any
+  live feed — plus when and where it was seen, including the nearest
+  airport at that position (resolved locally against a vendored
+  [OpenFlights](https://github.com/jpatokal/openflights) airports database,
+  no external API call). One card per aircraft — re-saving just
+  refreshes it. Browse saved cards in a fullscreen "My collection" panel
+  (opened from the HUD), correctly grouped by category (light/small/large/
+  heavy/etc). Removing a card is immediate but forgiving — it dims in place
+  with an Undo action for the rest of the session. Aircraft with no usable
+  category info at all (ADS-B code "C0") can't be saved.
 
 ## Quick start
 
@@ -279,9 +287,10 @@ A handful of plain files carry all the logic:
 - `app.py` — Flask backend; proxies every external API (mainly to work
   around CORS/User-Agent restrictions) with short-lived caching.
 - `enrichment/` — local static lookup tables (registration prefix, ICAO24
-  placeholder database, callsign decoding, aircraft type normalization)
-  that fill identity gaps the live feeds don't cover, served via
-  `/api/identity/<icao24>`. No external API, no database.
+  placeholder database, callsign decoding, aircraft type normalization,
+  MTOW-derived aircraft category) that fill identity gaps the live feeds
+  don't cover, served via `/api/identity/<icao24>`. No external API, no
+  database.
 - `static/index.html` — the frontend markup (map container, HUD, sidebar).
 - `static/js/` — the frontend logic (Leaflet map, polling, marker rendering,
   filters, photo/track features, Google sign-in + the aircraft collection)
