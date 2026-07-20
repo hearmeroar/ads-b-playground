@@ -672,9 +672,10 @@ Acceptance criteria:
  - Playwright test: toggling shows/hides airports and preserves debounced fetch behavior.
 
 Implementation notes:
-1. Update `static/index.html` HUD markup: swap checkbox markup for a `button.role-switch` or keep input but apply `.toggle` class; ensure id remains `toggle-airports`.
-2. Update `static/style.css` with `.toggle` styles (no build step) and ensure `[hidden]` rules don't conflict.
-3. Update `static/js/state-filters.js` event wiring to treat the toggle as a switch: use `aria-checked` and `element.classList.toggle('on')`.
-4. Add Playwright test `tests/frontend/test_airports_toggle.spec.js` asserting toggle behavior.
-Estimate: 0.25 dev days (markup + CSS + wiring + E2E smoke).
-Status: Implemented — uses `button[role="switch"]` with `aria-checked` + `.switch`/`.switch-track` CSS. All 8 Playwright tests in `test_airports_layer.spec.js` pass.
+1. Reused the existing `<label class="switch"><input type="checkbox">` pattern from other source/layer toggles in `static/index.html` — no new `.toggle` class or `button.role-switch` needed.
+2. Added per-size airport type checklist (`#airports-type-list`) with checkboxes for `large_airport`, `medium_airport`, `small_airport`, `heliport`, `seaplane_base`, `balloonport` — hidden until the layer is enabled.
+3. Wired `#toggle-airports` in `state-filters.js` to fetch `/api/airports?bbox=...&types=...` on enable, clear the cluster layer on disable, and re-fetch on pan (debounced) or type-checklist change.
+4. Added `#airports-help` popover with explanation of the layer.
+5. Tests live in `tests/frontend/test_airports_layer.spec.js` (8 tests): default-off, enable renders airports, pan re-fetches, disable stops fetches, popup content + heliport icon class, type checklist visibility and defaults, type checkbox toggling re-fetches with updated types param, help popover open/close.
+Estimate: 0.25 dev days (markup + CSS + wiring + E2E tests).
+Status: Implemented — uses `<label class="switch"><input type="checkbox">` matching the pattern of other source/layer toggles. All 8 Playwright tests in `test_airports_layer.spec.js` pass.
