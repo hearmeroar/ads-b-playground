@@ -39,6 +39,59 @@ Risks / Notes:
 - Airport resolution (IATA/ICAO → lat/lon) can reuse existing `enrichment/airports.py`.
 
 Estimate: 2–4 dev days (backend + frontend + tests) depending on polishing.
+
+- Enrich airline/company metadata from soaring-symbols and validate sources (high)
+
+Goal: surface additional airline metadata (alliance, country, website) in the
+sidebar and collection views whenever available, sourcing from the existing
+`soaring-symbols` assets and falling back to a validated alternate source if
+more authoritative data exists.
+
+Motivation: `static/airline-logos/` already vendors logo assets and a manifest
+(`airline-logos/manifest.json`) built from soaring-symbols and other tiers; the
+upstream `soaring-symbols` project also exposes structured metadata (alliance,
+country, website) that should be shown in the UI where applicable for better
+identity/attribution.
+
+Acceptance criteria:
+- Add `alliance`, `country`, and `website` fields to the airline/logo manifest
+  schema and `schema/aircraft.schema.json` where appropriate (new `operator`
+  subfields or a small `airline` schema referenced by `operator`).
+- Backend serves the enriched manifest via a stable static file or `/api/logos`
+  endpoint; frontend displays `alliance`/`country`/`website` in the sidebar when
+  the selected aircraft's operator has a matched manifest entry.
+- Implement a validation step and decision log: compare coverage/accuracy and
+  licensing of soaring-symbols vs alternatives, choose the preferred source,
+  and record the decision in `.ai/DECISIONS.md`.
+
+Candidate alternative unified sources to evaluate:
+- Wikidata (broad coverage, structured, includes country, official website,
+  and often alliance via properties) — strong candidate; CC0/ODbL compatibility
+  depends on how data is used (check attribution requirements).
+- OpenFlights `airlines.dat` (good IATA/ICAO mapping but sparse on alliance/website).
+- AirHex / AirLabs / commercial APIs (paid, often more consistent but require key/licence).
+- FlightAware/FR24 internal manifests (not public/clear licence) — lower priority.
+
+Validation checklist:
+1. Coverage: fraction of airlines in our manifest resolved by candidate source.
+2. Accuracy: spot-check 50 common carriers across regions for correct country/site/alliance.
+3. Freshness: how often source updates and ability to re-sync.
+4. Licensing: permissible to redistribute/serve assets or derived metadata.
+5. Technical access: ease of bulk download or API access for offline bundling.
+
+Implementation plan (phased):
+1. Add schema fields and update `airline-logos/manifest.json` format to include
+	new fields (backwards compatible). Commit as a schema-only change.
+2. Prototype: fetch `soaring-symbols` metadata for the existing manifest entries
+	and produce a backend-side merged `airline_manifest_enriched.json` (script).
+3. Evaluate candidates: run the validation checklist vs Wikidata and OpenFlights;
+	record results in `.ai/DECISIONS.md` and pick preferred source.
+4. Wire frontend to show the new fields when present (tooltip or extra row).
+5. Tests: backend unit test for manifest endpoint; frontend Playwright test that
+	checks sidebar shows `website` link and `alliance` badge for a known airline.
+
+Estimate: 2–3 dev days for schema + prototype + validation; extra time if an
+automated sync pipeline is required for the chosen source.
 ## Aircraft metadata
 
 - **Aircraft serial number (MSN)** — Add aircraft manufacturer serial number field. No verified source yet (adsbdb has `msn` field for some aircraft; needs validation against real data). Research required before prioritizing. (See personal memory for fuller context.)
