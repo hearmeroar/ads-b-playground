@@ -21,6 +21,24 @@ Guardrails
 - Do not modify code directly; create an ADR + small plan and assign Developer.
 - Keep changes incremental; prefer configuration and feature flags when possible.
 
+CURRENT.md ownership
+- Primary owner: **Architect** — responsible for keeping `/.ai/CURRENT.md` up to date
+  after any significant architectural change or at major session boundaries.
+- Secondary: **Developer** may propose small status updates via PR, but any
+  change to `/.ai/CURRENT.md` requires Architect approval (review + merge)
+  before it lands on `main`.
+- Automation: agents/assistants may prepare draft text and open a PR, but
+  must not push directly to `main` without human sign-off.
+
+Commit template for CURRENT.md
+```
+docs(.ai): update CURRENT.md — YYYY-MM-DD
+
+Short summary of change
+
+Refs: .agents/architect.md
+```
+
 Quick ADR template
 ```
 Date: YYYY-MM-DD
