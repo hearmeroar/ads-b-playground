@@ -575,13 +575,13 @@ html, body { margin: 0; padding: 0; height: 100%; }
 .gallery-nav {
   position: absolute; top: 0; bottom: 0;
   width: 56px; border: none; background: none;
-  color: #fff; font-size: 28px; line-height: 1; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 22px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: flex-start;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
-  padding: 0; z-index: 10;
+  padding: 0 6px; z-index: 10;
 }
-.gallery-prev { left: 0; }
-.gallery-next { right: 0; }
+.gallery-prev { left: 0; justify-content: flex-start; }
+.gallery-next { right: 0; justify-content: flex-end; }
 /* min-height matches .gallery-dot's own 6px so this row holds its height
    even when empty (a single-photo gallery renders this row with zero .gallery-dot
    children — see renderGallery(), static/js/sidebar-track.js) — otherwise the
