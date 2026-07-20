@@ -30,10 +30,14 @@
 
 ## Next steps (for user)
 
-**None required from AI — ready for commit.** User can:
-1. Review the new `.ai/` files and edits to CLAUDE.md/README.md
-2. Commit via `git add .ai/ CLAUDE.md README.md && git commit -m "..."`
-3. On next AI session, the memory system will auto-load and speed up context acquisition
+**Status update (2026-07-20):** the lightweight agent guidance files were added to the repository and committed to `main` (`.agents/*`). The AI memory system itself remains as originally created under `.ai/`.
+
+User can:
+1. Review the new `.ai/` files and edits to CLAUDE.md/README.md (unchanged).
+2. Review the added `.agents/` files in the repo (commit b10fb9f on `main`).
+3. On next AI session, the memory system and `.agents/` guidance will be available for the agent to reference.
+
+If you'd like, I can also keep `.ai/CURRENT.md` in-sync automatically after future in-repo changes (create/update entries and commit), or leave it human-updated only — tell me your preference.
 
 ## Known issues / future improvements
 
