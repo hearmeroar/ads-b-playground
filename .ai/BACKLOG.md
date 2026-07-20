@@ -2,6 +2,43 @@
 
 Ideas and features not yet scheduled. Grouped loosely by theme.
 
+- Centralize map "view zones" into config (high priority)
+
+Goal: make the app's geographic "view zone" easy to change and switch at runtime.
+
+Motivation: currently the coverage area (AREA_CENTER, AREA_RADIUS_NM, BBOX)
+is defined and duplicated across multiple places in the codebase (`app.py`,
+frontend constants, radius-source center fields). Changing it is error-prone.
+
+Proposal / Acceptance criteria:
+- Introduce a single, versioned zones config (e.g. `config/zones.json`) that
+	lists named zones. Each zone may be defined as:
+	- center: {lat, lon} + radius_nm
+	- bbox: {lamin, lomin, lamax, lomax}
+	- airport: IATA/ICAO code (resolved server-side to coordinates) + radius_nm
+- Backend loads zones at startup and exposes `/api/zones` and `/api/config`
+	with the active zone id and list of presets.
+- Frontend provides a quick-switch UI (HUD dropdown) to select an active zone;
+	selecting a zone updates map view and re-queries radius sources with the
+	new parameters without touching hardcoded constants.
+- Existing behaviour is preserved by default: a `default` zone matches current
+	AREA_CENTER/AREA_RADIUS_NM and serves as the fallback.
+
+Implementation notes / next steps:
+1. Add `config/zones.json` with a `default` example + two region presets.
+2. Update `app.py` to load zones and add `/api/zones` (no destructive changes).
+3. Make `/api/config` include `active_zone_id` and a canonical `radius_nm`/`bbox`.
+4. Adjust frontend `map-init.js` and `state-filters.js` to fetch `/api/zones`
+	 and wire a simple dropdown. Start with UI only (no persistence), then add
+	 session persistence or per-user preference later.
+5. Add tests: backend unit test for `/api/zones`, frontend test for dropdown.
+
+Risks / Notes:
+- This is a medium touch across both backend and frontend; start backend first
+	to expose a stable API the frontend can adopt incrementally.
+- Airport resolution (IATA/ICAO → lat/lon) can reuse existing `enrichment/airports.py`.
+
+Estimate: 2–4 dev days (backend + frontend + tests) depending on polishing.
 ## Aircraft metadata
 
 - **Aircraft serial number (MSN)** — Add aircraft manufacturer serial number field. No verified source yet (adsbdb has `msn` field for some aircraft; needs validation against real data). Research required before prioritizing. (See personal memory for fuller context.)
