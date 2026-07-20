@@ -109,7 +109,7 @@ later if a real need for it shows up.
   type/route, one line each, click any row to open its full sidebar.
 - **Identity enrichment** — fills gaps the live feeds leave (country,
   operator, manufacturer/model, year built) from small local lookup tables
-  (registration-prefix nationality marks, a placeholder ICAO24 database,
+  (registration-prefix nationality marks, a small curated ICAO24 database,
   ICAO airline callsign designators, aircraft-type normalization) — no
   external API, no database, and never overrides a value a live feed
   already supplied. The callsign→operator table itself has ~5700 entries,
@@ -117,8 +117,13 @@ later if a real need for it shows up.
   wins, since it's kept current for a few airlines the data below is
   missing or stale on) over a much larger table generated from the
   [OpenFlights](https://github.com/jpatokal/openflights) project's airline
-  database (ODbL/DbCL licensed). Unresolved fields show "Unknown" rather
-  than a blank row. Country (the aircraft's own registration) and **Operator Country**
+  database (ODbL/DbCL licensed). Year built has a similar two-tier setup —
+  a ~249,000-entry icao24→year table generated from the [OpenSky
+  Network](https://opensky-network.org) public aircraft metadata database
+  (unlicensed/as-is), which fills a real gap since the live feeds' own
+  `year` field turns out to be extremely region-dependent in practice (near
+  100% coverage over the US, close to 0% over this app's own Balkans
+  coverage area). Unresolved fields show "Unknown" rather than a blank row. Country (the aircraft's own registration) and **Operator Country**
   (the operating airline's home country — a separate field, since the two
   are frequently different countries) each render with their own small SVG
   flag (the [flag-icons](https://github.com/lipis/flag-icons) library,

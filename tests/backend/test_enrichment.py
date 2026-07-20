@@ -96,6 +96,38 @@ def test_icao24_lookup_unknown_hex_returns_none():
     assert DEFAULT_AIRCRAFT_DATABASE.lookup(None) is None
 
 
+# --- aircraft_database.py: OpenSky-generated year_built tier ---
+
+def test_icao24_lookup_generated_year_only(monkeypatch):
+    # An icao24 with no curated record at all, only a generated-table hit,
+    # must still resolve year_built — every other field stays None rather
+    # than being fabricated.
+    import enrichment.aircraft_database as aircraft_database
+    monkeypatch.setattr(aircraft_database, "_GENERATED_YEAR_BUILT", {"abcdef": 1999})
+    record = aircraft_database.DEFAULT_AIRCRAFT_DATABASE.lookup("abcdef")
+    assert record["year_built"] == 1999
+    assert record["source"] == "icao24_lookup"
+    assert record["registration"] is None
+    assert record["operator"] is None
+    assert record["manufacturer"] is None
+
+
+def test_icao24_lookup_curated_year_wins_over_generated(monkeypatch):
+    # A conflicting generated-table entry for the one curated icao24 must
+    # never override the hand-verified curated value.
+    import enrichment.aircraft_database as aircraft_database
+    monkeypatch.setattr(aircraft_database, "_GENERATED_YEAR_BUILT", {"49d3d3": 1900})
+    record = aircraft_database.DEFAULT_AIRCRAFT_DATABASE.lookup("49d3d3")
+    assert record["year_built"] == 2021
+
+
+def test_generated_year_built_table_size_guard():
+    # Documents the minimum expected size of the OpenSky-derived table and
+    # guards against the generation step's filters silently regressing.
+    from enrichment.aircraft_database import _GENERATED_YEAR_BUILT
+    assert len(_GENERATED_YEAR_BUILT) >= 200000
+
+
 # --- callsign.py ---
 
 def test_decode_callsign_example():
@@ -377,6 +409,17 @@ def test_enrich_identity_year_built_live_wins():
 def test_enrich_identity_year_built_icao24_tier():
     result = enrich_identity("49d3d3")
     assert result["year_built"]["value"] == 2021
+    assert result["year_built"]["source"] == "icao24_lookup"
+
+
+def test_enrich_identity_year_built_generated_tier(monkeypatch):
+    # End-to-end: an aircraft with no live year and no curated record still
+    # resolves year_built through enrich_identity() via the generated
+    # OpenSky-derived table, not just in the raw lookup() dict.
+    import enrichment.aircraft_database as aircraft_database
+    monkeypatch.setattr(aircraft_database, "_GENERATED_YEAR_BUILT", {"abcdef": 1988})
+    result = enrich_identity("abcdef")
+    assert result["year_built"]["value"] == 1988
     assert result["year_built"]["source"] == "icao24_lookup"
 
 

@@ -967,7 +967,29 @@ because photographer name and photo URL come from an external API.
     swappable ICAO24→full-record lookup (`AircraftDatabaseLookup.lookup()`,
     a small placeholder dataset behind an interface a real data source
     could later implement with zero caller changes) plus a separate ICAO
-    type-code/free-text→manufacturer+model normalization table;
+    type-code/free-text→manufacturer+model normalization table.
+    **`year_built` has a real second tier**, `_GENERATED_YEAR_BUILT`
+    (~249,000 icao24→year entries, `enrichment/data/opensky_year_built.json`),
+    generated from the [OpenSky Network](https://opensky-network.org)
+    public aircraft metadata CSV (unlicensed, offered as-is — used here as
+    a small icao24→year extract, not a redistribution of the full
+    database). Same curated-wins-over-generated shape as
+    `AIRLINE_OPERATORS` above, but scoped to `year_built` alone —
+    `registration`/`operator`/`manufacturer`/`model`/`country` are
+    deliberately never sourced from this CSV even though the same rows
+    carry them, since their naming doesn't match this project's own
+    `TYPE_CODE_TABLE`/curated-airline vocabulary. Coverage is real but
+    regionally lopsided: ~49% of the CSV's 520,000 rows globally, but only
+    ~4% of aircraft actually seen live over this app's own coverage area
+    (Balkans) — still strictly additive over having nothing, which is why
+    it shipped anyway. **A pre-existing data bug was found and fixed while
+    adding this**: the placeholder `_PLACEHOLDER_RECORDS` table used to
+    have 7 hand-written entries, but cross-checking each ICAO24 hex against
+    OpenSky's own real database showed 6 of them named the wrong aircraft
+    entirely for that hex (two were private/homebuilt light aircraft, not
+    the airliners claimed) — fabricated example data that was never
+    verified against a real registry. Those 6 were deleted; only `49d3d3`
+    (OK-SWC / Smartwings), independently confirmed correct, remains.
     `aircraft_enrichment.py`'s `enrich_identity()` is the orchestrator,
     resolving each field through its own priority chain that always tries
     a live value first (`source: "live"`) before ever touching a local

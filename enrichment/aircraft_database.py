@@ -7,9 +7,69 @@
    pure normalization table (no swappable interface needed — it's a small,
    stable, well-known ICAO type-designator vocabulary, not something that
    plausibly gets replaced by an external service the way (1) might).
+
+**`year_built` now has a real second tier**, `_GENERATED_YEAR_BUILT`
+(~249,000 entries, loaded from `enrichment/data/opensky_year_built.json`),
+generated from the [OpenSky Network](https://opensky-network.org) public
+aircraft metadata database
+(https://s3.opensky-network.org/data-samples/metadata/aircraftDatabase.csv),
+which OpenSky states is "unlicensed... offered as-is, no guarantees" — used
+here as a small derived extract (icao24 -> year only), not a redistribution
+of the full database. Same curated-wins-over-generated shape as
+`callsign.py`'s `AIRLINE_OPERATORS` merge, scoped to `year_built` only —
+`_PLACEHOLDER_RECORDS` still supplies registration/operator/manufacturer/
+model/country for its (now just one) hand-verified entry; those four fields
+are deliberately NOT sourced from the OpenSky CSV even though the same rows
+carry them, since their naming conventions don't match this project's own
+`TYPE_CODE_TABLE`/curated-airline vocabulary. Regenerate
+`opensky_year_built.json` with a one-off, uncommitted script (same
+"regenerate by hand" convention as the airline-logos manifest and the
+OpenFlights-generated tier of `callsign.py`): download the CSV above, parse
+with `csv.DictReader`, keep rows where `icao24` is exactly 6 lowercase hex
+chars and `built` parses to a 4-digit year in `[1944, <current year>]`, and
+write `{icao24: year}` as compact JSON with `sort_keys=True` for a diffable
+regen.
+
+Coverage is real but regionally lopsided — verified live against this app's
+own coverage area (Balkans, `AREA_CENTER` in `app.py`): only ~4% of
+aircraft actually seen there had a resolvable year, vs. ~49% of the CSV's
+520,000 rows globally. Still strictly additive over having nothing.
+
+**A pre-existing data bug found and fixed while adding this**: the original
+7-entry `_PLACEHOLDER_RECORDS` table included 6 entries (icao24s `4b1814`,
+`406b2e`, `3c6754`, `3944ee`, `4ca7b1`, `484506`) whose
+registration/operator/aircraft type did not actually belong to that ICAO24
+address — cross-checked against OpenSky's own database, which reports a
+completely different real aircraft for each of those 6 hexes (two of them
+private/homebuilt light aircraft, not the airliners claimed). Those 6 were
+fabricated example data, never independently verified against a real
+registry, and have been removed — only `49d3d3` (OK-SWC / Smartwings),
+which does check out against OpenSky's own record, remains. Removing them
+also means their (wrong) `year_built` values can no longer shadow the
+correct value the generated OpenSky tier now provides for those same real
+aircraft.
 """
 
+import json
+import os
+
 from .countries import country_by_iso
+
+_YEAR_BUILT_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "opensky_year_built.json")
+
+
+def _load_generated_year_built():
+    try:
+        with open(_YEAR_BUILT_DATA_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        # Missing/corrupt vendored data file degrades to "no generated
+        # tier" rather than crashing the whole enrichment module — matches
+        # app.py's _load_identity_cache()/_load_track_cache() tolerance.
+        return {}
+
+
+_GENERATED_YEAR_BUILT = _load_generated_year_built()
 
 
 class AircraftDatabaseLookup:
@@ -22,35 +82,14 @@ class AircraftDatabaseLookup:
 
 
 # Keyed by lowercase hex. country_iso resolved through countries.py so the
-# country name stays in sync with every other module.
+# country name stays in sync with every other module. The only entry here
+# that's been independently verified against a real registry — see the
+# module docstring above for the 6 fabricated entries this table used to
+# also contain.
 _PLACEHOLDER_RECORDS = {
     "49d3d3": {
         "registration": "OK-SWC", "operator": "Smartwings", "country_iso": "CZ",
         "manufacturer": "Boeing", "model": "737 MAX 8", "year_built": 2021,
-    },
-    "4b1814": {
-        "registration": "HB-JCA", "operator": "Swiss International Air Lines", "country_iso": "CH",
-        "manufacturer": "Airbus", "model": "A320neo", "year_built": 2018,
-    },
-    "406b2e": {
-        "registration": "G-EZTE", "operator": "easyJet", "country_iso": "GB",
-        "manufacturer": "Airbus", "model": "A320neo", "year_built": 2019,
-    },
-    "3c6754": {
-        "registration": "D-AIBL", "operator": "Lufthansa", "country_iso": "DE",
-        "manufacturer": "Airbus", "model": "A319", "year_built": 2010,
-    },
-    "3944ee": {
-        "registration": "F-GRHS", "operator": "Air France", "country_iso": "FR",
-        "manufacturer": "Airbus", "model": "A320", "year_built": 2007,
-    },
-    "4ca7b1": {
-        "registration": "EI-DVM", "operator": "Ryanair", "country_iso": "IE",
-        "manufacturer": "Boeing", "model": "737-800", "year_built": 2009,
-    },
-    "484506": {
-        "registration": "PH-BHA", "operator": "KLM Royal Dutch Airlines", "country_iso": "NL",
-        "manufacturer": "Boeing", "model": "787-9", "year_built": 2015,
     },
 }
 
@@ -62,18 +101,22 @@ class StaticAircraftDatabaseLookup(AircraftDatabaseLookup):
     def lookup(self, icao24):
         if not icao24:
             return None
-        record = self._records.get(icao24.strip().lower())
-        if not record:
+        key = icao24.strip().lower()
+        record = self._records.get(key)
+        year_built = (record or {}).get("year_built")
+        if year_built is None:
+            year_built = _GENERATED_YEAR_BUILT.get(key)
+        if record is None and year_built is None:
             return None
-        country = country_by_iso(record.get("country_iso"))
+        country = country_by_iso(record.get("country_iso")) if record else None
         return {
-            "registration": record.get("registration"),
-            "operator": record.get("operator"),
+            "registration": record.get("registration") if record else None,
+            "operator": record.get("operator") if record else None,
             "country": country["name"] if country else None,
             "country_iso": country["iso"] if country else None,
-            "manufacturer": record.get("manufacturer"),
-            "model": record.get("model"),
-            "year_built": record.get("year_built"),
+            "manufacturer": record.get("manufacturer") if record else None,
+            "model": record.get("model") if record else None,
+            "year_built": year_built,
             "source": "icao24_lookup",
             "confidence": 1.0,
         }
