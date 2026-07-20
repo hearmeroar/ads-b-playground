@@ -8,6 +8,37 @@ round of improvements (SQLite migration, CI, marker interpolation, etc.) —
 check it at the start of a session if picking this work back up, so it
 doesn't need to be re-derived from scratch.
 
+## AI Memory System (`.ai/`)
+
+This file is large (210KB) and mixes stable architectural facts, historical rationale, and detailed how-tos together. For efficient AI-agent context, the repo includes a committed project memory layer (`.ai/` directory):
+
+@.ai/PROJECT.md
+@.ai/ARCHITECTURE.md
+@.ai/CURRENT.md
+
+**Auto-imported above:** PROJECT.md (overview, goals, hard constraints), ARCHITECTURE.md (current-state map of sources/modules/data flow), CURRENT.md (what's actively being worked on). These three load automatically into context via `@` includes.
+
+**On-demand files** (not auto-imported, read when relevant):
+- `.ai/DECISIONS.md` — Architecture Decision Records (ADR log) for historically-significant decisions. Read when you need the rationale behind an architectural choice.
+- `.ai/BACKLOG.md` — Parked ideas and features not yet scheduled. Read before proposing new features or when asked about roadmap.
+
+**Session-start checklist:**
+1. Read CLAUDE.md (you're here).
+2. The three auto-imported `.ai/` files load as part of CLAUDE.md's own context.
+3. Optionally read `.ai/DECISIONS.md` (recent entries) if exploring why a past architectural choice was made.
+4. Optionally read `.ai/BACKLOG.md` if adding features or proposing ideas.
+
+**Before creating a commit:**
+If your changes represent an architecturally-significant decision (new data source, changed priority chain, changed storage approach, new constraint), add an entry to `.ai/DECISIONS.md` (format: date, problem, decision, reason, tradeoffs). Update `.ai/ARCHITECTURE.md` if the current-state map itself changed. Update `.ai/CURRENT.md` if the active task status changed. Place new parked ideas in `.ai/BACKLOG.md`, not DECISIONS.md.
+
+**What NOT to write in `.ai/` files:**
+- Temporary debugging traces or "tried X, didn't work" logs (keep those in CURRENT.md only while actively working, then remove them).
+- Duplication of README's install/run instructions (link to README instead).
+- Duplication of CLAUDE.md's full narrative (link to relevant sections instead).
+- Anything git-log derivable (commit history is authoritative via `git log`).
+
+---
+
 ## What this is
 
 A single-page live aircraft tracker: a Flask backend proxies six

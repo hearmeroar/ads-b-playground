@@ -340,6 +340,13 @@ Alongside them, `schema/aircraft.schema.json` documents the normalized
 aircraft shape the sidebar renders — every field, with the raw source field
 name and unit it came from.
 
+`.ai/` — **AI agent memory system** (committed to git): compressed map of
+current architecture (`ARCHITECTURE.md`), project overview and constraints
+(`PROJECT.md`), architecture decision log (`DECISIONS.md`), active work
+status (`CURRENT.md`), and parked ideas (`BACKLOG.md`). Designed for quick
+context-loading at the start of development sessions. See [`CLAUDE.md`](CLAUDE.md)
+§ "AI Memory System" for details.
+
 See [`CLAUDE.md`](CLAUDE.md) for the detailed architecture notes, non-obvious
 gotchas, and rationale behind specific decisions. `PLAN_NOTES.md` (repo root,
 gitignored) holds the working architecture audit and in-progress
