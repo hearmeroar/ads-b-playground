@@ -90,6 +90,32 @@ def test_airports_in_bbox_radius_filter_narrows_bbox_result():
     assert any(a["icao"] == "LYBE" for a in near_center)
 
 
+# --- Per-size `types` filter (backs the frontend's airport-type checklist) --
+
+def test_list_map_airports_types_filter_restricts_to_given_types():
+    airports = list_map_airports(types=["large_airport"])
+    assert airports  # the real dataset has plenty of large airports
+    assert all(a["type"] == "large_airport" for a in airports)
+
+
+def test_list_map_airports_types_filter_none_means_unfiltered():
+    # None (the default) must behave exactly like before this filter
+    # existed — every non-closed type present, not just some default subset.
+    unfiltered = list_map_airports()
+    assert any(a["type"] == "heliport" for a in unfiltered)
+    assert any(a["type"] == "small_airport" for a in unfiltered)
+
+
+def test_airports_in_bbox_types_filter():
+    # Belgrade Nikola Tesla (large_airport) is in view either way; asking
+    # only for heliports/small airports must drop it, while asking for its
+    # own type keeps it.
+    without_large = airports_in_bbox(44.5, 20.0, 45.1, 20.6, types=["heliport", "small_airport"])
+    assert not any(a["icao"] == "LYBE" for a in without_large)
+    with_large = airports_in_bbox(44.5, 20.0, 45.1, 20.6, types=["large_airport"])
+    assert any(a["icao"] == "LYBE" for a in with_large)
+
+
 # --- /api/airports route ---------------------------------------------------
 
 def test_api_airports_with_bbox(client):
@@ -120,6 +146,27 @@ def test_api_airports_without_bbox_falls_back_to_home_region(client):
 
 def test_api_airports_malformed_bbox_falls_back_to_home_region(client):
     resp = client.get("/api/airports", query_string={"bbox": "not,a,valid,bbox"})
+    assert resp.status_code == 200
+    icaos = [a["icao"] for a in resp.get_json()["airports"]]
+    assert "LYBE" in icaos
+
+
+def test_api_airports_types_param_filters_result(client):
+    resp = client.get(
+        "/api/airports",
+        query_string={"bbox": "44.5,20.0,45.1,20.6", "types": "large_airport"},
+    )
+    assert resp.status_code == 200
+    airports = resp.get_json()["airports"]
+    assert airports  # Belgrade Nikola Tesla itself should still be there
+    assert all(a["type"] == "large_airport" for a in airports)
+
+
+def test_api_airports_no_types_param_returns_every_type(client):
+    # No `types` at all (the pre-existing caller shape) must stay unfiltered
+    # — a request that never mentions the param behaves exactly as it did
+    # before this filter was added.
+    resp = client.get("/api/airports", query_string={"bbox": "44.5,20.0,45.1,20.6"})
     assert resp.status_code == 200
     icaos = [a["icao"] for a in resp.get_json()["airports"]]
     assert "LYBE" in icaos

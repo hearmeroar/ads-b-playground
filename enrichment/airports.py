@@ -152,7 +152,7 @@ def nearest_airport(lat, lon):
     }
 
 
-def list_map_airports(include_closed=False):
+def list_map_airports(include_closed=False, types=None):
     """Every airport worldwide for the map's "Airports" layer (see the
     module docstring for why this dataset is global rather than scoped to
     this app's coverage area).
@@ -161,6 +161,13 @@ def list_map_airports(include_closed=False):
     if it were an active one would be misleading, and it's a judgment call
     this function makes so callers don't have to remember to filter it
     themselves. Pass `include_closed=True` to get the full list anyway.
+
+    `types`, when given, is an iterable of OurAirports `type` values
+    (`large_airport`/`medium_airport`/`small_airport`/`heliport`/
+    `seaplane_base`/`balloonport`) — only airports whose `type` is in it are
+    kept. This is what backs the frontend's per-size checklist (large/medium
+    airports shown by default, the rest opt-in) — `None` (the default)
+    means no type restriction, same as before this filter existed.
 
     Each entry's raw `country` field is OurAirports' own 2-letter ISO code
     (e.g. "RS"), not a display name — a `country_name` key (e.g. "Serbia")
@@ -171,6 +178,9 @@ def list_map_airports(include_closed=False):
     sidebar's own flag/name resolution elsewhere in this app.
     """
     source = _MAP_AIRPORTS if include_closed else (a for a in _MAP_AIRPORTS if a.get("type") != "closed")
+    if types is not None:
+        types = set(types)
+        source = (a for a in source if a.get("type") in types)
     result = []
     for a in source:
         country = country_by_iso(a.get("country"))
@@ -178,7 +188,7 @@ def list_map_airports(include_closed=False):
     return result
 
 
-def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False, center=None, radius_km=None):
+def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False, center=None, radius_km=None, types=None):
     """Airports within a lat/lon bounding box — what the frontend actually
     renders. The full global list is stored (see the module docstring), but
     a live map only ever needs whatever's in view: `/api/airports` calls
@@ -197,6 +207,9 @@ def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False, center=No
     the app never actually covers. The full dataset is untouched either
     way — this only narrows what a given call returns.
 
+    `types` is passed straight through to `list_map_airports()` — see there
+    for its shape.
+
     Invalid bounds (non-numeric, or a degenerate box) return an empty list
     rather than raising — a malformed viewport shouldn't 500 the request.
     """
@@ -207,7 +220,7 @@ def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False, center=No
     if lamin > lamax or lomin > lomax:
         return []
     result = [
-        a for a in list_map_airports(include_closed=include_closed)
+        a for a in list_map_airports(include_closed=include_closed, types=types)
         if lamin <= a["lat"] <= lamax and lomin <= a["lon"] <= lomax
     ]
     if center is not None and radius_km is not None:

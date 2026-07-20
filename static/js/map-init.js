@@ -426,6 +426,12 @@ const airportsState = {
   clusterGroup: L.markerClusterGroup({ clusterPane: 'airportPane', maxClusterRadius: 60 }),
   enabled: false,
   debounceTimer: null,
+  // Per-size checklist (static/index.html's #airports-type-list) — Large
+  // and Medium ship on, matching the HTML's own `checked` attributes;
+  // everything else is opt-in. Sent to /api/airports as a `types` param so
+  // filtering happens server-side rather than fetching every type and
+  // discarding markers client-side.
+  enabledTypes: new Set(['large_airport', 'medium_airport']),
 };
 
 const AIRPORT_TYPE_LABELS = {
@@ -439,30 +445,65 @@ function escapeHtml(str) {
   }[c]));
 }
 
+// Small header glyph for the popup card below — the same AIRPORT_GLYPH/
+// HELIPORT_GLYPH markup airportIcon() (icons.js) draws on the map itself,
+// so the popup and its marker read as the same object rather than two
+// independently-styled representations of it.
+function airportPopupIconSvg(type) {
+  const glyph = (type === 'heliport' ? HELIPORT_GLYPH : AIRPORT_GLYPH).replace(/COLOR/g, AIRPORT_MARKER_COLOR);
+  return '<svg width="22" height="22" viewBox="0 0 24 24">' + glyph + '</svg>';
+}
+
+// Reworked into the app's own glass-card look (see .airport-popup* in
+// style.css) instead of Leaflet's plain default popup text — a title +
+// type badge header, monospace code chips for IATA/ICAO, then place/
+// elevation as their own rows, rather than one long <b>/<br> string.
 function airportPopupHtml(airport) {
   const typeLabel = AIRPORT_TYPE_LABELS[airport.type] || 'Airport';
-  const codes = [airport.iata, airport.icao].filter(Boolean).join(' / ');
+  const codes = [airport.iata, airport.icao].filter(Boolean);
   const flag = airport.country && typeof flagHtml === 'function' ? flagHtml(airport.country) : '';
   // country_name (a display name, e.g. "Serbia") is resolved backend-side
   // from the raw ISO code via country_by_iso() — falls back to the bare
   // code itself if that lookup has no entry for it, rather than showing
   // nothing next to the flag.
   const countryText = airport.country_name || airport.country;
-  const countryPart = flag ? flag + ' ' + escapeHtml(countryText) : escapeHtml(countryText || '');
-  const place = [airport.municipality ? escapeHtml(airport.municipality) : '', countryPart].filter(Boolean).join(', ');
+  const place = [airport.municipality ? escapeHtml(airport.municipality) : '', escapeHtml(countryText || '')]
+    .filter(Boolean).join(', ');
   const elevation = airport.elevation_ft != null ? Math.round(airport.elevation_ft * FT_TO_M) + ' m' : null;
-  let html = '<b>' + escapeHtml(airport.name) + '</b><br>' + typeLabel;
-  if (codes) html += ' &middot; ' + escapeHtml(codes);
-  if (place) html += '<br>' + place;
-  if (elevation) html += '<br>Elevation: ' + elevation;
+
+  let html = '<div class="airport-popup-card">';
+  html += '<div class="airport-popup-header">';
+  html += '<span class="airport-popup-icon">' + airportPopupIconSvg(airport.type) + '</span>';
+  html += '<div><div class="airport-popup-name">' + escapeHtml(airport.name) + '</div>';
+  html += '<div class="airport-popup-type">' + escapeHtml(typeLabel) + '</div></div>';
+  html += '</div>';
+  if (codes.length) {
+    html += '<div class="airport-popup-codes">' +
+      codes.map((c) => '<span class="airport-popup-code-chip">' + escapeHtml(c) + '</span>').join('') +
+      '</div>';
+  }
+  if (place) {
+    html += '<div class="airport-popup-row">' + (flag ? flag + ' ' : '') + place + '</div>';
+  }
+  if (elevation) {
+    html += '<div class="airport-popup-row airport-popup-row-muted">Elevation: ' + elevation + '</div>';
+  }
+  html += '</div>';
   return html;
 }
 
 function refreshAirportsInView() {
   if (!airportsState.enabled) return;
+  // An empty checklist means "show nothing" — not "no types param", which
+  // the backend would instead read as "no filter, show every type".
+  if (airportsState.enabledTypes.size === 0) {
+    airportsState.clusterGroup.clearLayers();
+    return;
+  }
   const b = map.getBounds();
   const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].join(',');
-  fetch('/api/airports?bbox=' + encodeURIComponent(bbox))
+  const types = Array.from(airportsState.enabledTypes).join(',');
+  fetch('/api/airports?bbox=' + encodeURIComponent(bbox) + '&types=' + encodeURIComponent(types))
     .then((resp) => resp.json())
     .then((data) => {
       if (!airportsState.enabled) return; // toggled off while this fetch was in flight
@@ -471,7 +512,7 @@ function refreshAirportsInView() {
       for (const airport of airports) {
         if (airport.lat == null || airport.lon == null) continue;
         const marker = L.marker([airport.lat, airport.lon], { icon: airportIcon(airport.type), pane: 'airportPane' });
-        marker.bindPopup(airportPopupHtml(airport));
+        marker.bindPopup(airportPopupHtml(airport), { className: 'airport-popup', minWidth: 170, maxWidth: 260 });
         airportsState.clusterGroup.addLayer(marker);
       }
     })
@@ -495,4 +536,14 @@ function setAirportsEnabled(enabled) {
   airportsState.clusterGroup.addTo(map);
   refreshAirportsInView();
   map.on('moveend', scheduleAirportsRefresh);
+}
+
+// Called from the per-size checklist (state-filters.js) — an explicit user
+// choice, so it re-fetches immediately rather than waiting for the pan
+// debounce above (which exists to smooth a drag/zoom gesture, not a
+// deliberate checkbox click).
+function setAirportsTypeEnabled(type, enabled) {
+  if (enabled) airportsState.enabledTypes.add(type);
+  else airportsState.enabledTypes.delete(type);
+  refreshAirportsInView();
 }

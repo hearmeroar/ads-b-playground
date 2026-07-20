@@ -107,6 +107,10 @@ test('airport marker popup shows name, codes, and elevation; heliport gets its o
   expect(airportPopup).toContain('BEG');
   expect(airportPopup).toContain('LYBE');
   expect(airportPopup).toContain('Large airport');
+  // Reworked into the app's own glass-card look (airport-popup-card) rather
+  // than Leaflet's plain default popup text.
+  expect(airportPopup).toContain('airport-popup-card');
+  expect(airportPopup).toContain('airport-popup-code-chip');
 
   const heliportIconHtml = await page.evaluate(() => {
     const layer = airportsState.clusterGroup.getLayers().find((l) => l.getPopup().getContent().includes('Test Heliport'));
@@ -119,6 +123,64 @@ test('airport marker popup shows name, codes, and elevation; heliport gets its o
     return layer.options.icon.options.html;
   });
   expect(airportIconHtml).toContain('airport-icon-large-airport');
+
+  // bindPopup's own className option lands on the marker's popup instance,
+  // which is what makes the .airport-popup CSS selectors in style.css apply.
+  const popupClassName = await page.evaluate(() => {
+    const layer = airportsState.clusterGroup.getLayers().find((l) => l.getPopup().getContent().includes('Belgrade Nikola Tesla'));
+    return layer.getPopup().options.className;
+  });
+  expect(popupClassName).toBe('airport-popup');
+});
+
+test('the per-size checklist is hidden until Airports is enabled, and defaults to Large + Medium only', async ({ page }) => {
+  const counts = {};
+  await mockAirports(page, counts);
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  await expect(page.locator('#airports-type-list')).toHaveAttribute('hidden', '');
+
+  await page.click('#toggle-airports');
+  await expect(page.locator('#airports-type-list')).not.toHaveAttribute('hidden', '');
+  await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length === 2);
+
+  expect(counts.lastUrl).toContain('types=large_airport%2Cmedium_airport');
+  expect(await page.isChecked('.airport-type-checkbox[value="large_airport"]')).toBe(true);
+  expect(await page.isChecked('.airport-type-checkbox[value="medium_airport"]')).toBe(true);
+  expect(await page.isChecked('.airport-type-checkbox[value="small_airport"]')).toBe(false);
+  expect(await page.isChecked('.airport-type-checkbox[value="heliport"]')).toBe(false);
+  expect(await page.isChecked('.airport-type-checkbox[value="seaplane_base"]')).toBe(false);
+  expect(await page.isChecked('.airport-type-checkbox[value="balloonport"]')).toBe(false);
+
+  // Turning Airports back off hides the checklist again.
+  await page.click('#toggle-airports');
+  await expect(page.locator('#airports-type-list')).toHaveAttribute('hidden', '');
+});
+
+test('checking/unchecking a size in the checklist re-fetches with the updated types param', async ({ page }) => {
+  const counts = {};
+  await mockAirports(page, counts);
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  await page.click('#toggle-airports');
+  await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length === 2);
+  expect(counts.n).toBe(1);
+
+  // Adding Heliport re-fetches immediately (not debounced like a pan).
+  await page.click('.airport-type-checkbox[value="heliport"]');
+  await page.waitForTimeout(150);
+  expect(counts.n).toBe(2);
+  expect(counts.lastUrl).toContain('types=large_airport%2Cmedium_airport%2Cheliport');
+
+  // Unchecking every type shows nothing and performs no further fetch.
+  await page.click('.airport-type-checkbox[value="large_airport"]');
+  await page.click('.airport-type-checkbox[value="medium_airport"]');
+  await page.click('.airport-type-checkbox[value="heliport"]');
+  await page.waitForTimeout(150);
+  expect(counts.n).toBe(4); // large_airport off + medium_airport off both still fetch (non-empty selection each time)
+  expect(await page.evaluate(() => airportsState.clusterGroup.getLayers().length)).toBe(0);
 });
 
 test('Airports (?) popover explains the layer and closes on outside click', async ({ page }) => {

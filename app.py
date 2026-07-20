@@ -1250,6 +1250,12 @@ def api_airports():
     # dataset stays in memory either way (see enrichment/airports.py), this
     # just stops airports outside the zone the app actually scans from ever
     # being rendered, even while panned somewhere far away.
+    #
+    # `types` (comma-separated OurAirports type values, e.g.
+    # "large_airport,medium_airport") backs the frontend's per-size
+    # checklist — only sent when the user has actually narrowed the
+    # selection, so an old/simple caller that never passes it still gets
+    # every type, unfiltered, exactly like before this param existed.
     bbox_param = request.args.get("bbox")
     if bbox_param:
         try:
@@ -1258,9 +1264,12 @@ def api_airports():
             lamin, lomin, lamax, lomax = BBOX["lamin"], BBOX["lomin"], BBOX["lamax"], BBOX["lomax"]
     else:
         lamin, lomin, lamax, lomax = BBOX["lamin"], BBOX["lomin"], BBOX["lamax"], BBOX["lomax"]
+    types_param = request.args.get("types")
+    types = {t for t in types_param.split(",") if t} if types_param else None
     airports = airports_in_bbox(
         lamin, lomin, lamax, lomax,
         center=(AREA_CENTER["lat"], AREA_CENTER["lon"]), radius_km=AREA_RADIUS_KM,
+        types=types,
     )
     return jsonify({"airports": airports})
 

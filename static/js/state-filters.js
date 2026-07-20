@@ -138,8 +138,20 @@ document.getElementById('toggle-weather-metar').addEventListener('change', (e) =
 // (map-init.js) also attaches/detaches its own pan/zoom listener instead of
 // a fixed-interval timer, since airport positions don't change but the
 // map's viewport does.
+const airportsTypeListEl = document.getElementById('airports-type-list');
 document.getElementById('toggle-airports').addEventListener('change', (e) => {
+  airportsTypeListEl.hidden = !e.target.checked;
   setAirportsEnabled(e.target.checked);
+});
+
+// Per-size checklist nested under the toggle above — each checkbox just
+// flips its own type in/out of airportsState.enabledTypes and triggers an
+// immediate re-fetch (map-init.js's setAirportsTypeEnabled), the same
+// "own setter owns its own state" idiom as every other filter here.
+document.querySelectorAll('.airport-type-checkbox').forEach((checkbox) => {
+  checkbox.addEventListener('change', (e) => {
+    setAirportsTypeEnabled(e.target.value, e.target.checked);
+  });
 });
 
 const GROUND_VEHICLE_MARKERS = new Set(['TWR']);

@@ -395,6 +395,38 @@
       </label>
       <div class="source-help-popover" id="airports-help-popover" hidden></div>
     </div>
+    <!-- Per-size checklist, revealed only while the layer itself is on
+         (state-filters.js toggles [hidden]) — ordered largest to smallest,
+         matching how a paper aviation chart or any size-tiered legend reads.
+         Large/Medium ship checked (the two categories a user actually
+         scanning airline traffic cares about); every smaller type is present
+         but unchecked, an explicit opt-in rather than a hidden capability. -->
+    <div class="airport-type-list" id="airports-type-list" hidden>
+      <label class="airport-type-option">
+        <input type="checkbox" class="airport-type-checkbox" value="large_airport" checked>
+        <span>Large airport</span>
+      </label>
+      <label class="airport-type-option">
+        <input type="checkbox" class="airport-type-checkbox" value="medium_airport" checked>
+        <span>Medium airport</span>
+      </label>
+      <label class="airport-type-option">
+        <input type="checkbox" class="airport-type-checkbox" value="small_airport">
+        <span>Small airport</span>
+      </label>
+      <label class="airport-type-option">
+        <input type="checkbox" class="airport-type-checkbox" value="heliport">
+        <span>Heliport</span>
+      </label>
+      <label class="airport-type-option">
+        <input type="checkbox" class="airport-type-checkbox" value="seaplane_base">
+        <span>Seaplane base</span>
+      </label>
+      <label class="airport-type-option">
+        <input type="checkbox" class="airport-type-checkbox" value="balloonport">
+        <span>Balloonport</span>
+      </label>
+    </div>
   </div>
 
   <div class="filter-block">
