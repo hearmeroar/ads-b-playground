@@ -16,3 +16,4 @@ playwright-report/
 .app.db-wal
 .app.db-shm
 PROD_INFRA_NOTES.md
+PLAN_NOTES.md

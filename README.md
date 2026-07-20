@@ -341,7 +341,10 @@ aircraft shape the sidebar renders — every field, with the raw source field
 name and unit it came from.
 
 See [`CLAUDE.md`](CLAUDE.md) for the detailed architecture notes, non-obvious
-gotchas, and rationale behind specific decisions.
+gotchas, and rationale behind specific decisions. `PLAN_NOTES.md` (repo root,
+gitignored) holds the working architecture audit and in-progress
+implementation plan for the current round of improvements, for resuming
+across sessions.
 
 ## Attribution
 

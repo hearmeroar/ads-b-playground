@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**`PLAN_NOTES.md`** (repo root, gitignored, not committed) holds the working
+architecture audit + the in-progress implementation plan for the current
+round of improvements (SQLite migration, CI, marker interpolation, etc.) —
+check it at the start of a session if picking this work back up, so it
+doesn't need to be re-derived from scratch.
+
 ## What this is
 
 A single-page live aircraft tracker: a Flask backend proxies six
