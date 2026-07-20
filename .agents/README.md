@@ -14,4 +14,16 @@ Usage
 - Link ADRs / `.ai/` entries in PR descriptions when a change affects architecture.
 - Follow branch / commit / PR conventions in `.agents/developer.md`.
 
+ Quick SOP (summary):
+
+- Draft a 1–6 line update describing the change, date, and refs.
+- Open a branch `docs/current/<short-what>` and create a PR with title
+	`docs(.ai): update CURRENT.md — YYYY-MM-DD`.
+- Add label `docs/.ai`, request review from `Architect` and merge only after
+	Architect approval.
+- Keep `CURRENT.md` short; move rationale to `DECISIONS.md`.
+
+ See `.agents/architect.md` for the full step-by-step procedure and commit
+ template.
+
 Contact: this is a project-local playbook — modify by PR if you want to evolve it.

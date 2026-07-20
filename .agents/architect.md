@@ -39,6 +39,29 @@ Short summary of change
 Refs: .agents/architect.md
 ```
 
+SOP: how to update `/.ai/CURRENT.md` (step-by-step)
+
+1. Prepare draft
+  - Author (Developer or AI) prepares a 1–6 line draft describing the change.
+  - Include date, short summary, and any relevant PR/ADR/issue links.
+
+2. Open a PR
+  - Create a branch `docs/current/<short-what>` from `main`.
+  - Push the branch and open a PR titled: `docs(.ai): update CURRENT.md — YYYY-MM-DD`.
+  - Add the `docs/.ai` label and request review from the `Architect`.
+
+3. Review & merge
+  - Architect reviews the PR, edits as needed, and merges when satisfied.
+  - Small, non-architectural edits may be fast-tracked but still require Architect approval.
+
+4. Post-merge housekeeping
+  - Architect adds one-line entry to `DECISIONS.md` if the change reflects an ADR or an important decision.
+  - Close related issues and link the merge commit in the issue/PR.
+
+Notes
+- Keep `/.ai/CURRENT.md` concise — it is a status snapshot, not a long-form changelog.
+- Use `DECISIONS.md` for rationale and `BACKLOG.md` for ideas.
+
 Quick ADR template
 ```
 Date: YYYY-MM-DD
