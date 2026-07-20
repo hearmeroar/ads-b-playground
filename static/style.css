@@ -37,6 +37,11 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .count { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 #hud .label { font-size: 11px; color: var(--muted); margin: 1px 0 12px; }
 
+/* #search-block is a .filter-block, whose divider/spacing rule only adds
+   room above itself (border-top/padding-top/margin-top) — nothing pushes
+   .sources away from it below, so the search input reads as glued to the
+   first source row without this. */
+#hud #search-block { margin-bottom: 12px; }
 #hud .sources { display: flex; flex-direction: column; gap: 8px; }
 #hud .source-row { display: flex; align-items: center; gap: 8px; position: relative; }
 #hud .swatch {
