@@ -302,6 +302,68 @@ aircraft's sidebar (similar to `radiusRecordsByHex` for radius sources). A non-m
 difference, missing callsign, or a FlightAware-only flight) simply leaves FlightAware's own marker
 showing — never causes a false merge. Cached like the four radius sources (10s `FLIGHTAWARE_MIN_INTERVAL`).
 
+**FlightRadar24, via the unofficial `JeanExtreme002/FlightRadarAPI` SDK
+(`/api/flightradar24`)**: a seventh source, added after researching whether
+any project streams the *real* ADS-B Exchange feed (see this repo's git
+history/session notes around 2026-07-19–20 for the full investigation —
+short version: ADSBX itself has no free no-feed path, its legacy TCP/HTTP
+bridges are dead or Cloudflare-blocked, and every other commercial network
+checked — RadarBox, ADSBHub, PlaneFinder, Wingbits — gates live streaming
+behind feeder status or payment). This SDK (409★, MIT,
+https://github.com/JeanExtreme002/FlightRadarAPI) is the one surviving free
+lead: it talks to FlightRadar24's own *private* web API (the same one
+flightradar24.com's frontend uses), **not** FR24's official paid `fr24api`.
+**Known, ongoing risk, not hypothetical**: the SDK depends on `curl_cffi`
+specifically for TLS/JA3 impersonation to get past FlightRadar24's
+Cloudflare bot-fingerprinting, and ships a dedicated `CloudflareError`
+exception because FlightRadar24 does sometimes block it. Its own README says
+it "should only be used for your own educational purposes." This is the
+same category of risk that already killed a comparable PlaneFinder wrapper
+(`wiseman/node-planefinder`, dead since 2015 per its own README — PlaneFinder
+deliberately obfuscated their data against it) — it could stop working the
+day FlightRadar24 tightens detection, through no bug of this app's own.
+Because of that, it's built exactly like FlightAware's paid/risky pattern:
+**ships off by default**, and `cached_flightradar24()` (`app.py`) catches
+bare `Exception` — not just `requests.RequestException` — since it wraps a
+third-party client whose failure surface (curl_cffi errors, parsing errors)
+isn't fully typed; a failure always degrades to the same stale-cache-or-502
+pattern every other source uses, never breaks the rest of the poll.
+`_fr24_client.get_flights(bounds=...)` returns `Flight` objects
+(`icao_24bit`, `latitude`/`longitude`, `heading`, `altitude` in feet,
+`ground_speed` in knots, `squawk`, `aircraft_code`, `registration`,
+`origin_airport_iata`/`destination_airport_iata`, `callsign`, `on_ground`,
+`vertical_speed`) with no login required — `FLIGHTRADAR24_FIELDS`
+(`app.py`) is the exact allowlist serialized into the `/api/flightradar24`
+response; anything beyond that (full airport name/city/country, aircraft
+photos, flight history) only exists behind the SDK's separate, per-flight
+`get_flight_details()` call, which this app doesn't use (would need to be
+lazy/click-only, same pattern as adsbdb, not spent on every poll).
+**Unlike FlightAware, this source *is* ICAO24-keyed** — `icao_24bit` maps
+straight to `icao24` — so `parseFlightRadar24Aircraft()` (`static/js/
+parsers.js`) converts the raw fields into this app's own "raw record"
+convention (the same field names `parseAdsbExchangeAircraft()` produces),
+which is what lets it slot into the *same* `radiusRecordsByHex` map the four
+radius sources share, with zero changes to `normalizeOpenSky()`/
+`fieldSourcesFor()`/`RAW_FIELD_ALIASES` — dedup and enrichment badging both
+just work. **Priority: sits below even airplanes.live**, both in
+`radiusRecordsByHex`'s enrichment order and in the marker `excludeIds`
+render chain (`static/js/main.js`'s `poll()`) — the newest, least-proven,
+most failure-prone source never outranks any of the four established free
+ones, mirroring why FlightAware ships off by default too. **Route fields**
+(`originAirport`/`destinationAirport`) come directly from FR24's own data,
+not a FlightAware-style callsign match — but since the basic feed only ever
+has a bare IATA code (no airport name), `parseFlightRadar24Aircraft()`
+formats it as `" (CODE)"` (a leading space before the parens) so the shared
+Route card's `splitAirportString()` regex (built for FlightAware/adsbdb's
+`"Name (CODE)"` strings) still parses it correctly — empty city name, just
+the big code — rather than building a second, bespoke rendering path for
+two bare codes. `fieldSources.originAirport`/`.destinationAirport` are set
+by hand to `['flightradar24']` in `updateFlightRadar24Markers()`, the same
+"generic call, then hand-overwrite" idiom FlightAware's own callsign-match
+branch already uses, since `fieldSourcesFor()`'s `ROUTE_FIELDS` handling
+only ever trusts an explicit `routeSource` override, not the generic
+per-entry lookup, for these two fields.
+
 **Area coupling:** All location-based constants derive from one `AREA_CENTER`
 (`{"lat": 44.0, "lon": 21.0}`) in `app.py`: `BBOX` is computed from it,
 every `RADIUS_SOURCES[*]["center"]` is set to it (with the appropriate
@@ -619,8 +681,11 @@ because photographer name and photo URL come from an external API.
 - **Dedup + enrichment rule:** `poll()` fetches all enabled sources in
   parallel, builds a `flightawareByCallsign` lookup (callsign-normalized for matching),
   then defers rendering until all arrive. Rendering happens in one fixed priority order
-  — **OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live > FlightAware** — since
-  each step depends on data or state from the others. **FlightAware uses callsign-based dedup:**
+  — **OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live > FlightRadar24 > FlightAware**
+  — since each step depends on data or state from the others. FlightRadar24 is
+  ICAO24-keyed like the radius sources (not callsign-keyed like FlightAware), so it
+  sits inside the same `excludeIds`/`radiusRecordsByHex` chain as them, just last —
+  see the FlightRadar24 section above for why. **FlightAware uses callsign-based dedup:**
   after the ICAO24-keyed chain above, FlightAware flights matching any other source's
   callsign (trimmed, case-insensitive) are suppressed, and their route data is merged
   into that source's sidebar. A failing source degrades to `null` and is skipped for
@@ -2251,6 +2316,27 @@ because photographer name and photo URL come from an external API.
   `geom: "AREAS"` (multi-polygon) SIGMET's nested-rings coordinate shape,
   which the first version 500'd on since it assumed every SIGMET's
   `coords` was a flat list.
+- `tests/backend/test_flightradar24.py` mocks the `FlightRadarAPI` SDK
+  directly (`monkeypatch.setattr(app._fr24_client, "get_flights", ...)`) —
+  the first backend test file that isn't mocking `app.requests.get`/`.post`,
+  since this source never calls `requests` itself. Covers the happy path,
+  10s caching, stale-fallback on the SDK's own `CloudflareError`, and —
+  since `cached_flightradar24()` deliberately catches bare `Exception`, not
+  just the SDK's typed errors — stale-fallback on an arbitrary `ValueError`
+  too, plus the cold-start 502 path. `conftest.py`'s `reset_caches` gained a
+  `_flightradar24_cache.clear()` entry.
+- `test_flightradar24.spec.js` covers: off by default (zero markers, no
+  fetch); markers render once toggled on; the toggle itself controls marker
+  visibility; an aircraft already claimed by OpenSky (shared ICAO24) is not
+  double-marked, proving the priority placement below airplanes.live; and
+  the Route card renders a bare IATA code correctly (the `" (CODE)"`
+  formatting trick — see the FlightRadar24 section above). Reuses
+  `states.json`'s `"aaaaaa"` for the dedup case; picks a hex (`"123456"`)
+  confirmed absent from every other fixture for its own-marker cases, after
+  an early draft of this test picked `"ffffff"` and got a false failure —
+  that hex was already used by `airplaneslive.json`'s own fixture aircraft,
+  so the "aircraft already covered" dedup logic was correctly excluding it
+  the whole time; the bug was in the test's own fixture data, not the app.
 
 ## SVG Icon Rendering
 

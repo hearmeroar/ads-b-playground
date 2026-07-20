@@ -20,6 +20,11 @@ const VERTICAL_RATE_LEVEL_THRESHOLD_MS = 0.5;
 // data-quality ranking).
 const SOURCE_COLORS = {
   opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32', flightaware: '#00acc1',
+  // FlightRadar24, via the unofficial JeanExtreme002/FlightRadarAPI SDK — see
+  // CLAUDE.md for why it ships off by default and lowest-priority. Brown,
+  // distinct from every color above (avoids adsbone's yellow-orange, which
+  // FR24's own brand orange would sit too close to).
+  flightradar24: '#6d4c41',
   // adsbdb.com is a lazy-on-click lookup (like Flywme below), not a per-poll
   // marker source — see the CLAUDE.md pitfall about SOURCE_COLORS entries
   // needing to stay out of sourceToggles/markerMapsBySource unless they
@@ -35,6 +40,7 @@ const SOURCE_COLORS = {
 const SOURCE_DISPLAY_NAMES = {
   opensky: 'OpenSky', adsbfi: 'adsb.fi', adsblol: 'adsb.lol',
   adsbone: 'adsb.one', airplaneslive: 'airplanes.live', flightaware: 'FlightAware',
+  flightradar24: 'FlightRadar24',
   adsbdb: 'adsbdb.com',
   flywme: 'Flywme',
 };

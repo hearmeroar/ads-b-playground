@@ -24,6 +24,7 @@ function normalizeOpenSky(s, extra) {
     callsign: (s.callsign || '').trim() || null,
     registration: (extra && extra.registration) || null,
     aircraftType: (extra && extra.aircraftType) || null,
+    icaoTypeCode: (extra && extra.icaoTypeCode) || null,
     originCountry: s.origin_country || null,
     categoryDisplay: categoryDisplay,
     altitudeM: s.baro_altitude,
@@ -181,6 +182,7 @@ function normalizeAdsbExchange(a) {
     callsign: (a.callsign || '').trim() || null,
     registration: a.registration || null,
     aircraftType: a.aircraftType || null,
+    icaoTypeCode: a.icaoTypeCode || null,
     originCountry: null,
     categoryDisplay: formatAdsbExchangeCategory(a.category),
     altitudeM: a.altitudeM,
@@ -235,6 +237,12 @@ function parseAdsbExchangeAircraft(ac) {
     callsign: ac.flight,
     registration: ac.r,
     aircraftType: ac.desc || ac.t || null,
+    // Kept separate from aircraftType above: `t` is the standardized ICAO
+    // type designator (e.g. "B38M"), while aircraftType prefers `desc`'s
+    // free text (e.g. "BOEING 737 MAX 8") whenever present. /api/identity
+    // needs the raw code specifically — it's a reliable exact-match lookup
+    // key, unlike desc text, whose exact wording varies across aircraft.
+    icaoTypeCode: ac.t || null,
     lat: ac.lat,
     lon: ac.lon,
     onGround: onGround,
@@ -292,6 +300,111 @@ function parseAdsbExchangeAircraft(ac) {
   };
 }
 
+// FlightRadar24, via the unofficial JeanExtreme002/FlightRadarAPI SDK —
+// app.py's /api/flightradar24 already serializes each Flight object's
+// fields under their own SDK attribute names (icao_24bit, ground_speed,
+// aircraft_code, ...). Converts them into this app's own "raw record"
+// convention — the same field names parseAdsbExchangeAircraft() produces —
+// so this source's data can sit in the same radiusRecordsByHex map as the
+// four radius sources and reuse fieldSourcesFor/RAW_FIELD_ALIASES with no
+// special-casing. Unlike those four, origin/destination are populated
+// directly here (bare IATA codes, no name/city/country) rather than only
+// ever arriving via a FlightAware callsign match.
+function parseFlightRadar24Aircraft(f) {
+  return {
+    icao24: (f.icao_24bit || '').toLowerCase() || null,
+    callsign: (f.callsign || '').trim() || null,
+    registration: f.registration || null,
+    aircraftType: f.aircraft_code || null,
+    icaoTypeCode: f.aircraft_code || null, // FR24's aircraft_code is already the bare ICAO type code
+    lat: f.latitude,
+    lon: f.longitude,
+    onGround: !!f.on_ground,
+    altitudeM: typeof f.altitude === 'number' ? f.altitude * 0.3048 : null,
+    altGeomM: null,
+    speedKmh: typeof f.ground_speed === 'number' ? f.ground_speed * 1.852 : null,
+    verticalRateMs: typeof f.vertical_speed === 'number' ? f.vertical_speed * 0.3048 / 60 : null,
+    squawk: f.squawk || null,
+    category: null, // FR24's basic feed has no DO-260B emitter category code
+    emergency: null,
+    track: typeof f.heading === 'number' ? f.heading : null,
+    iasKt: null, tasKt: null, mach: null,
+    magHeadingDeg: null, trueHeadingDeg: null,
+    turnRateDegPerSec: null, rollDeg: null,
+    navAltitudeM: null, navHeadingDeg: null, navQnh: null, navModes: null,
+    windDirDeg: null, windSpeedKt: null, oatC: null, tatC: null,
+    hasAlert: false,
+    positionSource: null,
+    secondsSinceContact: typeof f.time === 'number'
+      ? Math.max(0, Math.floor(Date.now() / 1000) - f.time) : null,
+    operator: null, manufactureYear: null,
+    dbFlags: null, messageType: null, adsbVersion: null,
+    nic: null, nicBaro: null, nacP: null, nacV: null,
+    sil: null, silType: null, gva: null, sda: null,
+    radiusOfContainmentM: null, messageCount: null,
+    signalStrengthDbm: null, secondsSincePositionUpdate: null,
+    // render-details.js's Route card (shared with FlightAware/adsbdb) parses
+    // "Name (CODE)" via splitAirportString() — FR24's basic feed only ever
+    // has the bare IATA code, no airport name, so a leading-space "(CODE)"
+    // format matches that regex with an empty name group, which renders as
+    // just the big code with a blank city line rather than misreading the
+    // code itself as a city name.
+    originAirport: f.origin_airport_iata ? ' (' + f.origin_airport_iata + ')' : null,
+    destinationAirport: f.destination_airport_iata ? ' (' + f.destination_airport_iata + ')' : null,
+  };
+}
+
+// Same unified shape as normalizeAdsbExchange() (reused directly for every
+// field it already covers), plus originAirport/destinationAirport — the one
+// thing normalizeAdsbExchange() never sets, since for the four radius
+// sources those only ever arrive via a FlightAware callsign match, not from
+// the source's own data the way FlightRadar24's do.
+function normalizeFlightRadar24(a) {
+  const info = normalizeAdsbExchange(a);
+  info.originAirport = a.originAirport || null;
+  info.destinationAirport = a.destinationAirport || null;
+  return info;
+}
+
+// Same shape as updateRadiusSourceMarkers(), not a parametrized reuse of it
+// — kept as its own function, same as updateFlightAwareMarkers() is its own
+// function, since this source's route fields need their own fieldSources
+// override (FlightRadar24's own data, not a FlightAware callsign match) and
+// its normalize call differs. excludeIds/radiusRecordsByHex work exactly
+// like the radius sources' own — see CLAUDE.md for why this source sits
+// last in that priority chain.
+function updateFlightRadar24Markers(aircraftList, excludeIds, radiusRecordsByHex) {
+  const items = [];
+  for (const a of aircraftList) { // already parsed by poll() (parseFlightRadar24Aircraft)
+    if (a.lat == null || a.lon == null) continue;
+    // Unlike the four radius sources, FR24 isn't fundamentally keyed by
+    // ICAO24 (it's flight-object-keyed, with icao_24bit as just one
+    // attribute) — a flight with no transponder hex can't dedupe or key a
+    // marker the way this map (and excludeIds/radiusRecordsByHex) assumes.
+    if (!a.icao24) continue;
+    if (!passesMotionFilter(a.onGround)) continue;
+    const isGroundVehicle = looksLikeGroundVehicle({
+      category: a.category, registration: a.registration, aircraftType: a.aircraftType, callsign: a.callsign,
+    });
+    if (hideNonAircraft() && isGroundVehicle) continue;
+    const categoryGroup = categoryGroupFor({ adsbExchangeCategory: a.category });
+    if (!passesCategoryFilter(categoryGroup)) continue;
+    if (excludeIds && a.icao24 && excludeIds.has(a.icao24)) continue;
+    const info = normalizeFlightRadar24(a);
+    const entries = (radiusRecordsByHex && a.icao24 && radiusRecordsByHex.get(a.icao24)) || [{ source: 'flightradar24', data: a }];
+    const fieldSources = fieldSourcesFor(info, entries, null);
+    if (info.originAirport) fieldSources.originAirport = ['flightradar24'];
+    if (info.destinationAirport) fieldSources.destinationAirport = ['flightradar24'];
+    items.push({
+      id: a.icao24, lat: a.lat, lon: a.lon, heading: a.track,
+      info: info, fieldSources: fieldSources, registration: a.registration,
+      isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
+      categoryCode: a.category,
+    });
+  }
+  return syncMarkers(flightradar24Markers, items, SOURCE_COLORS.flightradar24);
+}
+
 // FlightAware AeroAPI shape: position/altitude/speed/heading live under
 // last_position (not top-level like other sources); altitude is in hundreds
 // of feet (e.g. 8 = 800 ft); origin/destination are objects with code_iata/name.
@@ -312,6 +425,7 @@ function parseFlightAware(f) {
     fa_flight_id: f.fa_flight_id,
     callsign: f.ident || null,
     aircraftType: f.aircraft_type || null,
+    icaoTypeCode: f.aircraft_type || null, // FlightAware's aircraft_type is already the bare ICAO type code
     lat: typeof lp.latitude === 'number' ? lp.latitude : null,
     lon: typeof lp.longitude === 'number' ? lp.longitude : null,
     onGround: altFt === 0,
@@ -332,6 +446,7 @@ function normalizeFlightAware(f) {
     callsign: f.callsign || null,
     registration: null,
     aircraftType: f.aircraftType || null,
+    icaoTypeCode: f.icaoTypeCode || null,
     originCountry: null,
     categoryDisplay: null,
     altitudeM: f.altitudeM,

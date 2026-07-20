@@ -47,6 +47,7 @@ from urllib.parse import quote
 
 import requests
 from authlib.integrations.flask_client import OAuth
+from FlightRadarAPI import FlightRadar24API
 from flask import Flask, jsonify, redirect, request, send_from_directory, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -377,6 +378,80 @@ FLIGHTAWARE_QUERY = '-latlong "{lamin} {lomin} {lamax} {lomax}"'.format(**BBOX)
 FLIGHTAWARE_API_KEY = os.environ.get("FLIGHTAWARE_API_KEY")
 FLIGHTAWARE_MIN_INTERVAL = 10
 _flightaware_cache = {"data": None, "ts": 0.0}
+
+# FlightRadar24, via the unofficial JeanExtreme002/FlightRadarAPI SDK
+# (https://github.com/JeanExtreme002/FlightRadarAPI): talks to FlightRadar24's
+# own private web API — the same one flightradar24.com's own frontend uses —
+# not FR24's official paid API, so there is no key to configure here. Unlike
+# the four anonymous radius sources, this isn't a plain requests.get(url): the
+# SDK makes its own HTTP calls (via curl_cffi, for TLS/JA3 impersonation, to
+# get past FlightRadar24's Cloudflare bot-fingerprinting), so it needs its own
+# fetch/cache helper rather than cached_radius_source(). The SDK ships a
+# dedicated CloudflareError class specifically because FlightRadar24 does
+# sometimes block this kind of client — a confirmed, ongoing risk, not a
+# hypothetical one, which is why this source ships off by default (like
+# FlightAware) and always degrades to "skip this cycle" rather than ever
+# failing the whole poll. Unlike FlightAware, flights here do carry an
+# ICAO24 (icao_24bit), so the frontend dedupes them against OpenSky/the four
+# radius sources by ICAO24 like any of those, not by callsign — but the route
+# fields are bare IATA codes only (no airport name/city/country the way
+# FlightAware's nested object has), so the frontend renders Route as plain
+# text for this source, not the fancier card.
+_fr24_client = FlightRadar24API()
+FLIGHTRADAR24_BOUNDS = _fr24_client.get_bounds({
+    "tl_y": BBOX["lamax"], "tl_x": BBOX["lomin"],
+    "br_y": BBOX["lamin"], "br_x": BBOX["lomax"],
+})
+FLIGHTRADAR24_MIN_INTERVAL = 10
+_flightradar24_cache = {"data": None, "ts": 0.0}
+
+# Field allowlist copied off python/FlightRadarAPI/entities/flight.py's own
+# Flight.__init__ — this is the exact set the basic (non-details) call
+# populates; anything else on a Flight object needs the separate, per-flight
+# get_flight_details() call this app doesn't use (would be lazy/click-only,
+# same pattern as adsbdb, not something to spend on every poll).
+FLIGHTRADAR24_FIELDS = (
+    "id", "icao_24bit", "latitude", "longitude", "heading", "altitude",
+    "ground_speed", "squawk", "aircraft_code", "registration", "time",
+    "origin_airport_iata", "destination_airport_iata", "number",
+    "airline_iata", "airline_icao", "on_ground", "vertical_speed", "callsign",
+)
+
+
+def _serialize_fr24_flight(flight):
+    return {field: getattr(flight, field, None) for field in FLIGHTRADAR24_FIELDS}
+
+
+def cached_flightradar24():
+    """Same TTL + stale-on-failure cache contract as cached_radius_source(),
+    but fetching via the FlightRadarAPI SDK instead of requests.get. Catches
+    bare Exception (not just requests.RequestException) deliberately: the SDK
+    makes its own HTTP calls under the hood and can raise its own
+    FlightRadarError family (including CloudflareError) or lower-level
+    curl_cffi/parsing errors that aren't requests exceptions at all — this is
+    the one source in this app whose failure surface isn't fully known/typed,
+    so the catch is intentionally broader than everywhere else in this file."""
+    now = time.time()
+    cache = _flightradar24_cache
+
+    if cache["data"] is not None and now - cache["ts"] < FLIGHTRADAR24_MIN_INTERVAL:
+        return jsonify(cache["data"])
+
+    try:
+        flights = _fr24_client.get_flights(bounds=FLIGHTRADAR24_BOUNDS)
+        payload = {"flights": [_serialize_fr24_flight(f) for f in flights]}
+        cache["data"] = payload
+        cache["ts"] = now
+        return jsonify(payload)
+
+    except Exception as exc:
+        if cache["data"] is not None:
+            stale = dict(cache["data"])
+            stale["stale"] = True
+            stale["error"] = str(exc)
+            return jsonify(stale)
+        return jsonify({"flights": [], "error": str(exc)}), 502
+
 
 # Planespotters (https://www.planespotters.net/photo/api): free, no key, but
 # requires a descriptive User-Agent with contact info or it 403s — override
@@ -805,6 +880,11 @@ def api_flightaware():
     )
 
 
+@app.route("/api/flightradar24")
+def api_flightradar24():
+    return cached_flightradar24()
+
+
 def fetch_planespotters(kind, value):
     cache_key = f"{kind}:{value}"
     if cache_key in _photo_cache:
@@ -1072,6 +1152,7 @@ def api_identity(icao24):
         registration=request.args.get("registration") or None,
         callsign=request.args.get("callsign") or None,
         aircraft_type=request.args.get("aircraft_type") or None,
+        icao_type_code=request.args.get("icao_type") or None,
         known_country=request.args.get("known_country") or None,
         known_operator=request.args.get("known_operator") or None,
         known_manufacture_year=request.args.get("known_manufacture_year", type=int),

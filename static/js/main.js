@@ -385,8 +385,17 @@ async function fetchFlightAwareFlights() {
   }
 }
 
+async function fetchFlightRadar24Flights() {
+  try {
+    const data = await fetchJson('/api/flightradar24');
+    return data.flights || [];
+  } catch (e) {
+    return null;
+  }
+}
+
 async function poll() {
-  const [openskyStates, adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft, flightawareFlights] =
+  const [openskyStates, adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft, flightawareFlights, flightradar24Flights] =
     await Promise.all([
       isSourceEnabled('opensky') ? fetchOpenSkyStates() : Promise.resolve(null),
       isSourceEnabled('adsbfi') ? fetchRadiusSourceAircraft('/api/adsbfi') : Promise.resolve(null),
@@ -394,6 +403,7 @@ async function poll() {
       isSourceEnabled('adsbone') ? fetchRadiusSourceAircraft('/api/adsbone') : Promise.resolve(null),
       isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
       isSourceEnabled('flightaware') ? fetchFlightAwareFlights() : Promise.resolve(null),
+      isSourceEnabled('flightradar24') ? fetchFlightRadar24Flights() : Promise.resolve(null),
     ]);
 
   // Each source fetches independently: fetchRadiusSourceAircraft swallows its
@@ -409,7 +419,8 @@ async function poll() {
   const parsedAdsbone = adsboneAircraft && adsboneAircraft.map(parseAdsbExchangeAircraft);
   const parsedAirplaneslive = airplanesliveAircraft && airplanesliveAircraft.map(parseAdsbExchangeAircraft);
   const parsedFlights = flightawareFlights && flightawareFlights.map(parseFlightAware);
-  const radiusLists = [parsedAdsbfi, parsedAdsblol, parsedAdsbone, parsedAirplaneslive];
+  const parsedFlightradar24 = flightradar24Flights && flightradar24Flights.map(parseFlightRadar24Aircraft);
+  const radiusLists = [parsedAdsbfi, parsedAdsblol, parsedAdsbone, parsedAirplaneslive, parsedFlightradar24];
   recordLiveTrails(parsedStates, radiusLists);
 
   // The generic "updated" timestamp lives here, not in fetchOpenSkyStates()
@@ -443,6 +454,11 @@ async function poll() {
   // mode can show a badge per source that independently supplied a field.
   const radiusRecordsByHex = new Map(); // icao24 -> Array<{ source, data }>
   for (const [name, list] of [
+    // flightradar24 sits below even airplanes.live — the newest, least-proven
+    // source (see CLAUDE.md) never outranks any of the four established free
+    // ones for enrichment purposes, same as it doesn't for marker priority
+    // below.
+    ['flightradar24', parsedFlightradar24],
     ['airplaneslive', parsedAirplaneslive], ['adsbone', parsedAdsbone],
     ['adsblol', parsedAdsblol], ['adsbfi', parsedAdsbfi],
   ]) {
@@ -480,6 +496,17 @@ async function poll() {
     // Later sources must not re-render what this one just claimed.
     for (const key of markerMap.keys()) excludeIds.add(key);
   }
+
+  // FlightRadar24 renders last among the ICAO24-keyed sources — only what
+  // OpenSky/adsb.fi/adsb.lol/adsb.one/airplanes.live don't already cover.
+  // See CLAUDE.md for why this unofficial, best-effort source never outranks
+  // any of the established free ones.
+  if (isSourceEnabled('flightradar24') && parsedFlightradar24) {
+    counts.flightradar24 = updateFlightRadar24Markers(parsedFlightradar24, excludeIds, radiusRecordsByHex);
+  } else {
+    counts.flightradar24 = flightradar24Markers.size;
+  }
+  for (const key of flightradar24Markers.keys()) excludeIds.add(key);
 
   // FlightAware: after OpenSky/radius sources, render only those flights that
   // weren't matched to another source's callsign (matched ones had their data

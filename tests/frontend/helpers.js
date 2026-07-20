@@ -20,6 +20,7 @@ async function mockAllSources(page) {
   await page.route('**/api/adsblol', (route) => route.fulfill({ json: { ac: [] } }));
   await page.route('**/api/adsbone', (route) => route.fulfill({ json: { ac: [] } }));
   await page.route('**/api/flightaware', (route) => route.fulfill({ json: { flights: [] } }));
+  await page.route('**/api/flightradar24', (route) => route.fulfill({ json: { flights: [] } }));
   await page.route('**/api/photo/**', (route) => route.fulfill({ json: { photos: [] } }));
   await page.route('**/api/track/**', (route) => route.fulfill({ status: 404, json: { path: [], error: 'not_found' } }));
   // All-null default so existing tests (which don't care about enrichment)

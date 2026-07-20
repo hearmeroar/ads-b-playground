@@ -4,9 +4,11 @@ const adsblolMarkers = new Map(); // hex -> L.Marker
 const adsboneMarkers = new Map(); // hex -> L.Marker
 const airplanesliveMarkers = new Map(); // hex -> L.Marker
 const flightawareMarkers = new Map(); // fa_flight_id -> L.Marker
+const flightradar24Markers = new Map(); // icao24 -> L.Marker
 const markerMapsBySource = {
   opensky: openskyMarkers, adsbfi: adsbfiMarkers, adsblol: adsblolMarkers,
   adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers, flightaware: flightawareMarkers,
+  flightradar24: flightradar24Markers,
 };
 
 const sourceToggles = {
@@ -16,6 +18,7 @@ const sourceToggles = {
   adsbone: document.getElementById('toggle-adsbone'),
   airplaneslive: document.getElementById('toggle-airplaneslive'),
   flightaware: document.getElementById('toggle-flightaware'),
+  flightradar24: document.getElementById('toggle-flightradar24'),
 };
 function isSourceEnabled(name) {
   return sourceToggles[name].checked;
