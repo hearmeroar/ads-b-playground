@@ -133,6 +133,15 @@ document.getElementById('toggle-weather-metar').addEventListener('change', (e) =
   setMetarEnabled(e.target.checked);
 });
 
+// Airports layer — same "purely presentational, own setter owns its own
+// state" idiom as the weather toggles above, except setAirportsEnabled
+// (map-init.js) also attaches/detaches its own pan/zoom listener instead of
+// a fixed-interval timer, since airport positions don't change but the
+// map's viewport does.
+document.getElementById('toggle-airports').addEventListener('change', (e) => {
+  setAirportsEnabled(e.target.checked);
+});
+
 const GROUND_VEHICLE_MARKERS = new Set(['TWR']);
 const GROUND_VEHICLE_CALLSIGN_RE = /^[A-Z]{4}\d{2}$/;
 function looksLikeGroundVehicle({ category, registration, aircraftType, callsign }) {

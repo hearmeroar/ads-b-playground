@@ -53,7 +53,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 import storage
 from enrichment.aircraft_enrichment import enrich_identity
-from enrichment.airports import nearest_airport
+from enrichment.airports import airports_in_bbox, nearest_airport
 
 try:
     from dotenv import load_dotenv
@@ -1216,6 +1216,38 @@ def api_sigmet():
         if _sigmet_cache["data"] is not None:
             return jsonify(_sigmet_cache["data"])
         return jsonify({"error": str(exc)}), 502
+
+
+@app.route("/api/airports")
+def api_airports():
+    # Backs the map's "Airports" toggle (static/js/map-init.js's
+    # setAirportsEnabled()/refreshAirportsInView()) — fetched on toggle-on
+    # and again on every pan/zoom (debounced client-side) while the layer
+    # is on, never during the aircraft poll loop, since airport positions
+    # don't change within a session. The full worldwide OurAirports dataset
+    # (~85,700 entries after dropping closed airports) is kept in memory
+    # (see enrichment/airports.py's module docstring for why it's global,
+    # not trimmed to this app's own coverage area) but a live map only ever
+    # needs whatever's in the current viewport — the frontend sends its own
+    # current bounds as `bbox` (`lamin,lomin,lamax,lomax`, same shape this
+    # app's own BBOX constant already uses for the outbound METAR/SIGMET
+    # calls above), so this never ships the whole ~16 MB dataset to the
+    # browser at once. Falls back to this app's own home-region BBOX when
+    # `bbox` is missing or malformed, so a first call with no viewport yet
+    # still returns something sensible instead of nothing.
+    #
+    # No caching: airports_in_bbox() makes zero I/O calls (a plain in-memory
+    # list comprehension over local data), the same "nothing external to
+    # protect with a TTL" rationale as /api/identity/<icao24> above.
+    bbox_param = request.args.get("bbox")
+    if bbox_param:
+        try:
+            lamin, lomin, lamax, lomax = (float(x) for x in bbox_param.split(","))
+        except ValueError:
+            lamin, lomin, lamax, lomax = BBOX["lamin"], BBOX["lomin"], BBOX["lamax"], BBOX["lomax"]
+    else:
+        lamin, lomin, lamax, lomax = BBOX["lamin"], BBOX["lomin"], BBOX["lamax"], BBOX["lomax"]
+    return jsonify({"airports": airports_in_bbox(lamin, lomin, lamax, lomax)})
 
 
 if __name__ == "__main__":

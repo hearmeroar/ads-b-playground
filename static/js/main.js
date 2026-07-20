@@ -229,6 +229,15 @@ function refreshWeatherMetarHelp() {
     + 'Click a station for the raw METAR text. Sourced from aviationweather.gov, updated hourly.';
 }
 
+function refreshAirportsHelp() {
+  document.getElementById('airports-help-popover').textContent =
+    'Every airport worldwide (large/medium/small airports, heliports, seaplane bases), '
+    + 'from OurAirports (public domain, updated nightly). Closed airports are hidden. '
+    + 'Only airports in the current map view are loaded — pan or zoom to see a different '
+    + 'area\'s airports. Nearby markers cluster into a numbered bubble at low zoom; click '
+    + 'a marker for its name, codes, and elevation.';
+}
+
 // A "(?)" icon is click-to-toggle (works on touch, unlike a hover title): it
 // opens a small popover explaining a source/track quota state, and a click
 // anywhere else closes it — same pattern as the category dropdown. Both the
@@ -259,6 +268,7 @@ wireHelpPopover('weather-precip-help', 'weather-precip-help-popover', refreshWea
 wireHelpPopover('weather-forecast-help', 'weather-forecast-help-popover', refreshWeatherForecastHelp);
 wireHelpPopover('weather-sigmet-help', 'weather-sigmet-help-popover', refreshWeatherSigmetHelp);
 wireHelpPopover('weather-metar-help', 'weather-metar-help-popover', refreshWeatherMetarHelp);
+wireHelpPopover('airports-help', 'airports-help-popover', refreshAirportsHelp);
 document.addEventListener('click', closeHelpPopovers);
 
 // Dev-mode source badges (.source-badge) are freshly regenerated HTML every

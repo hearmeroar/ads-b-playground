@@ -98,6 +98,37 @@ function towerIcon(color) {
   return rotatedDivIcon('surface-obstacle-icon', 20, 10, 0, color, SURFACE_OBSTACLE_GLYPH, '0 0 200 200');
 }
 
+// Airport/heliport markers (map-init.js's Airports layer) — Material Design
+// Icons (pictogrammers.com/MaterialDesign, Apache-2.0), same vendoring
+// convention as GROUP_ICONS in render-details.js and the favicon glyph.
+// Heliports get their own distinct "helicopter" glyph rather than reusing
+// the generic airport pin, since they're a visually and operationally
+// distinct kind of facility a user would want to tell apart at a glance.
+const AIRPORT_GLYPH = '<path d="M14.97,5.92C14.83,5.41 14.3,5.1 13.79,5.24L10.39,6.15L5.95,2.03L4.72,2.36L7.38,6.95L4.19,7.8L2.93,6.82L2,7.07L3.66,9.95L14.28,7.11C14.8,6.96 15.1,6.43 14.97,5.92M21,10L20,12H15L14,10L15,9H17V7H18V9H20L21,10M22,20V22H2V20H15V13H20V20H22Z" fill="COLOR" stroke="#fff" stroke-width="0.6"/>';
+const HELIPORT_GLYPH = '<path d="M3,3H17V5H3V3M23,6V10.5L14.75,12.2C14.91,12.6 15,13.04 15,13.5C15,14.9 14.18,16.1 13,16.66V17L13,19H16V21H4A3,3 0 0,1 1,18V17H3V18A1,1 0 0,0 4,19H5V16.74C3.25,16.13 2,14.46 2,12.5C2,10 4,8 6.5,8H9V6H11V8H21V6H23M11,19V17H7V19H11M7.5,10C6.12,10 5,10.9 5,12C5,13.1 6.12,14 7.5,14C8.88,14 10,13.1 10,12C10,10.9 8.88,10 7.5,10Z" fill="COLOR" stroke="#fff" stroke-width="0.6"/>';
+
+// Fixed neutral slate color, not source-colored — like towerIcon, an
+// airport is static ground infrastructure, not a "source" of aircraft data.
+const AIRPORT_MARKER_COLOR = '#475569';
+
+// Icon size scales with real-world significance (a major hub should read
+// as more prominent than a small strip/heliport at a glance, the same idea
+// as varying line weight on a paper aviation chart) rather than every
+// airport type looking identical regardless of size.
+const AIRPORT_ICON_SIZES = {
+  large_airport: 26, medium_airport: 20, small_airport: 15,
+  heliport: 15, seaplane_base: 15, balloonport: 13,
+};
+
+// Never rotated (static ground infrastructure, no heading) — headingDeg is
+// hardcoded to 0 via rotatedDivIcon, same idiom towerIcon already uses.
+function airportIcon(type) {
+  const size = AIRPORT_ICON_SIZES[type] || 15;
+  const cssClass = 'airport-icon airport-icon-' + (type || 'unknown').replace(/_/g, '-');
+  const glyph = (type === 'heliport' ? HELIPORT_GLYPH : AIRPORT_GLYPH).replace(/COLOR/g, AIRPORT_MARKER_COLOR);
+  return rotatedDivIcon(cssClass, size, size / 2, 0, AIRPORT_MARKER_COLOR, glyph, '0 0 24 24');
+}
+
 const ICON_BUILDERS = { uav: uavIcon };
 for (const group of Object.keys(CATEGORY_GLYPHS)) {
   ICON_BUILDERS[group] = (headingDeg, color) => categoryIcon(group, headingDeg, color);

@@ -5,6 +5,8 @@
 <title>Live Aircraft — Serbia & Neighboring Region</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="stylesheet" href="leaflet/leaflet.css" />
+<link rel="stylesheet" href="leaflet-markercluster/MarkerCluster.css">
+<link rel="stylesheet" href="leaflet-markercluster/MarkerCluster.Default.css">
 <link rel="stylesheet" href="flag-icons/css/flag-icons.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -375,6 +377,27 @@
   </div>
 
   <div class="filter-block">
+    <div class="filter-title">Airports</div>
+    <div class="source-row">
+      <span class="swatch" style="background:#475569"></span>
+      <span class="source-name">Show airports</span>
+      <button type="button" class="source-help" id="airports-help"
+              aria-label="About the airports layer">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
+      <label class="switch" style="--row-color:#475569">
+        <input type="checkbox" id="toggle-airports">
+        <span class="switch-track"></span>
+      </label>
+      <div class="source-help-popover" id="airports-help-popover" hidden></div>
+    </div>
+  </div>
+
+  <div class="filter-block">
     <div class="source-row">
       <span class="source-name">Dev mode</span>
       <button type="button" class="source-help" id="dev-mode-help" aria-label="What does dev mode show?">
@@ -419,6 +442,7 @@
  </div>
 
 <script src="leaflet/leaflet.js"></script>
+<script src="leaflet-markercluster/leaflet.markercluster.js"></script>
 <script src="js/map-init.js"></script>
 <script src="js/constants.js"></script>
 <script src="js/route-validation.js"></script>

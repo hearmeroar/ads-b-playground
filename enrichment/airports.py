@@ -1,7 +1,11 @@
 """Nearest-airport lookup for the aircraft collection's "where was it seen"
 feature (app.py's api_collection_save()) — answers "what's nearby" for a
 saved aircraft's position without any external API call or key, matching
-this package's existing local-static-table convention.
+this package's existing local-static-table convention. Also holds the
+airport-marker dataset for the map's "Airports" layer (`list_map_airports()`/
+`airports_in_bbox()` below) — a separate dataset, since it needs a
+different source (size/type classification, see below) than the
+nearest-airport table.
 
 Data: `enrichment/data/airports.json`, 7698 entries generated from the
 [OpenFlights](https://github.com/jpatokal/openflights) project's
@@ -20,13 +24,59 @@ Python scan over ~7700 rows is sub-millisecond, and a collection save is a
 rare, click-driven, per-aircraft event, not a per-poll cost — so keeping
 the whole world's airports costs nothing here and means the lookup still
 works correctly if this app's AREA_CENTER ever moves.
+
+**Map-layer data is a second, deliberately different dataset**,
+`enrichment/data/ourairports.json` (85,776 entries, ~16 MB), generated from
+[OurAirports](https://ourairports.com/data/)'s `airports.csv` (Public
+Domain / CC0, updated nightly, hosted at
+`https://github.com/davidmegginson/ourairports-data` — mirrored at
+`https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv`),
+not the OpenFlights table above, because OurAirports is the one of the two
+that classifies each row's `type` (`large_airport`/`medium_airport`/
+`small_airport`/`heliport`/`seaplane_base`/`balloonport`/`closed`) — needed
+so the map layer can render airports differently by size and can skip
+`closed` ones, neither of which OpenFlights' `airports.dat` supports (its
+own `type` column is dropped entirely when generating `airports.json`
+above). Regenerate the same one-off/uncommitted way: download
+`airports.csv` from the URL above, parse with `csv.DictReader`, drop rows
+with no `name`/unparseable `latitude_deg`/`longitude_deg`, and write
+`{ident, type, name, lat, lon, elevation_ft, country, municipality, iata,
+icao}` per row as compact JSON, sorted by type-priority (large → medium →
+small → heliport → seaplane_base → balloonport → closed) then name for a
+readable diff.
+
+**Global, like the OpenFlights table above — every airport worldwide is
+kept in memory, not just this app's own coverage area** (explicit product
+decision: an earlier draft of this feature pre-filtered the *stored* data
+to a 600 km radius around `AREA_CENTER`, which was reverted after the
+project owner asked for every airport to be available, not just a curated
+regional slice). This is by far the largest vendored dataset in this repo
+(~16 MB vs. `opensky_year_built.json`'s 3.3 MB, the previous largest) —
+accepted since the feature's whole point is that every airport is there to
+be shown, wherever the map happens to be looking.
+
+**What actually reaches the browser is a different story**: nothing calls
+`list_map_airports()` over HTTP directly — `/api/airports` (app.py) always
+goes through `airports_in_bbox()`, scoped to the map's *current viewport*,
+re-fetched on pan/zoom (see `static/js/map-init.js`'s Airports-layer
+section). Panning from Belgrade to another region re-queries this same
+in-memory table for whatever's newly in view — the stored data doesn't
+change, only which slice of it gets requested. `Leaflet.markercluster` is
+vendored/wired on top of that as a second line of defense for a
+zoomed-out viewport that still spans thousands of airports (e.g. a whole
+continent) — the two techniques solve different problems: bbox filtering
+keeps the *dataset* scoped to what's relevant, clustering keeps the *map*
+readable when that scope is still visually dense.
 """
 
 import json
 import math
 import os
 
+from .countries import country_by_iso
+
 _AIRPORTS_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "airports.json")
+_MAP_AIRPORTS_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "ourairports.json")
 
 
 def _load_airports():
@@ -40,7 +90,18 @@ def _load_airports():
         return []
 
 
+def _load_map_airports():
+    try:
+        with open(_MAP_AIRPORTS_DATA_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        # Same tolerance as _load_airports() above — a missing/corrupt file
+        # just means the map layer has nothing to show, not a crash.
+        return []
+
+
 _AIRPORTS = _load_airports()
+_MAP_AIRPORTS = _load_map_airports()
 
 _EARTH_RADIUS_KM = 6371.0
 
@@ -79,3 +140,52 @@ def nearest_airport(lat, lon):
         "iata": best.get("iata"), "icao": best.get("icao"),
         "distance_km": round(best_distance, 1),
     }
+
+
+def list_map_airports(include_closed=False):
+    """Every airport worldwide for the map's "Airports" layer (see the
+    module docstring for why this dataset is global rather than scoped to
+    this app's coverage area).
+
+    `closed` airports are dropped by default: showing a defunct airport as
+    if it were an active one would be misleading, and it's a judgment call
+    this function makes so callers don't have to remember to filter it
+    themselves. Pass `include_closed=True` to get the full list anyway.
+
+    Each entry's raw `country` field is OurAirports' own 2-letter ISO code
+    (e.g. "RS"), not a display name — a `country_name` key (e.g. "Serbia")
+    is added here via `country_by_iso()` (the same lookup `countries.py`
+    already provides for the aircraft sidebar's own country rows) so the
+    map popup doesn't have to show a bare code. `None` when the code isn't
+    in `countries.py`'s table — a real, accepted limitation, same as the
+    sidebar's own flag/name resolution elsewhere in this app.
+    """
+    source = _MAP_AIRPORTS if include_closed else (a for a in _MAP_AIRPORTS if a.get("type") != "closed")
+    result = []
+    for a in source:
+        country = country_by_iso(a.get("country"))
+        result.append({**a, "country_name": country["name"] if country else None})
+    return result
+
+
+def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False):
+    """Airports within a lat/lon bounding box — what the frontend actually
+    renders. The full global list is stored (see the module docstring), but
+    a live map only ever needs whatever's in view: `/api/airports` calls
+    this with the current viewport's bounds (re-fetched on pan/zoom, same
+    "only load what's visible" idea as any tile layer), rather than ever
+    shipping the whole ~85,000-row dataset to the browser at once.
+
+    Invalid bounds (non-numeric, or a degenerate box) return an empty list
+    rather than raising — a malformed viewport shouldn't 500 the request.
+    """
+    try:
+        lamin, lomin, lamax, lomax = float(lamin), float(lomin), float(lamax), float(lomax)
+    except (TypeError, ValueError):
+        return []
+    if lamin > lamax or lomin > lomax:
+        return []
+    return [
+        a for a in list_map_airports(include_closed=include_closed)
+        if lamin <= a["lat"] <= lamax and lomin <= a["lon"] <= lomax
+    ]

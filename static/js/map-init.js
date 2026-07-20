@@ -396,3 +396,103 @@ function setMetarEnabled(enabled) {
   refreshMetar();
   weatherMetarState.timer = setInterval(refreshMetar, WEATHER_REFRESH_INTERVAL_MS);
 }
+
+// --- Airports ----------------------------------------------------------
+// Renders airports (OurAirports, see enrichment/airports.py's module
+// docstring for source/license/why the dataset is global) as markers.
+// Unlike every layer above, this one isn't refreshed on a timer — airport
+// positions don't change during a session — it's refreshed by *where the
+// map is looking*: /api/airports is called with the current viewport's
+// bounds (`bbox`), re-fetched on pan/zoom (debounced), so panning from one
+// region to another swaps in that region's airports without ever asking
+// the backend for (or holding in the browser) the whole ~85,700-airport
+// world at once.
+//
+// Airport markers render above weather/scan-radius (overlayPane, 400) and
+// ground-vehicle markers (groundPane, 450) but below real aircraft
+// (markerPane, 600) — an airport pin should never visually compete with an
+// aircraft actually sitting over it.
+map.createPane('airportPane');
+map.getPane('airportPane').style.zIndex = 460;
+
+// Even scoped to one viewport, a zoomed-out view (a whole country/continent)
+// can still hold thousands of airports/heliports — Leaflet.markercluster
+// (vendored at static/leaflet-markercluster/) keeps that many markers from
+// ever being placed on the map unclustered. clusterPane matches the pane
+// above so cluster bubbles layer the same way individual airport markers do.
+const AIRPORTS_FETCH_DEBOUNCE_MS = 500;
+
+const airportsState = {
+  clusterGroup: L.markerClusterGroup({ clusterPane: 'airportPane', maxClusterRadius: 60 }),
+  enabled: false,
+  debounceTimer: null,
+};
+
+const AIRPORT_TYPE_LABELS = {
+  large_airport: 'Large airport', medium_airport: 'Medium airport', small_airport: 'Small airport',
+  heliport: 'Heliport', seaplane_base: 'Seaplane base', balloonport: 'Balloonport',
+};
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function airportPopupHtml(airport) {
+  const typeLabel = AIRPORT_TYPE_LABELS[airport.type] || 'Airport';
+  const codes = [airport.iata, airport.icao].filter(Boolean).join(' / ');
+  const flag = airport.country && typeof flagHtml === 'function' ? flagHtml(airport.country) : '';
+  // country_name (a display name, e.g. "Serbia") is resolved backend-side
+  // from the raw ISO code via country_by_iso() — falls back to the bare
+  // code itself if that lookup has no entry for it, rather than showing
+  // nothing next to the flag.
+  const countryText = airport.country_name || airport.country;
+  const countryPart = flag ? flag + ' ' + escapeHtml(countryText) : escapeHtml(countryText || '');
+  const place = [airport.municipality ? escapeHtml(airport.municipality) : '', countryPart].filter(Boolean).join(', ');
+  const elevation = airport.elevation_ft != null ? Math.round(airport.elevation_ft * FT_TO_M) + ' m' : null;
+  let html = '<b>' + escapeHtml(airport.name) + '</b><br>' + typeLabel;
+  if (codes) html += ' &middot; ' + escapeHtml(codes);
+  if (place) html += '<br>' + place;
+  if (elevation) html += '<br>Elevation: ' + elevation;
+  return html;
+}
+
+function refreshAirportsInView() {
+  if (!airportsState.enabled) return;
+  const b = map.getBounds();
+  const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].join(',');
+  fetch('/api/airports?bbox=' + encodeURIComponent(bbox))
+    .then((resp) => resp.json())
+    .then((data) => {
+      if (!airportsState.enabled) return; // toggled off while this fetch was in flight
+      airportsState.clusterGroup.clearLayers();
+      const airports = (data && data.airports) || [];
+      for (const airport of airports) {
+        if (airport.lat == null || airport.lon == null) continue;
+        const marker = L.marker([airport.lat, airport.lon], { icon: airportIcon(airport.type), pane: 'airportPane' });
+        marker.bindPopup(airportPopupHtml(airport));
+        airportsState.clusterGroup.addLayer(marker);
+      }
+    })
+    .catch(() => {}); // a failed refresh just leaves the last-good markers showing
+}
+
+function scheduleAirportsRefresh() {
+  clearTimeout(airportsState.debounceTimer);
+  airportsState.debounceTimer = setTimeout(refreshAirportsInView, AIRPORTS_FETCH_DEBOUNCE_MS);
+}
+
+function setAirportsEnabled(enabled) {
+  airportsState.enabled = enabled;
+  if (!enabled) {
+    clearTimeout(airportsState.debounceTimer);
+    map.off('moveend', scheduleAirportsRefresh);
+    airportsState.clusterGroup.clearLayers();
+    if (map.hasLayer(airportsState.clusterGroup)) map.removeLayer(airportsState.clusterGroup);
+    return;
+  }
+  airportsState.clusterGroup.addTo(map);
+  refreshAirportsInView();
+  map.on('moveend', scheduleAirportsRefresh);
+}

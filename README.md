@@ -91,6 +91,16 @@ in-memory dict.
   colored by flight category) via
   [aviationweather.gov](https://aviationweather.gov/) (NOAA), all
   refreshed every ~5 minutes.
+- **Airports layer** — an off-by-default HUD toggle renders every airport
+  worldwide (large/medium/small airports, heliports, seaplane bases,
+  balloonports) from [OurAirports](https://ourairports.com/data/) (public
+  domain, updated nightly). Only what's in the current map view is loaded —
+  panning or zooming re-fetches for the new viewport rather than ever
+  holding the whole ~85,000-airport dataset in the browser at once — and
+  nearby markers cluster into a numbered bubble at low zoom. Icon size
+  scales with real-world significance (a major hub renders bigger than a
+  small strip), heliports get their own distinct glyph, and closed airports
+  are hidden. Click a marker for its name, codes, place, and elevation.
 - **Icons by category** — each aircraft category (fixed-wing weight classes,
   rotorcraft, glider, lighter-than-air, parachutist, ultralight, UAV) renders
   with its own distinct SVG silhouette from the
@@ -319,6 +329,9 @@ A handful of plain files carry all the logic:
   `leaflet.css`, `images/`, `LICENSE`), vendored the same way instead of
   loading from the unpkg CDN, so the map works without third-party uptime
   (and the Playwright suite runs without touching the network).
+- `static/leaflet-markercluster/` — [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster)
+  1.5.3 (MIT), vendored the same way, used to keep the Airports layer's
+  markers readable at low zoom instead of showing thousands of individual pins.
 
 Alongside them, `schema/aircraft.schema.json` documents the normalized
 aircraft shape the sidebar renders — every field, with the raw source field
@@ -342,3 +355,5 @@ David Taylor (Edinburgh) and Jim Mason (Glasgow), and
 **Airline logos** via [soaring-symbols](https://github.com/anhthang/soaring-symbols)
 (MIT) and [airframesio/airline-images](https://github.com/airframesio/airline-images)
 — logos remain the property of their respective airlines.
+
+**Airport data** via [OurAirports](https://ourairports.com/data/) (public domain / CC0).

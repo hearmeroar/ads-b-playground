@@ -171,7 +171,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 
 /* Marker icons (map + dropdown) */
 .plane-icon-rotate { transition: transform .4s linear; }
-.plane-icon:not(.surface-obstacle-icon) {
+.plane-icon:not(.surface-obstacle-icon):not(.airport-icon) {
   filter: drop-shadow(1px 3px 0 rgba(15, 23, 42, 0.25));
 }
 .plane-icon svg path,
