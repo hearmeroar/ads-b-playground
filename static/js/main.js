@@ -452,16 +452,16 @@ async function poll() {
   // winner, consistent with the marker dedup order below), but EVERY
   // source that reported the aircraft is kept, not just the winner, so dev
   // mode can show a badge per source that independently supplied a field.
+  // Both this loop's order and the exclude-chain's order below are derived
+  // from the single RADIUS_SOURCE_PRIORITY array (constants.js) rather than
+  // two separately hand-written, mirrored lists.
+  const parsedByRadiusSource = {
+    adsbfi: parsedAdsbfi, adsblol: parsedAdsblol, adsbone: parsedAdsbone,
+    airplaneslive: parsedAirplaneslive, flightradar24: parsedFlightradar24,
+  };
   const radiusRecordsByHex = new Map(); // icao24 -> Array<{ source, data }>
-  for (const [name, list] of [
-    // flightradar24 sits below even airplanes.live — the newest, least-proven
-    // source (see CLAUDE.md) never outranks any of the four established free
-    // ones for enrichment purposes, same as it doesn't for marker priority
-    // below.
-    ['flightradar24', parsedFlightradar24],
-    ['airplaneslive', parsedAirplaneslive], ['adsbone', parsedAdsbone],
-    ['adsblol', parsedAdsblol], ['adsbfi', parsedAdsbfi],
-  ]) {
+  for (const name of [...RADIUS_SOURCE_PRIORITY].reverse()) {
+    const list = parsedByRadiusSource[name];
     if (!list) continue;
     for (const a of list) {
       if (!a.icao24) continue;
@@ -480,12 +480,16 @@ async function poll() {
   }
 
   const counts = { opensky: openskyCount };
-  const radiusSources = [
-    ['adsbfi', adsbfiMarkers, parsedAdsbfi],
-    ['adsblol', adsblolMarkers, parsedAdsblol],
-    ['adsbone', adsboneMarkers, parsedAdsbone],
-    ['airplaneslive', airplanesliveMarkers, parsedAirplaneslive],
-  ];
+  // Order derived from RADIUS_SOURCE_PRIORITY (minus flightradar24, which
+  // uses its own update function below rather than this generic loop) —
+  // see the radiusRecordsByHex comment above for why both share one list.
+  const radiusMarkerMaps = {
+    adsbfi: adsbfiMarkers, adsblol: adsblolMarkers,
+    adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers,
+  };
+  const radiusSources = RADIUS_SOURCE_PRIORITY
+    .filter((name) => name !== 'flightradar24')
+    .map((name) => [name, radiusMarkerMaps[name], parsedByRadiusSource[name]]);
   const excludeIds = new Set(openskyMarkers.keys());
   for (const [name, markerMap, aircraft] of radiusSources) {
     if (isSourceEnabled(name) && aircraft) {
@@ -499,6 +503,9 @@ async function poll() {
 
   // FlightRadar24 renders last among the ICAO24-keyed sources — only what
   // OpenSky/adsb.fi/adsb.lol/adsb.one/airplanes.live don't already cover.
+  // This is its own code block rather than folded into the radiusSources
+  // loop above (it uses a different update function), but its position here
+  // must stay last, matching RADIUS_SOURCE_PRIORITY's own last entry.
   // See CLAUDE.md for why this unofficial, best-effort source never outranks
   // any of the established free ones.
   if (isSourceEnabled('flightradar24') && parsedFlightradar24) {

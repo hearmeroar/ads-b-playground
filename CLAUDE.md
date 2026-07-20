@@ -328,6 +328,15 @@ bare `Exception` — not just `requests.RequestException` — since it wraps a
 third-party client whose failure surface (curl_cffi errors, parsing errors)
 isn't fully typed; a failure always degrades to the same stale-cache-or-502
 pattern every other source uses, never breaks the rest of the poll.
+**Refactored 2026-07-20**: `cached_flightradar24()` used to hand-duplicate
+`cached_radius_source()`'s whole TTL/stale-fallback structure just to widen
+the exception catch. Both now call a shared `_cached_fetch(cache,
+min_interval, fetch_fn, empty_payload=None, catch=(requests.RequestException,))`
+— `fetch_fn` is a zero-arg callable returning the parsed payload (a
+`requests.get(...).json()` closure for `cached_radius_source()`, an
+`_fr24_client.get_flights(...)` closure here), and `catch` is FlightRadar24's
+one remaining point of difference, passed as `(Exception,)`. No behavior
+changed; the duplicated cache/stale/502 logic did not need to exist twice.
 `_fr24_client.get_flights(bounds=...)` returns `Flight` objects
 (`icao_24bit`, `latitude`/`longitude`, `heading`, `altitude` in feet,
 `ground_speed` in knots, `squawk`, `aircraft_code`, `registration`,
@@ -537,7 +546,18 @@ API key:
   the hazard/qualifier, FIR name, and altitude range. Cached server-side
   for `SIGMET_MIN_INTERVAL` (300s) like every other proxied source; a
   network error re-serves the last good list if one exists, otherwise 502
-  (same stale-or-fail pattern as the four radius sources).
+  (same stale-or-fail pattern as the four radius sources). **Bug fixed
+  2026-07-20**: both `/api/metar` and `/api/sigmet`'s error handlers used to
+  write `except requests.RequestException:` with no `as exc` at all — the
+  only two handlers in `app.py` where the exception text was fully
+  unrecoverable, not even available to log, let alone surface — unlike
+  every other proxied source, which at least captures it (e.g.
+  `cached_radius_source()`'s stale-cache branch puts `str(exc)` into the
+  response). Both now capture `as exc` and include `str(exc)` in the 502
+  (no-cache) response body; the 200 stale-cache path is untouched, since its
+  payload is a bare list (unlike the dict-shaped radius sources), so there's
+  no field to attach an error string to without changing that response's
+  shape.
 - **METAR** — airport weather-station observations (wind, visibility,
   ceiling, raw text) from the same aviationweather.gov source, via a new
   `/api/metar` proxy — same no-CORS situation as SIGMET, but this endpoint
@@ -685,7 +705,16 @@ because photographer name and photo URL come from an external API.
   — since each step depends on data or state from the others. FlightRadar24 is
   ICAO24-keyed like the radius sources (not callsign-keyed like FlightAware), so it
   sits inside the same `excludeIds`/`radiusRecordsByHex` chain as them, just last —
-  see the FlightRadar24 section above for why. **FlightAware uses callsign-based dedup:**
+  see the FlightRadar24 section above for why. **Single source of truth for
+  this order (2026-07-20):** the ICAO24-keyed portion of this priority
+  (adsb.fi/adsb.lol/adsb.one/airplanes.live/FlightRadar24 — OpenSky and
+  FlightAware aren't in it, see below) used to be written twice in
+  `poll()` — once low→high to build `radiusRecordsByHex` (so the
+  highest-priority entry is pushed last and wins), once high→low for the
+  `excludeIds` chain — as two independently hand-written, mirrored array
+  literals with no link between them, a real risk of drifting out of sync
+  on a future reorder. Both are now derived from one `RADIUS_SOURCE_PRIORITY`
+  array (`constants.js`), reversed for the former. **FlightAware uses callsign-based dedup:**
   after the ICAO24-keyed chain above, FlightAware flights matching any other source's
   callsign (trimmed, case-insensitive) are suppressed, and their route data is merged
   into that source's sidebar. A failing source degrades to `null` and is skipped for
@@ -848,6 +877,20 @@ because photographer name and photo URL come from an external API.
   (deliberately short) map of those exceptions, checked as a fallback only
   when the direct key lookup comes back `undefined`, so it never masks a
   genuine `null` from a source that has the field but no value for it.
+  **Bug fixed 2026-07-20**: the synthetic OpenSky entry built by
+  `pickFields(info, OPENSKY_NATIVE_FIELDS)` never carried a raw `category`
+  key at all — `OPENSKY_NATIVE_FIELDS` deliberately excludes
+  `categoryDisplay` (it's computed, not copied 1:1), so `RAW_FIELD_ALIASES`'s
+  `categoryDisplay → category` fallback had nothing to find on that entry.
+  Net effect: whenever OpenSky's own category won (see the Category section
+  below), its badge either didn't render at all, or — if a radius source
+  also happened to report a category for the same aircraft — silently
+  credited that source instead. Fixed in `updateOpenSkyMarkers` by setting
+  `category` on the synthetic entry by hand, but only when
+  `openskyCategoryIsMeaningful(s.category)` is true (the same check
+  `normalizeOpenSky` uses to decide whether to prefer OpenSky's label at
+  all), so the badge appears exactly when OpenSky's category was actually
+  used, never when it was 0/1/absent.
   `updateOpenSkyMarkers` builds `entries` from `radiusRecordsByHex.get(s.icao24)`
   plus the synthetic OpenSky entry; `updateRadiusSourceMarkers` (which now
   also takes a `radiusRecordsByHex` parameter) passes that same aircraft's
@@ -1178,7 +1221,19 @@ because photographer name and photo URL come from an external API.
     ...fields}`), not one giant single-line blob like `_track_cache`'s own
     file — the same readable/diffable-by-hand JSONL convention
     `IDENTITY_HISTORY_FILE` already used, applied here too after the
-    project owner asked for it explicitly. `flightroute`'s own fields
+    project owner asked for it explicitly. **Refactored 2026-07-20**: this
+    atomic-write idiom (tmp file + `os.replace`, parse-and-skip-corrupt-lines
+    on read) used to be copy-pasted three times — here, in `_load_users`/
+    `_save_users`, and in `_load_collections`/`_save_collections` — each
+    with its own hand-written `open()`/`readlines()`/`json.loads()` loop.
+    Factored into two shared helpers, `_read_jsonl(path)` (returns a list of
+    parsed dicts, `[]` for a missing file, skipping corrupt lines) and
+    `_write_jsonl(path, records)` (the atomic write) — each `_load_*`/
+    `_save_*` function keeps its own per-entry validation and key shape
+    (`_identity_cache`/`_users` are dicts keyed by `icao24`/`sub`;
+    `_collections` is a plain list), since that part genuinely differs
+    between the three stores; only the file IO itself was actually
+    duplicated. `flightroute`'s own fields
     (`registered_owner_country_name`, and especially `airline`/operator)
     are deliberately excluded from this cache — they're properties of a
     specific flight/callsign, not the airframe itself, and can legitimately
@@ -1550,6 +1605,11 @@ because photographer name and photo URL come from an external API.
   each source builds its marker items: OpenSky's own `on_ground` field, or
   `alt_baro === 'ground'` for adsb.fi/airplanes.live (their convention for a
   grounded aircraft, parsed into `onGround` by `parseAdsbExchangeAircraft`).
+  **Bug fixed 2026-07-20**: `alt_baro === 'ground'` used to leave `altitudeM`
+  `null` (the same value as a genuinely missing reading), even though
+  "ground" is a definite, known signal, not missing data — the sidebar's
+  Altitude row went blank for a grounded aircraft instead of reading `0`.
+  `parseAdsbExchangeAircraft` now maps it to `altitudeM: 0` explicitly.
   Changing it also re-runs `poll()` immediately.
 - Clicking a marker (any source) calls `selectAircraft(icao24)`, which opens
   `#sidebar` — a floating glass-card panel on the left (styled to match the
@@ -1779,7 +1839,18 @@ because photographer name and photo URL come from an external API.
   (`time_position`/3 and `sensors`/12 are deliberately skipped — the former
   duplicates `last_contact`, the latter is always null without an owned
   receiver). adsb.fi/airplanes.live aircraft are parsed by the shared
-  `parseAdsbExchangeAircraft()`. Both normalizers share `formatSquawk()`
+  `parseAdsbExchangeAircraft()`. **Coordinate validation (2026-07-20):**
+  every `update*Markers` function used to only check `lat == null || lon ==
+  null` before rendering a marker — a malformed upstream record (NaN, or a
+  value outside the physically valid `[-90,90]`/`[-180,180]` range) would
+  have silently rendered rather than being skipped like a genuinely missing
+  position. All four now call a shared `isValidCoordinate(lat, lon)`
+  (`constants.js`) instead. **Shared unit constants:** `FT_TO_M` (0.3048)
+  and `KT_TO_KMH` (1.852), also in `constants.js`, replace what used to be
+  the same two literals repeated across `parsers.js`/`render-details.js` —
+  including a `196.850` in `render-details.js`'s `formatVerticalRateUnit()`
+  that was really just `1/FT_TO_M*60` hardcoded as its own separate number,
+  with no link back to the constant it was derived from. Both normalizers share `formatSquawk()`
   (highlights the universal ICAO emergency codes 7500/7600/7700 in red,
   regardless of source) and the unit-aware `formatVerticalRateUnit()`
   (climbing/descending/level — adsb.fi/airplanes.live report
@@ -1810,7 +1881,18 @@ because photographer name and photo URL come from an external API.
   category is taken from adsb.fi/airplanes.live if available, so an
   aircraft with unknown OpenSky category but known radius-source category still
   gets the correct icon and filter behavior. OpenSky's category takes
-  priority only when it's a meaningful value (2+).
+  priority only when it's a meaningful value, via `openskyCategoryIsMeaningful()`
+  (`state-filters.js`) — a shared helper, not the two independently-written
+  checks this used to be. **Bug fixed 2026-07-20**: `normalizeOpenSky()`
+  (`parsers.js`) used to decide "meaningful" via a bare `category >= 2`,
+  while `categoryGroupFor()` decided it via `group !== 'unknown'` — these
+  disagreed for category 13 ("Reserved"), which passes `>= 2` but maps to
+  `'unknown'` in `OPENSKY_CATEGORY_GROUP`. The sidebar could show
+  "Category: Reserved" while the marker icon and category filter treated
+  the same aircraft as unknown-category (and possibly fell through to a
+  radius source's own category instead). Both call sites now go through
+  `openskyCategoryIsMeaningful(category)`, defined once next to
+  `OPENSKY_CATEGORY_GROUP` itself so the two checks can't drift apart again.
 - **Marker icon by category:** `iconFor(item, color)` dispatches on
   `item.categoryGroup` via the `ICON_BUILDERS` lookup table, which is built
   from `CATEGORY_GLYPHS` (a `{group: glyph}` table) by the shared

@@ -166,12 +166,24 @@ const ADSBEXCHANGE_CATEGORY_GROUP = {
   C0: 'unknown', C1: 'surface_obstacle', C2: 'surface_obstacle', C3: 'surface_obstacle',
   C4: 'surface_obstacle', C5: 'surface_obstacle', C6: 'unknown', C7: 'unknown',
 };
+// Whether OpenSky's own numeric category is meaningful (not 0/1 = "no
+// info"/"no ADS-B category info"). Single source of truth shared with
+// normalizeOpenSky() (parsers.js), which uses the same check to decide
+// whether OpenSky's category label wins over a radius source's — the two
+// checks used to be written independently (`category >= 2` there vs.
+// `group !== 'unknown'` here) and disagreed on category 13 ("Reserved"):
+// it passed the `>= 2` check but OPENSKY_CATEGORY_GROUP maps it to
+// 'unknown', so the sidebar could show "Category: Reserved" while the
+// marker icon/category filter treated the aircraft as unknown-category.
+function openskyCategoryIsMeaningful(category) {
+  return typeof category === 'number' && OPENSKY_CATEGORY_GROUP[category] !== undefined
+    && OPENSKY_CATEGORY_GROUP[category] !== 'unknown';
+}
 function categoryGroupFor({ openskyCategory, adsbExchangeCategory }) {
-  const openskyGroup = typeof openskyCategory === 'number' ? OPENSKY_CATEGORY_GROUP[openskyCategory] : null;
+  // OpenSky takes priority when it reported a meaningful category.
+  if (openskyCategoryIsMeaningful(openskyCategory)) return OPENSKY_CATEGORY_GROUP[openskyCategory];
+  // Otherwise fall back to adsb.fi/airplanes.live's own category.
   const adsbGroup = typeof adsbExchangeCategory === 'string' ? ADSBEXCHANGE_CATEGORY_GROUP[adsbExchangeCategory] : null;
-  // OpenSky приоритетнее: если он дал значимую категорию, используем её
-  if (openskyGroup && openskyGroup !== 'unknown') return openskyGroup;
-  // Иначе используем категорию от adsb.fi/airplanes.live
   if (adsbGroup) return adsbGroup;
   return 'unknown';
 }

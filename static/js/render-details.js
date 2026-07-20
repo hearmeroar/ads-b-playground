@@ -74,7 +74,7 @@ function formatAltitude(meters) {
 function formatSpeedKmh(kmh) {
   if (kmh == null) return null;
   return currentUnitSystem === 'imperial'
-    ? Math.round(kmh / 1.852) + ' kt'
+    ? Math.round(kmh / KT_TO_KMH) + ' kt'
     : Math.round(kmh) + ' km/h';
 }
 // For fields that are natively in knots (IAS/TAS/wind speed).
@@ -82,14 +82,17 @@ function formatSpeedKt(kt) {
   if (kt == null) return null;
   return currentUnitSystem === 'imperial'
     ? Math.round(kt) + ' kt'
-    : Math.round(kt * 1.852) + ' km/h';
+    : Math.round(kt * KT_TO_KMH) + ' km/h';
 }
 function formatVerticalRateUnit(rateMs) {
   if (rateMs == null) return null;
   if (Math.abs(rateMs) <= VERTICAL_RATE_LEVEL_THRESHOLD_MS) return 'level';
   const word = rateMs > 0 ? 'climbing' : 'descending';
+  // ft/min = (m/s) / FT_TO_M (-> ft/s) * 60 — was a separately hardcoded
+  // 196.850 literal (the same derived constant, just pre-multiplied) with
+  // no link back to FT_TO_M as its source.
   const value = currentUnitSystem === 'imperial'
-    ? (rateMs > 0 ? '+' : '') + Math.round(rateMs * 196.850) + ' ft/min'
+    ? (rateMs > 0 ? '+' : '') + Math.round(rateMs / FT_TO_M * 60) + ' ft/min'
     : (rateMs > 0 ? '+' : '') + rateMs.toFixed(1) + ' m/s';
   return value + ' (' + word + ')';
 }

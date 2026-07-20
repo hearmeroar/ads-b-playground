@@ -6,6 +6,22 @@ const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
 // stays at or under this (m/s) reads as level in both places.
 const VERTICAL_RATE_LEVEL_THRESHOLD_MS = 0.5;
 
+// Shared unit-conversion constants — previously repeated as bare literals
+// (0.3048, 1.852, and a separately hardcoded 196.850 that was really just
+// 1/FT_TO_M*60) across parsers.js and render-details.js with no single
+// source of truth, risking rounding drift between them.
+const FT_TO_M = 0.3048;
+const KT_TO_KMH = 1.852;
+
+// Guards against a malformed upstream record (NaN, missing, or a lat/lon
+// out of the physically valid range) rendering as a marker instead of being
+// skipped the same way a genuinely missing position already is.
+function isValidCoordinate(lat, lon) {
+  return typeof lat === 'number' && typeof lon === 'number'
+    && Number.isFinite(lat) && Number.isFinite(lon)
+    && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
 // Three independent data sources, each rendered as its own color-coded set of
 // markers, all keyed by the aircraft's ICAO24/hex address (the same aircraft
 // can in principle show up in more than one feed at once — see the dedup
@@ -18,6 +34,17 @@ const VERTICAL_RATE_LEVEL_THRESHOLD_MS = 0.5;
 // are independent instances of the same aggregator family as adsb.fi, ordered
 // between it and airplanes.live as a coverage/uptime fallback chain (not a
 // data-quality ranking).
+// Canonical ICAO24-keyed enrichment/render priority, highest first. Both
+// main.js's radiusRecordsByHex construction (reversed, so the
+// highest-priority entry is pushed last and wins — array[length-1]) and its
+// marker exclude-chain derive their order from this one array, instead of
+// two independently hand-written mirror lists that could silently drift out
+// of sync with each other. OpenSky and FlightAware aren't in this list:
+// OpenSky always renders first and unconditionally seeds excludeIds, and
+// FlightAware dedupes by callsign, not ICAO24 (see
+// matchedFlightawareCallsigns instead).
+const RADIUS_SOURCE_PRIORITY = ['adsbfi', 'adsblol', 'adsbone', 'airplaneslive', 'flightradar24'];
+
 const SOURCE_COLORS = {
   opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32', flightaware: '#00acc1',
   // FlightRadar24, via the unofficial JeanExtreme002/FlightRadarAPI SDK — see

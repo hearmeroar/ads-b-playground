@@ -104,34 +104,56 @@ _users = {}  # sub -> {"sub":, "email":, "name":, "picture":, "created_ts":}
 USERS_FILE = os.environ.get("USERS_FILE", ".users.jsonl")
 
 
-def _load_users():
+def _read_jsonl(path):
+    """Reads a JSONL file into a list of parsed dicts. A missing file (never
+    written yet) is treated as empty, and a corrupt line is skipped rather
+    than failing the whole load — every JSONL store in this app (_users,
+    _identity_cache, _collections) is a durability optimization, not a
+    source of truth, so a bad file degrades gracefully instead of crashing
+    the app. Shared by all three _load_*() functions below, which each
+    still own their own per-entry validation/key-shape logic (dict vs. list,
+    which field the entry is keyed by) — only the file IO itself is common."""
     try:
-        with open(USERS_FILE, "r") as f:
+        with open(path, "r") as f:
             lines = f.readlines()
     except OSError:
-        return
+        return []
+    records = []
     for line in lines:
         line = line.strip()
         if not line:
             continue
         try:
-            entry = json.loads(line)
+            records.append(json.loads(line))
         except ValueError:
             continue
+    return records
+
+
+def _write_jsonl(path, records):
+    """Atomically rewrites a JSONL file (tmp file + os.replace), one JSON
+    object per line — best-effort, same idiom shared by all three
+    _save_*() functions below. A write failure (e.g. read-only filesystem)
+    is ignored, for the same reason _read_jsonl() ignores a missing file."""
+    tmp = path + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            for record in records:
+                f.write(json.dumps(record) + "\n")
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _load_users():
+    for entry in _read_jsonl(USERS_FILE):
         sub = entry.get("sub")
         if sub:
             _users[sub] = entry
 
 
 def _save_users():
-    tmp = USERS_FILE + ".tmp"
-    try:
-        with open(tmp, "w") as f:
-            for entry in _users.values():
-                f.write(json.dumps(entry) + "\n")
-        os.replace(tmp, USERS_FILE)
-    except OSError:
-        pass
+    _write_jsonl(USERS_FILE, _users.values())
 
 
 _load_users()
@@ -424,33 +446,22 @@ def _serialize_fr24_flight(flight):
 
 def cached_flightradar24():
     """Same TTL + stale-on-failure cache contract as cached_radius_source(),
-    but fetching via the FlightRadarAPI SDK instead of requests.get. Catches
-    bare Exception (not just requests.RequestException) deliberately: the SDK
-    makes its own HTTP calls under the hood and can raise its own
-    FlightRadarError family (including CloudflareError) or lower-level
-    curl_cffi/parsing errors that aren't requests exceptions at all — this is
-    the one source in this app whose failure surface isn't fully known/typed,
-    so the catch is intentionally broader than everywhere else in this file."""
-    now = time.time()
-    cache = _flightradar24_cache
-
-    if cache["data"] is not None and now - cache["ts"] < FLIGHTRADAR24_MIN_INTERVAL:
-        return jsonify(cache["data"])
-
-    try:
+    via the shared _cached_fetch() helper — but fetching through the
+    FlightRadarAPI SDK instead of requests.get, and catching bare Exception
+    (not just requests.RequestException) deliberately: the SDK makes its own
+    HTTP calls under the hood and can raise its own FlightRadarError family
+    (including CloudflareError) or lower-level curl_cffi/parsing errors that
+    aren't requests exceptions at all — this is the one source in this app
+    whose failure surface isn't fully known/typed, so the catch is
+    intentionally broader than everywhere else in this file."""
+    def fetch():
         flights = _fr24_client.get_flights(bounds=FLIGHTRADAR24_BOUNDS)
-        payload = {"flights": [_serialize_fr24_flight(f) for f in flights]}
-        cache["data"] = payload
-        cache["ts"] = now
-        return jsonify(payload)
+        return {"flights": [_serialize_fr24_flight(f) for f in flights]}
 
-    except Exception as exc:
-        if cache["data"] is not None:
-            stale = dict(cache["data"])
-            stale["stale"] = True
-            stale["error"] = str(exc)
-            return jsonify(stale)
-        return jsonify({"flights": [], "error": str(exc)}), 502
+    return _cached_fetch(
+        _flightradar24_cache, FLIGHTRADAR24_MIN_INTERVAL, fetch,
+        empty_payload={"flights": []}, catch=(Exception,),
+    )
 
 
 # Planespotters (https://www.planespotters.net/photo/api): free, no key, but
@@ -507,26 +518,14 @@ IDENTITY_TRACKED_FIELDS = ("registration", "manufacturer", "type", "registered_o
 
 
 def _load_identity_cache():
-    """Best-effort: populate _identity_cache from disk. One JSON object per
-    line (icao24 + its fields), same readable JSONL convention as
-    IDENTITY_HISTORY_FILE, rather than one giant single-line blob — easier
-    to scan/diff/grep by hand. A missing file, a corrupt line, or a line
-    missing "icao24" is skipped rather than failing the whole load — like
-    the track cache, this is an optimization/history layer, not a source
-    of truth."""
-    try:
-        with open(IDENTITY_CACHE_FILE, "r") as f:
-            lines = f.readlines()
-    except OSError:
-        return
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
+    """Best-effort: populate _identity_cache from disk via _read_jsonl(). One
+    JSON object per line (icao24 + its fields), same readable JSONL
+    convention as IDENTITY_HISTORY_FILE, rather than one giant single-line
+    blob — easier to scan/diff/grep by hand. A line missing "icao24" is
+    skipped, same as a missing file or a corrupt line already are inside
+    _read_jsonl() — like the track cache, this is an optimization/history
+    layer, not a source of truth."""
+    for entry in _read_jsonl(IDENTITY_CACHE_FILE):
         icao24 = entry.pop("icao24", None)
         if icao24:
             _identity_cache[icao24] = entry
@@ -536,15 +535,11 @@ def _save_identity_cache():
     """Best-effort atomic write of the whole cache, one aircraft per line.
     Identity resolutions are infrequent (per user click, or one every
     IDENTITY_BACKFILL_INTERVAL seconds in the background), so rewriting the
-    whole file each time is cheap. Write errors are ignored."""
-    tmp = IDENTITY_CACHE_FILE + ".tmp"
-    try:
-        with open(tmp, "w") as f:
-            for icao24, entry in _identity_cache.items():
-                f.write(json.dumps({"icao24": icao24, **entry}) + "\n")
-        os.replace(tmp, IDENTITY_CACHE_FILE)
-    except OSError:
-        pass
+    whole file each time via _write_jsonl() is cheap."""
+    _write_jsonl(
+        IDENTITY_CACHE_FILE,
+        ({"icao24": icao24, **entry} for icao24, entry in _identity_cache.items()),
+    )
 
 
 def _update_identity_cache(icao24, aircraft):
@@ -806,32 +801,48 @@ def api_track(icao24):
         return _track_error_response(cached, str(exc))
 
 
-def cached_radius_source(url, cache, min_interval, headers=None, params=None, empty_payload=None):
-    """Shared fetch+cache logic for the simple, anonymous, no-quota radius
-    sources (adsb.fi, airplanes.live) — no auth, just a short cache and
-    stale-on-failure fallback, unlike OpenSky's endpoints above. Also used
-    by FlightAware (paid/metered but same cache+stale pattern)."""
+def _cached_fetch(cache, min_interval, fetch_fn, empty_payload=None, catch=(requests.RequestException,)):
+    """Shared TTL + stale-on-failure cache contract: call fetch_fn() (a
+    zero-arg callable returning the already-parsed JSON payload) at most
+    once every min_interval seconds; on any exception type in `catch`, fall
+    back to the last good payload (marked stale) or an empty default. Both
+    cached_radius_source() (plain HTTP GET sources) and
+    cached_flightradar24() (SDK-backed, needs a broader exception catch —
+    see its own docstring) go through this instead of each hand-duplicating
+    the same TTL/stale-fallback structure."""
     now = time.time()
 
     if cache["data"] is not None and now - cache["ts"] < min_interval:
         return jsonify(cache["data"])
 
     try:
-        resp = requests.get(url, headers=headers, params=params, timeout=10)
-        resp.raise_for_status()
-        payload = resp.json()
+        payload = fetch_fn()
         cache["data"] = payload
         cache["ts"] = now
         return jsonify(payload)
 
-    except requests.RequestException as exc:
+    except catch as exc:
         if cache["data"] is not None:
             stale = dict(cache["data"])
             stale["stale"] = True
             stale["error"] = str(exc)
             return jsonify(stale)
-        default_empty = empty_payload if empty_payload is not None else {"ac": []}
+        default_empty = dict(empty_payload) if empty_payload is not None else {"ac": []}
+        default_empty["error"] = str(exc)
         return jsonify(default_empty), 502
+
+
+def cached_radius_source(url, cache, min_interval, headers=None, params=None, empty_payload=None):
+    """Shared fetch+cache logic for the simple, anonymous, no-quota radius
+    sources (adsb.fi, airplanes.live) — no auth, just a short cache and
+    stale-on-failure fallback, unlike OpenSky's endpoints above. Also used
+    by FlightAware (paid/metered but same cache+stale pattern)."""
+    def fetch():
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+
+    return _cached_fetch(cache, min_interval, fetch, empty_payload=empty_payload)
 
 
 def radius_source_response(name):
@@ -1181,32 +1192,13 @@ SNAPSHOT_FIELDS = (
 
 
 def _load_collections():
-    try:
-        with open(COLLECTIONS_FILE, "r") as f:
-            lines = f.readlines()
-    except OSError:
-        return
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
+    for entry in _read_jsonl(COLLECTIONS_FILE):
         if entry.get("id") and entry.get("user_id"):
             _collections.append(entry)
 
 
 def _save_collections():
-    tmp = COLLECTIONS_FILE + ".tmp"
-    try:
-        with open(tmp, "w") as f:
-            for card in _collections:
-                f.write(json.dumps(card) + "\n")
-        os.replace(tmp, COLLECTIONS_FILE)
-    except OSError:
-        pass
+    _write_jsonl(COLLECTIONS_FILE, _collections)
 
 
 _load_collections()
@@ -1350,10 +1342,10 @@ def api_metar():
         _metar_cache["data"] = payload
         _metar_cache["ts"] = now
         return jsonify(payload)
-    except requests.RequestException:
+    except requests.RequestException as exc:
         if _metar_cache["data"] is not None:
             return jsonify(_metar_cache["data"])
-        return jsonify([]), 502
+        return jsonify({"error": str(exc)}), 502
 
 
 @app.route("/api/sigmet")
@@ -1369,10 +1361,10 @@ def api_sigmet():
         _sigmet_cache["data"] = filtered
         _sigmet_cache["ts"] = now
         return jsonify(filtered)
-    except requests.RequestException:
+    except requests.RequestException as exc:
         if _sigmet_cache["data"] is not None:
             return jsonify(_sigmet_cache["data"])
-        return jsonify([]), 502
+        return jsonify({"error": str(exc)}), 502
 
 
 if __name__ == "__main__":

@@ -15,8 +15,10 @@
 // re-render without re-fetching. The photo gallery is rendered separately
 // (see loadGallery()), not part of this.
 function normalizeOpenSky(s, extra) {
-  // Category: OpenSky takes priority, but only if it's a meaningful value (not 0 or 1 = "unknown")
-  const openskyCategoryLabel = s.category >= 2 ? OPENSKY_CATEGORY_LABELS[s.category] : null;
+  // Category: OpenSky takes priority, but only if it's a meaningful value —
+  // see openskyCategoryIsMeaningful() (state-filters.js), the single source
+  // of truth for this check shared with categoryGroupFor().
+  const openskyCategoryLabel = openskyCategoryIsMeaningful(s.category) ? OPENSKY_CATEGORY_LABELS[s.category] : null;
   const extraCategoryLabel = extra && extra.category ? formatAdsbExchangeCategory(extra.category) : null;
   const categoryDisplay = openskyCategoryLabel || extraCategoryLabel || null;
   return {
@@ -120,7 +122,7 @@ function parseOpenSkyState(arr) {
 function updateOpenSkyMarkers(states, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns) {
   const items = [];
   for (const s of states) { // already parsed by poll() (parseOpenSkyState)
-    if (s.lat == null || s.lon == null) continue; // no position — skip this aircraft
+    if (!isValidCoordinate(s.lat, s.lon)) continue; // missing/malformed position — skip this aircraft
     if (!passesMotionFilter(s.on_ground)) continue;
     const radiusEntries = radiusRecordsByHex ? (radiusRecordsByHex.get(s.icao24) || []) : [];
     const winner = radiusEntries.length ? radiusEntries[radiusEntries.length - 1] : null;
@@ -138,7 +140,17 @@ function updateOpenSkyMarkers(states, radiusRecordsByHex, flightawareByCallsign,
     });
     if (!passesCategoryFilter(categoryGroup)) continue;
     const info = normalizeOpenSky(s, extra);
-    const entries = [{ source: 'opensky', data: pickFields(info, OPENSKY_NATIVE_FIELDS) }, ...radiusEntries];
+    // pickFields() only copies OPENSKY_NATIVE_FIELDS, which deliberately
+    // excludes categoryDisplay (it's computed, not native) — so without this,
+    // fieldSourcesFor's RAW_FIELD_ALIASES lookup (categoryDisplay -> category)
+    // would never find a `category` key on OpenSky's own provenance entry,
+    // and its badge would be missing (or misattributed to a radius source
+    // that also happens to report one) even when OpenSky's own category won.
+    // Only set when meaningful, matching exactly when normalizeOpenSky()
+    // above actually used it to produce categoryDisplay.
+    const openskyRaw = pickFields(info, OPENSKY_NATIVE_FIELDS);
+    if (openskyCategoryIsMeaningful(s.category)) openskyRaw.category = s.category;
+    const entries = [{ source: 'opensky', data: openskyRaw }, ...radiusEntries];
     const fieldSources = fieldSourcesFor(info, entries, null);
     // Enrich with FlightAware's route data if callsign matches
     const faKey = normalizeCallsignKey(info.callsign);
@@ -246,10 +258,13 @@ function parseAdsbExchangeAircraft(ac) {
     lat: ac.lat,
     lon: ac.lon,
     onGround: onGround,
-    altitudeM: altFt != null ? altFt * 0.3048 : null,
-    altGeomM: altGeomFt != null ? altGeomFt * 0.3048 : null,
-    speedKmh: gsKt != null ? gsKt * 1.852 : null,
-    verticalRateMs: vRateFtMin != null ? vRateFtMin * 0.3048 / 60 : null,
+    // "ground" is a definite, known signal (the aircraft is on the ground),
+    // not missing data — altitudeM used to stay null here, leaving the
+    // sidebar's Altitude row blank for a grounded aircraft instead of 0.
+    altitudeM: onGround ? 0 : (altFt != null ? altFt * FT_TO_M : null),
+    altGeomM: altGeomFt != null ? altGeomFt * FT_TO_M : null,
+    speedKmh: gsKt != null ? gsKt * KT_TO_KMH : null,
+    verticalRateMs: vRateFtMin != null ? vRateFtMin * FT_TO_M / 60 : null,
     squawk: ac.squawk || null,
     category: ac.category || null,
     emergency: (ac.emergency && ac.emergency !== 'none') ? ac.emergency : null,
@@ -264,7 +279,7 @@ function parseAdsbExchangeAircraft(ac) {
     trueHeadingDeg: typeof ac.true_heading === 'number' ? ac.true_heading : null,
     turnRateDegPerSec: typeof ac.track_rate === 'number' ? ac.track_rate : null,
     rollDeg: typeof ac.roll === 'number' ? ac.roll : null,
-    navAltitudeM: navAltFt != null ? navAltFt * 0.3048 : null,
+    navAltitudeM: navAltFt != null ? navAltFt * FT_TO_M : null,
     navHeadingDeg: typeof ac.nav_heading === 'number' ? ac.nav_heading : null,
     navQnh: typeof ac.nav_qnh === 'number' ? ac.nav_qnh : null,
     navModes: (Array.isArray(ac.nav_modes) && ac.nav_modes.length) ? ac.nav_modes : null,
@@ -320,10 +335,10 @@ function parseFlightRadar24Aircraft(f) {
     lat: f.latitude,
     lon: f.longitude,
     onGround: !!f.on_ground,
-    altitudeM: typeof f.altitude === 'number' ? f.altitude * 0.3048 : null,
+    altitudeM: typeof f.altitude === 'number' ? f.altitude * FT_TO_M : null,
     altGeomM: null,
-    speedKmh: typeof f.ground_speed === 'number' ? f.ground_speed * 1.852 : null,
-    verticalRateMs: typeof f.vertical_speed === 'number' ? f.vertical_speed * 0.3048 / 60 : null,
+    speedKmh: typeof f.ground_speed === 'number' ? f.ground_speed * KT_TO_KMH : null,
+    verticalRateMs: typeof f.vertical_speed === 'number' ? f.vertical_speed * FT_TO_M / 60 : null,
     squawk: f.squawk || null,
     category: null, // FR24's basic feed has no DO-260B emitter category code
     emergency: null,
@@ -376,7 +391,7 @@ function normalizeFlightRadar24(a) {
 function updateFlightRadar24Markers(aircraftList, excludeIds, radiusRecordsByHex) {
   const items = [];
   for (const a of aircraftList) { // already parsed by poll() (parseFlightRadar24Aircraft)
-    if (a.lat == null || a.lon == null) continue;
+    if (!isValidCoordinate(a.lat, a.lon)) continue;
     // Unlike the four radius sources, FR24 isn't fundamentally keyed by
     // ICAO24 (it's flight-object-keyed, with icao_24bit as just one
     // attribute) — a flight with no transponder hex can't dedupe or key a
@@ -429,8 +444,8 @@ function parseFlightAware(f) {
     lat: typeof lp.latitude === 'number' ? lp.latitude : null,
     lon: typeof lp.longitude === 'number' ? lp.longitude : null,
     onGround: altFt === 0,
-    altitudeM: altFt != null ? altFt * 0.3048 : null,
-    speedKmh: gsKt != null ? gsKt * 1.852 : null,
+    altitudeM: altFt != null ? altFt * FT_TO_M : null,
+    speedKmh: gsKt != null ? gsKt * KT_TO_KMH : null,
     track: typeof lp.heading === 'number' ? lp.heading : null,
     originAirport: originAirport,
     destinationAirport: destinationAirport,
@@ -485,7 +500,7 @@ function normalizeFlightAware(f) {
 function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, sourceName, flightawareByCallsign, matchedFlightawareCallsigns, radiusRecordsByHex) {
   const items = [];
   for (const a of aircraftList) { // already parsed by poll() (parseAdsbExchangeAircraft)
-    if (a.lat == null || a.lon == null) continue;
+    if (!isValidCoordinate(a.lat, a.lon)) continue;
     if (!passesMotionFilter(a.onGround)) continue;
     const isGroundVehicle = looksLikeGroundVehicle({
       category: a.category, registration: a.registration, aircraftType: a.aircraftType, callsign: a.callsign,
@@ -525,7 +540,7 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, s
 function updateFlightAwareMarkers(flights, excludedCallsigns) {
   const items = [];
   for (const f of flights) { // already parsed by poll() (parseFlightAware)
-    if (f.lat == null || f.lon == null) continue;
+    if (!isValidCoordinate(f.lat, f.lon)) continue;
     const faKey = normalizeCallsignKey(f.callsign);
     if (excludedCallsigns && faKey && excludedCallsigns.has(faKey)) continue;
     if (!passesMotionFilter(f.onGround)) continue;
