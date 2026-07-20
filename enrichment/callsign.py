@@ -89,6 +89,13 @@ _CURATED_AIRLINE_OPERATORS = {
     "EJU": {"operator": "easyJet Europe", "country_iso": "AT"},
     "ITY": {"operator": "ITA Airways", "country_iso": "IT"},
     "RUK": {"operator": "Ryanair UK", "country_iso": "GB"},
+    # Found via a real aircraft (SP-RKZ): "RYS" is Buzz's real ICAO
+    # designator (Ryanair Group's Polish low-cost subsidiary, formerly
+    # named "Ryanair Sun" — RYS is a holdover from that original name).
+    # Wasn't in this curated table, so the generated tier's own "RYS" —
+    # an unrelated Thai airline called "Royal Sky" that happens to share
+    # the code in OpenFlights' data — was winning by default.
+    "RYS": {"operator": "Buzz", "country_iso": "PL"},
     "ICE": {"operator": "Icelandair", "country_iso": "IS"},
 
     # ═══════════════ Balkans / CWE region ═══════════════

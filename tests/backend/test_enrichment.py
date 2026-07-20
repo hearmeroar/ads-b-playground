@@ -154,6 +154,19 @@ def test_decode_callsign_curated_tier_wins_over_generated():
     assert decode_callsign("QFA123")["operator"] == "Qantas Airways"
 
 
+def test_decode_callsign_rys_resolves_to_buzz_not_royal_sky():
+    # Found via a real aircraft (SP-RKZ, callsign RYS7025): "RYS" is Buzz's
+    # real ICAO designator (Ryanair Group's Polish subsidiary, formerly
+    # "Ryanair Sun" — hence the code), but OpenFlights' own data has an
+    # unrelated Thai airline, "Royal Sky", under the same code — which was
+    # winning by default until "RYS" was added to the curated tier.
+    from enrichment.callsign import _GENERATED_AIRLINE_OPERATORS
+    assert _GENERATED_AIRLINE_OPERATORS["RYS"]["operator"] == "Royal Sky"
+    result = decode_callsign("RYS7025")
+    assert result["operator"] == "Buzz"
+    assert result["country_iso"] == "PL"
+
+
 def test_decode_callsign_generated_tier_resolves_an_airline_curated_lacks():
     # A spot-check that the generated tier is actually reachable end-to-end
     # through decode_callsign(), not just present in the raw dict — "KAP"
