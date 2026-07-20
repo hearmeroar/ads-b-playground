@@ -527,3 +527,59 @@ Implementation notes:
 	gallery presence, play/pause of track (basic), and save/unsave flow.
 
 Estimate: 1–2 dev days (frontend extraction + small backend route + E2E test).
+
+--
+
+External links: UTM params, rel attributes, and variableized host
+
+Goal: ensure every external link emitted by the app includes standardized
+UTM/query parameters, is wrapped with appropriate `rel` attributes when
+licence/policy allows, and whose base is built from a single configurable
+variable (so the domain/hosting can change without touching many templates).
+
+Motivation: analytics consistency (UTM tagging), security/privacy (noreferrer
+for cross-origin), and operational flexibility (the external link base is not
+hardcoded while deployment/domain is not yet stable).
+
+Acceptance criteria:
+- All externally-rendered links (gallery credits, airline website links,
+  photographer links, adsbdb/planespotters outbound references, README or
+  footer external anchors) must be generated via a single helper that:
+  - appends configured UTM parameters (configurable via `app.py` env or
+	 `constants.js`) to the URL without breaking existing query params;
+  - adds `rel="noreferrer noopener nofollow"` when the audit permits;
+  - generates the host via a variable (e.g. `EXTERNAL_LINK_BASE`) so the
+	 domain can be switched centrally.
+- A license/audit document is produced listing third-party resources whose
+  licenses require or forbid `rel` wrapping or attribution; this doc lives in
+  `/.ai/DECISIONS.md` or `/.ai/BACKLOG.md` as the license-check summary.
+- Tests: unit tests for the link builder function (proper UTM merge,
+  rel attribute inclusion), and a Playwright test asserting external gallery
+  credit links contain UTM and `rel` attributes.
+
+Implementation notes:
+1. Config: add `EXTERNAL_LINK_BASE` and `EXTERNAL_LINK_UTM` to `app.py`'s
+	`/api/config` payload and to `static/js/constants.js` as fallback. Read
+	them from environment variables (`EXTERNAL_LINK_BASE`, `EXTERNAL_LINK_UTM`)
+	for easy deploy-time change.
+2. Frontend helper: add `utils/externalLink.js` exporting `buildExternalHref(href)`
+	(merges UTM params), and `externalLinkAttrs()` returning `{target: '_blank',
+	rel: 'noreferrer noopener nofollow'}` when allowed. Replace inline `href`
+	construction in `renderGallery()`, `renderDetailsHtml()`, `airlineLogoHtml()`,
+	and any other place external links are injected with `createElement('a')`
+	to use these helpers.
+3. Backend: where server-side templates or endpoints render links (e.g. any
+	server-side emails, static pages), use a shared `external_link(href)` helper
+	to perform the same UTM/rel transformation when generating HTML.
+4. Licence audit: scan `static/airline-logos/`, vendored assets, and external
+	API terms (Planespotters, airport-data.com, adsbdb) for requirements about
+	link wrapping or mandatory attribution. Record findings in
+	`/.ai/DECISIONS.md` with recommended `rel` policy. If a license forbids
+	wrapping links with `noreferrer` (rare), the helper must allow per-host
+	overrides via `EXTERNAL_LINK_POLICY` mapping.
+5. Variableization: ensure `EXTERNAL_LINK_BASE` is used when building any
+	upstream-only proxied link (e.g., when rewriting image URLs or building a
+	short redirect path). Keep default `EXTERNAL_LINK_BASE` empty so absolute
+	hrefs continue to be respected when desired.
+
+Estimate: 0.5–1 dev days (helper + replacements + license audit note + tests).
