@@ -22,13 +22,9 @@ Guardrails
 - Keep changes incremental; prefer configuration and feature flags when possible.
 
 CURRENT.md ownership
-- Primary owner: **Architect** — responsible for keeping `/.ai/CURRENT.md` up to date
-  after any significant architectural change or at major session boundaries.
-- Secondary: **Developer** may propose small status updates via PR, but any
-  change to `/.ai/CURRENT.md` requires Architect approval (review + merge)
-  before it lands on `main`.
-- Automation: agents/assistants may prepare draft text and open a PR, but
-  must not push directly to `main` without human sign-off.
+- Primary owner: **Architect** — responsible for major architectural status and strategic direction.
+- Secondary: **Developer** may apply small, non-controversial updates directly to `/.ai/CURRENT.md` when they reflect an already-completed implementation or a narrow operational status change. Larger roadmap or architecture-status revisions should still involve the Architect.
+- Automation: agents/assistants may prepare draft text and apply it directly as part of a code or memory update, but should label the change clearly and keep it small.
 
 Commit template for CURRENT.md
 ```

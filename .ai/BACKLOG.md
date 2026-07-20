@@ -675,3 +675,5 @@ Implementation notes:
 3. Update `static/js/state-filters.js` event wiring to treat the toggle as a switch: use `aria-checked` and `element.classList.toggle('on')`.
 4. Add Playwright test `tests/frontend/test_airports_toggle.spec.js` asserting toggle behavior.
 Estimate: 0.25 dev days (markup + CSS + wiring + E2E smoke).
+Status: Done
+Completed: 2026-07-20

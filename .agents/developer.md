@@ -31,5 +31,6 @@ PR description template
 
 Guidelines
 - When touching `.ai/ARCHITECTURE.md`, coordinate with Architect.
+- When updating `.ai/BACKLOG.md` or `/.ai/CURRENT.md`, Developer may apply small memory updates directly as part of a focused change. Large status or strategy changes still should be reviewed by Architect.
 - Add unit tests for behavior changes; mock external calls in backend tests.
 - Keep PRs reviewable (≤300 changed lines preferred).

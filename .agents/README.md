@@ -17,10 +17,10 @@ Usage
  Quick SOP (summary):
 
 - Draft a 1–6 line update describing the change, date, and refs.
+- For small updates to `/.ai/BACKLOG.md` or `/.ai/CURRENT.md`, Developer may make the change directly as part of the same focused implementation branch, without a separate docs-only PR.
 - Open a branch `docs/current/<short-what>` and create a PR with title
-	`docs(.ai): update CURRENT.md — YYYY-MM-DD`.
-- Add label `docs/.ai`, request review from `Architect` and merge only after
-	Architect approval.
+	`docs(.ai): update CURRENT.md — YYYY-MM-DD` for larger strategy or architecture status changes.
+- Add label `docs/.ai`, request Architect review when the update is more than a routine status note.
 - Keep `CURRENT.md` short; move rationale to `DECISIONS.md`.
 
  See `.agents/architect.md` for the full step-by-step procedure and commit

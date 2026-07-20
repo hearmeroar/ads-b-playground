@@ -30,7 +30,7 @@
 
 ## Next steps (for user)
 
-**Status update (2026-07-20):** the lightweight agent guidance files were added to the repository and committed to `main` (`.agents/*`). The AI memory system itself remains as originally created under `.ai/`.
+**Status update (2026-07-20):** the lightweight agent guidance files were added to the repository and committed to `main` (`.agents/*`). The AI memory system itself remains as originally created under `.ai/`. The gallery arrow hit-area fix is now documented and the agent memory update policy has been simplified.
 
 User can:
 1. Review the new `.ai/` files and edits to CLAUDE.md/README.md (unchanged).
