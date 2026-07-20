@@ -130,6 +130,21 @@ function buildMergedDetails(icao24) {
   // winning source's dot renders first and Flywme's second — the badge
   // order itself reflects the priority chain.
   const enrichment = enrichmentById.get(icao24);
+  const fieldNeedsCorroboration = {};
+  // A genuine cross-border "airline" helicopter flight under a matching
+  // ICAO 3LD designator is rare, while a government/EMS/police callsign
+  // prefix coincidentally colliding with an unrelated real airline's
+  // designator is not (the real bug this closes: a Romanian rescue
+  // helicopter's "MAI" callsign — Ministerul Afacerilor Interne — decoding
+  // to Mauritania Airlines International). So a callsign-decoded operator/
+  // operator_country that conflicts with the aircraft's own ICAO24
+  // hex-block country is withheld in normal mode for rotorcraft
+  // specifically — see enrich_identity()'s needs_corroboration flag and the
+  // matching frontend handling below/in render-details.js. Every other
+  // category still displays it normally (cross-border leasing legitimately
+  // produces this same kind of mismatch constantly), just with extra detail
+  // in the dev-mode tooltip.
+  const isRotorcraft = live.categoryGroup === 'rotorcraft';
   if (enrichment) {
     for (const [beKey, feKey] of Object.entries(ENRICHMENT_FIELD_MAP)) {
       const resolved = enrichment[beKey];
@@ -143,6 +158,18 @@ function buildMergedDetails(icao24) {
       }
       if (!resolved) continue;
       const already = info[feKey] != null && info[feKey] !== '';
+
+      if ((beKey === 'operator' || beKey === 'operator_country') && resolved.needs_corroboration) {
+        fieldNeedsCorroboration[feKey] = true;
+        // Not already filled by a higher tier, and this is the specific
+        // combination (rotorcraft, normal mode) where the value is
+        // withheld entirely rather than shown as fact — "continue" leaves
+        // info[feKey] unset, so identityRow renders the ordinary "Unknown"
+        // it already would for any other unresolved field. Dev mode still
+        // falls through below and fills it normally, tagged, for debugging.
+        if (!already && isRotorcraft && !currentDevMode) continue;
+      }
+
       if (already) {
         // Only co-display when enrichment resolved this field via a real
         // locally-computed tier (registration_prefix/icao24_lookup/
@@ -185,7 +212,10 @@ function buildMergedDetails(icao24) {
       fieldComputationBasis.categoryDisplay = resolvedCategory.source;
     }
   }
-  return { info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation };
+  return {
+    info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation,
+    fieldNeedsCorroboration, categoryGroup: live.categoryGroup,
+  };
 }
 
 // Single place that (re)renders the sidebar for whichever aircraft is
@@ -196,7 +226,7 @@ function buildMergedDetails(icao24) {
 function renderSelectedDetails() {
   if (selectedIcao24 == null || !detailsById.has(selectedIcao24)) return;
   const m = buildMergedDetails(selectedIcao24);
-  const rendered = renderDetailsHtml(m.info, m.fieldSources, m.fieldConfidence, m.fieldComputationBasis, m.routeValidation);
+  const rendered = renderDetailsHtml(m.info, m.fieldSources, m.fieldConfidence, m.fieldComputationBasis, m.routeValidation, m.fieldNeedsCorroboration, m.categoryGroup);
   sidebarHeaderEl.innerHTML = rendered.header;
   sidebarRouteEl.innerHTML = rendered.route;
   sidebarDetailsEl.innerHTML = rendered.body;
@@ -647,9 +677,14 @@ async function fetchPhotosFrom(endpoint, kind, value, query) {
 }
 
 // Tries registration first (more specific/reliable), falling back to the
-// ICAO24 hex.
+// ICAO24 hex — but only when the registration actually looks like a real
+// tail number (see looksLikePlausibleRegistration()). A bare internal fleet
+// number (observed on real military/government helicopters, e.g. "333")
+// skips straight to the hex-based lookup instead of risking a false match
+// in Planespotters' own registration index.
 async function fetchPlanespottersPhotos(icao24, registration) {
-  let photos = registration ? await fetchPhotosFrom('/api/photo', 'reg', registration) : [];
+  let photos = looksLikePlausibleRegistration(registration)
+    ? await fetchPhotosFrom('/api/photo', 'reg', registration) : [];
   if (!photos.length && icao24) {
     photos = await fetchPhotosFrom('/api/photo', 'hex', icao24);
   }
@@ -658,12 +693,13 @@ async function fetchPlanespottersPhotos(icao24, registration) {
 
 // airport-data.com has no registration-only lookup worth using here — it's
 // always queried by ICAO24 hex (`m`), optionally hinted with the
-// registration (`r`) for a more precise match per its docs. `needed` is
-// "how many more slots this gallery still has", sent as `n`.
+// registration (`r`) for a more precise match per its docs — only added
+// when plausible, same rationale as fetchPlanespottersPhotos() above.
+// `needed` is "how many more slots this gallery still has", sent as `n`.
 async function fetchAirportDataPhotos(icao24, registration, needed) {
   if (!icao24 || needed <= 0) return [];
   let query = '?n=' + needed;
-  if (registration) query += '&reg=' + encodeURIComponent(registration);
+  if (looksLikePlausibleRegistration(registration)) query += '&reg=' + encodeURIComponent(registration);
   return fetchPhotosFrom('/api/photo2', 'hex', icao24, query);
 }
 

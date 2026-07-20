@@ -22,6 +22,19 @@ function isValidCoordinate(lat, lon) {
     && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
 }
 
+// Guards a raw live-feed registration string before it's used as a
+// Planespotters/airport-data.com photo lookup key. A bare internal fleet
+// number (e.g. "333"/"293", seen on real military/government helicopters —
+// not a real ICAO/FAA-format tail number) is short and generic enough to
+// false-match an unrelated aircraft in those services' own registration
+// index. Every real civil registration mark (ICAO Annex 7 nationality
+// marks, US N-numbers, ...) contains at least one letter, so that alone is
+// enough to reject the bad case without a length threshold that would also
+// wrongly reject legitimate short marks (e.g. US "N1"-style registrations).
+function looksLikePlausibleRegistration(reg) {
+  return typeof reg === 'string' && /[A-Za-z]/.test(reg);
+}
+
 // Three independent data sources, each rendered as its own color-coded set of
 // markers, all keyed by the aircraft's ICAO24/hex address (the same aircraft
 // can in principle show up in more than one feed at once — see the dedup
@@ -147,9 +160,10 @@ function fieldSourcesFor(info, entries, routeSource) {
 // part of a composite fieldKey) additionally carries a data-detail
 // attribute naming the computation technique + confidence, read by the
 // tooltip click handler.
-function sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) {
+function sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) {
   fieldConfidence = fieldConfidence || {};
   fieldComputationBasis = fieldComputationBasis || {};
+  fieldNeedsCorroboration = fieldNeedsCorroboration || {};
   if (!fieldKey) return '';
   const keys = Array.isArray(fieldKey) ? fieldKey : [fieldKey];
   const sources = [...new Set(keys.flatMap((k) => fieldSources[k] || []))];
@@ -158,7 +172,15 @@ function sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputati
     if (s === 'flywme' && !Array.isArray(fieldKey)) {
       const basis = ENRICHMENT_BASIS_LABELS[fieldComputationBasis[fieldKey]] || 'this application';
       const conf = fieldConfidence[fieldKey];
-      const detail = 'computed from ' + basis + (conf != null ? ', confidence ' + conf.toFixed(1) : '');
+      let detail = 'computed from ' + basis + (conf != null ? ', confidence ' + conf.toFixed(1) : '');
+      // Set only for a callsign-decoded operator/operator_country whose
+      // claimed country disagrees with the aircraft's own ICAO24 hex-block
+      // country (see enrich_identity()) — extra debugging context even when
+      // the value itself still displays normally (non-rotorcraft; a
+      // rotorcraft instead gets a visible tag, see renderDetailsHtml).
+      if (fieldNeedsCorroboration[fieldKey]) {
+        detail += ' — unconfirmed: conflicts with the aircraft’s own ICAO24 hex-address country';
+      }
       detailAttr = ' data-detail="' + detail + '"';
     }
     return '<span class="source-badge" style="background:' + SOURCE_COLORS[s] + '" data-source="' + s + '"' + detailAttr + '></span>';

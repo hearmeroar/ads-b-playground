@@ -14,7 +14,51 @@ few dozen entries, so there's nothing here to cache or reset.
 from enrichment.aircraft_database import normalize_aircraft_type
 from enrichment.aircraft_enrichment import enrich_identity
 from enrichment.callsign import decode_callsign
+from enrichment.icao24_allocation import ICAO24_BLOCKS, country_for_icao24
 from enrichment.registration import lookup_country_by_registration
+
+
+# --- icao24_allocation.py ---
+
+def test_icao24_allocation_romania_covers_the_reported_helicopters():
+    # Real aircraft this feature was built to fix: two Romanian SMURD/MAI
+    # rescue helicopters whose callsigns ("MAI333"/"MAI293") collide with
+    # Mauritania Airlines' ICAO designator (see aircraft_enrichment.py).
+    for hexval in ("4A35CE", "4A34D8"):
+        result = country_for_icao24(hexval)
+        assert result["country"] == "Romania"
+        assert result["country_iso"] == "RO"
+        assert result["source"] == "icao24_block"
+
+
+def test_icao24_allocation_result_shape():
+    result = country_for_icao24("400000")  # United Kingdom
+    assert result == {
+        "country": "United Kingdom", "country_iso": "GB",
+        "source": "icao24_block", "confidence": country_for_icao24("400000")["confidence"],
+    }
+    assert 0 < result["confidence"] < 1.0  # below registration_prefix's 1.0
+
+
+def test_icao24_allocation_lowercase_and_uppercase_agree():
+    assert country_for_icao24("4a35ce") == country_for_icao24("4A35CE")
+
+
+def test_icao24_allocation_unallocated_or_invalid_returns_none():
+    assert country_for_icao24(None) is None
+    assert country_for_icao24("") is None
+    assert country_for_icao24("not-hex") is None
+    assert country_for_icao24("FFFFFF") is None  # above every allocated block
+
+
+def test_icao24_allocation_covers_essentially_every_icao_member_state():
+    assert len(ICAO24_BLOCKS) >= 150
+
+
+def test_icao24_allocation_blocks_do_not_overlap():
+    blocks = sorted(ICAO24_BLOCKS, key=lambda b: b[0])
+    for (start_a, end_a, _), (start_b, _, _) in zip(blocks, blocks[1:]):
+        assert end_a < start_b
 
 
 # --- registration.py ---
@@ -304,6 +348,26 @@ def test_enrich_identity_country_icao24_tier():
     assert result["country"]["source"] == "icao24_lookup"
 
 
+def test_enrich_identity_country_icao24_block_tier():
+    # 4A35CE has no curated icao24_lookup record (unlike 49d3d3), so country
+    # falls all the way to the new icao24_block tier — this is the real gap
+    # that used to leave "Registration Country: Unknown" for aircraft with
+    # bare, non-ICAO-format registrations (military/government tail numbers
+    # like "333"), see test_enrich_identity_operator_country_needs_corroboration.
+    result = enrich_identity("4A35CE")
+    assert result["country"]["value"] == "Romania"
+    assert result["country"]["country_iso"] == "RO"
+    assert result["country"]["source"] == "icao24_block"
+
+
+def test_enrich_identity_country_registration_prefix_outranks_icao24_block():
+    # A UK-prefixed registration on a Romanian-block hex: registration_prefix
+    # must still win (it's the more specific, higher-confidence signal).
+    result = enrich_identity("4A35CE", registration="G-FRAG")
+    assert result["country"]["value"] == "United Kingdom"
+    assert result["country"]["source"] == "registration_prefix"
+
+
 def test_enrich_identity_country_has_no_callsign_tier():
     # Country means country of *registration* — a callsign only reveals the
     # operator's home country, which is a different concept (surfaced via
@@ -349,6 +413,47 @@ def test_enrich_identity_operator_country_callsign_tier():
 
 def test_enrich_identity_operator_country_unknown():
     assert enrich_identity("ffffff")["operator_country"] is None
+
+
+def test_enrich_identity_operator_needs_corroboration_on_hex_country_mismatch():
+    # The real reported bug: a Romanian rescue helicopter's "MAI" callsign
+    # prefix (Ministerul Afacerilor Interne) collides with Mauritania
+    # Airlines' real ICAO designator. The aircraft's own ICAO24 hex address
+    # (assigned by Romania) disagrees with the callsign-decoded operator's
+    # claimed home country (Mauritania) — both operator and operator_country
+    # must carry needs_corroboration so the frontend can treat the match as
+    # unconfirmed rather than displaying it as fact.
+    result = enrich_identity("4A35CE", callsign="MAI333")
+    assert result["operator"]["value"] == "Mauritania Airlines International"
+    assert result["operator"]["needs_corroboration"] is True
+    assert result["operator_country"]["value"] == "Mauritania"
+    assert result["operator_country"]["needs_corroboration"] is True
+
+
+def test_enrich_identity_operator_no_corroboration_flag_when_hex_country_agrees():
+    # Ryanair (Ireland) on an Ireland-block hex: no mismatch, so the flag
+    # key must be absent entirely, not merely False.
+    result = enrich_identity("4CA123", callsign="RYR123")
+    assert result["operator"]["value"] == "Ryanair"
+    assert "needs_corroboration" not in result["operator"]
+    assert "needs_corroboration" not in result["operator_country"]
+
+
+def test_enrich_identity_operator_no_corroboration_flag_when_hex_country_unknown():
+    # No icao24 block at all for this hex (outside every allocated range) —
+    # there's nothing to corroborate against, so the flag must stay absent
+    # rather than defaulting to "conflict".
+    result = enrich_identity("ffffff", callsign="RYR123")
+    assert "needs_corroboration" not in result["operator"]
+    assert "needs_corroboration" not in result["operator_country"]
+
+
+def test_enrich_identity_operator_no_corroboration_flag_when_operator_is_live():
+    # A live-sourced operator never goes through callsign_decode at all, so
+    # it can never carry this flag even on a hex/callsign country mismatch.
+    result = enrich_identity("4A35CE", callsign="MAI333", known_operator="Real Operator")
+    assert result["operator"]["source"] == "live"
+    assert "needs_corroboration" not in result["operator"]
 
 
 def test_enrich_identity_operator_country_no_tier_from_icao24_lookup():
@@ -473,3 +578,11 @@ def test_route_query_params_feed_the_fallback_tiers(client):
     assert data["country"]["source"] == "registration_prefix"  # outranks callsign_decode
     assert data["operator"]["value"] == "Smartwings"  # from callsign_decode, no icao24 record here
     assert data["manufacturer"]["value"] == "Boeing"  # from aircraft_type_db, no icao24 record here
+
+
+def test_route_operator_needs_corroboration_round_trips(client):
+    resp = client.get("/api/identity/4A35CE?callsign=MAI333")
+    data = resp.get_json()
+    assert data["country"]["value"] == "Romania"  # icao24_block tier
+    assert data["operator"]["needs_corroboration"] is True
+    assert data["operator_country"]["needs_corroboration"] is True

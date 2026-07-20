@@ -8,6 +8,7 @@ from .aircraft_category import category_for_aircraft
 from .aircraft_database import DEFAULT_AIRCRAFT_DATABASE, normalize_aircraft_type
 from .callsign import decode_callsign
 from .countries import country_iso_for_name
+from .icao24_allocation import country_for_icao24
 from .registration import lookup_country_by_registration
 from .manufacturer_aliases import normalize_manufacturer
 
@@ -46,10 +47,36 @@ def enrich_identity(
     from whichever manufacturer/model this call resolved via
     `aircraft_category.py`'s static MTOW-based table, the lowest-priority
     fallback in the whole category chain.
+
+    A callsign-decoded operator/operator_country is a real ICAO 3LD
+    designator match, but a static ~5700-entry table has no way to know a
+    given designator is defunct/recycled, nor that a non-commercial
+    (government/EMS/police/military) aircraft's callsign prefix can
+    coincidentally collide with an unrelated real airline's code (found via
+    a real aircraft: a Romanian rescue helicopter's "MAI" callsign prefix —
+    short for Ministerul Afacerilor Interne, the Ministry of Internal
+    Affairs — decoding to "Mauritania Airlines International"). Since the
+    aircraft's own ICAO24 hex address is assigned directly by its actual
+    State of Registry (`icao24_allocation.py`), independent of both the
+    registration string and the callsign, a disagreement between the two is
+    a real corroboration signal: whenever "operator"/"operator_country" end
+    up sourced from `callsign_decode` and `country_for_icao24(icao24)`
+    resolves to a *different* country than the callsign decode did, that
+    field gains `needs_corroboration: True`. The value is never dropped
+    here — an operator's home country legitimately differs from the
+    aircraft's own registration country extremely often for ordinary
+    reasons (cross-border leasing, flag-of-convenience registries), so
+    hiding it outright at this layer would suppress a lot of correct data.
+    This module always returns everything it resolves, flag included; only
+    the frontend decides what to do with the flag, and does so more
+    aggressively for rotorcraft specifically (see CLAUDE.md) since a
+    genuine cross-border "airline" helicopter flight under a matching ICAO
+    3LD designator is rare, while this exact collision pattern is not.
     """
     db_record = DEFAULT_AIRCRAFT_DATABASE.lookup(icao24)
     reg_country = lookup_country_by_registration(registration)
     cs_decoded = decode_callsign(callsign)
+    icao24_country = country_for_icao24(icao24)
     # icao_type_code (e.g. "B38M") is a standardized exact-match key and
     # checked first; aircraft_type is often a source's free-text description
     # (e.g. "BOEING 737 MAX 8") whose exact wording varies too much across
@@ -78,10 +105,28 @@ def enrich_identity(
             "confidence": db_record["confidence"],
             "country_iso": db_record["country_iso"],
         }
+    if not country and icao24_country:
+        country = {
+            "value": icao24_country["country"], "source": icao24_country["source"],
+            "confidence": icao24_country["confidence"],
+            "country_iso": icao24_country["country_iso"],
+        }
     # Deliberately no callsign_decode tier for country: a callsign only
     # tells you the operator's home country, not the aircraft's country of
     # registration — conflating the two under one "Country" field is what
     # this fix removes. That data instead feeds the operator tier below.
+
+    # A callsign-decoded operator's claimed home country disagreeing with
+    # the aircraft's own ICAO24-block country is a real corroboration gap —
+    # see the module docstring. Computed once, applied to both "operator"
+    # and "operator_country" below (whichever of the two actually ends up
+    # sourced from callsign_decode).
+    cs_needs_corroboration = bool(
+        cs_decoded
+        and cs_decoded.get("country_iso")
+        and icao24_country
+        and cs_decoded["country_iso"] != icao24_country["country_iso"]
+    )
 
     # --- operator ---
     operator = _live(known_operator)
@@ -95,6 +140,8 @@ def enrich_identity(
             "value": cs_decoded["operator"], "source": cs_decoded["source"],
             "confidence": cs_decoded["confidence"],
         }
+        if cs_needs_corroboration:
+            operator["needs_corroboration"] = True
 
     # --- operator_country (the operating airline's home country — a
     # distinct concept from "country", which is the aircraft's own
@@ -106,6 +153,8 @@ def enrich_identity(
             "confidence": cs_decoded["country_confidence"],
             "country_iso": cs_decoded["country_iso"],
         }
+        if cs_needs_corroboration:
+            operator_country["needs_corroboration"] = True
 
     # --- registration ---
     reg = _live(registration)

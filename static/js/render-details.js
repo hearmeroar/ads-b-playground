@@ -316,10 +316,11 @@ function splitAirportString(s) {
   return m ? { name: m[1], code: m[2] } : { name: s, code: null };
 }
 
-function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation) {
+function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation, fieldNeedsCorroboration, categoryGroup) {
   fieldSources = fieldSources || {};
   fieldConfidence = fieldConfidence || {};
   fieldComputationBasis = fieldComputationBasis || {};
+  fieldNeedsCorroboration = fieldNeedsCorroboration || {};
   const dash = '—';
   // In normal mode, a row disappears when its value is empty (today's exact
   // behavior). In dev mode every row always renders — a dash placeholder
@@ -327,7 +328,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   function detailRow(label, value, fieldKey) {
     const has = value != null && value !== '';
     if (!has && !currentDevMode) return null;
-    const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) : '';
+    const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
     return '<b>' + label + ':</b> ' + (has ? value : dash) + badge;
   }
   // Same "always render in dev mode" treatment for the two hardcoded
@@ -336,7 +337,18 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   function specialRow(label, isSet, htmlWhenSet, fieldKey) {
     if (!isSet && !currentDevMode) return null;
     if (!isSet) return '<b>' + label + ':</b> ' + dash;
-    return htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) : '');
+    return htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '');
+  }
+  // A callsign-decoded operator/operator_country whose claimed country
+  // conflicts with the aircraft's own ICAO24 hex-block country is withheld
+  // entirely in normal mode for rotorcraft (see buildMergedDetails() in
+  // sidebar-track.js — this function never sees the suppressed value at
+  // all, "Unknown" falls out of the ordinary has=false path below). When it
+  // *is* shown — dev mode, rotorcraft — this tags it visibly rather than
+  // letting it read as an ordinary resolved field.
+  function unconfirmedTagHtml(fieldKey) {
+    if (!currentDevMode || categoryGroup !== 'rotorcraft' || !fieldNeedsCorroboration[fieldKey]) return '';
+    return ' <span class="field-unconfirmed-tag">⚠ Unconfirmed</span>';
   }
   // Identity fields the enrichment pipeline can fill (Country/Operator/
   // Manufacturer/Model/Year built): unlike detailRow, always renders — a
@@ -345,7 +357,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // specifically meant to always resolve to *something* meaningful.
   function identityRow(label, value, fieldKey, helpHtml) {
     const has = value != null && value !== '';
-    const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis) : '';
+    const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
     // Label + "(?)" icon are wrapped together in .identity-label-wrap, which
     // carries the min-width column-alignment that plain <b> used to have on
     // its own (static/style.css) — keeps the icon flush against the label
@@ -354,7 +366,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     // lighter weight/smaller size than a plain detailRow <b> — four-plus
     // rows of full-bold labels each now carrying their own icon read as too
     // heavy/loud as a block.
-    return '<span class="identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span> ' + (has ? value : 'Unknown') + badge;
+    return '<span class="identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span> ' + (has ? value : 'Unknown') + badge + unconfirmedTagHtml(fieldKey);
   }
   function renderGroup(title, rows, iconKey) {
     const filtered = rows.filter((r) => r != null);
@@ -504,7 +516,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     detailRow('Last position update', formatRelativeSeconds(info.secondsSincePositionUpdate), 'secondsSincePositionUpdate'),
   ], 'signalQuality');
   function badgeFor(key) {
-    return currentDevMode ? sourceBadgeHtml(key, fieldSources, fieldConfidence, fieldComputationBasis) : '';
+    return currentDevMode ? sourceBadgeHtml(key, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
   }
   // --- Header: identity essentials at a glance, promoted out of the
   // Identity group into their own masthead so the sidebar reads
@@ -547,7 +559,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const isReject = routeValidation && routeValidation.band === 'reject';
   const isLow = routeValidation && routeValidation.band === 'low';
   const routeDevBadge = currentDevMode
-    ? sourceBadgeHtml(['originAirport', 'destinationAirport'], fieldSources, fieldConfidence, fieldComputationBasis)
+    ? sourceBadgeHtml(['originAirport', 'destinationAirport'], fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration)
     : '';
   const routeConfidenceBadge = routeValidation ? routeConfidenceBadgeHtml(routeValidation) : '';
   const routeCategoryGroup = categoryParts ? CATEGORY_LABEL_TO_GROUP[categoryParts.label] : null;

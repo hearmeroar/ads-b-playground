@@ -1220,6 +1220,41 @@ because photographer name and photo URL come from an external API.
     still co-displays its own badge alongside a live source's when one
     already won, so the fallback stays visible/debuggable in dev mode
     rather than silently disappearing.
+  - **`icao24_allocation.py`** — ICAO24 (Mode S transponder hex address) to
+    country via the official ICAO block allocation table (Annex 10, Volume
+    III, Part I, Appendix to Chapter 9, Table 9-1, "Allocation of aircraft
+    addresses to States"). Unlike `registration.py`'s own prefix-based
+    lookup, this is a *permanent* assignment directly from the State of
+    Registry that never changes for an airframe's lifetime — a real,
+    independent corroboration signal, not derived from and not a replacement
+    for the registration string. Contains 184 blocks covering essentially
+    every ICAO member state. A `country_for_icao24(icao24_hex)` function
+    does a linear scan (fine — this is click-triggered, not per-poll) and
+    returns `{"country", "country_iso", "source": "icao24_block",
+    "confidence": 0.85}` or `None` for invalid/unallocated input. Confidence
+    capped below `registration_prefix`'s 1.0 since a small number of blocks
+    are subdivided for special use rather than exclusive state ownership.
+    **Real bug this fixed**: a callsign-decoded operator's home country can
+    legitimately differ from the aircraft's own registration country
+    (cross-border leasing, flag-of-convenience registries) *or* disagree due
+    to a callsign collision — a non-commercial aircraft (government/EMS/
+    police/military) whose callsign prefix coincidentally matches an unrelated
+    real airline's ICAO designator (found via a real Romanian rescue
+    helicopter's "MAI" callsign — Ministry of Internal Affairs — decoding to
+    Mauritania Airlines International). Since ICAO24 is assigned directly by
+    the aircraft's own state, not influenced by operator/callsign, a
+    disagreement is a real signal: `enrich_identity()` marks such matches
+    with a `needs_corroboration` flag when Operator/Operator Country come
+    from `callsign_decode` and their country differs from
+    `country_for_icao24(icao24)`. The flag suppresses the mismatched value
+    entirely in normal mode *for rotorcraft specifically* (where a genuine
+    cross-border "airline" flight is rare, unlike fixed-wing leasing where
+    it's routine) — the field renders "Unknown" instead. Dev mode shows the
+    suppressed value anyway, tagged with `⚠ Unconfirmed`, and the badge
+    tooltip carries the extra conflict detail. Non-rotorcraft always display
+    the value plainly (cross-border is normal for them), just with the
+    tooltip flag for context. Tests verify the behavior across both aircraft
+    categories and dev-mode visibility.
   - **`/api/identity/<icao24>`** (`app.py`) is fetched lazily from
     `selectAircraft()` — same lazy-on-click pattern as `loadTrack`/
     `loadGallery`, never during the main poll, so the 50+ on-screen
