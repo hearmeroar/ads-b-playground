@@ -9,6 +9,7 @@ from .aircraft_database import DEFAULT_AIRCRAFT_DATABASE, normalize_aircraft_typ
 from .callsign import decode_callsign
 from .countries import country_iso_for_name
 from .registration import lookup_country_by_registration
+from .manufacturer_aliases import normalize_manufacturer
 
 
 def _live(value, confidence=1.0):
@@ -122,6 +123,8 @@ def enrich_identity(
             "value": db_record["manufacturer"], "source": db_record["source"],
             "confidence": db_record["confidence"],
         }
+        # Normalize manufacturer names to a canonical form when possible
+        manufacturer["value"] = normalize_manufacturer(manufacturer["value"])
         model = {
             "value": db_record["model"], "source": db_record["source"],
             "confidence": db_record["confidence"],
@@ -131,6 +134,8 @@ def enrich_identity(
             "value": type_normalized["manufacturer"], "source": type_normalized["source"],
             "confidence": type_normalized["confidence"],
         }
+        # Normalize the manufacturer discovered from type lookup too
+        manufacturer["value"] = normalize_manufacturer(manufacturer["value"])
         model = {
             "value": type_normalized["model"], "source": type_normalized["source"],
             "confidence": type_normalized["confidence"],

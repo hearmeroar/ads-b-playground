@@ -54,6 +54,7 @@ import json
 import os
 
 from .countries import country_by_iso
+from .manufacturer_aliases import normalize_manufacturer
 
 _YEAR_BUILT_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "opensky_year_built.json")
 
