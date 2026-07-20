@@ -409,3 +409,60 @@ Implementation notes:
 	 not required for this change.
 
 Estimate: 0.5–1 dev days (frontend work + one Playwright smoke test).
+
+--
+
+Улучшение поиска: поиск по нескольким сущностям
+
+Проблема: текущий поиск в интерфейсе ограничен одним типом сущности за раз
+(например: только по `registration` или только по `callsign`), что затрудняет
+быстрый поиск при неполных данных (нет регистрации, есть только callsign,
+или найдено по adsbdb только в одном источнике). Нужно научить поиск
+одновременному поиску по нескольким полям/сущностям и аккуратно сортировать
+результаты по релевантности.
+
+Критерии приёма:
+- UI: единый поисковый ввод в HUD/sidebar, который выполняет одновременно
+  поиски по `icao24`, `registration`, `callsign`, `operator`, `flight_id` и
+  по идентификатору adsbdb; показывает сгруппированные результаты по
+  типу (Aircraft, Registration, Flight, AdsBDB) с подсчётом и иконкой
+  источника.
+- Релевантность: результаты, совпадающие по точному `icao24` или
+  `registration`, ранжируются выше; частичные совпадения в `callsign` или
+  `operator` отображаются ниже. Предусмотреть fuzzy-матчинг (case-insensitive,
+  trimmed whitespace) и simple substring match; опционально позже — fuzzy
+  distance (Levenshtein) для опечаток.
+- Операция должна быть быстрым клиентским фильтром для уже загруженных
+  данных и отправлять параллельные запросы к бэкенду только когда есть
+  подозрение на недостающие локальные данные (например, при коротком
+  вводе не делать ненужных сетевых вызовов).
+- API: добавить `/api/search?q=...` (backend) который выполняет серверную
+  агрегацию по источникам (OpenSky cache, radius sources' caches, adsbdb,
+  storage.collections) и возвращает normalized list с `type`, `id`,
+  `display`, `source`, `score`. Фронтенд использует этот API при длинных
+  или не локально-результативных запросах.
+
+Реализация / заметки:
+1. Frontend: обновить `static/js/main.js`/`sidebar-track.js` чтобы единый
+	`searchInput` запускал сначала a) local search по `detailsById` и поставил
+	бы результаты мгновенно, затем при отсутствии совпадений или по таймауту
+	(e.g. 300ms debounce) выполнить b) networkSearch() вызов `/api/search`.
+2. Backend: добавить `/api/search` endpoint в `app.py` который объединяет
+	быстрые локальные поиски по кешам (OpenSky `_cache`, `RADIUS_SOURCES[*].cache`,
+	`_adsbdb_cache` и `storage.collections`) в одном запросе. Каждый найденный
+	результат снабжать `score` (integer) и `source` поле. Никаких внешних
+	запросов в цепочке — только локальные caches & storage — чтобы API
+	оставался быстрым.
+3. Normalization: ответ `/api/search` должен использовать тот же display
+	shape, что `buildMergedDetails()` возвращает для боковой панели, чтобы
+	клик по результату сразу открывал `selectAircraft()` или провёл
+	навигацию к найденному типу (например, коллекция → карточка, рейс →
+	окно трека).
+4. Pagination/limits: возвращать максимум N (e.g. 50) результатов и
+	provide total_estimate flag. Implement simple deduping by `icao24` or
+	`registration` so the same aircraft doesn't show multiple times.
+5. Tests: backend unit tests for `/api/search` with mock caches; frontend
+	Playwright spec to type a query and assert grouped results and opening
+	of the selected result.
+
+Estimate: 1–2 dev days (backend endpoint + frontend wiring + 1 E2E smoke test).
