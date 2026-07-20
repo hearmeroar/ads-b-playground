@@ -182,6 +182,10 @@ BBOX = {
 # bounding-box query, only lat/lon/radius (nautical miles, max 250 for all
 # four), so each approximates the same area as BBOX from one shared radius.
 AREA_RADIUS_NM = 220
+# Same circle in km, for consumers that measure distance that way (the
+# Airports layer's scan-zone filter — see api_airports() below — rather
+# than another API's own radius query param).
+AREA_RADIUS_KM = AREA_RADIUS_NM * 1.852
 
 # Never hit OpenSky more often than every MIN_INTERVAL seconds, no matter how
 # many tabs/clients poll our /api/states — keeps both anonymous and
@@ -1239,6 +1243,13 @@ def api_airports():
     # No caching: airports_in_bbox() makes zero I/O calls (a plain in-memory
     # list comprehension over local data), the same "nothing external to
     # protect with a TTL" rationale as /api/identity/<icao24> above.
+    #
+    # Also scoped to the app's own scan zone (AREA_CENTER/AREA_RADIUS_KM —
+    # the same circle the scan-radius range rings draw), independent of
+    # whatever the viewport bbox above is showing: the full worldwide
+    # dataset stays in memory either way (see enrichment/airports.py), this
+    # just stops airports outside the zone the app actually scans from ever
+    # being rendered, even while panned somewhere far away.
     bbox_param = request.args.get("bbox")
     if bbox_param:
         try:
@@ -1247,7 +1258,11 @@ def api_airports():
             lamin, lomin, lamax, lomax = BBOX["lamin"], BBOX["lomin"], BBOX["lamax"], BBOX["lomax"]
     else:
         lamin, lomin, lamax, lomax = BBOX["lamin"], BBOX["lomin"], BBOX["lamax"], BBOX["lomax"]
-    return jsonify({"airports": airports_in_bbox(lamin, lomin, lamax, lomax)})
+    airports = airports_in_bbox(
+        lamin, lomin, lamax, lomax,
+        center=(AREA_CENTER["lat"], AREA_CENTER["lon"]), radius_km=AREA_RADIUS_KM,
+    )
+    return jsonify({"airports": airports})
 
 
 if __name__ == "__main__":

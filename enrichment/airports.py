@@ -67,6 +67,16 @@ zoomed-out viewport that still spans thousands of airports (e.g. a whole
 continent) — the two techniques solve different problems: bbox filtering
 keeps the *dataset* scoped to what's relevant, clustering keeps the *map*
 readable when that scope is still visually dense.
+
+**A second, independent filter narrows this further to the app's own scan
+zone** (`airports_in_bbox()`'s `center`/`radius_km` params, wired from
+`app.py`'s `AREA_CENTER`/`AREA_RADIUS_NM` — the same circle the scan-radius
+range rings draw): an airport can be inside the current viewport bbox and
+still get dropped if it's outside that circle. The stored dataset stays
+exactly as global as described above — this is purely a rendering
+restriction, not a re-filter of what's kept in memory — so if `AREA_CENTER`
+ever moves, every airport is still there to show, just under a
+recentered circle.
 """
 
 import json
@@ -168,13 +178,24 @@ def list_map_airports(include_closed=False):
     return result
 
 
-def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False):
+def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False, center=None, radius_km=None):
     """Airports within a lat/lon bounding box — what the frontend actually
     renders. The full global list is stored (see the module docstring), but
     a live map only ever needs whatever's in view: `/api/airports` calls
     this with the current viewport's bounds (re-fetched on pan/zoom, same
     "only load what's visible" idea as any tile layer), rather than ever
     shipping the whole ~85,000-row dataset to the browser at once.
+
+    `center`/`radius_km`, when both given, apply a second, independent
+    filter: only airports within `radius_km` of `center` (a `(lat, lon)`
+    tuple) survive, on top of the bbox check above. This is what scopes the
+    layer to the app's own scan zone (`AREA_CENTER`/`AREA_RADIUS_NM` in
+    app.py — the same circle the scan-radius range rings draw) rather than
+    to *whatever* the viewport happens to be showing: panning away from the
+    scan zone still queries this function with the new viewport's bbox, but
+    the radius filter now empties the result instead of showing airports
+    the app never actually covers. The full dataset is untouched either
+    way — this only narrows what a given call returns.
 
     Invalid bounds (non-numeric, or a degenerate box) return an empty list
     rather than raising — a malformed viewport shouldn't 500 the request.
@@ -185,7 +206,11 @@ def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False):
         return []
     if lamin > lamax or lomin > lomax:
         return []
-    return [
+    result = [
         a for a in list_map_airports(include_closed=include_closed)
         if lamin <= a["lat"] <= lamax and lomin <= a["lon"] <= lomax
     ]
+    if center is not None and radius_km is not None:
+        center_lat, center_lon = center
+        result = [a for a in result if _haversine_km(center_lat, center_lon, a["lat"], a["lon"]) <= radius_km]
+    return result

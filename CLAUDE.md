@@ -653,6 +653,23 @@ worldwide as map markers, off by default like every other optional overlay.
   backend side either: `airports_in_bbox()` makes zero I/O calls (a plain
   in-memory list comprehension), the same "nothing external to protect
   with a TTL" rationale as `/api/identity/<icao24>`.
+- **Further scoped to this app's own scan zone, independent of the
+  viewport** (2026-07-20, explicit product decision): `api_airports()`
+  also passes `center=(AREA_CENTER["lat"], AREA_CENTER["lon"]),
+  radius_km=AREA_RADIUS_KM` (`AREA_RADIUS_KM = AREA_RADIUS_NM * 1.852`,
+  next to `AREA_RADIUS_NM` itself) into `airports_in_bbox()` — the same
+  220 nm circle the scan-radius range rings draw, i.e. the area the four
+  radius sources actually cover. `airports_in_bbox()`'s new `center`/
+  `radius_km` params apply a haversine distance check on top of the
+  existing bbox check, so an airport must pass *both* to be returned: in
+  view *and* inside the scan zone. Panning far away from the scan zone
+  (e.g. to Tokyo) still sends a valid viewport `bbox` and gets a normal
+  200 response, just with an empty `airports` array — the four radius
+  sources don't cover that area either, so airport markers shouldn't
+  imply they do. The full ~85,700-airport dataset stays exactly as global
+  in memory as described above (`enrichment/airports.py`'s module
+  docstring) — this is purely a response-shaping filter, not a trim of
+  what's loaded, so it stays correct if `AREA_CENTER` is ever moved.
 - **Marker clustering is still needed even with viewport scoping**: a
   zoomed-out view (a whole country or continent) can still hold thousands
   of airports/heliports in view at once. `Leaflet.markercluster` (MIT,

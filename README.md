@@ -94,9 +94,12 @@ in-memory dict.
 - **Airports layer** — an off-by-default HUD toggle renders every airport
   worldwide (large/medium/small airports, heliports, seaplane bases,
   balloonports) from [OurAirports](https://ourairports.com/data/) (public
-  domain, updated nightly). Only what's in the current map view is loaded —
-  panning or zooming re-fetches for the new viewport rather than ever
-  holding the whole ~85,000-airport dataset in the browser at once — and
+  domain, updated nightly). Only what's in the current map view *and*
+  within the app's own scan zone (the same circle the scan-radius range
+  rings draw) is ever rendered — panning or zooming re-fetches for the new
+  viewport rather than ever holding the whole ~85,000-airport dataset in
+  the browser at once, and panning far outside the scan zone shows no
+  airports there even though the full dataset covers the whole world — and
   nearby markers cluster into a numbered bubble at low zoom. Icon size
   scales with real-world significance (a major hub renders bigger than a
   small strip), heliports get their own distinct glyph, and closed airports

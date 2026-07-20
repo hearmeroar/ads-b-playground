@@ -75,6 +75,21 @@ def test_airports_in_bbox_invalid_bounds_return_empty():
     assert airports_in_bbox(45.1, 20.0, 44.5, 20.6) == []  # lamin > lamax
 
 
+def test_airports_in_bbox_radius_filter_narrows_bbox_result():
+    # A wide bbox spanning Belgrade and well beyond finds BEG with no
+    # radius filter applied...
+    wide = airports_in_bbox(30.0, 0.0, 60.0, 40.0)
+    assert any(a["icao"] == "LYBE" for a in wide)
+    # ...but centering a tight radius far from Belgrade (while the bbox
+    # itself still contains it) drops it — the radius filter is
+    # independent of, and narrower than, the bbox check.
+    far_center = airports_in_bbox(30.0, 0.0, 60.0, 40.0, center=(35.0, -5.0), radius_km=200)
+    assert not any(a["icao"] == "LYBE" for a in far_center)
+    # A radius that does cover Belgrade keeps it.
+    near_center = airports_in_bbox(30.0, 0.0, 60.0, 40.0, center=(44.0, 21.0), radius_km=407)
+    assert any(a["icao"] == "LYBE" for a in near_center)
+
+
 # --- /api/airports route ---------------------------------------------------
 
 def test_api_airports_with_bbox(client):
@@ -82,6 +97,16 @@ def test_api_airports_with_bbox(client):
     assert resp.status_code == 200
     icaos = [a["icao"] for a in resp.get_json()["airports"]]
     assert "LYBE" in icaos
+
+
+def test_api_airports_scoped_to_scan_zone(client):
+    # A bbox around Tokyo is valid and would normally return real airports,
+    # but it's nowhere near this app's own scan zone (AREA_CENTER/
+    # AREA_RADIUS_KM, the Balkans) — the route must scope to that zone
+    # regardless of what the viewport itself is showing.
+    resp = client.get("/api/airports", query_string={"bbox": "35.5,139.6,35.8,139.9"})
+    assert resp.status_code == 200
+    assert resp.get_json()["airports"] == []
 
 
 def test_api_airports_without_bbox_falls_back_to_home_region(client):
