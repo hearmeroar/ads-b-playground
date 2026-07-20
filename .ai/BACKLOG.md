@@ -197,6 +197,80 @@ Implementation notes:
 	 dev-mode test asserts suppressed value tooltip appears.
 
 Estimate: 0.5–1 developer day (backend change + unit tests + minor frontend dev-mode message).
+
+- Gallery arrow hit-zone: make arrow click area full container height
+
+Goal: expand the clickable/touch target for the gallery's previous/next
+arrow controls so they occupy the full vertical height of the gallery
+container. This reduces misclicks when users tap near the image top/bottom
+edge on mobile or small screens.
+
+Acceptance criteria:
+- Clicking/tapping anywhere vertically within the gallery container on the
+  left/right edge triggers the previous/next action respectively.
+- No visible layout changes besides the arrows remaining visually centered.
+- Playwright/E2E test covers top/middle/bottom click positions inside the
+  container for both arrows and asserts slide changes.
+
+Implementation notes:
+1. CSS: set `.gallery-nav`/`.gallery-prev`/`.gallery-next` to `height: 100%`
+	and use `display:flex; align-items:center; justify-content:center;` so the
+	visual arrow stays centered while the hit area spans the container.
+2. Ensure the nav elements are placed above the image (z-index) without
+	blocking any required pointer events on other controls (dots, credits).
+3. JS: no change expected to gallery logic; event handlers already attached to
+	the arrow buttons. If handlers rely on click-target sizing, adapt to
+	prevent race conditions with drag gestures.
+4. Tests: add `tests/frontend/test_photo.spec.js` checks for clicks near the
+	top and bottom of the left/right halves of the gallery container.
+
+Estimate: 0.25–0.5 dev days (CSS tweak + one E2E test).
+
+- Map update frequency and track smoothing (polling & interpolation)
+
+Goal: reduce jitter and improve perceived smoothness of moving aircraft on the
+map while keeping network usage and rate-limit safety acceptable. Provide a
+configurable polling cadence per-source and optional client-side track
+interpolation/smoothing for rendering.
+
+Motivation: raw poll intervals (10s/12s) and discrete OpenSky track points can
+produce visibly jerky map movement, especially at lower poll rates or for
+fast-moving aircraft. A combination of smarter polling and lightweight
+interpolation yields smoother visuals without extra backend load.
+
+Acceptance criteria:
+- Configurable per-source poll intervals exposed from the backend (`/api/config`
+	includes `poll_intervals` per source) and adjustable via env or `zones`/config.
+- On the frontend, a new smoothing layer optionally interpolates positions
+	between received waypoints so markers animate smoothly while remaining
+	anchored to real data (no hallucinated long-term tracks).
+- Default behaviour unchanged: if smoothing is off, existing discrete updates
+	remain. Smoothing is opt-in in the HUD (toggle) and off by default.
+- No additional network calls are made for smoothing; it uses the existing
+	poll/cached data only. Polling frequency respects upstream rate limits
+	(OpenSky tokens/quota) and backend-exposed `min_interval` hints.
+- Tests: unit test for per-source poll interval config; Playwright test that
+	toggles smoothing on and asserts marker movement appears continuous across
+	successive poll intervals (visual smoke test), and that toggling it off
+	returns to discrete jumps.
+
+Implementation notes:
+1. Backend: include `poll_intervals` in `/api/config` (read from existing
+	 source `min_interval` settings or explicit env config). Document limits to
+	 avoid user-configured intervals that violate upstream quotas.
+2. Frontend: implement a `smoothing` module in `static/js/` that provides
+	 `interpolatePositions(waypoints, now)` → position and `animateMarker()` that
+	 runs per-frame via `requestAnimationFrame` while target data updates arrive.
+	 Keep an option to cap interpolation time window (e.g. 2× poll interval) to
+	 avoid visually drifting from reality when upstream data is stale.
+3. Consider a hybrid adaptive polling mode: when a selected aircraft is open
+	 in the sidebar, poll its `/api/track/<icao24>` more frequently (respecting
+	 track quota TTL) while leaving general map polling at a lower cadence.
+4. Add `SMOOTHING_ENABLED` feature flag defaults to `false` (opt-in) and a
+	 HUD toggle `#toggle-smoothing` wired in `state-filters.js` along with the
+	 other filters. Persist in sessionStorage only.
+
+Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 ## Aircraft metadata
 
 - **Aircraft serial number (MSN)** — Add aircraft manufacturer serial number field. No verified source yet (adsbdb has `msn` field for some aircraft; needs validation against real data). Research required before prioritizing. (See personal memory for fuller context.)
