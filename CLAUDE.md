@@ -869,7 +869,36 @@ because photographer name and photo URL come from an external API.
     from `enrich_identity()` — `operator` and `operator_country` — rather
     than one field carrying the other's country as a side attribute; see
     "Registered Owner is a brand new field" below for why that distinction
-    matters; `aircraft_database.py` holds a
+    matters.
+    **`AIRLINE_OPERATORS` is itself two merged tiers**, not one flat table
+    (the same "priority chain inside a single Flywme slot" shape used
+    throughout this app, e.g. Planespotters+airport-data.com or the airline
+    logos above): `_CURATED_AIRLINE_OPERATORS` (the original ~90
+    hand-picked majors) always wins on conflict, merged over
+    `_GENERATED_AIRLINE_OPERATORS` (~5700 entries, built from the
+    [OpenFlights](https://github.com/jpatokal/openflights) project's
+    `data/airlines.dat` — Open Database License + Database Contents
+    License, used here as a small attributed derived extract, not a
+    redistribution of the database). The curated tier survives specifically
+    *because* OpenFlights turned out to be stale enough to lack some
+    currently-flying airlines outright — confirmed missing: `"ITY"` (ITA
+    Airways, launched 2021) and `"TVP"` (Smartwings' current designator,
+    both worked examples this test suite already relies on) — and to
+    disagree with the curated tier's own naming for at least one it does
+    have (`"QFA"` → plain `"Qantas"` in OpenFlights vs. `"Qantas Airways"`
+    curated). Generation (a one-off script, not committed, same
+    "regenerate by hand" convention as the airline-logos manifest and the
+    favicon PNGs) filters `airlines.dat` rows to a plausible 3-character
+    ICAO code, a name, and a country string `enrichment/countries.py` can
+    resolve — directly, or via a small alias table used only at generation
+    time (`"Ivory Coast"`, `"Republic of Korea"`, `"Burma"`, `"Russian
+    Federation"`, etc. → this app's own canonical country names) — which is
+    also why `countries.py` gained two more entries (**Taiwan**, **South
+    Sudan**) neither of which had a real ICAO-member-state entry there
+    before, despite both having genuine airlines/designators in the data.
+    When OpenFlights lists the same ICAO code more than once (a defunct
+    airline's designator later reassigned — routine in real ICAO Doc 8585
+    history), the row marked active wins. `aircraft_database.py` holds a
     swappable ICAO24→full-record lookup (`AircraftDatabaseLookup.lookup()`,
     a small placeholder dataset behind an interface a real data source
     could later implement with zero caller changes) plus a separate ICAO
@@ -2065,7 +2094,19 @@ because photographer name and photo URL come from an external API.
   prefix table), each orchestrator priority tier in isolation (including
   `operator_country`'s own `callsign_decode`-only tier, kept separate from
   `operator` itself), and that `conftest.py`'s `reset_caches` needs no new
-  entry (this route is intentionally uncached).
+  entry (this route is intentionally uncached). Also covers the two-tier
+  `AIRLINE_OPERATORS` merge (`enrichment/callsign.py`): `_CURATED_
+  AIRLINE_OPERATORS` stays at its documented ~90+ minimum; the OpenFlights-
+  generated tier is asserted at a ~5000+ minimum (guards against the
+  generation step's country-name filter silently regressing); the curated
+  tier's `"QFA"` → `"Qantas Airways"` wins over the generated tier's plain
+  `"Qantas"` end-to-end through `decode_callsign()`; and a real airline the
+  curated 96 never covered (`"KAP"`, Cape Air) resolves correctly through
+  the generated tier alone. `test_decode_callsign_lowercase_and_unknown`'s
+  "definitely not a real designator" placeholder was `"ZZZ"`, which turned
+  out to collide with a real one (Zabaykalskii Airlines) once the generated
+  tier landed — replaced with `"XQZ"`, checked against the live table
+  rather than assumed, so this can't quietly rot again as coverage grows.
 - `test_identity_enrichment.spec.js` covers: dev-mode-off shows resolved
   enrichment values plainly and unresolved ones as literal "Unknown" with
   zero badges; dev-mode-on shows exactly one black `flywme`-sourced badge

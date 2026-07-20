@@ -112,8 +112,13 @@ later if a real need for it shows up.
   (registration-prefix nationality marks, a placeholder ICAO24 database,
   ICAO airline callsign designators, aircraft-type normalization) — no
   external API, no database, and never overrides a value a live feed
-  already supplied. Unresolved fields show "Unknown" rather than a blank
-  row. Country (the aircraft's own registration) and **Operator Country**
+  already supplied. The callsign→operator table itself has ~5700 entries,
+  merging a small hand-curated set of major/regional carriers (which always
+  wins, since it's kept current for a few airlines the data below is
+  missing or stale on) over a much larger table generated from the
+  [OpenFlights](https://github.com/jpatokal/openflights) project's airline
+  database (ODbL/DbCL licensed). Unresolved fields show "Unknown" rather
+  than a blank row. Country (the aircraft's own registration) and **Operator Country**
   (the operating airline's home country — a separate field, since the two
   are frequently different countries) each render with their own small SVG
   flag (the [flag-icons](https://github.com/lipis/flag-icons) library,

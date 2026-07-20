@@ -113,15 +113,57 @@ def test_decode_callsign_also_yields_country():
 
 def test_decode_callsign_lowercase_and_unknown():
     assert decode_callsign("ryr123")["operator"] == "Ryanair"
-    assert decode_callsign("ZZZ999") is None
+    # "ZZZ" used to be a safe "definitely not a real designator" placeholder
+    # for a 96-entry hand-curated table, but collides with a real one
+    # (Zabaykalskii Airlines, Russia) now that AIRLINE_OPERATORS includes
+    # OpenFlights' ~5700-entry data/airlines.dat — "XQZ" is checked against
+    # the live table below rather than assumed, so this doesn't rot again.
+    from enrichment.callsign import AIRLINE_OPERATORS
+    assert "XQZ" not in AIRLINE_OPERATORS
+    assert decode_callsign("XQZ999") is None
     assert decode_callsign(None) is None
 
 
 def test_decode_callsign_covers_at_least_90_airlines():
-    # The table was expanded from 18 to ~90+ entries; this test documents
-    # the minimum expected size and guards against accidental regressions.
-    from enrichment.callsign import AIRLINE_OPERATORS
-    assert len(AIRLINE_OPERATORS) >= 90
+    # The hand-curated tier alone was expanded from 18 to ~90+ entries; this
+    # documents that minimum and guards against accidental regressions there.
+    # The merged AIRLINE_OPERATORS (curated + OpenFlights-generated, see
+    # callsign.py's module docstring) is far larger — see
+    # test_decode_callsign_generated_tier_adds_broad_coverage below.
+    from enrichment.callsign import _CURATED_AIRLINE_OPERATORS
+    assert len(_CURATED_AIRLINE_OPERATORS) >= 90
+
+
+def test_decode_callsign_generated_tier_adds_broad_coverage():
+    # The OpenFlights-derived tier should dwarf the hand-curated one —
+    # documents the minimum expected size and guards against the generation
+    # step silently regressing (e.g. an over-aggressive country-name filter).
+    from enrichment.callsign import AIRLINE_OPERATORS, _GENERATED_AIRLINE_OPERATORS
+    assert len(_GENERATED_AIRLINE_OPERATORS) >= 5000
+    assert len(AIRLINE_OPERATORS) >= 5000
+
+
+def test_decode_callsign_curated_tier_wins_over_generated():
+    # OpenFlights' own data is stale enough to disagree with (or lack
+    # entirely) some current airlines — the hand-curated tier must always
+    # win. "QFA" is the confirmed real-world case: OpenFlights has it as
+    # plain "Qantas", not "Qantas Airways".
+    from enrichment.callsign import _CURATED_AIRLINE_OPERATORS, _GENERATED_AIRLINE_OPERATORS
+    assert _GENERATED_AIRLINE_OPERATORS["QFA"]["operator"] == "Qantas"
+    assert _CURATED_AIRLINE_OPERATORS["QFA"]["operator"] == "Qantas Airways"
+    assert decode_callsign("QFA123")["operator"] == "Qantas Airways"
+
+
+def test_decode_callsign_generated_tier_resolves_an_airline_curated_lacks():
+    # A spot-check that the generated tier is actually reachable end-to-end
+    # through decode_callsign(), not just present in the raw dict — "KAP"
+    # (Cape Air) is real but was never in the hand-curated 96.
+    from enrichment.callsign import _CURATED_AIRLINE_OPERATORS
+    assert "KAP" not in _CURATED_AIRLINE_OPERATORS
+    result = decode_callsign("KAP123")
+    assert result is not None
+    assert result["operator"] == "Cape Air"
+    assert result["source"] == "callsign_decode"
 
 
 def test_decode_callsign_every_entry_has_a_valid_country():
