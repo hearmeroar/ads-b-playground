@@ -1067,6 +1067,37 @@ because photographer name and photo URL come from an external API.
     string that matches nothing in `countries.py`'s placeholder set (not
     exhaustive) still renders without a flag — a real, accepted limitation,
     not a bug.
+    **`COUNTRY_NAME_ALIASES`** (`enrichment/countries.py`), a real bug fix,
+    not the accepted limitation above: `country_iso_for_name()`'s exact
+    match failed for a genuine, spelled-correctly country name simply
+    because a live source reports a country's official/long-form name
+    rather than the short name `COUNTRIES` itself uses — caught on a real
+    aircraft, PH-BHG (KLM564), whose OpenSky `origin_country` is "Kingdom
+    of the Netherlands", not "Netherlands", so the Registration Country row
+    showed the right text with no flag. `country_iso_for_name()` now checks
+    this alias table as a fallback after the direct lookup misses. **182
+    entries, generated from the real ISO 3166-1 dataset** (pycountry/
+    iso-codes' `src/pycountry/databases/iso3166-1.json`, fetched and diffed
+    against `COUNTRIES` programmatically — every `name`/`official_name`/
+    `common_name` field that disagrees with this table's own canonical
+    name) rather than hand-typed from memory, after a first hand-typed pass
+    turned out to get official name word order wrong for three countries
+    (`"iran (islamic republic of)"`, `"bolivia (plurinational state of)"`,
+    `"venezuela (bolivarian republic of)"` — none of which are the real ISO
+    string; the real ones are `"islamic republic of iran"`, `"plurinational
+    state of bolivia"`, `"bolivarian republic of venezuela"`) and invented
+    one outright (`"the bahamas"` — the real ISO official name is
+    `"commonwealth of the bahamas"`). Four entries are real but don't come
+    from that JSON file and are kept from the original hand-typed table on
+    purpose: `"swaziland"` (Eswatini's pre-2018 name), `"burma"` (Myanmar's
+    pre-1989 name), `"the former yugoslav republic of macedonia"` (North
+    Macedonia's pre-2019 UN/ISO name), and `"republic of korea"` (South
+    Korea's actual, universally-used official name — the ISO dataset's own
+    `name` field for `KR` is oddly reordered as `"Korea, Republic of"` with
+    no natural-order `official_name` at all, so the generation pass alone
+    would have missed it). Not exhaustive — a live source using some other
+    phrasing not covered here still degrades to no flag, per the limitation
+    above.
   - **Pitfall hit once, worth remembering**: `Object.keys(SOURCE_COLORS)`
     is iterated in a few places (the per-source toggle wiring, HUD count
     updates, the startup spinner loop) under the assumption that every

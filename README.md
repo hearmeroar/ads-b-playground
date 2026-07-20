@@ -122,7 +122,10 @@ later if a real need for it shows up.
   (the operating airline's home country — a separate field, since the two
   are frequently different countries) each render with their own small SVG
   flag (the [flag-icons](https://github.com/lipis/flag-icons) library,
-  vendored locally — no build step). In dev mode, a computed value gets a
+  vendored locally — no build step), matched by name against a ~180-entry
+  alias table so a live source's official/long-form country name (e.g.
+  OpenSky's "Kingdom of the Netherlands") still resolves a flag, not just
+  the short form. In dev mode, a computed value gets a
   black "Flywme" dot (this application, as a data source in its own right)
   whose tooltip names the technique and confidence behind it.
 - **Airline logos** — a small logo next to Operator, looked up from the
