@@ -129,6 +129,37 @@ Tests:
 	visible and then disappears when the HUD updates.
 
 Estimate: 0.5–1 developer day (mostly frontend wiring + one E2E test).
+
+- Make 'Undo' buttons in Collection more prominent (UX)
+
+Goal: when a user removes a saved collection card, the in-UI undo affordance
+should be highly visible and actionable (not a disabled control), reducing
+friction for accidental deletes.
+
+Motivation: current UX dims the removed card and shows an undo button that is
+easy to miss or appears disabled; users may not notice the ability to undo or
+are uncertain whether the action succeeded.
+
+Acceptance criteria:
+- The removed card is visually dimmed but retains a clearly visible, contrasty
+  Undo button (primary-style, not disabled) and an inline "Removed · Undo"
+  affordance that stands out from the muted card background.
+- Clicking Undo restores the card immediately and removes the ghost state.
+- If the user navigates away or refreshes, the action is final (the "undo"
+  state is session-scoped), consistent with current behaviour, but the UI must
+  make this clear (small hint text: "Undo available this session").
+
+Implementation notes:
+1. Update `static/style.css` with a `.collection-card-undo` primary variant
+	(color, padding, pointer cursor) and ensure `[hidden]` rules don't hide it.
+2. Change `auth-collection.js`'s `removeCardWithUndo()` to add a visible undo
+	button (not `disabled`) and start a short timer to visually expire the undo
+	affordance if desired; keep the existing backend `DELETE` behaviour (it is
+	already immediate). The undo handler should re-POST the saved snapshot.
+3. Add a Playwright test that removes a card, asserts the Undo button is visible
+	(not disabled), clicks it, and verifies the card reappears.
+
+Estimate: 0.25–0.5 dev days (CSS + small JS change + E2E test).
 ## Aircraft metadata
 
 - **Aircraft serial number (MSN)** — Add aircraft manufacturer serial number field. No verified source yet (adsbdb has `msn` field for some aircraft; needs validation against real data). Research required before prioritizing. (See personal memory for fuller context.)
