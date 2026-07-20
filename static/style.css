@@ -97,6 +97,9 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .switch input {
   position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1;
 }
+#hud .switch button,
+#hud .switch { border: none; padding: 0; background: transparent; cursor: pointer; }
+#hud .switch:focus-visible { outline: 2px solid var(--row-color, #1a73e8); outline-offset: 2px; }
 #hud .switch-track {
   position: absolute; inset: 0; background: #d7dbe1; border-radius: 999px;
   transition: background .15s ease;
@@ -106,8 +109,10 @@ html, body { margin: 0; padding: 0; height: 100%; }
   background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: transform .15s ease;
 }
-#hud .switch input:checked + .switch-track { background: var(--row-color, #1a73e8); }
-#hud .switch input:checked + .switch-track::before { transform: translateX(13px); }
+#hud .switch input:checked + .switch-track,
+#hud .switch[aria-checked="true"] .switch-track { background: var(--row-color, #1a73e8); }
+#hud .switch input:checked + .switch-track::before,
+#hud .switch[aria-checked="true"] .switch-track::before { transform: translateX(13px); }
 
 #hud .filter-block { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 #hud .filter-title { font-size: 11px; color: var(--muted); margin-bottom: 6px; }

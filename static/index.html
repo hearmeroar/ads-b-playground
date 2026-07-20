@@ -389,10 +389,10 @@
                 fill="currentColor">?</text>
         </svg>
       </button>
-      <label class="switch" style="--row-color:#475569">
-        <input type="checkbox" id="toggle-airports">
+      <button type="button" id="toggle-airports" class="switch" role="switch"
+              aria-checked="false" aria-label="Show airports" style="--row-color:#475569">
         <span class="switch-track"></span>
-      </label>
+      </button>
       <div class="source-help-popover" id="airports-help-popover" hidden></div>
     </div>
     <!-- Per-size checklist, revealed only while the layer itself is on

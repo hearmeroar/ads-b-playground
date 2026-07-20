@@ -40,6 +40,8 @@ test('airports layer is off by default and fetches nothing', async ({ page }) =>
 
   expect(counts.n).toBeUndefined();
   expect(await page.evaluate(() => map.hasLayer(airportsState.clusterGroup))).toBe(false);
+  expect(await page.getAttribute('#toggle-airports', 'role')).toBe('switch');
+  expect(await page.getAttribute('#toggle-airports', 'aria-checked')).toBe('false');
 });
 
 test('enabling Airports fetches the current viewport bbox and renders both airports', async ({ page }) => {

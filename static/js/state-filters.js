@@ -139,9 +139,12 @@ document.getElementById('toggle-weather-metar').addEventListener('change', (e) =
 // a fixed-interval timer, since airport positions don't change but the
 // map's viewport does.
 const airportsTypeListEl = document.getElementById('airports-type-list');
-document.getElementById('toggle-airports').addEventListener('change', (e) => {
-  airportsTypeListEl.hidden = !e.target.checked;
-  setAirportsEnabled(e.target.checked);
+const airportsToggleButton = document.getElementById('toggle-airports');
+airportsToggleButton.addEventListener('click', () => {
+  const enabled = airportsToggleButton.getAttribute('aria-checked') !== 'true';
+  airportsToggleButton.setAttribute('aria-checked', String(enabled));
+  airportsTypeListEl.hidden = !enabled;
+  setAirportsEnabled(enabled);
 });
 
 // Per-size checklist nested under the toggle above — each checkbox just
