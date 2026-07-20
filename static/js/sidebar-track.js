@@ -642,6 +642,18 @@ async function fetchAirportDataPhotos(icao24, registration, needed) {
   return fetchPhotosFrom('/api/photo2', 'hex', icao24, query);
 }
 
+// Both the loading spinner and the final "no photos found" text sit in the
+// same fixed-aspect-ratio .gallery-placeholder box the real gallery uses
+// (.gallery-slider-container, see style.css), and are followed by this same
+// empty .gallery-dots row — so #sidebar-gallery's total height is identical
+// across every state (loading -> N photos, or loading -> 0 photos) and never
+// pushes the route card/details below it up or down as photos resolve.
+function emptyDotsRow() {
+  const row = document.createElement('div');
+  row.className = 'gallery-dots';
+  return row;
+}
+
 function renderGalleryLoading() {
   sidebarGalleryEl.innerHTML = '';
   const box = document.createElement('div');
@@ -650,13 +662,16 @@ function renderGalleryLoading() {
   spinner.className = 'gallery-spinner';
   box.appendChild(spinner);
   sidebarGalleryEl.appendChild(box);
+  sidebarGalleryEl.appendChild(emptyDotsRow());
 }
 
 // Renders via DOM properties (.src/.href/.textContent), not HTML-string
 // concatenation, since photographer name/link come from an external API and
 // shouldn't be trusted as raw markup. Shows exactly `photos.length` slides —
 // no padding to GALLERY_TARGET_COUNT with empty placeholders, and no
-// carousel chrome (dots/prev/next) for a single photo, where it's pointless.
+// prev/next nav or clickable dots for a single photo, where they'd be
+// pointless — but the (empty) .gallery-dots row itself still renders, so the
+// sidebar doesn't jump in height the moment a 1-photo gallery tops up to 2+.
 function renderGallery(photos) {
   sidebarGalleryEl.innerHTML = '';
 
@@ -665,24 +680,29 @@ function renderGallery(photos) {
     placeholder.className = 'gallery-placeholder';
     placeholder.textContent = 'No photos found';
     sidebarGalleryEl.appendChild(placeholder);
+    sidebarGalleryEl.appendChild(emptyDotsRow());
     return;
   }
 
   const N = photos.length;
 
-  let dotsWrap = null;
-  let dots = [];
-  if (N > 1) {
-    dotsWrap = document.createElement('div');
-    dotsWrap.className = 'gallery-dots';
-    dots = photos.map((_, i) => {
-      const dot = document.createElement('span');
-      dot.className = 'gallery-dot';
-      dot.addEventListener('click', () => goTo(i));
-      dotsWrap.appendChild(dot);
-      return dot;
-    });
-  }
+  // Always rendered, even for a single photo (which gets zero actual .gallery-dot
+  // children) — this row's padding + min-height (CSS) is what keeps the gap
+  // below the photo constant. It used to be omitted entirely for N === 1,
+  // which read fine in isolation, but caused a visible layout jump when a
+  // Planespotters-only gallery (1 photo, no dots row) topped up from
+  // airport-data.com moments later and suddenly grew a dots row: the route
+  // card (or #sidebar-details) shifted down as that row appeared/changed
+  // height. Reserving the same space up front, populated or not, removes
+  // the jump instead of just resizing it.
+  const dotsWrap = emptyDotsRow();
+  const dots = N > 1 ? photos.map((_, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'gallery-dot';
+    dot.addEventListener('click', () => goTo(i));
+    dotsWrap.appendChild(dot);
+    return dot;
+  }) : [];
 
   const imgWrap = document.createElement('div');
   imgWrap.className = 'gallery-image-wrap';
@@ -853,7 +873,7 @@ function renderGallery(photos) {
   goTo(0, false);
   imgWrap.appendChild(sliderContainer);
   sidebarGalleryEl.appendChild(imgWrap);
-  if (dotsWrap) sidebarGalleryEl.appendChild(dotsWrap);
+  sidebarGalleryEl.appendChild(dotsWrap);
 }
 
 async function loadGallery(icao24, registration) {

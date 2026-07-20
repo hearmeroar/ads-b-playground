@@ -490,9 +490,16 @@ html, body { margin: 0; padding: 0; height: 100%; }
 .gallery-image-wrap.stretch img { width: 100%; height: auto; max-height: 280px; object-fit: contain; }
 .gallery-image-wrap.native { padding: 10px 0; }
 .gallery-image-wrap.native img { max-width: 100%; max-height: 220px; }
+/* Same fixed 16:9 box as .gallery-slider-container (not a flat 180px height)
+   — the loading spinner and "no photos found" text are both shown in this
+   box before any real photo has loaded, and matching its aspect ratio to
+   the eventual photo box is what keeps the sidebar from jumping in height
+   the moment the real gallery (or its dots row, see .gallery-dots above)
+   replaces it. */
 .gallery-placeholder {
   display: flex; align-items: center; justify-content: center;
-  height: 180px; background: #f2f4f6; color: var(--muted); font-size: 12px;
+  width: 100%; aspect-ratio: 16 / 9;
+  background: #f2f4f6; color: var(--muted); font-size: 12px;
 }
 .gallery-spinner {
   width: 24px; height: 24px; border-radius: 50%;
@@ -545,7 +552,12 @@ html, body { margin: 0; padding: 0; height: 100%; }
 }
 .gallery-prev { left: 4px; }
 .gallery-next { right: 4px; }
-.gallery-dots { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 0; }
+/* min-height matches .gallery-dot's own 6px so this row holds its height
+   even when empty (a single-photo gallery renders this row with zero .gallery-dot
+   children — see renderGallery(), static/js/sidebar-track.js) — otherwise the
+   sidebar visibly grew/shifted the moment a 1-photo gallery topped up to 2+
+   and this row's dots suddenly appeared. */
+.gallery-dots { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 0; min-height: 6px; }
 .gallery-dot {
   width: 6px; height: 6px; border-radius: 50%; background: #d7dbe1; cursor: pointer;
 }
