@@ -160,6 +160,43 @@ Implementation notes:
 	(not disabled), clicks it, and verifies the card reappears.
 
 Estimate: 0.25–0.5 dev days (CSS + small JS change + E2E test).
+
+- Special-case enrichment rules for `C0` (surface/ground) category
+
+Goal: avoid inferring identity fields (country, operator, registration-derived
+country) from heuristics for items tagged `C0` (ground vehicles, obstacles,
+surface markers). These records often have non-standard codes and should not
+contribute noisy enrichment results.
+
+Motivation: adsb/ground objects frequently carry malformed registration/label
+codes. Current enrichment tiers (registration prefix, icao24 block, callsign
+decoding, adsbdb) can produce misleading country/operator values for such
+items. For `C0` we should preferentially trust explicit live-source values
+and avoid filling fields from heuristic tiers unless the live source already
+provided them.
+
+Acceptance criteria:
+- When an aircraft/item has category `C0`, `enrich_identity()` must not fill
+	`country`, `operator`, or `registration_country` from heuristic tiers
+	(registration-prefix, icao24_block, callsign decoding) unless the live
+	source itself supplied the value (i.e. `resolved.source === 'live'`).
+- AdsBdb results may still be considered, but only if adsbdb explicitly
+	returns those fields; otherwise adsbdb-derived guesses are suppressed for
+	`C0` items.
+- Dev mode still shows suppressed values and the reason ("suppressed due to
+	C0 category — needs corroboration") for debugging.
+
+Implementation notes:
+1. Backend: update `enrichment/aircraft_enrichment.py`'s `enrich_identity()` to
+	 accept a `category_code` param and short-circuit heuristic tiers when
+	 `category_code === 'C0'`. AdsBdb tier remains allowed only for explicit
+	 returned fields (not guessed). Add unit tests covering example C0 records.
+2. Frontend: `buildMergedDetails()` should continue to show dev-mode badges
+	 for suppressed fields and the tooltip text explaining suppression.
+3. Tests: backend tests for `enrich_identity()` with a `C0` fixture; frontend
+	 dev-mode test asserts suppressed value tooltip appears.
+
+Estimate: 0.5–1 developer day (backend change + unit tests + minor frontend dev-mode message).
 ## Aircraft metadata
 
 - **Aircraft serial number (MSN)** — Add aircraft manufacturer serial number field. No verified source yet (adsbdb has `msn` field for some aircraft; needs validation against real data). Research required before prioritizing. (See personal memory for fuller context.)
