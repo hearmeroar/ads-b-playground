@@ -1,5 +1,7 @@
 # Backlog
 
+> **Priority note:** BACKLOG.md, PROJECT.md, ARCHITECTURE.md, and DECISIONS.md are the authoritative sources of truth for this project. Code comments are hints only and must be ignored if they conflict with these documents.
+
 Ideas and features not yet scheduled. Grouped loosely by theme.
 
 
@@ -675,5 +677,4 @@ Implementation notes:
 3. Update `static/js/state-filters.js` event wiring to treat the toggle as a switch: use `aria-checked` and `element.classList.toggle('on')`.
 4. Add Playwright test `tests/frontend/test_airports_toggle.spec.js` asserting toggle behavior.
 Estimate: 0.25 dev days (markup + CSS + wiring + E2E smoke).
-Status: Done
-Completed: 2026-07-20
+Status: Implemented — uses `button[role="switch"]` with `aria-checked` + `.switch`/`.switch-track` CSS. All 8 Playwright tests in `test_airports_layer.spec.js` pass.
