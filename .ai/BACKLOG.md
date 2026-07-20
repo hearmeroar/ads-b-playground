@@ -358,3 +358,54 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 ---
 
 *(Items not yet researched or prioritized are not listed. See DECISIONS.md for completed architectural choices, not backlog.*
+
+--
+
+Local track persistence & smoothing (frontend)
+
+Problem: the browser-side local track (the small live trail collected from map
+polls when an aircraft has no OpenSky historical `/track`) is not reliably
+remembered when the same aircraft is re-selected during the same browser
+session. Additionally, the rendered local track is visually jagged — we need
+to both persist it for the session and provide a lightweight smoothing
+interpolation so the marker animation appears continuous.
+
+Acceptance criteria:
+- When a selected aircraft has no OpenSky historical track, the frontend
+	collects its recent positions (from polls) into a per-session cache
+	(`sessionStorage` or in-memory `Map` keyed by `icao24`) and re-uses it on
+	subsequent selections within the same browser session.
+- The saved local track must survive sidebar close/open and map panning but
+	reset on full page reload (session-scoped persistence only).
+- Add a HUD toggle `#toggle-smoothing` (off by default) that enables client-
+	side interpolation between waypoints (uses `requestAnimationFrame` and
+	interpolates position + heading). When smoothing is off the existing
+	discrete updates remain unchanged.
+- Existing behaviour is preserved for OpenSky `/api/track` results (server
+	tracks still take precedence); smoothing only affects locally-collected
+	fallback trails and real-time marker movement rendering, not persisted
+	server-side tracks.
+
+Implementation notes:
+1. Frontend: add `localTrailCache` (`Map<icao24, Array<{lat,lon,ts}>>`) kept in
+	 module scope and mirrored into `sessionStorage` on change (serialization
+	 capped e.g. latest 200 points to avoid unbounded growth). `selectAircraft()`
+	 should check `localTrailCache` when no server `track` is available and draw
+	 it into the `trackLayerGroup` as a polyline colored per altitude like the
+	 server track.
+2. Smoothing module: implement `smoothing.interpolate(waypoints, t)` and
+	 `smoothing.animateMarker(marker, waypoints)` that runs until new waypoints
+	 arrive or selection changes. Keep max interpolation window (e.g. 2× poll
+	 interval) so markers don't drift far from reality if upstream stalls.
+3. HUD toggle wiring: small toggle in `state-filters.js` persisted to
+	 `sessionStorage['smoothingEnabled']`; UI text tooltip explaining tradeoffs
+	 (smoother visuals vs. potential small latency in following exact polled
+	 position). Off by default.
+4. Tests: add a Playwright smoke test that (a) selects an aircraft without a
+	 server track, (b) simulates multiple poll positions arriving, (c) closes
+	 the sidebar and re-opens it, asserting the same trail is redrawn, and (d)
+	 toggles smoothing on and verifies marker movement looks continuous (basic
+	 frame-sampling assertion rather than pixel-perfect). Backend unit tests
+	 not required for this change.
+
+Estimate: 0.5–1 dev days (frontend work + one Playwright smoke test).
