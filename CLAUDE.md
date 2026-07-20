@@ -1487,8 +1487,16 @@ because photographer name and photo URL come from an external API.
   - CSS: `#sidebar-details .airline-logo` (`static/style.css`) mirrors
     `#sidebar-details .fi`'s sizing/vertical-align so the flag and the logo
     read as one visual family of "small icon before a text value" rows.
-    Attribution for both tiers is a static line in `#sidebar-attribution`
-    (`static/index.html`, right after `#sidebar-details`).
+    Attribution for both tiers used to be a static line in
+    `#sidebar-attribution` (`static/index.html`, right after
+    `#sidebar-details`); moved to README.md's Attribution section instead
+    (2026-07-20) — neither tier's license requires runtime UI display
+    (MIT only requires the notice ship with copies of the software, already
+    satisfied by the vendored `LICENSE`/`NOTICE.md` files under
+    `static/airline-logos/`; airframesio/airline-images has no formal
+    license terms at all), so the credit lives in the repo's docs rather
+    than the sidebar footer. `#sidebar-attribution` and its CSS were
+    removed as unused once nothing populated it anymore.
 - **Route validation (Layer 2 geometric check, `static/js/
   route-validation.js`)**: adsbdb's flightroute is a historical
   callsign→route lookup, not a live flight plan — reused callsigns,

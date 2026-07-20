@@ -314,3 +314,7 @@ and commercial projects.
 [PlaneBase](http://planebase.biz/) for aircraft data, flightroute data to
 David Taylor (Edinburgh) and Jim Mason (Glasgow), and
 [airport-data.com](https://www.airport-data.com) for aircraft photographs.
+
+**Airline logos** via [soaring-symbols](https://github.com/anhthang/soaring-symbols)
+(MIT) and [airframesio/airline-images](https://github.com/airframesio/airline-images)
+— logos remain the property of their respective airlines.
