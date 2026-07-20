@@ -19,6 +19,7 @@ def enrich_identity(
     registration=None,
     callsign=None,
     aircraft_type=None,
+    icao_type_code=None,
     known_country=None,
     known_operator=None,
     known_manufacture_year=None,
@@ -40,7 +41,12 @@ def enrich_identity(
     db_record = DEFAULT_AIRCRAFT_DATABASE.lookup(icao24)
     reg_country = lookup_country_by_registration(registration)
     cs_decoded = decode_callsign(callsign)
-    type_normalized = normalize_aircraft_type(aircraft_type)
+    # icao_type_code (e.g. "B38M") is a standardized exact-match key and
+    # checked first; aircraft_type is often a source's free-text description
+    # (e.g. "BOEING 737 MAX 8") whose exact wording varies too much across
+    # sources/aircraft to match TYPE_DESC_TABLE reliably, so it's only a
+    # fallback for when no ICAO code was available at all.
+    type_normalized = normalize_aircraft_type(icao_type_code) or normalize_aircraft_type(aircraft_type)
 
     # --- country ---
     country = _live(known_country)

@@ -411,6 +411,7 @@ async function loadIdentityEnrichment(icao24, info) {
     if (info.registration) params.set('registration', info.registration);
     if (info.callsign) params.set('callsign', info.callsign);
     if (info.aircraftType) params.set('aircraft_type', info.aircraftType);
+    if (info.icaoTypeCode) params.set('icao_type', info.icaoTypeCode);
     if (info.originCountry) params.set('known_country', info.originCountry);
     if (info.operator) params.set('known_operator', info.operator);
     if (info.manufactureYear) params.set('known_manufacture_year', info.manufactureYear);

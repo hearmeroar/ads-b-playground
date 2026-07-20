@@ -222,7 +222,10 @@ def test_normalize_aircraft_type_by_code():
 
 
 def test_normalize_aircraft_type_by_free_text_case_insensitive():
-    result = normalize_aircraft_type("b737 max 8")
+    # "boeing 737 max 8" is the real desc string readsb (adsb.fi/adsb.lol/
+    # airplanes.live) generates for a 737 MAX 8 — verified against
+    # wiedehopf/tar1090-db's own per-hex aircraft database, not guessed.
+    result = normalize_aircraft_type("boeing 737 max 8")
     assert result["manufacturer"] == "Boeing"
     assert result["model"] == "737 MAX 8"
     assert result["icao_type"] is None  # matched via free text, not a code
