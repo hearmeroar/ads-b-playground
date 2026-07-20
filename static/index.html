@@ -389,10 +389,10 @@
                 fill="currentColor">?</text>
         </svg>
       </button>
-      <button type="button" id="toggle-airports" class="switch" role="switch"
-              aria-checked="false" aria-label="Show airports" style="--row-color:#475569">
+      <label class="switch" style="--row-color:#475569">
+        <input type="checkbox" id="toggle-airports">
         <span class="switch-track"></span>
-      </button>
+      </label>
       <div class="source-help-popover" id="airports-help-popover" hidden></div>
     </div>
     <!-- Per-size checklist, revealed only while the layer itself is on
@@ -402,30 +402,48 @@
          scanning airline traffic cares about); every smaller type is present
          but unchecked, an explicit opt-in rather than a hidden capability. -->
     <div class="airport-type-list" id="airports-type-list" hidden>
-      <label class="airport-type-option">
-        <input type="checkbox" class="airport-type-checkbox" value="large_airport" checked>
-        <span>Large airport</span>
-      </label>
-      <label class="airport-type-option">
-        <input type="checkbox" class="airport-type-checkbox" value="medium_airport" checked>
-        <span>Medium airport</span>
-      </label>
-      <label class="airport-type-option">
-        <input type="checkbox" class="airport-type-checkbox" value="small_airport">
-        <span>Small airport</span>
-      </label>
-      <label class="airport-type-option">
-        <input type="checkbox" class="airport-type-checkbox" value="heliport">
-        <span>Heliport</span>
-      </label>
-      <label class="airport-type-option">
-        <input type="checkbox" class="airport-type-checkbox" value="seaplane_base">
-        <span>Seaplane base</span>
-      </label>
-      <label class="airport-type-option">
-        <input type="checkbox" class="airport-type-checkbox" value="balloonport">
-        <span>Balloonport</span>
-      </label>
+      <div class="source-row">
+        <span class="source-name">Large airport</span>
+        <label class="switch" style="--row-color:#475569">
+          <input type="checkbox" class="airport-type-checkbox" value="large_airport" checked>
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div class="source-row">
+        <span class="source-name">Medium airport</span>
+        <label class="switch" style="--row-color:#475569">
+          <input type="checkbox" class="airport-type-checkbox" value="medium_airport" checked>
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div class="source-row">
+        <span class="source-name">Small airport</span>
+        <label class="switch" style="--row-color:#475569">
+          <input type="checkbox" class="airport-type-checkbox" value="small_airport">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div class="source-row">
+        <span class="source-name">Heliport</span>
+        <label class="switch" style="--row-color:#475569">
+          <input type="checkbox" class="airport-type-checkbox" value="heliport">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div class="source-row">
+        <span class="source-name">Seaplane base</span>
+        <label class="switch" style="--row-color:#475569">
+          <input type="checkbox" class="airport-type-checkbox" value="seaplane_base">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div class="source-row">
+        <span class="source-name">Balloonport</span>
+        <label class="switch" style="--row-color:#475569">
+          <input type="checkbox" class="airport-type-checkbox" value="balloonport">
+          <span class="switch-track"></span>
+        </label>
+      </div>
     </div>
   </div>
 

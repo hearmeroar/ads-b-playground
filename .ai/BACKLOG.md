@@ -678,4 +678,3 @@ Implementation notes:
 4. Added `#airports-help` popover with explanation of the layer.
 5. Tests live in `tests/frontend/test_airports_layer.spec.js` (8 tests): default-off, enable renders airports, pan re-fetches, disable stops fetches, popup content + heliport icon class, type checklist visibility and defaults, type checkbox toggling re-fetches with updated types param, help popover open/close.
 Estimate: 0.25 dev days (markup + CSS + wiring + E2E tests).
-Status: Implemented — uses `<label class="switch"><input type="checkbox">` matching the pattern of other source/layer toggles. All 8 Playwright tests in `test_airports_layer.spec.js` pass.

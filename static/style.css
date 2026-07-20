@@ -93,13 +93,11 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .source-row.locked .switch { opacity: 0.5; }
 #hud .switch input:disabled { cursor: not-allowed; }
 
-#hud .switch { position: relative; width: 30px; height: 17px; flex: none; margin-left: auto; }
+#hud .switch { position: relative; width: 30px; height: 17px; flex: none; margin-left: auto; cursor: pointer; display: inline-block; }
+#hud .switch:focus-visible { outline: 2px solid var(--row-color, #1a73e8); outline-offset: 2px; }
 #hud .switch input {
   position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1;
 }
-#hud .switch button,
-#hud .switch { border: none; padding: 0; background: transparent; cursor: pointer; }
-#hud .switch:focus-visible { outline: 2px solid var(--row-color, #1a73e8); outline-offset: 2px; }
 #hud .switch-track {
   position: absolute; inset: 0; background: #d7dbe1; border-radius: 999px;
   transition: background .15s ease;
@@ -109,10 +107,8 @@ html, body { margin: 0; padding: 0; height: 100%; }
   background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: transform .15s ease;
 }
-#hud .switch input:checked + .switch-track,
-#hud .switch[aria-checked="true"] .switch-track { background: var(--row-color, #1a73e8); }
-#hud .switch input:checked + .switch-track::before,
-#hud .switch[aria-checked="true"] .switch-track::before { transform: translateX(13px); }
+#hud .switch input:checked + .switch-track { background: var(--row-color, #1a73e8); }
+#hud .switch input:checked + .switch-track::before { transform: translateX(13px); }
 
 #hud .filter-block { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 #hud .filter-title { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
@@ -128,14 +124,10 @@ html, body { margin: 0; padding: 0; height: 100%; }
    indented slightly to read as nested under it. */
 #hud .airport-type-list {
   display: flex; flex-direction: column; gap: 4px;
-  margin-top: 8px; padding-left: 17px;
+  margin-top: 8px;
 }
 #hud .airport-type-list[hidden] { display: none; }
-#hud .airport-type-option {
-  display: flex; align-items: center; gap: 7px;
-  font-size: 12px; color: var(--ink); cursor: pointer;
-}
-#hud .airport-type-option input { margin: 0; cursor: pointer; accent-color: #475569; }
+#hud .airport-type-list .source-row { margin-bottom: 0; }
 #hud .segmented {
   display: flex; background: #eef0f3; border-radius: 9px; padding: 2px; gap: 2px;
 }

@@ -40,8 +40,15 @@ test('airports layer is off by default and fetches nothing', async ({ page }) =>
 
   expect(counts.n).toBeUndefined();
   expect(await page.evaluate(() => map.hasLayer(airportsState.clusterGroup))).toBe(false);
-  expect(await page.getAttribute('#toggle-airports', 'role')).toBe('switch');
-  expect(await page.getAttribute('#toggle-airports', 'aria-checked')).toBe('false');
+  // Toggle is now a native checkbox inside a label.switch (same pattern as other source toggles)
+  expect(await page.isChecked('#toggle-airports')).toBe(false);
+  // The label.switch wrapper provides the visual toggle styling via .switch-track
+  expect(await page.locator('label.switch:has(#toggle-airports)').count()).toBe(1);
+  expect(await page.evaluate(() => {
+    const label = document.querySelector('label.switch:has(#toggle-airports)');
+    const track = label.querySelector('.switch-track');
+    return getComputedStyle(track).borderRadius;
+  })).toBe('999px'); // visual toggle styling applied
 });
 
 test('enabling Airports fetches the current viewport bbox and renders both airports', async ({ page }) => {

@@ -140,9 +140,8 @@ document.getElementById('toggle-weather-metar').addEventListener('change', (e) =
 // map's viewport does.
 const airportsTypeListEl = document.getElementById('airports-type-list');
 const airportsToggleButton = document.getElementById('toggle-airports');
-airportsToggleButton.addEventListener('click', () => {
-  const enabled = airportsToggleButton.getAttribute('aria-checked') !== 'true';
-  airportsToggleButton.setAttribute('aria-checked', String(enabled));
+airportsToggleButton.addEventListener('change', () => {
+  const enabled = airportsToggleButton.checked;
   airportsTypeListEl.hidden = !enabled;
   setAirportsEnabled(enabled);
 });
