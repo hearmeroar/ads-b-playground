@@ -466,3 +466,64 @@ Estimate: 0.5–1 dev days (frontend work + one Playwright smoke test).
 	of the selected result.
 
 Estimate: 1–2 dev days (backend endpoint + frontend wiring + 1 E2E smoke test).
+
+--
+
+Design: Aircraft detail page
+
+Goal: design a standalone aircraft detail page (route `/aircraft/<icao24>`)
+and corresponding richer sidebar layout for the current single-aircraft view.
+This page is a canonical, linkable representation of a tracked aircraft that
+combines live telemetry, enrichment, gallery, historical track, and actions
+(save/unsave, share, center/map follow). The same layout can be used to
+power a larger read-only view for saved collection cards.
+
+Motivation: the current sidebar is a transient UI; a dedicated page improves
+shareability, deep-linking, accessibility, and gives room for additional UX
+elements (larger gallery, track playback controls, richer enrichment details).
+
+Acceptance criteria:
+- Route `/aircraft/<icao24>` renders server-side a minimal HTML shell that the
+  frontend hydrates; opening the URL selects and displays the given aircraft
+  (falls back to an informative 404-like view if unknown).
+- Layout sections: header (registration/icao24/callsign/type + source badges),
+  gallery (carousel with photographer credit), route card (origin/destination
+  with confidence dot), details groups (Identity, Position, Speed & Heading,
+  Autopilot, Weather, Signal & Data Quality), historical track viewer with
+  altitude-colored segments and playback controls, action bar (save, share,
+  center/follow), and a collapsible enrichment panel showing adsbdb/planespotters
+  /flywme computed fields and source badges.
+- All rows must support dev-mode badges (sources) and `(?)` info popovers as
+  the sidebar does today; same grouping, but optimized for vertical reading.
+- Responsive behavior: two-column desktop (gallery + details), single-column
+  mobile with sticky action bar; gallery fills top region on mobile.
+- Accessibility: semantic headings, keyboard navigation for gallery/carousel,
+  accessible labels for action buttons, and `aria-live` region for track
+  playback status updates.
+- Tests: Playwright spec that opens `/aircraft/<icao24>` for a known fixture,
+  asserts header data, gallery loads, track draws, and the Save action works.
+
+Implementation notes:
+1. Backend: add a simple route in `app.py` that serves `static/index.html` with
+	an injected `window.__INITIAL_SELECTED_ICAO24 = 'xxxxxx'` variable when the
+	path matches `/aircraft/<icao24>`; no server-rendered details required — the
+	frontend hydrates from existing caches/APIs (same pattern as SPA deep-links).
+2. Frontend: extract `renderSelectedDetails()` into a reusable `aircraftPage
+	renderer` module so the same render logic powers both the sidebar and the
+	full page. `selectAircraft()` should read `window.__INITIAL_SELECTED_ICAO24`
+	on load and call the same hydrate path used by sidebar selection.
+3. Gallery: reuse `loadGallery()` logic but present a larger slider with
+	keyboard arrows and an accessible caption/credit area; infinite-loop
+	behavior same as existing carousel.
+4. Track viewer: expose playback controls (play/pause, speed 0.5x/1x/2x, scrub
+	timeline) that animate the marker along historical track points using the
+	`trackLayerGroup` and `requestAnimationFrame`. Playback uses cached OpenSky
+	`/api/track` data where available, otherwise local `localTrailCache` fallback.
+5. Share: implement a small `navigator.clipboard.writeText(window.location.href)`
+	action and a copy-success toast; no external sharing APIs.
+6. Save/unsave: reuse `auth-collection.js` save endpoint; when saved, update
+	the HUD accent and collection panel. Provide a confirmation toast.
+7. Tests: add `tests/frontend/test_aircraft_page.spec.js` covering deep-link,
+	gallery presence, play/pause of track (basic), and save/unsave flow.
+
+Estimate: 1–2 dev days (frontend extraction + small backend route + E2E test).
