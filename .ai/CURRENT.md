@@ -2,6 +2,34 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Late night, bug fix: spurious sidebar close on cross-source handoff)
+
+✅ **Bug fix: aircraft sidebar/track spuriously closes on cross-source marker handoff**
+- **Root cause:** `clearStaleMarkers(markerMap, seen)` (`static/js/icons.js:205-213`) was
+  calling `deselectAircraft()` whenever a selected aircraft fell out of a single source's
+  render list, intending to catch "aircraft disappeared everywhere" — but this fired
+  incorrectly during every priority-based dedup handoff (e.g. aircraft moves from adsb.fi
+  to OpenSky priority between polls, so adsb.fi's own render list no longer includes it
+  even though it's still alive in OpenSky's list). Resulted in spurious sidebar closure
+  + track layer cleared, even though aircraft was fully live, just now owned by a
+  different marker map.
+- **Fix:** Two changes:
+  1. Remove the deselect from `clearStaleMarkers()` — per-source scope can't know
+     global liveness. Changed `icons.js:210` to a comment explaining why.
+  2. Add a **single global liveness check at the end of `poll()`** (`main.js:558-567`)
+     that checks whether the aircraft has disappeared from *every* source's marker map.
+     Uses the already-existing `markerMapsBySource` (all 7 sources) to decide.
+     Preserves the "genuinely gone" deselect behavior while fixing spurious handoff closes.
+     Also removes the now-stale `if (selectedIcao24 === id) deselectAircraft();` from
+     `clearAllMarkers()` (`icons.js:218`).
+- **Test:** New regression test `tests/frontend/test_track.spec.js:171` — 3-poll scenario:
+  aircraft appears in adsb.fi only, sidebar opens; OpenSky picks it up (handoff), sidebar
+  must stay open; both stop reporting, sidebar closes. Covers both the fix (step 2 keeps
+  sidebar) and the non-regression (step 3 still closes).
+- **Verification:** Backend suite 255 passed, Frontend suite 149 passed. Also fixed
+  pre-existing `config/zones.json` state (active_zone_id was "LYBE", reset to "default")
+  to unblock backend test run.
+
 ## Status as of 2026-07-21 (Night, filter loader completed)
 
 ✅ **UX: Show loader when applying filters** — a small unobtrusive spinner/loader that appears whenever a HUD filter change triggers a re-poll (`poll()`), so the UI doesn't appear unresponsive during the network round trip. Four controls are in scope:

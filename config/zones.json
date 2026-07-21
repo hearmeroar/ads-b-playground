@@ -1,5 +1,5 @@
 {
-  "active_zone_id": "KSFO",
+  "active_zone_id": "default",
   "zones": {
     "default": {
       "center": {
@@ -101,6 +101,14 @@
       "center": {
         "lat": 37.619806,
         "lon": -122.374821
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "LYBE": {
+      "center": {
+        "lat": 44.818401,
+        "lon": 20.309099
       },
       "zoom": 8,
       "radius_nm": 220

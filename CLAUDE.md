@@ -2143,6 +2143,20 @@ because photographer name and photo URL come from an external API.
   does not re-request OpenSky history on every 12 s poll, preventing the old
   behaviour that rapidly exhausted the separate track-credit bucket; while
   using the fallback, its local path is refreshed from each poll instead.
+  **Bug fixed 2026-07-21 — spurious sidebar close on cross-source marker
+  handoff:** earlier code in `static/js/icons.js`'s `clearStaleMarkers()` was
+  calling `deselectAircraft()` whenever a single source's render list no
+  longer included a selected aircraft, intending to catch "aircraft left the
+  map entirely" — but this fired incorrectly for every cross-source dedup
+  handoff (e.g. aircraft moves from adsb.fi to OpenSky priority between polls,
+  so adsb.fi's next render excludes it even though it's still alive). Fixed by
+  removing the deselect from `clearStaleMarkers()` (per-source scope can't know
+  global liveness) and moving it to the end of `poll()` in `static/js/main.js`,
+  which checks whether the aircraft has disappeared from *every* source's
+  marker map, not just one. Regression test in `tests/frontend/test_track.spec.js`
+  covers the handoff scenario (3-poll sequence: aircraft appears in adsb.fi
+  only, then OpenSky joins, then both disappear; sidebar must stay open for
+  step 2 and close only for step 3).
 - **Track is colored by altitude**, like OpenSky's own web map:
   `drawTrack(waypoints)` builds a `trackLayerGroup` — an `L.featureGroup` of
   short two-point polyline segments, one per consecutive waypoint pair,

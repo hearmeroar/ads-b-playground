@@ -207,7 +207,11 @@ function clearStaleMarkers(markerMap, seen) {
     if (!seen.has(id)) {
       map.removeLayer(marker);
       markerMap.delete(id);
-      if (selectedIcao24 === id) deselectAircraft();
+      // Do NOT deselect here — a single source's stale-marker sweep only sees
+      // that source's view. Cross-source handoffs (aircraft moves from adsb.fi
+      // to OpenSky priority) would spuriously close the sidebar even though
+      // the aircraft is still alive. Deselection is decided once per poll in
+      // main.js's poll() after all sources have rendered.
     }
   }
 }

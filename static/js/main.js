@@ -555,10 +555,17 @@ async function poll() {
   updateCounts(counts);
   if (currentDevMode) { renderDevAircraftTable(); refreshIdentityStats(); }
 
-  // Do not spend OpenSky track credits every 12 seconds for an already-open
-  // sidebar. When its historical endpoint is unavailable, keep the local
-  // fallback path live from the positions collected by this poll instead.
-  if (selectedIcao24 && trackUsesLiveFallback) {
+  // Deselect only if the aircraft genuinely disappeared from every source this
+  // poll. Don't deselect if a single source's own stale-marker sweep removed it
+  // — that's a cross-source handoff (e.g. OpenSky now claims it instead of
+  // adsb.fi), not a real disappearance. Must happen after all seven sources
+  // have rendered so we can check the union of all marker maps.
+  if (selectedIcao24 && !Object.values(markerMapsBySource).some((m) => m.has(selectedIcao24))) {
+    deselectAircraft();
+  } else if (selectedIcao24 && trackUsesLiveFallback) {
+    // Do not spend OpenSky track credits every 12 seconds for an already-open
+    // sidebar. When its historical endpoint is unavailable, keep the local
+    // fallback path live from the positions collected by this poll instead.
     drawTrack(liveTrailById.get(selectedIcao24));
   }
 }

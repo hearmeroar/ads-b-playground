@@ -167,3 +167,102 @@ test('track status clears when deselecting aircraft', async ({ page }) => {
   trackStatus = await page.textContent('#track-status');
   expect(trackStatus).toBe('');
 });
+
+test('sidebar stays open across cross-source marker handoff (dedup priority change)', async ({ page }) => {
+  // Regression: when an aircraft moves from a lower-priority source (adsb.fi)
+  // to a higher-priority one (OpenSky) between polls, the sidebar used to
+  // close spuriously even though the aircraft is still alive. This test
+  // simulates that handoff in three poll cycles.
+
+  // Poll 1: aircraft 'hhhhhh' appears only in adsb.fi
+  await page.route('**/api/adsbfi', (route) => route.fulfill({
+    json: {
+      ac: [
+        { hex: 'hhhhhh', flight: 'TST100  ', r: 'N123AA', t: 'B737', alt_baro: 8000, gs: 450, track: 45, lat: 44.0, lon: 21.0 }
+      ]
+    }
+  }));
+
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await page.waitForFunction(() => adsbfiMarkers.has('hhhhhh'));
+  await page.waitForTimeout(500);
+
+  // Click the adsb.fi marker to select the aircraft
+  await clickMarker(page, 'adsbfiMarkers', 'hhhhhh');
+  await page.waitForTimeout(500);
+
+  // Sidebar is open and we have at least 1 trail point collected
+  let sidebarOpen = await page.evaluate(() => document.getElementById('sidebar').classList.contains('open'));
+  expect(sidebarOpen).toBe(true);
+  let selectedId = await page.evaluate(() => selectedIcao24);
+  expect(selectedId).toBe('hhhhhh');
+
+  // Poll 2: adsb.fi reports 'hhhhhh' at a second position (builds trail)
+  await page.route('**/api/adsbfi', (route) => route.fulfill({
+    json: {
+      ac: [
+        { hex: 'hhhhhh', flight: 'TST100  ', r: 'N123AA', t: 'B737', alt_baro: 8200, gs: 460, track: 45, lat: 44.05, lon: 21.05 }
+      ]
+    }
+  }));
+  await page.evaluate(() => poll());
+  await page.waitForTimeout(500);
+
+  // Sidebar still open, track should now have at least one segment
+  sidebarOpen = await page.evaluate(() => document.getElementById('sidebar').classList.contains('open'));
+  expect(sidebarOpen).toBe(true);
+  let trackSegments = await trackSegmentCount(page);
+  expect(trackSegments).toBeGreaterThan(0);
+
+  // Poll 3: OpenSky NOW ALSO reports 'hhhhhh' (higher priority) — dedup handoff.
+  // adsb.fi still reports it but will be excluded from render (already in
+  // openskyMarkers). The bug would cause clearStaleMarkers(adsbfiMarkers)
+  // to spuriously call deselectAircraft() since 'hhhhhh' won't be in adsb.fi's
+  // render list. The fix keeps sidebar open.
+  await page.route('**/api/states', (route) => route.fulfill({
+    json: {
+      time: 2000,
+      rate_limit_remaining: 3999,
+      states: [
+        ['hhhhhh', 'TST100  ', 'Testland', 1500, 1500, 21.05, 44.05, 8200, false, 460, 45, 0, null, 8200, '2000', false, 0, 1]
+      ]
+    }
+  }));
+  await page.route('**/api/adsbfi', (route) => route.fulfill({
+    json: {
+      ac: [
+        { hex: 'hhhhhh', flight: 'TST100  ', r: 'N123AA', t: 'B737', alt_baro: 8200, gs: 460, track: 45, lat: 44.05, lon: 21.05 }
+      ]
+    }
+  }));
+  await page.evaluate(() => poll());
+  await page.waitForTimeout(500);
+
+  // Key assertions: sidebar is STILL OPEN (regression guard)
+  sidebarOpen = await page.evaluate(() => document.getElementById('sidebar').classList.contains('open'));
+  expect(sidebarOpen).toBe(true);
+  selectedId = await page.evaluate(() => selectedIcao24);
+  expect(selectedId).toBe('hhhhhh');
+
+  // Marker handoff happened as expected: now in opensky, removed from adsb.fi
+  let hasInOpenSky = await page.evaluate(() => openskyMarkers.has('hhhhhh'));
+  let hasInAdsbfi = await page.evaluate(() => adsbfiMarkers.has('hhhhhh'));
+  expect(hasInOpenSky).toBe(true);
+  expect(hasInAdsbfi).toBe(false);
+
+  // Track is still visible (live fallback kept fresh)
+  trackSegments = await trackSegmentCount(page);
+  expect(trackSegments).toBeGreaterThan(0);
+
+  // Finally: confirm the "genuinely gone" case still closes the sidebar.
+  // Stop reporting 'hhhhhh' from everywhere.
+  await page.route('**/api/states', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/adsbfi', (route) => route.fulfill({ json: { ac: [] } }));
+  await page.evaluate(() => poll());
+  await page.waitForTimeout(500);
+
+  // Now the sidebar SHOULD close (no regression)
+  sidebarOpen = await page.evaluate(() => document.getElementById('sidebar').classList.contains('open'));
+  expect(sidebarOpen).toBe(false);
+});

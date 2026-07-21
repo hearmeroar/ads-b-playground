@@ -448,6 +448,15 @@ Bug: локальный трек иногда не рисуется (intermitten
 
 Оценка: 0.25–0.75 dev days (логирование + форсированный fallback + E2E тест).
 
+
+Завершено 2026-07-21. Исходная гипотеза о недостаточном fallback-рендере была
+неправильна; истинная причина — spurious sidebar close на cross-source dedup
+handoffs. `clearStaleMarkers()` вызывала `deselectAircraft()` при любом
+изменении priority, даже если самолёт был жив в другом источнике. Fix:
+переместил deselection logic в конец `poll()`, где есть полный view всех
+marker maps. Регрессионный тест в `test_track.spec.js` покрывает 3-poll
+sequence с handoff. Backend + Frontend суиты: 255+149 passed.
+
 --
 
 Улучшение поиска: поиск по нескольким сущностям
