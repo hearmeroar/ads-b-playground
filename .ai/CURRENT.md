@@ -2,11 +2,23 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Bug fix: `/api/health` route path was missing `/api` prefix)
+
+✅ **Bug fix: `/api/health` route definition missing `/api` prefix**
+- **Symptom**: Endpoint returned 404 despite code being present and syntactically correct in `app.py`
+- **Root cause**: Route was defined as `@app.route("/health")` but requests were to `http://127.0.0.1:5051/api/health` (with `/api` prefix). Flask routing requires exact path match.
+- **Fix**: Changed route decorator to `@app.route("/api/health")` (line 690 in `app.py`)
+- **Tests updated**: Changed all test calls from `/health` to `/api/health` in:
+  - `tests/backend/test_health.py` (3 tests, all now passing)
+  - `tests/frontend/test_health.spec.js` (3 tests, updated)
+- **Verification**: Tested endpoint manually: `curl http://127.0.0.1:5051/api/health` now returns `{"status": "ok"}` with 200
+- **Commit**: `fix: correct /api/health route path (was /health without /api prefix)`
+
 ## Status as of 2026-07-21 (Implementation Complete: `/api/health` endpoint)
 
 ✅ **Feature Complete: `/api/health` endpoint for deployment monitoring**
 - **Architectural Decision:** Endpoint is public, unauthenticated, returns minimal response (status only, no operational details).
-- **Backend implementation** (`app.py` lines 690-700):
+- **Backend implementation** (`app.py` lines 690-701):
   - Route checks SQLite connectivity as core liveness indicator
   - Returns 200 with `{"status": "ok"}` on success
   - Returns 503 with `{"status": "degraded", "message": "..."}` on database errors

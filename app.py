@@ -687,7 +687,7 @@ def fetch_states():
     return fetch_opensky(OPENSKY_URL, {**BBOX, "extended": 1})
 
 
-@app.route("/health")
+@app.route("/api/health")
 def health():
     """Health check endpoint for deployment monitoring (Northflank, uptime
     monitors, CI/CD orchestration). Public, unauthenticated. Returns minimal

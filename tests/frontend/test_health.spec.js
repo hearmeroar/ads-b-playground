@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
-test('GET /health returns 200 with status ok', async ({ page }) => {
-  const response = await page.goto('/health');
+test('GET /api/health returns 200 with status ok', async ({ page }) => {
+  const response = await page.goto('/api/health');
   expect(response.status()).toBe(200);
 
   const text = await page.content();
@@ -11,7 +11,7 @@ test('GET /health returns 200 with status ok', async ({ page }) => {
 });
 
 test('health response does not leak operational details', async ({ page }) => {
-  const response = await page.goto('/health');
+  const response = await page.goto('/api/health');
   const text = await page.content();
 
   // These terms should NOT appear in the health response
@@ -23,6 +23,6 @@ test('health response does not leak operational details', async ({ page }) => {
 
 test('health endpoint is accessible without authentication', async ({ page }) => {
   // Don't mock /api/me, don't log in — just hit the endpoint directly
-  const response = await page.goto('/health');
+  const response = await page.goto('/api/health');
   expect(response.status()).toBe(200);
 });
