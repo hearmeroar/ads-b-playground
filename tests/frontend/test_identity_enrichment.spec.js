@@ -296,3 +296,112 @@ test('category fallback: a live-sourced category is never overwritten, but Flywm
   expect(catSources[catSources.length - 1]).toBe('flywme');
   expect(catSources).toContain('opensky');
 });
+
+// --- C0 aircraft special case (surface vehicles with malformed registration/callsigns) ---
+
+test('C0 aircraft: category_code=C0 is passed to the enrichment endpoint', async ({ page }) => {
+  let identityFetchUrl = null;
+  await page.route('**/api/identity/**', (route) => {
+    identityFetchUrl = route.request().url();
+    route.fulfill({ json: {
+      country: null, operator: null, operator_country: null, registration: null,
+      manufacturer: null, model: null, year_built: null,
+    } });
+  });
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  // Hex "474806" in the adsbfi fixture has category "C0"
+  await selectAircraft(page, '474806', 'adsbfi');
+
+  expect(identityFetchUrl).toContain('category_code=C0');
+});
+
+test('C0 aircraft: heuristic-only enrichment tiers are suppressed in normal mode, showing "Unknown" instead', async ({ page }) => {
+  // For a C0 aircraft, the backend skips registration_prefix/icao24_block/
+  // callsign_decode tiers and only uses live data or exact database matches.
+  // We mock the enrichment response to show null for operator (which would
+  // normally be filled by callsign_decode for a non-C0 aircraft).
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null,
+    operator: null,  // Normally would come from callsign_decode, but C0 skips it
+    operator_country: null,
+    registration: null,
+    manufacturer: null, model: null, year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, '474806', 'adsbfi');
+
+  // Normal mode: should show "Unknown" for operator (because C0 suppressed the heuristic tier)
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+  expect(sidebarText).toContain('Operator? Unknown');
+  expect(sidebarText).toContain('Registration Country? Unknown');
+  expect(sidebarText).toContain('Operator Country? Unknown');
+
+  // No badges in normal mode (all are Unknown, no enrichment sources shown)
+  const badgeCount = await page.evaluate(() => document.querySelectorAll('#sidebar-details .source-badge').length);
+  expect(badgeCount).toBe(0);
+});
+
+test('C0 aircraft: dev mode does not change the display for C0-suppressed fields (they\'re null, not hidden)', async ({ page }) => {
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null, operator: null, operator_country: null, registration: null,
+    manufacturer: null, model: null, year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await page.click('#toggle-dev-mode');
+  await selectAircraft(page, '474806', 'adsbfi');
+
+  // Dev mode: C0-suppressed fields are still null (not shown with a special reason),
+  // because the suppression happens at the backend level, not at the frontend UI level.
+  // The backend simply returns null for these fields.
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+  expect(sidebarText).toContain('Operator? —');  // Dev mode shows dashes for missing fields
+  expect(sidebarText).toContain('Registration Country? —');
+
+  // No badges for C0-suppressed fields (they're null from the backend)
+  const operatorBadges = await badgeSourcesForLabel(page, 'Operator');
+  expect(operatorBadges).toEqual([]);
+});
+
+test('C0 aircraft: live data still resolves for C0 (only heuristic tiers are skipped)', async ({ page }) => {
+  // Even with C0 category, live data should still resolve (e.g., operator passed
+  // as a live hint from the source).
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null,
+    operator: { value: 'Test Airline', source: 'live', confidence: 1.0 },
+    operator_country: null,
+    registration: null,
+    manufacturer: null, model: null, year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, '474806', 'adsbfi');
+
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+  expect(sidebarText).toContain('Test Airline');
+  expect(sidebarText).not.toContain('Unknown');
+
+  // Live data should show the normal badge
+  expect(await badgeSourcesForLabel(page, 'Operator')).not.toEqual([]);
+});
+
+test('non-C0 aircraft still work normally with enrichment from heuristic tiers', async ({ page }) => {
+  // Regression test: C0 special case doesn't break non-C0 aircraft.
+  // "eeeeee" is from adsbfi with normal category "A3", not C0.
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null,
+    operator: { value: 'Ryanair', source: 'callsign_decode', confidence: 0.8 },
+    operator_country: { value: 'Ireland', source: 'callsign_decode', confidence: 0.6, country_iso: 'IE' },
+    registration: null, manufacturer: null, model: null, year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, 'eeeeee', 'adsbfi');
+
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+  expect(sidebarText).toContain('Ryanair');
+  expect(sidebarText).toContain('Ireland');
+  expect(sidebarText).not.toContain('Unknown');
+});

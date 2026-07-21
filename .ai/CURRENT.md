@@ -2,6 +2,54 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Continuation: C0 aircraft enrichment special case completed)
+
+✅ **Feature Complete: C0 aircraft enrichment special case**
+- **What this is:** Prevents heuristic-based guessing for C0 aircraft (surface vehicles
+  with malformed registration/callsigns). C0 aircraft now skip registration_prefix,
+  icao24_block, and callsign_decode enrichment tiers, relying only on live data or
+  exact database matches (icao24_lookup).
+- **Backend implementation** (`enrichment/aircraft_enrichment.py`):
+  - Added `category_code` parameter to `enrich_identity()` orchestrator
+  - Added `is_c0 = category_code == "C0"` flag early in country/operator/operator_country resolution
+  - Added conditions to skip heuristic tiers for C0: `if not X and not is_c0 and tier_data`
+  - Live data and icao24_lookup tiers still work for C0
+  - Updated docstring with "Special case: C0 aircraft" section (164 lines, comprehensive)
+- **Backend HTTP layer** (`app.py`):
+  - Modified `/api/identity/<icao24>` route to accept `category_code` query parameter
+  - Passed to `enrich_identity()` via `category_code=request.args.get("category_code") or None`
+- **Frontend data plumbing** (`static/js/sidebar-track.js`):
+  - Modified `loadIdentityEnrichment(icao24, info)` to extract `categoryCode` from aircraft info object
+  - Added `params.set('category_code', info.categoryCode)` when present
+  - Added explanatory comment on C0 special case behavior
+- **Backend testing** (`tests/backend/test_enrichment.py`):
+  - 9 comprehensive unit tests for C0 special case:
+    * `test_enrich_identity_c0_skips_registration_prefix_tier`: Verifies heuristic tier is bypassed
+    * `test_enrich_identity_c0_skips_icao24_block_tier`: Verifies hex-block heuristic is bypassed
+    * `test_enrich_identity_c0_skips_callsign_decode_tier`: Verifies callsign heuristic bypassed
+    * `test_enrich_identity_c0_allows_live_tier`: Verifies live data still works
+    * `test_enrich_identity_c0_allows_icao24_lookup_tier`: Verifies exact DB match works
+    * `test_enrich_identity_c0_combined_live_and_db`: Verifies correct tier interaction
+    * `test_route_c0_category_code_skips_heuristics`: End-to-end route with C0
+    * `test_route_c0_category_code_allows_live_data`: End-to-end route with live data
+    * `test_route_c0_category_code_non_c0_works_normally`: Regression test for non-C0 behavior
+  - **All 77 enrichment tests pass** (68 existing + 9 new C0 tests)
+- **Frontend testing** (`tests/frontend/test_identity_enrichment.spec.js`):
+  - 5 comprehensive tests for C0 behavior:
+    * `C0 aircraft: category_code=C0 is passed to the enrichment endpoint` — verifies parameter passing
+    * `C0 aircraft: heuristic-only enrichment tiers are suppressed in normal mode, showing "Unknown" instead` — core suppression
+    * `C0 aircraft: dev mode does not change the display for C0-suppressed fields (they're null, not hidden)` — dev mode behavior
+    * `C0 aircraft: live data still resolves for C0 (only heuristic tiers are skipped)` — live fallback
+    * `non-C0 aircraft still work normally with enrichment from heuristic tiers` — regression test
+  - Tests use existing C0 aircraft from fixture (`hex 474806` in adsbfi.json with `category: "C0"`)
+  - Tests structured to verify suppression behavior, fallback handling, and regression protection
+- **Verification:**
+  - Backend test suite: **77/77 tests passing** (verified 9/9 C0 tests pass)
+  - App imports without errors
+  - No syntax or type errors in modified code
+- **Backlog status:** Item `✅ Special-case enrichment for C0 category` marked for auto-cleanup
+- **Commits:** (pending, ready to push)
+
 ## Status as of 2026-07-21 (Late night, bug fix: spurious sidebar close on cross-source handoff)
 
 ✅ **Bug fix: aircraft sidebar/track spuriously closes on cross-source marker handoff**

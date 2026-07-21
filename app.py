@@ -1244,6 +1244,7 @@ def api_identity(icao24):
         known_country=request.args.get("known_country") or None,
         known_operator=request.args.get("known_operator") or None,
         known_manufacture_year=request.args.get("known_manufacture_year", type=int),
+        category_code=request.args.get("category_code") or None,
     )
     return jsonify(result)
 

@@ -586,3 +586,83 @@ def test_route_operator_needs_corroboration_round_trips(client):
     assert data["country"]["value"] == "Romania"  # icao24_block tier
     assert data["operator"]["needs_corroboration"] is True
     assert data["operator_country"]["needs_corroboration"] is True
+
+
+# --- C0 category (surface vehicles) special case ---
+# C0 aircraft have malformed registrations/callsigns and should skip heuristic
+# tiers for country/operator/operator_country fields, relying only on live
+# data or exact database matches.
+
+def test_enrich_identity_c0_skips_registration_prefix_tier():
+    # Even with a malformed registration, C0 aircraft should not guess a
+    # country from it — the heuristic tier is skipped entirely.
+    result = enrich_identity("ffffff", registration="MALFORMED-123", category_code="C0")
+    assert result["country"] is None
+
+
+def test_enrich_identity_c0_skips_icao24_block_tier():
+    # A C0 aircraft on a Romania-block hex should not get Romania from the
+    # hex address — the icao24_block heuristic is skipped for C0.
+    result = enrich_identity("4A35CE", category_code="C0")
+    assert result["country"] is None
+
+
+def test_enrich_identity_c0_skips_callsign_decode_tier():
+    # A C0 aircraft with a valid callsign should not get a decoded operator
+    # from it — the callsign_decode heuristic is skipped for C0.
+    result = enrich_identity("ffffff", callsign="RYR123", category_code="C0")
+    assert result["operator"] is None
+    assert result["operator_country"] is None
+
+
+def test_enrich_identity_c0_allows_live_tier():
+    # C0 aircraft can still get values from live data (if a click passed it).
+    result = enrich_identity("ffffff", known_country="Some Country", category_code="C0")
+    assert result["country"]["value"] == "Some Country"
+    assert result["country"]["source"] == "live"
+
+
+def test_enrich_identity_c0_allows_icao24_lookup_tier():
+    # C0 aircraft with an exact database record should still use it — an
+    # icao24_lookup is precise, not a heuristic guess.
+    result = enrich_identity("49d3d3", category_code="C0")
+    assert result["country"]["value"] == "Czech Republic"
+    assert result["country"]["source"] == "icao24_lookup"
+    assert result["operator"]["value"] == "Smartwings"
+    assert result["registration"]["value"] == "OK-SWC"
+
+
+def test_enrich_identity_c0_combined_live_and_db():
+    # C0 with both live data and a database record: live wins, db fills gaps.
+    result = enrich_identity("49d3d3", known_country="Override", category_code="C0")
+    assert result["country"]["value"] == "Override"
+    assert result["country"]["source"] == "live"
+    # Other fields still get db_record data
+    assert result["operator"]["value"] == "Smartwings"
+    assert result["registration"]["value"] == "OK-SWC"
+
+
+def test_route_c0_category_code_skips_heuristics(client):
+    # End-to-end: passing category_code=C0 via the route skips heuristics
+    # for the specific icao24 (no db record), leaving country/operator null.
+    resp = client.get("/api/identity/ffffff?registration=MALFORMED&callsign=RYR123&category_code=C0")
+    data = resp.get_json()
+    assert data["country"] is None
+    assert data["operator"] is None
+    assert data["operator_country"] is None
+
+
+def test_route_c0_category_code_allows_live_data(client):
+    # C0 with live data passed in still uses it.
+    resp = client.get("/api/identity/ffffff?known_country=Live+Country&category_code=C0")
+    data = resp.get_json()
+    assert data["country"]["value"] == "Live Country"
+    assert data["country"]["source"] == "live"
+
+
+def test_route_c0_category_code_non_c0_works_normally(client):
+    # Sanity check: without category_code=C0, heuristics still work normally.
+    resp = client.get("/api/identity/ffffff?registration=OK-SWC")
+    data = resp.get_json()
+    assert data["country"]["value"] == "Czech Republic"
+    assert data["country"]["source"] == "registration_prefix"

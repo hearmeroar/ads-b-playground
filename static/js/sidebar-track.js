@@ -470,6 +470,9 @@ async function loadIdentityEnrichment(icao24, info) {
     if (info.originCountry) params.set('known_country', info.originCountry);
     if (info.operator) params.set('known_operator', info.operator);
     if (info.manufactureYear) params.set('known_manufacture_year', info.manufactureYear);
+    // For C0 (surface vehicles with no category info), backend skips heuristic
+    // tiers and relies on live data or exact database matches only.
+    if (info.categoryCode) params.set('category_code', info.categoryCode);
   }
   try {
     const resp = await fetch('/api/identity/' + encodeURIComponent(icao24) + '?' + params.toString());

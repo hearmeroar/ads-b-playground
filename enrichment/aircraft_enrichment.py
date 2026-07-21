@@ -26,6 +26,7 @@ def enrich_identity(
     known_country=None,
     known_operator=None,
     known_manufacture_year=None,
+    category_code=None,
 ):
     """Returns a dict with all 8 keys always present: country, operator,
     operator_country, registration, manufacturer, model, year_built,
@@ -47,6 +48,16 @@ def enrich_identity(
     from whichever manufacturer/model this call resolved via
     `aircraft_category.py`'s static MTOW-based table, the lowest-priority
     fallback in the whole category chain.
+
+    **Special case: C0 aircraft (surface vehicles with no category info)** —
+    When category_code is "C0", this function skips heuristic tiers
+    (registration_prefix, icao24_block, callsign_decode) for country/operator/
+    operator_country fields, relying only on live data or exact database
+    matches. C0 aircraft have malformed registrations/callsigns and should
+    not have those fields guessed from invalid data; only adsbdb or a live
+    source can fill those gaps. Fields from db_record (exact aircraft database
+    match) are still used, since those are precise and don't depend on parsing
+    a malformed registration string.
 
     A callsign-decoded operator/operator_country is a real ICAO 3LD
     designator match, but a static ~5700-entry table has no way to know a
@@ -85,6 +96,12 @@ def enrich_identity(
     type_normalized = normalize_aircraft_type(icao_type_code) or normalize_aircraft_type(aircraft_type)
 
     # --- country ---
+    # C0 aircraft (surface vehicles, no category info) have malformed
+    # registrations — skip heuristic tiers for them and rely on live data or
+    # exact database matches only. adsbdb can fill the gap later if it has
+    # real data.
+    is_c0 = category_code == "C0"
+
     country = _live(known_country)
     if country:
         # A live-sourced country string still gets a flag when its exact
@@ -93,19 +110,21 @@ def enrich_identity(
         iso = country_iso_for_name(known_country)
         if iso:
             country["country_iso"] = iso
-    if not country and reg_country:
-        country = {
-            "value": reg_country["country"], "source": reg_country["source"],
-            "confidence": reg_country["confidence"],
-            "country_iso": reg_country["country_iso"],
-        }
     if not country and db_record and db_record.get("country"):
         country = {
             "value": db_record["country"], "source": db_record["source"],
             "confidence": db_record["confidence"],
             "country_iso": db_record["country_iso"],
         }
-    if not country and icao24_country:
+    # Skip registration-prefix and icao24-block tiers for C0 (ground vehicles);
+    # only use them for real aircraft with valid registrations.
+    if not country and not is_c0 and reg_country:
+        country = {
+            "value": reg_country["country"], "source": reg_country["source"],
+            "confidence": reg_country["confidence"],
+            "country_iso": reg_country["country_iso"],
+        }
+    if not country and not is_c0 and icao24_country:
         country = {
             "value": icao24_country["country"], "source": icao24_country["source"],
             "confidence": icao24_country["confidence"],
@@ -135,7 +154,9 @@ def enrich_identity(
             "value": db_record["operator"], "source": db_record["source"],
             "confidence": db_record["confidence"],
         }
-    if not operator and cs_decoded:
+    # Skip callsign_decode tier for C0 (ground vehicles with malformed
+    # registrations often have invalid callsigns too).
+    if not operator and not is_c0 and cs_decoded:
         operator = {
             "value": cs_decoded["operator"], "source": cs_decoded["source"],
             "confidence": cs_decoded["confidence"],
@@ -146,8 +167,9 @@ def enrich_identity(
     # --- operator_country (the operating airline's home country — a
     # distinct concept from "country", which is the aircraft's own
     # registration) ---
+    # Skip callsign_decode tier for C0 (same reasoning as operator above).
     operator_country = None
-    if cs_decoded and cs_decoded.get("country"):
+    if not is_c0 and cs_decoded and cs_decoded.get("country"):
         operator_country = {
             "value": cs_decoded["country"], "source": cs_decoded["source"],
             "confidence": cs_decoded["country_confidence"],
