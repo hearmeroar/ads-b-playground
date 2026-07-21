@@ -2,6 +2,74 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Bug fix: C-category heuristic fields leaked real-looking but wrong data)
+
+✅ **Bug fix: `category_code` never reached the backend on a real marker
+click, so the C0-C5 heuristic-skip in `enrich_identity()` never engaged —
+plus, the heuristic-skip was tightened to cover every local lookup table,
+not just three of them**
+- **Symptom (reported live, with a screenshot)**: a real C0 aircraft
+  ("No ADS-B category info") showed a plausible-looking but completely
+  fabricated Operator ("Taxi Aereo Cozatl"), Operator Country ("Mexico"),
+  and Registration Country ("Bulgaria") — exactly the kind of confident-
+  looking wrong data the C0-C5 special case (shipped earlier the same
+  session, see below) was supposed to prevent.
+- **Root cause #1 (the actual production bug)**: `selectAircraft()`
+  (`static/js/sidebar-track.js`) called
+  `loadIdentityEnrichment(icao24, details && details.info)` — but
+  `categoryCode` is stored as a *sibling* of `info` on `detailsById`'s
+  entry (`icons.js`), never nested inside `info` itself. So
+  `info.categoryCode` was always `undefined` in the real click path, and
+  `/api/identity` was called with no `category_code` param at all — the
+  backend's C0-C5 skip logic (from earlier the same session) never had a
+  chance to engage for any real aircraft, only for hand-built test/script
+  data that happened to set `categoryCode` directly on the `info` object.
+  Fixed by merging `categoryCode` into the object passed to
+  `loadIdentityEnrichment`/`loadAdsbdb` at the one call site
+  (`Object.assign({}, details.info, { categoryCode: details.categoryCode })`)
+  — this also fixes `maybeRefetchIdentityWithAdsbdbData`'s re-fetch path,
+  which receives the same object.
+- **Root cause #2 (explicit product decision, not just a bug)**: even with
+  `category_code` correctly reaching the backend, the existing C0-C5 skip
+  only bypassed three heuristic tiers (registration_prefix, icao24_block,
+  callsign_decode) but still ran the exact-match aircraft-database
+  (`icao24_lookup`) and type-code tiers. Per explicit direction from the
+  project owner ("это все эвристика рассчитанная самим приложением. тут
+  она неприменима, отключаем полностью для этих категорий" — "this is all
+  heuristic computed by the app itself, it doesn't apply here, disable it
+  completely for these categories"), `enrich_identity()`
+  (`enrichment/aircraft_enrichment.py`) now short-circuits entirely for
+  C0-C5: it returns *only* the live tier (whatever `known_country`/
+  `known_operator`/`registration`/`known_manufacture_year` the caller
+  already had), with every other field (including the previously-untouched
+  `icao24_lookup`/db_record tier) forced to `None`. No local lookup table
+  is ever consulted for a C-category object now — only adsbdb (a separate,
+  external database, not this module) or the live feed itself can fill
+  those fields for one.
+- **Tests updated** (`tests/backend/test_enrichment.py`): the four tests
+  that specifically asserted the *old*, looser behavior
+  (`test_enrich_identity_c0_allows_icao24_lookup_tier`,
+  `test_enrich_identity_c0_combined_live_and_db`,
+  `test_enrich_identity_c5_allows_icao24_lookup_tier`,
+  `test_enrich_identity_c_category_combined_live_and_db`) were rewritten
+  to assert the new, stricter one (the first and third renamed to
+  `..._skips_icao24_lookup_tier`). Full backend suite: 273/273 passing.
+- **Verification**: reproduced the exact production scenario via a
+  scripted real click (mocked `/api/adsbfi` with a C0 aircraft carrying a
+  Ryanair-prefixed callsign `RYR123` and a Bulgaria-prefixed registration
+  `LZ-TEST` — the same shape of data that produced the wrong result live)
+  through the actual `selectAircraft()` → `/api/identity` → sidebar-render
+  path, not a hand-built shortcut. Confirmed the real outgoing request now
+  includes `category_code=C0`, the backend's response has every field
+  `null` except the live-sourced `registration`, and the rendered sidebar
+  shows "Unknown" for Operator with no leaked "Bulgaria"/"Mexico"-style
+  text anywhere.
+- Playwright's own `test_identity_enrichment.spec.js` still can't run in
+  this session due to the pre-existing `page.goto`/`load`-event
+  infrastructure issue logged elsewhere in this file — verification above
+  was done via a standalone Playwright script using `domcontentloaded`
+  instead, which isn't affected by that issue.
+
 ## Status as of 2026-07-21 (Bug fix: C0 identity fields showed "Unknown" instead of hiding)
 
 ✅ **Bug fix: `looksLikeGroundVehicle()` regex excluded C0, breaking the whole

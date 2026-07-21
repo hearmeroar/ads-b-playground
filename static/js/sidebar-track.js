@@ -609,8 +609,16 @@ function selectAircraft(icao24) {
   }
   sidebarEl.classList.add('open');
   loadGallery(icao24, details && details.registration);
-  loadIdentityEnrichment(icao24, details && details.info);
-  loadAdsbdb(icao24, details && details.info);
+  // categoryCode lives as a sibling of `info` on detailsById's entry (see
+  // icons.js), not nested inside it — merge it in so loadIdentityEnrichment
+  // (and loadAdsbdb, whose own `info` param flows into
+  // maybeRefetchIdentityWithAdsbdbData below) can see it and apply the
+  // C0-C5 special case. Passing details.info directly here previously left
+  // category_code permanently unset on every real click, so the backend's
+  // heuristic-skip for ground vehicles never actually engaged.
+  const infoWithCategory = details && Object.assign({}, details.info, { categoryCode: details.categoryCode });
+  loadIdentityEnrichment(icao24, infoWithCategory);
+  loadAdsbdb(icao24, infoWithCategory);
 }
 
 function deselectAircraft() {

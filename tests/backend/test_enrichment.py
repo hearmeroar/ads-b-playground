@@ -622,24 +622,26 @@ def test_enrich_identity_c0_allows_live_tier():
     assert result["country"]["source"] == "live"
 
 
-def test_enrich_identity_c0_allows_icao24_lookup_tier():
-    # C0 aircraft with an exact database record should still use it — an
-    # icao24_lookup is precise, not a heuristic guess.
+def test_enrich_identity_c0_skips_icao24_lookup_tier():
+    # C0 aircraft get NOTHING from the exact-match aircraft database either —
+    # even a precise db record is not trusted for a ground vehicle's ICAO24
+    # (tightened after a real C0 aircraft resolved a plausible-looking but
+    # entirely wrong Operator/Registration Country this way — see the
+    # module docstring).
     result = enrich_identity("49d3d3", category_code="C0")
-    assert result["country"]["value"] == "Czech Republic"
-    assert result["country"]["source"] == "icao24_lookup"
-    assert result["operator"]["value"] == "Smartwings"
-    assert result["registration"]["value"] == "OK-SWC"
+    assert result["country"] is None
+    assert result["operator"] is None
+    assert result["registration"] is None
 
 
 def test_enrich_identity_c0_combined_live_and_db():
-    # C0 with both live data and a database record: live wins, db fills gaps.
+    # C0 with both live data and a database record: live wins, but the db
+    # record never fills gaps for C-category — only the live value survives.
     result = enrich_identity("49d3d3", known_country="Override", category_code="C0")
     assert result["country"]["value"] == "Override"
     assert result["country"]["source"] == "live"
-    # Other fields still get db_record data
-    assert result["operator"]["value"] == "Smartwings"
-    assert result["registration"]["value"] == "OK-SWC"
+    assert result["operator"] is None
+    assert result["registration"] is None
 
 
 def test_route_c0_category_code_skips_heuristics(client):
@@ -707,19 +709,19 @@ def test_enrich_identity_c4_allows_live_tier():
     assert result["operator"]["source"] == "live"
 
 
-def test_enrich_identity_c5_allows_icao24_lookup_tier():
-    # C5: fixed obstacle. Exact database matches should still work for
-    # C-category — icao24_lookup is precise, not a heuristic guess.
+def test_enrich_identity_c5_skips_icao24_lookup_tier():
+    # C5: fixed obstacle. Exact database matches are not trusted for
+    # C-category either — same as C0 (see the module docstring).
     result = enrich_identity("49d3d3", category_code="C5")
-    assert result["country"]["value"] == "Czech Republic"
-    assert result["country"]["source"] == "icao24_lookup"
-    assert result["operator"]["value"] == "Smartwings"
-    assert result["registration"]["value"] == "OK-SWC"
+    assert result["country"] is None
+    assert result["operator"] is None
+    assert result["registration"] is None
 
 
 def test_enrich_identity_c_category_combined_live_and_db():
-    # C-category with both live data and database record: live wins, db
-    # fills gaps — just like C0. Verify with C2 as example.
+    # C-category with both live data and a database record: live wins, but
+    # the db record never fills gaps for C-category — just like C0. Verify
+    # with C2 as example.
     result = enrich_identity(
         "49d3d3",
         known_country="Override",
@@ -727,9 +729,8 @@ def test_enrich_identity_c_category_combined_live_and_db():
     )
     assert result["country"]["value"] == "Override"
     assert result["country"]["source"] == "live"
-    # DB record fills other fields
-    assert result["operator"]["value"] == "Smartwings"
-    assert result["registration"]["value"] == "OK-SWC"
+    assert result["operator"] is None
+    assert result["registration"] is None
 
 
 def test_route_c_category_code_skips_heuristics(client):
