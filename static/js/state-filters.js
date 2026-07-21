@@ -170,7 +170,7 @@ function looksLikeGroundVehicle({ category, registration, aircraftType, callsign
   const trimmedCallsign = (callsign || '').trim();
   if (trimmedCallsign && GROUND_VEHICLE_CALLSIGN_RE.test(trimmedCallsign)) return true;
   if (typeof category === 'number' && category >= 16 && category <= 20) return true;
-  if (typeof category === 'string' && /^C[1-5]$/.test(category)) return true;
+  if (typeof category === 'string' && /^C[0-5]$/.test(category)) return true;
   return false;
 }
 

@@ -2,6 +2,49 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Bug fix: C0 identity fields showed "Unknown" instead of hiding)
+
+✅ **Bug fix: `looksLikeGroundVehicle()` regex excluded C0, breaking the whole
+C-category identity-field-hiding feature**
+- **Symptom**: a C0 aircraft (e.g. the `TWR`-registered ground station in
+  `tests/frontend/fixtures/adsbfi.json`, hex `474806`) showed every identity
+  field (Manufacturer, Model, Year built, Registered Owner) as the literal
+  "Unknown" in normal mode, instead of being hidden — the exact opposite of
+  the C0-C5 UX feature shipped earlier the same day (see below in this file).
+- **Root cause**: `static/js/state-filters.js`'s `looksLikeGroundVehicle()`
+  checked the category string against `/^C[1-5]$/` — a regex that excludes
+  C0 itself. So `isGroundVehicle` was always `false` for C0 aircraft, and
+  `identityRow()` (`render-details.js`) never hit its
+  `isGroundVehicle && !has && !currentDevMode` hide-branch — it fell through
+  to the ordinary "Unknown" text every other identity field uses. The
+  backend's C0 heuristic-suppression (`enrichment/aircraft_enrichment.py`)
+  was working exactly as designed the whole time — its correctly-empty
+  response (nulls, since heuristic tiers are deliberately skipped for C0)
+  is what made every field render "Unknown" once combined with the frontend
+  bug, which is what made the feature look completely broken end-to-end.
+- **Fix**: one-character regex change, `/^C[1-5]$/` → `/^C[0-5]$/`
+  (`static/js/state-filters.js`). The collection-panel's own separate C0
+  check (`auth-collection.js`, `details.categoryCode === 'C0'`) was
+  independent of this function and unaffected by the bug.
+- **Verification**: confirmed the corrected regex classifies C0 (with or
+  without a `TWR` registration) as a ground vehicle and leaves normal
+  aircraft (e.g. A3) untouched, via a standalone Node script exercising the
+  exact function body. Full backend suite for this area
+  (`tests/backend/test_enrichment.py`, 86 tests covering the C0-C5
+  enrichment special case) passes unchanged, confirming the backend side
+  was never the problem.
+- **Playwright verification blocked by a pre-existing environment issue**:
+  every `test_identity_enrichment.spec.js` run in this session hit
+  `page.goto: Test timeout ... waiting until "load"` — confirmed via the
+  failure's own page snapshot that the app actually renders fully (HUD
+  buttons all present), so this is the browser's `load` event never firing
+  (most likely an external network fetch hanging rather than failing under
+  this session's outbound proxy), not a real regression. This matches the
+  identical symptom already logged in this file's C1-C5 session entry
+  below ("pre-existing timeout infrastructure issue ... confirmed present
+  on main branch before this session") — reconfirmed independently this
+  session, unrelated to the fix above.
+
 ## Status as of 2026-07-21 (Session continuation: C0→C0-C5 expansion + UX enhancement in progress)
 
 ✅ **Feature Complete: C0→C0-C5 aircraft enrichment special case expansion**
