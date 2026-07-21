@@ -147,3 +147,19 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 - Add test coverage: happy path (200), degraded path (503).
 
 **References:** BACKLOG.md "Health check endpoint" (now unblocked)
+
+---
+
+## 2026-07-21 — Disable local-heuristic enrichment entirely for C0-C5 ground vehicles/obstacles
+
+**Problem:** `enrichment/aircraft_enrichment.py`'s heuristic tiers (registration-prefix, ICAO24 block, callsign decode, and the icao24/type-code database) assume registration/callsign strings follow real ICAO conventions. Ground vehicles and obstacles (DO-260B categories C0–C5) often carry malformed or coincidental strings that happen to match a real prefix/designator, producing confident-looking but entirely fabricated data — a real C0 object with no ADS-B category info showed a fabricated "Taxi Aereo Cozatl" operator and "Bulgaria"/"Mexico" countries, sourced purely from these heuristics matching junk registration/callsign strings.
+
+**Decision:** For any object whose ADS-B category code is C0–C5, `enrich_identity()` short-circuits to the live tier only — no local lookup table is ever consulted (not even the exact-match icao24/type-code database, which earlier drafts still allowed). Only a live feed value, or separately adsbdb's own returned fields, can fill these objects' identity fields. The frontend also hides (rather than showing "Unknown" for) empty identity rows on C0–C5 objects in normal mode.
+
+**Reason:** Explicit project-owner direction after the fabricated-data incident above — for non-aircraft, a heuristic match is more likely coincidental than correct, and presenting it confidently (badges, "Unknown" placeholders, flags) misleads more than an honest absence of data would.
+
+**Tradeoffs:**
+- A rare, genuine case where a C0–C5 object's registration/callsign would have resolved correctly via one of these tables now shows nothing — accepted, since the false-positive risk across the whole category outweighs the lost true positives.
+- Needed two follow-up bug fixes to actually take effect: `categoryCode` wasn't reaching `/api/identity` on a real click (stored as a sibling of `info`, not inside it), and `looksLikeGroundVehicle()`'s regex excluded C0 itself (`/^C[1-5]$/` instead of `/^C[0-5]$/`), so the frontend's hide-when-empty behavior never engaged for C0 specifically.
+
+**References:** `enrichment/aircraft_enrichment.py`'s "Special case: C0 aircraft" docstring section, `tests/backend/test_enrichment.py`'s C0/C1-C5 test groups.
