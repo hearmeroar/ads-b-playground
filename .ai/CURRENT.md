@@ -9,9 +9,10 @@
 - **RapidAPI flight data APIs (research)** — Exploratory audit with 4 initial candidates: AeroDataBox API (schedules/status), Flight Data/Travelpayots (historical prices), Aviation Edge/Aviationstack (tracking), Lufthansa Open API (schedules). All candidates must support free tier. Effort S, Value Medium. Findings → DECISIONS.md.
 - **airframes.io (research + integration)** — Aircraft history/lifecycle enrichment (accidents, incidents, operator changes, write-offs). Lazy-fetch tier below adsbdb, similar to adsbdb's click-only model. Effort L, Value Med–High. New History sidebar group or expanded Aircraft Identity section if approved.
 
-✅ **Added two Frontend UX features to backlog:**
+✅ **Added three Frontend UX features to backlog:**
 - **Selected aircraft styling & visual highlight** — Apply visual distinction to selected marker (glow, color change, size) so selection state is obvious on map. Effort XS–S, Value Medium.
 - **Auto-center map on aircraft selection** — Automatic map pan to center on selected aircraft (replaces manual button click). Effort XS, Value Medium (optional HUD toggle for ~S).
+- **Marker coloring modes** — Switch from source-based coloring to: category-based, altitude-based (gradient green→red), or uniform. HUD dropdown picker, sessionStorage persistence. Altitude-based mode highlights relative altitude at a glance. Effort S, Value Medium.
 
 All items positioned in backlog with acceptance criteria, effort estimates, and implementation notes. Data sources items include research gates before implementation.
 
