@@ -256,6 +256,13 @@ function refreshAirportsHelp() {
     + 'a marker for its name, codes, and elevation.';
 }
 
+function refreshSignalTypeHelp() {
+  document.getElementById('signal-type-help-popover').textContent =
+    'ADS-R is a ground-station rebroadcast of ADS-B signals, which includes UAT traffic. '
+    + 'Unknown covers aircraft from sources that report neither a signal type nor a recognized position source. '
+    + 'Aircraft without a signal type are always shown unless this filter is used.';
+}
+
 // A "(?)" icon is click-to-toggle (works on touch, unlike a hover title): it
 // opens a small popover explaining a source/track quota state, and a click
 // anywhere else closes it — same pattern as the category dropdown. Both the
@@ -287,6 +294,7 @@ wireHelpPopover('weather-forecast-help', 'weather-forecast-help-popover', refres
 wireHelpPopover('weather-sigmet-help', 'weather-sigmet-help-popover', refreshWeatherSigmetHelp);
 wireHelpPopover('weather-metar-help', 'weather-metar-help-popover', refreshWeatherMetarHelp);
 wireHelpPopover('airports-help', 'airports-help-popover', refreshAirportsHelp);
+wireHelpPopover('signal-type-help', 'signal-type-help-popover', refreshSignalTypeHelp);
 document.addEventListener('click', closeHelpPopovers);
 
 // Dev-mode source badges (.source-badge) are freshly regenerated HTML every

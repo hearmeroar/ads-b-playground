@@ -57,6 +57,7 @@ requires.
 | Planespotters as third data source (metadata enrichment) | L | High | Data sources | Helicopter + rare aircraft coverage gap; requires API research, integration into enrichment chain, dedup/priority |
 | Free tier API and user registration system | M–L | High | Backend | Enable multi-user deployments with API keys, rate limiting, quota management. Requires registration endpoint, token generation, SQLite user role/quota schema, middleware. |
 | Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Frontend UX | Highest standalone value in the backlog; worth scheduling deliberately |
+| **Data source flags filter** | S–M | Med–High | Frontend UX | **HIGH PRIORITY** — Research data quality flags (dbFlags, NIC/NACp/NACv, messageType) across all sources; implement HUD filter to show/hide aircraft by flag state. Improves visibility of data quality. See UI/UX section. |
 | Health check endpoint (`/api/health`) | XS–S | Medium | DevOps | Public unauthenticated endpoint for Northflank/uptime-monitor health checks. Decision made 2026-07-21: public minimal response (DECISIONS.md). |
 | Seamless login without page reload | M | Medium | Frontend UX | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
 | Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Frontend UX | Shareable/deep-linkable view; reusable layout could also serve collection cards |
@@ -441,6 +442,69 @@ Estimate: 2–3 dev days (backend routes + SQLite schema + middleware + tests + 
 - **Route prediction based on vector** — Extrapolate aircraft's future position/trajectory from current velocity vector (heading + speed). Use cases: (1) predict convergence/collision risk between aircraft, (2) anticipate which airports lie on the aircraft's natural path, (3) validate adsbdb routes more precisely by comparing predicted vs. claimed destination. Requires integrating haversine-based forward projection into the route-validation geometry chain. Layer 3 validation, lower priority than current Layer 2 (geometric-consistency check). Would reuse `destinationPoint()` helper from route-validation.js.
 
 ## UI/UX
+
+- **Data source flags filter** — HIGH PRIORITY
+
+Goal: Research and implement a HUD filter to show/hide aircraft based on data quality flags. Different data sources expose different quality indicators (dbFlags, position accuracy codes, message types, etc.); a unified filter UI lets power users quickly identify high-quality vs. low-confidence tracks.
+
+Motivation: raw ADS-B data contains quality metadata (DO-260B NIC/NACp/NACv accuracy, mode-S message type, mlat/tisb status) that's currently shown only in dev-mode badges. A visible filter makes this actionable: users can hide noisy/low-confidence data to focus on good signals, or (conversely) highlight only MLAT-derived positions to understand triangulation coverage.
+
+Phase 1 — Research (1–2h):
+1. Document what flags each source exposes:
+   - **OpenSky**: position accuracy fields (NIC, NACp, NACv) returned as part of state vector; position source (`0=ADS-B`, `1=MLAT`, `2=FLARM`, `3=ADSR`)
+   - **adsb.fi/airplanes.live**: `mlat` array (non-empty = MLAT), `tisb` array (non-empty = TIS-B), `dbFlags` bitmask (DO-260B flags), `messageType` (0–5), `adsbVersion` (0–2)
+   - **adsb.lol/adsb.one**: same as adsb.fi (ADSBExchange format)
+   - **FlightAware**: no explicit quality flags in basic response (premium API may have)
+   - **FlightRadar24**: `mlat` boolean, `tisb` boolean (inferred from API response structure)
+2. Map flags into human-readable categories:
+   - **Position source**: ADS-B, MLAT, TIS-B, FLARM, unknown
+   - **Accuracy tier**: High (NACp ≥ 8), Medium (NACp 4–7), Low (NACp < 4), unknown
+   - **Message freshness**: Recent (< 10s), Stale (≥ 10s)
+   - **Data completeness**: Complete (all fields present), Partial (some fields null), Sparse
+3. Create a reference table in DECISIONS.md mapping each source + flag to display name + filtering logic.
+
+Acceptance criteria (Phase 1):
+- Research doc in `.ai/DECISIONS.md` entry dated 2026-07-21 documenting:
+  - Table of flags per source (OpenSky, adsb.fi, adsb.lol, adsb.one, FR24, FlightAware)
+  - Human-readable category names (Position source, Accuracy, Freshness, Completeness)
+  - Filtering logic: which flag combinations = "show" vs. "hide"
+  - Example: "show only MLAT + High accuracy" → filter aircraft where `(mlat.length > 0 || tisb.length > 0) && nacpValue >= 8`
+- Reference implementation sketch (pseudocode) for frontend filtering
+
+Phase 2 — Implementation (1–2h):
+1. Frontend data plumbing (`static/js/parsers.js`, `icons.js`):
+   - Extend `parseOpenSkyState()` to extract position source from index 16
+   - Extend `parseAdsbExchangeAircraft()` to set `qualityFlags = {mlat, tisb, dbFlags, messageType, nacpValue, nicValue}`
+   - Add computed `flagsCategory()` function that maps flags → human readable tier (e.g., "High accuracy MLAT")
+   - Store qualityFlags on each render `item` (alongside `categoryGroup`, `lat`, `lon`)
+
+2. HUD filter UI (`static/js/state-filters.js`, `static/index.html`):
+   - Add `#data-quality-filter` multi-select or checkbox group in HUD (same family as `#category-filter`, not a simple toggle)
+   - Options: "All", "High accuracy (NACp ≥ 8)", "MLAT + TIS-B only", "ADS-B primary", "Recent (< 10s)", etc.
+   - Default: "All" (no filtering)
+   - Selection updates `currentDataQualityFilter` state
+   - Clicking an option calls `poll()` immediately (same pattern as source/category toggles)
+
+3. Filtering logic (`static/js/main.js`):
+   - Add `passesDataQualityFilter(item, filter)` predicate (similar to `passesMotionFilter()`)
+   - Call it in the render chain before `syncMarkers()` so hidden aircraft don't get markers
+   - HUD count pill should show X of Y aircraft passing filter (e.g., "487 / 1200")
+
+4. Tests:
+   - Backend unit test (if any server-side flag processing): test fixture aircraft with known flags, assert correct parsing
+   - Frontend Playwright test (`tests/frontend/test_data_quality_filter.spec.js`):
+     * Load page with mixed-quality fixture data
+     * Default state: all aircraft visible
+     * Select "High accuracy only" filter → aircraft with low NACp hidden, count updates
+     * Select "MLAT only" → only MLAT-sourced aircraft visible
+     * Toggle "All" → all aircraft reappear
+     * Filter persists across poll cycles
+
+Estimate: S–M total (1–2 dev days: 1–2h research + 1–2h implementation + 0.5–1h testing)
+
+**Status:** Added to backlog 2026-07-21, marked HIGH PRIORITY for next session.
+
+---
 
 - **Configure the UI agent (`.agents/ui.md`)** — role file was created
   2026-07-21 (scope, hard constraints, guardrails, testing checklist) but

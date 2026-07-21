@@ -117,6 +117,25 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .filter-block .source-row { margin-bottom: 4px; }
 #hud .filter-block .source-row:last-child { margin-bottom: 0; }
 
+/* Data quality filter — two independent facets (Status flags + Signal type) */
+#hud .data-quality-group { margin-top: 12px; }
+#hud .data-quality-group:first-of-type { margin-top: 0; }
+#hud .data-quality-group-title {
+  font-size: 11px; font-weight: 500; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+#hud .chip-checkbox-list {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+#hud .chip-checkbox {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; cursor: pointer; user-select: none;
+  padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; transition: all 0.2s;
+}
+#hud .chip-checkbox:hover { background: var(--surface-hover); }
+#hud .chip-checkbox input { margin: 0; cursor: pointer; }
+#hud .chip-checkbox input:checked ~ label { font-weight: 500; }
+
 /* Airports per-size checklist — deliberately plain native checkboxes, not
    the .switch pill every source/layer toggle above uses: these are
    sub-filters of one already-on layer, not independent data sources, so a

@@ -468,3 +468,88 @@ document.addEventListener('click', () => categoryDropdown.classList.remove('open
 function passesCategoryFilter(group) {
   return currentCategoryFilter === 'all' || currentCategoryFilter === group;
 }
+
+// --- Data Quality Filter (Status flags + Signal type) ---
+
+// Status flags group: decode dbFlags bitmask
+function decodeDbFlags(dbFlags) {
+  if (dbFlags == null) return { military: false, interesting: false, pia: false, ladd: false };
+  return {
+    military: !!(dbFlags & 1),
+    interesting: !!(dbFlags & 2),
+    pia: !!(dbFlags & 4),
+    ladd: !!(dbFlags & 8),
+  };
+}
+
+// Opt-in: empty set = no filtering. Multiple checked flags use OR logic.
+let currentStatusFlagsFilter = new Set(); // subset of 'military'|'interesting'|'pia'|'ladd'
+
+function passesStatusFlagsFilter(dbFlags) {
+  if (currentStatusFlagsFilter.size === 0) return true;
+  const decoded = decodeDbFlags(dbFlags);
+  for (const flag of currentStatusFlagsFilter) {
+    if (decoded[flag]) return true;
+  }
+  return false;
+}
+
+// Signal type group: derive bucket from messageType or fallback to positionSource
+const SIGNAL_TYPE_BUCKETS = ['adsb', 'adsr', 'tisb', 'mlat', 'mode_s', 'adsc', 'asterix', 'flarm', 'unknown'];
+
+function signalTypeBucketFor(info) {
+  const mt = info.messageType;
+  if (mt) {
+    if (mt.startsWith('adsb')) return 'adsb';
+    if (mt.startsWith('adsr')) return 'adsr';  // includes UAT, rebroadcast by the ground station
+    if (mt.startsWith('tisb')) return 'tisb';
+    if (mt === 'mlat') return 'mlat';
+    if (mt === 'mode_s') return 'mode_s';
+    if (mt === 'adsc') return 'adsc';
+    return 'unknown'; // readsb's own 'other'
+  }
+  // No messageType — pure-OpenSky aircraft (use OpenSky's own position_source code) or FlightAware/FlightRadar24 (always unknown)
+  if (info.positionSource === 'ADS-B') return 'adsb';
+  if (info.positionSource === 'MLAT') return 'mlat';
+  if (info.positionSource === 'ASTERIX') return 'asterix';
+  if (info.positionSource === 'FLARM') return 'flarm';
+  return 'unknown';
+}
+
+// All checked by default = no filtering. Set membership is OR by construction.
+let currentSignalTypeFilter = new Set(SIGNAL_TYPE_BUCKETS);
+
+function passesSignalTypeFilter(info) {
+  return currentSignalTypeFilter.has(signalTypeBucketFor(info));
+}
+
+// Combined: AND between facets
+function passesDataQualityFilter(info) {
+  return passesStatusFlagsFilter(info.dbFlags) && passesSignalTypeFilter(info);
+}
+
+// Wiring: Event listeners for both filter groups
+function reapplyDataQualityFilter() {
+  const allCheckboxes = document.querySelectorAll('.status-flag-checkbox, .signal-type-checkbox');
+  allCheckboxes.forEach((c) => { c.disabled = true; });
+  document.getElementById('data-quality-filter-spinner').hidden = false;
+  poll().finally(() => { // apply right away instead of waiting for the next 12s tick
+    allCheckboxes.forEach((c) => { c.disabled = false; });
+    document.getElementById('data-quality-filter-spinner').hidden = true;
+  });
+}
+
+document.querySelectorAll('.status-flag-checkbox').forEach((checkbox) => {
+  checkbox.addEventListener('change', () => {
+    if (checkbox.checked) currentStatusFlagsFilter.add(checkbox.value);
+    else currentStatusFlagsFilter.delete(checkbox.value);
+    reapplyDataQualityFilter();
+  });
+});
+document.querySelectorAll('.signal-type-checkbox').forEach((checkbox) => {
+  checkbox.addEventListener('change', () => {
+    if (checkbox.checked) currentSignalTypeFilter.add(checkbox.value);
+    else currentSignalTypeFilter.delete(checkbox.value);
+    reapplyDataQualityFilter();
+  });
+});

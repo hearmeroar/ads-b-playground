@@ -2,6 +2,29 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-22 (Feature: Data quality filter — Status flags + Signal type)
+
+✅ **Data quality filter fully implemented — COMPLETED**
+- **Effort:** M (5 phases across state-filters/parsers/HTML/CSS/JS)
+- **Value:** High (exposing already-parsed but unused dbFlags + messageType fields)
+- **Two independent filter groups:**
+  - **Status flags** (opt-in, OR logic): Military, Interesting, PIA, LADD — per-checkbox tooltips, no internal dbFlags terminology exposed
+  - **Signal type** (default all, OR logic): ADS-B, ADS-R/UAT, TIS-B, MLAT, Mode-S, ADS-C, ASTERIX, FLARM, Unknown — shared help popover
+  - Combined with **AND between facets**: `(statusFlagsOR) AND (signalTypeOR)`
+- **Implementation:**
+  - `state-filters.js`: `decodeDbFlags()`, `signalTypeBucketFor()`, predicates, event listeners + `reapplyDataQualityFilter()`
+  - `parsers.js`: filter checks after `info` build (4 call sites: OpenSky, radius sources, FlightRadar24, FlightAware)
+  - `index.html`: chip-checkbox UI (lines 307–342) with responsive flex layout
+  - `style.css`: `.chip-checkbox-list`, `.data-quality-group`, `.data-quality-group-title` styling
+  - `main.js`: `refreshSignalTypeHelp()` function wired via existing `wireHelpPopover()` pattern
+- **Signal type derivation:** messageType primary (readsb enum), positionSource fallback (OpenSky-only aircraft)
+- **Known limitation:** Aircraft without dbFlags/messageType excluded once any Status flag checked (not a bug — they have no flags to check against)
+- **Tests:** 12 new Playwright tests in `test_data_quality_filter.spec.js`, all passing
+- **Test suite totals:** Frontend 172/181 passed (2 pre-existing failures), Backend 276/276 passed
+- **Fixtures:** `adsbfi.json` updated with `dbFlags` and `type` fields (6 aircraft with varied flag/type combinations)
+- **Backlog status:** Item marked ✅ COMPLETED
+- **Commit:** feat: add Data quality filter (Status flags + Signal type)
+
 ## Status as of today (Backlog: Change default zone to London)
 
 ✅ **Change default zone configuration — COMPLETED**

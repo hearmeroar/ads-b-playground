@@ -305,6 +305,43 @@
   </div>
 
   <div class="filter-block">
+    <div class="filter-title"><span>Data quality</span><span class="count-spinner" id="data-quality-filter-spinner" hidden></span></div>
+
+    <div class="data-quality-group">
+      <div class="data-quality-group-title"><span>Status flags</span></div>
+      <div class="chip-checkbox-list" id="status-flags-list">
+        <label class="chip-checkbox" title="Aircraft identified as military.">
+          <input type="checkbox" class="status-flag-checkbox" value="military">Military</label>
+        <label class="chip-checkbox" title="Aircraft marked as interesting by the data source/community metadata.">
+          <input type="checkbox" class="status-flag-checkbox" value="interesting">Interesting</label>
+        <label class="chip-checkbox" title="Privacy ICAO Address. Aircraft using a rotating or anonymized ICAO address through a privacy program.">
+          <input type="checkbox" class="status-flag-checkbox" value="pia">PIA</label>
+        <label class="chip-checkbox" title="Limited Aircraft Data Displayed. Aircraft with FAA LADD privacy restrictions.">
+          <input type="checkbox" class="status-flag-checkbox" value="ladd">LADD</label>
+      </div>
+    </div>
+
+    <div class="data-quality-group">
+      <div class="data-quality-group-title">
+        <span>Signal type</span>
+        <button type="button" class="source-help" id="signal-type-help" aria-label="About signal type">?</button>
+      </div>
+      <div class="chip-checkbox-list" id="signal-type-list">
+        <label class="chip-checkbox"><input type="checkbox" class="signal-type-checkbox" value="adsb" checked>ADS-B</label>
+        <label class="chip-checkbox"><input type="checkbox" class="signal-type-checkbox" value="adsr" checked>ADS-R</label>
+        <label class="chip-checkbox"><input type="checkbox" class="signal-type-checkbox" value="tisb" checked>TIS-B</label>
+        <label class="chip-checkbox"><input type="checkbox" class="signal-type-checkbox" value="mlat" checked>MLAT</label>
+        <label class="chip-checkbox"><input type="checkbox" class="signal-type-checkbox" value="mode_s" checked>Mode-S</label>
+        <label class="chip-checkbox"><input type="checkbox" class="signal-type-checkbox" value="adsc" checked>ADS-C</label>
+        <label class="chip-checkbox"><input type="checkbox" class="signal-type-checkbox" value="asterix" checked>ASTERIX</label>
+        <label class="chip-checkbox"><input type="checkbox" class="signal-type-checkbox" value="flarm" checked>FLARM</label>
+        <label class="chip-checkbox"><input type="checkbox" class="signal-type-checkbox" value="unknown" checked>Unknown</label>
+      </div>
+      <div class="source-help-popover" id="signal-type-help-popover" hidden></div>
+    </div>
+  </div>
+
+  <div class="filter-block">
     <div class="source-row" title="Filters out surface vehicles, obstacles, and reference/test beacons (e.g. tower transponders) that get reported alongside real aircraft">
       <span class="source-name">Hide non-aircraft</span>
       <span class="count-spinner" id="hide-junk-spinner" hidden></span>

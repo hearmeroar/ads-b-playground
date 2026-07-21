@@ -140,6 +140,7 @@ function updateOpenSkyMarkers(states, radiusRecordsByHex, flightawareByCallsign,
     });
     if (!passesCategoryFilter(categoryGroup)) continue;
     const info = normalizeOpenSky(s, extra);
+    if (!passesDataQualityFilter(info)) continue;
     // pickFields() only copies OPENSKY_NATIVE_FIELDS, which deliberately
     // excludes categoryDisplay (it's computed, not native) — so without this,
     // fieldSourcesFor's RAW_FIELD_ALIASES lookup (categoryDisplay -> category)
@@ -406,6 +407,7 @@ function updateFlightRadar24Markers(aircraftList, excludeIds, radiusRecordsByHex
     if (!passesCategoryFilter(categoryGroup)) continue;
     if (excludeIds && a.icao24 && excludeIds.has(a.icao24)) continue;
     const info = normalizeFlightRadar24(a);
+    if (!passesDataQualityFilter(info)) continue;
     const entries = (radiusRecordsByHex && a.icao24 && radiusRecordsByHex.get(a.icao24)) || [{ source: 'flightradar24', data: a }];
     const fieldSources = fieldSourcesFor(info, entries, null);
     if (info.originAirport) fieldSources.originAirport = ['flightradar24'];
@@ -510,6 +512,7 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, s
     if (!passesCategoryFilter(categoryGroup)) continue;
     if (excludeIds && excludeIds.has(a.icao24)) continue;
     const info = normalizeAdsbExchange(a);
+    if (!passesDataQualityFilter(info)) continue;
     const entries = (radiusRecordsByHex && radiusRecordsByHex.get(a.icao24)) || [{ source: sourceName, data: a }];
     const fieldSources = fieldSourcesFor(info, entries, null);
     // Enrich with FlightAware's route data if callsign matches
@@ -546,6 +549,7 @@ function updateFlightAwareMarkers(flights, excludedCallsigns) {
     if (!passesMotionFilter(f.onGround)) continue;
     if (!passesCategoryFilter('unknown')) continue;
     const info = normalizeFlightAware(f);
+    if (!passesDataQualityFilter(info)) continue;
     const fieldSources = fieldSourcesFor(info, [{ source: 'flightaware', data: info }], null);
     items.push({
       id: f.fa_flight_id, lat: f.lat, lon: f.lon, heading: f.track,
