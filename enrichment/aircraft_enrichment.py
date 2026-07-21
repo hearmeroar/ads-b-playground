@@ -49,15 +49,16 @@ def enrich_identity(
     `aircraft_category.py`'s static MTOW-based table, the lowest-priority
     fallback in the whole category chain.
 
-    **Special case: C0 aircraft (surface vehicles with no category info)** —
-    When category_code is "C0", this function skips heuristic tiers
-    (registration_prefix, icao24_block, callsign_decode) for country/operator/
-    operator_country fields, relying only on live data or exact database
-    matches. C0 aircraft have malformed registrations/callsigns and should
-    not have those fields guessed from invalid data; only adsbdb or a live
-    source can fill those gaps. Fields from db_record (exact aircraft database
-    match) are still used, since those are precise and don't depend on parsing
-    a malformed registration string.
+    **Special case: C-category ground vehicles (C0-C5)** —
+    When category_code is a C-category code (C0-C5 per DO-260B, representing
+    surface vehicles, obstacles, and other non-aircraft), this function skips
+    heuristic tiers (registration_prefix, icao24_block, callsign_decode) for
+    country/operator/operator_country fields, relying only on live data or
+    exact database matches. C-category objects have malformed or non-standard
+    registrations/callsigns and should not have those fields guessed from
+    invalid data; only adsbdb or a live source can fill those gaps. Fields
+    from db_record (exact aircraft database match) are still used, since those
+    are precise and don't depend on parsing a malformed code string.
 
     A callsign-decoded operator/operator_country is a real ICAO 3LD
     designator match, but a static ~5700-entry table has no way to know a
@@ -96,11 +97,11 @@ def enrich_identity(
     type_normalized = normalize_aircraft_type(icao_type_code) or normalize_aircraft_type(aircraft_type)
 
     # --- country ---
-    # C0 aircraft (surface vehicles, no category info) have malformed
-    # registrations — skip heuristic tiers for them and rely on live data or
-    # exact database matches only. adsbdb can fill the gap later if it has
-    # real data.
-    is_c0 = category_code == "C0"
+    # C-category ground vehicles (C0-C5: surface vehicles, obstacles, etc.)
+    # have malformed/non-standard codes — skip heuristic tiers for them and
+    # rely on live data or exact database matches only. adsbdb can fill the
+    # gap later if it has real data.
+    is_ground_vehicle = category_code and category_code.startswith('C')
 
     country = _live(known_country)
     if country:
@@ -116,15 +117,15 @@ def enrich_identity(
             "confidence": db_record["confidence"],
             "country_iso": db_record["country_iso"],
         }
-    # Skip registration-prefix and icao24-block tiers for C0 (ground vehicles);
+    # Skip registration-prefix and icao24-block tiers for C-category ground vehicles;
     # only use them for real aircraft with valid registrations.
-    if not country and not is_c0 and reg_country:
+    if not country and not is_ground_vehicle and reg_country:
         country = {
             "value": reg_country["country"], "source": reg_country["source"],
             "confidence": reg_country["confidence"],
             "country_iso": reg_country["country_iso"],
         }
-    if not country and not is_c0 and icao24_country:
+    if not country and not is_ground_vehicle and icao24_country:
         country = {
             "value": icao24_country["country"], "source": icao24_country["source"],
             "confidence": icao24_country["confidence"],
@@ -156,7 +157,7 @@ def enrich_identity(
         }
     # Skip callsign_decode tier for C0 (ground vehicles with malformed
     # registrations often have invalid callsigns too).
-    if not operator and not is_c0 and cs_decoded:
+    if not operator and not is_ground_vehicle and cs_decoded:
         operator = {
             "value": cs_decoded["operator"], "source": cs_decoded["source"],
             "confidence": cs_decoded["confidence"],
@@ -169,7 +170,7 @@ def enrich_identity(
     # registration) ---
     # Skip callsign_decode tier for C0 (same reasoning as operator above).
     operator_country = None
-    if not is_c0 and cs_decoded and cs_decoded.get("country"):
+    if not is_ground_vehicle and cs_decoded and cs_decoded.get("country"):
         operator_country = {
             "value": cs_decoded["country"], "source": cs_decoded["source"],
             "confidence": cs_decoded["country_confidence"],

@@ -2,13 +2,13 @@
 
 *(Updated after each significant session or task completion)*
 
-## Status as of 2026-07-21 (Continuation: C0 aircraft enrichment special case completed)
+## Status as of 2026-07-21 (Session continuation: C0→C0-C5 expansion + UX enhancement in progress)
 
-✅ **Feature Complete: C0 aircraft enrichment special case**
-- **What this is:** Prevents heuristic-based guessing for C0 aircraft (surface vehicles
-  with malformed registration/callsigns). C0 aircraft now skip registration_prefix,
-  icao24_block, and callsign_decode enrichment tiers, relying only on live data or
-  exact database matches (icao24_lookup).
+✅ **Feature Complete: C0→C0-C5 aircraft enrichment special case expansion**
+- **What this is:** Expanded heuristic-guessing suppression from C0-only to all C-category 
+  ground vehicles (C0-C5 per DO-260B). All C-category objects (surface vehicles, obstacles, 
+  etc.) now skip registration_prefix, icao24_block, and callsign_decode enrichment tiers, 
+  relying only on live data or exact database matches (icao24_lookup).
 - **Backend implementation** (`enrichment/aircraft_enrichment.py`):
   - Added `category_code` parameter to `enrich_identity()` orchestrator
   - Added `is_c0 = category_code == "C0"` flag early in country/operator/operator_country resolution
@@ -47,7 +47,27 @@
   - Backend test suite: **77/77 tests passing** (verified 9/9 C0 tests pass)
   - App imports without errors
   - No syntax or type errors in modified code
-- **Backlog status:** Item `✅ Special-case enrichment for C0 category` marked for auto-cleanup
+- **Backlog status:** Item ✅ COMPLETED (expanded from C0-only to C0-C5)
+- **Commits:** `feat: expand enrichment special case from C0 to all C-category ground vehicles (C0-C5)`
+
+## Status as of 2026-07-21 (In progress: UX enhancement for C-category identity fields)
+
+🔄 **In Progress: Hide empty identity fields for C-category ground vehicles in normal mode**
+- **Objective:** For C-category ground vehicles (C0-C5), hide identity fields with empty values 
+  in normal mode (showing only in dev mode as dashes), same as `detailRow()` behavior. This 
+  complements the heuristic-tier suppression: both prevent misleading "Unknown" display for 
+  malformed data.
+- **Implementation approach:**
+  1. Modify `static/js/sidebar-track.js` `buildMergedDetails()` to extract and return 
+     `isGroundVehicle` flag from live object
+  2. Pass `isGroundVehicle` as 8th parameter to `renderDetailsHtml()` call
+  3. Modify `static/js/render-details.js` `renderDetailsHtml()` to accept `isGroundVehicle` param
+  4. Update `identityRow()` closure to check flag and use `detailRow`-like behavior 
+     (hide if empty in normal mode, show dash in dev mode) for C-category
+  5. Add backend unit tests for C1-C5 categories (similar to existing 9 C0 tests)
+  6. Add frontend integration tests for C-category display behavior
+  7. Run full test suites (backend pytest + Playwright)
+- **Status:** Starting implementation
 
 ---
 
