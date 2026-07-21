@@ -48,6 +48,14 @@
   - App imports without errors
   - No syntax or type errors in modified code
 - **Backlog status:** Item `✅ Special-case enrichment for C0 category` marked for auto-cleanup
+
+---
+
+✅ **Post-session cleanup: Backlog updated to reflect C0 completion**
+- Removed C0 item from "At a glance" table (line 36)
+- Marked C0 item with `✅ ` prefix in full item list
+- Added completion note with commit hash (edbea92)
+- Backlog-cleanup hook will prune the `✅ ` line on next unrelated commit
 - **Commits:** (pending, ready to push)
 
 ## Status as of 2026-07-21 (Late night, bug fix: spurious sidebar close on cross-source handoff)

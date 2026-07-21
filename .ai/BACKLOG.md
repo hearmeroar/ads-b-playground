@@ -33,7 +33,6 @@ requires.
 
 | Item | Speed | Value | Read |
 |---|---|---|---|
-| `C0`-category enrichment special-case | S | Med–High | Quick win — real data-correctness bug (heuristics can badge a ground vehicle with a plausible-looking but wrong country/operator) |
 | Local track persistence & smoothing (frontend) | S | Med–High | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
 | Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Highest standalone value in the backlog; worth scheduling deliberately |
 | Health check endpoint (`/api/health`) | XS–S | Medium | Cheap once the admin-only-vs-public question is answered — currently blocked on that decision, not on effort |
@@ -159,7 +158,6 @@ automated sync pipeline is required for the chosen source.
  scope and can be broken into smaller PRs.
 
 
-- Special-case enrichment rules for `C0` (surface/ground) category
 
 Goal: avoid inferring identity fields (country, operator, registration-derived
 country) from heuristics for items tagged `C0` (ground vehicles, obstacles,
@@ -195,6 +193,8 @@ Implementation notes:
 	 dev-mode test asserts suppressed value tooltip appears.
 
 Estimate: 0.5–1 developer day (backend change + unit tests + minor frontend dev-mode message).
+
+Status (2026-07-21): ✅ COMPLETED — Full implementation in commit edbea92. Backend: 9 new unit tests (77/77 total passing). Frontend: 5 new integration tests verifying parameter passing, suppression behavior, and live data fallback. Feature ready for production.
 
 
 - Map update frequency and track smoothing (polling & interpolation)
