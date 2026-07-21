@@ -147,3 +147,28 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 - Add test coverage: happy path (200), degraded path (503).
 
 **References:** BACKLOG.md "Health check endpoint" (now unblocked)
+
+---
+
+## 2026-07-21 — Conditional tech-stack revisit at 1MB+ active code size
+
+**Problem:** "No build step" (Hard Constraint #2) is valid now (active code ~935KB: 347KB frontend + 588KB backend, no tooling pressure), but will it remain valid as the codebase grows? TypeScript, bundlers, minifiers, and CSS preprocessors all add complexity; triggering their adoption on size alone (without other reasons) would violate the "maintainable by one dev" goal. Need a documented decision point to avoid ad-hoc revisits.
+
+**Decision:** Keep "No build step" constraint as-is while active code remains <1MB. If active code (excluding vendored data like OurAirports, opensky_year_built) reaches 1MB+, trigger an explicit architectural review (not an automatic adoption) to evaluate: TypeScript (type safety + IDE support vs. build step + complexity), minifiers (bundle size reduction), bundlers (code-splitting), CSS frameworks (scale). Any adoption is a conscious choice with documented tradeoffs, not a default response to size alone.
+
+**Reason:** 
+- Current active code (~935KB) is manageable without tooling overhead; 1MB threshold allows natural growth without premature optimization.
+- "Maintainable by a single developer" is an explicit goal; premature tooling adoption works against it.
+- 1MB is a more realistic inflection point than 500KB — by this size, file count/complexity becomes genuinely harder to reason about mentally.
+- JSDoc + strict IDE settings can deliver ~80% of TypeScript benefits (type hints, refactoring safety in IDE) without a build step.
+
+**Tradeoffs:**
+- No automatic safeguard against single-file blowup (one file from 50KB to 200KB). Mitigated by code review discipline (architect verifies each feature's scope).
+- Revisit is conditional, not guaranteed — may never happen if the app's scope stays bounded.
+- Decision is documented explicitly, so future maintainers can revisit consciously rather than accidentally shipping tooling overhead.
+
+**Implementation (immediate):**
+- Hard Constraint #2 (PROJECT.md) updated with revisit condition.
+- This DECISIONS.md entry documents the reasoning.
+
+**References:** PROJECT.md § Hard Constraints #2, CLAUDE.md § Conventions § "No build step", memory/project_performance_discipline.md (related: performance discipline is non-negotiable, tooling is not)

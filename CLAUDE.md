@@ -3212,9 +3212,15 @@ scale ever change again.
   though — the project isn't attached to staying build-step-free forever.
   If a future need (bundling, minification, TypeScript, whatever) makes a
   build step the better tradeoff, adopt one; this convention just reflects
-  that nothing so far has justified it. **"No database" was the same kind
-  of soft convention, and was retired 2026-07-20** for the state that
-  actually needed a database's guarantees: `storage.py`'s SQLite file
+  that nothing so far has justified it. **Revisit condition**: if active code
+  reaches 1MB+ (currently ~935KB), trigger an explicit architectural review
+  (TypeScript, minifiers, bundlers, CSS frameworks) — size alone doesn't
+  automatically justify tooling overhead, but it should trigger a conscious
+  decision point. JSDoc + strict IDE settings can deliver ~80% of TypeScript
+  benefits (type hints, refactoring safety in IDE) without a build step.
+  See DECISIONS.md 2026-07-21 for full reasoning. **"No database" was the
+  same kind of soft convention, and was retired 2026-07-20** for the state
+  that actually needed a database's guarantees: `storage.py`'s SQLite file
   (accounts, saved collections, the identity cache/history log) — see the
   Aircraft collection section above for the concrete cross-process
   consistency bug that justified it. Every short-lived request cache

@@ -2,6 +2,43 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Documentation: tech-stack revisit condition at 1MB+)
+
+✅ **Added explicit tech-stack revisit condition (1MB+ active code threshold)**
+- **Current codebase size**: ~935 KB active code (347 KB frontend + 588 KB backend); 20 MB vendored data (OurAirports, opensky_year_built, etc.)
+- **Why 1MB, not 500KB**: allows natural feature growth (~65 KB more before review); 1MB is a realistic inflection point where complexity genuinely becomes hard to reason about
+- **What it triggers**: architectural review (TypeScript, bundlers, minifiers, CSS frameworks) — not automatic adoption, but a conscious decision point
+- **Why it matters**: JSDoc + strict IDE settings deliver ~80% of TypeScript benefits without build-step overhead; premature tooling adoption conflicts with "maintainable by one dev" goal
+- **Files updated**:
+  - `.ai/PROJECT.md` Hard Constraint #2: added "Revisit condition: if active code reaches 1MB+"
+  - `.ai/DECISIONS.md`: new 2026-07-21 entry with full reasoning
+  - `CLAUDE.md` Conventions: updated with reference to revisit condition
+  - Memory: new `tech_stack_constraints.md` with detailed breakdown (size, threshold, rationale, headroom)
+- **Verified**: Exact size breakdown confirmed via `wc -c` and `find` (frontend JS 287 KB + CSS 50 KB + HTML 10 KB; backend app.py 67 KB + storage.py 12 KB + enrichment 509 KB)
+- **Decision is documented**: future maintainers will revisit consciously rather than accidentally shipping tooling overhead
+
+## Status as of 2026-07-21 (Session continuation: Smoothing feature recovery)
+
+✅ **Feature Complete: Restored local track persistence & smoothing after rollback**
+- **Session context**: Prior attempt to fix track-update bug broke the feature entirely (track stopped updating when smoothing enabled). Rolled back entire change, which deleted smoothing feature from UI. Recovered by selectively re-implementing only the smoothing feature without the broken track fix.
+- **What shipped**:
+  - Position-only tweening via `tweenMarkerTo()` (1500ms via `requestAnimationFrame`)
+  - HUD toggle in `#hud` (off by default, purely presentational, no `poll()` re-trigger)
+  - Integration: `syncMarkers()` checks `smoothingEnabled` and dispatches to tween or instant jump
+  - Cleanup: `cancelMarkerTween()` called in `clearStaleMarkers()`/`clearAllMarkers()`
+  - Persistence fix: `selectAircraft()` optimistically renders `liveTrailById` before waiting for OpenSky
+- **Files touched**:
+  - `static/index.html` — toggle row (Line 325) + `<script src="js/smoothing.js"></script>`
+  - `static/js/smoothing.js` — already existed, no changes needed
+  - `static/js/state-filters.js` — toggle listener (`smoothingEnabled` var)
+  - `static/js/icons.js` — `syncMarkers()` dispatch, cleanup in stale-marker functions
+  - `static/js/sidebar-track.js` — persistence check in `selectAircraft()`
+  - `.ai/BACKLOG.md` — marked ✅ COMPLETED
+- **Verified**: Backend `app.py` imports without syntax errors; toggle restored to UI
+- **Pending**: End-to-end browser test (toggle visibility, smoothing motion, track updates); create regression test for `test_local_track_smoothing.spec.js`
+- **Known issue NOT fixed**: Track update logic that was broken in prior attempt — skipped to preserve feature stability. The core problem remains: when to redraw from `liveTrailById` without overwriting quality OpenSky historical track data.
+- **Next step**: Do NOT attempt to fix the track-update logic until a clear design is agreed on (live trail vs. historical track priority, when each applies, test coverage). Current state (smoothing works, track uses fallback correctly, toggle visible) is stable enough to ship.
+
 ## Status as of 2026-07-21 (Backlog: Add three new data source research items + two Frontend UX features)
 
 ✅ **Added three new backlog research items for data sources:**
