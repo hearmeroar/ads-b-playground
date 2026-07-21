@@ -2,6 +2,40 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-22 (Fix: `backlog-cleanup.sh` never matched the table Status column)
+
+✅ **BACKLOG.md completed items were never auto-pruned — fixed**
+- **Root cause:** `.ai/BACKLOG.md` adopted a second "Status column" completion
+  convention (2026-07-22, `✅` inside an "At a glance" table cell) alongside
+  the original convention (`✅` prefixing a standalone prose line). The
+  `backlog-cleanup.sh` commit hook only ever matched the original convention
+  (`grep -c '^\s*✅\s'`) — since no line in the file actually starts with `✅`
+  anymore, `before` was always `0` and the hook silently no-opped on every
+  commit since the table convention was introduced. Four shipped items
+  (Change default zone, Keyboard navigation, Auto-center map, Health check
+  endpoint) sat in the backlog marked done but never pruned.
+- **Fix:** `.claude/hooks/backlog-cleanup.sh` rewritten as a single `awk`
+  pass that treats a line as completed if it matches *either* convention —
+  the original `^\s*✅\s` prose prefix, or a markdown table row where any
+  pipe-delimited trimmed cell is exactly `✅`. Verified against a synthetic
+  fixture (table-row ✅, prose-line ✅, and a mid-sentence ✅ that must
+  survive) before touching the real file.
+- **One-time manual cleanup**: also removed 3 stale prose bullets (Auto-
+  center map, Keyboard navigation, Health check endpoint) that duplicated
+  the same shipped features as still-open ideas — the hook only ever prunes
+  ✅-marked lines, not general duplicates, so these needed a manual pass.
+- **Noteworthy side effect during this session**: the already-known-flaky
+  `if: Bash(git commit *)` hook matcher (see the `capture-test-run.sh`/
+  `require-verification.sh` entries below) fired on unrelated scratch-repo
+  Bash calls used to test the new hook logic, which caused the *updated*
+  `backlog-cleanup.sh` to run for real against this repo's actual
+  `.ai/BACKLOG.md` mid-session and stage a 4-line removal on its own. No
+  commit happened as a result — confirms this matcher's unreliability is
+  broader than previously documented (fires with no "commit"/"git" text
+  anywhere in the triggering command).
+- `config/zones.json`'s pre-existing uncommitted change (present before
+  this session started) was left untouched — not part of this fix.
+
 ## Status as of 2026-07-22 (Feature: Keyboard navigation in airport search dropdown)
 
 ✅ **Keyboard navigation for zone-search results — COMPLETED**
