@@ -61,6 +61,56 @@ try:
 except ImportError:
     pass
 
+# --- Zone configuration ---
+# Loaded from config/zones.json. Defines the coverage area (center, zoom, radius)
+# from which BBOX, RADIUS_SOURCES, FlightAware, and FlightRadar24 are derived.
+# Override the path via ZONES_FILE env var if needed.
+ZONES_FILE = os.environ.get("ZONES_FILE", "config/zones.json")
+
+
+def _load_zone_config():
+    default = {
+        "active_zone_id": "default",
+        "zones": {
+            "default": {
+                "center": {"lat": 44.0, "lon": 21.0},
+                "zoom": 8,
+                "radius_nm": 220,
+            }
+        },
+    }
+    try:
+        with open(ZONES_FILE, "r") as f:
+            cfg = json.load(f)
+        if "zones" in cfg and cfg.get("active_zone_id") in cfg["zones"]:
+            return cfg
+    except (OSError, ValueError):
+        pass
+    return default
+
+
+_zone_config = _load_zone_config()
+_active_zone_id = _zone_config["active_zone_id"]
+_zone = _zone_config["zones"][_active_zone_id]
+
+AREA_CENTER = _zone["center"]
+AREA_ZOOM = _zone["zoom"]
+AREA_RADIUS_NM = _zone["radius_nm"]
+
+# Bounding box derived from AREA_CENTER: keeps the same shape as before but
+# is now computed from the config-driven center rather than hardcoded.
+BBOX_HALF_HEIGHT_DEG = 2.5
+BBOX_HALF_WIDTH_DEG = 4.0
+BBOX = {
+    "lamin": AREA_CENTER["lat"] - BBOX_HALF_HEIGHT_DEG,
+    "lamax": AREA_CENTER["lat"] + BBOX_HALF_HEIGHT_DEG,
+    "lomin": AREA_CENTER["lon"] - BBOX_HALF_WIDTH_DEG,
+    "lomax": AREA_CENTER["lon"] + BBOX_HALF_WIDTH_DEG,
+}
+
+# Same circle in km, for consumers that measure distance that way
+AREA_RADIUS_KM = AREA_RADIUS_NM * 1.852
+
 app = Flask(__name__, static_folder="static", static_url_path="")
 
 # Signed session cookie key, needed for Sign-in-with-Google below (Flask's
@@ -152,40 +202,6 @@ TOKEN_URL = (
 
 CLIENT_ID = os.environ.get("OPENSKY_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("OPENSKY_CLIENT_SECRET")
-
-# Single source of truth for the observation area: roughly the center of
-# Serbia. BBOX (OpenSky's bounding-box query) and every RADIUS_SOURCES
-# entry's "center" (lat/lon/radius query, see below) are both derived from
-# this one point instead of five independently-maintained constants.
-# AREA_ZOOM is the initial Leaflet zoom level that frames this area — served
-# via /api/config so the frontend's map.setView() call has one backend-owned
-# value to match against instead of a constant it must keep in sync by hand.
-AREA_CENTER = {"lat": 44.0, "lon": 21.0}
-AREA_ZOOM = 8
-
-# Bounding box: Serbia and its immediate neighbors (half the size of the
-# original Balkans-wide box, centered on AREA_CENTER). Half-height/width are
-# in degrees latitude/longitude, not distance — deliberately kept as the
-# original hand-picked box shape rather than derived from AREA_RADIUS_NM
-# below, since a lat/lon box and a radius are different shapes and neither
-# converts exactly into the other.
-BBOX_HALF_HEIGHT_DEG = 2.5
-BBOX_HALF_WIDTH_DEG = 4.0
-BBOX = {
-    "lamin": AREA_CENTER["lat"] - BBOX_HALF_HEIGHT_DEG,
-    "lamax": AREA_CENTER["lat"] + BBOX_HALF_HEIGHT_DEG,
-    "lomin": AREA_CENTER["lon"] - BBOX_HALF_WIDTH_DEG,
-    "lomax": AREA_CENTER["lon"] + BBOX_HALF_WIDTH_DEG,
-}
-
-# Shared by every RADIUS_SOURCES entry below: none of the four has a
-# bounding-box query, only lat/lon/radius (nautical miles, max 250 for all
-# four), so each approximates the same area as BBOX from one shared radius.
-AREA_RADIUS_NM = 220
-# Same circle in km, for consumers that measure distance that way (the
-# Airports layer's scan-zone filter — see api_airports() below — rather
-# than another API's own radius query param).
-AREA_RADIUS_KM = AREA_RADIUS_NM * 1.852
 
 # Never hit OpenSky more often than every MIN_INTERVAL seconds, no matter how
 # many tabs/clients poll our /api/states — keeps both anonymous and
@@ -567,7 +583,13 @@ def api_config():
     # backend-owned AREA_CENTER instead of a hardcoded constant it has to
     # keep in sync by hand — see map-init.js. Pure local values, no I/O, so
     # (like /api/identity) this is deliberately uncached.
-    return jsonify({"center": AREA_CENTER, "zoom": AREA_ZOOM, "radius_nm": AREA_RADIUS_NM})
+    return jsonify({
+        "center": AREA_CENTER,
+        "zoom": AREA_ZOOM,
+        "radius_nm": AREA_RADIUS_NM,
+        "bbox": BBOX,
+        "active_zone_id": _active_zone_id,
+    })
 
 
 def _states_error_response(message):
