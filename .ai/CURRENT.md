@@ -2,6 +2,14 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of today (Backlog: Browser autocomplete + keyboard navigation in search)
+
+✅ **Disabled browser autocomplete in airport search + added keyboard-nav backlog item**
+- **HTML:** Added `spellcheck="false"`, `data-1p-ignore`, `data-lpignore`, `data-form-type="other"` to `#zone-search-input` to suppress browser autocomplete/password managers that obscure the search dropdown results
+- **Backlog:** Added "Keyboard navigation in airport search results" (XS–S, Medium) — arrow keys (↑↓), Enter to select, first result highlighted by default
+- **Next request:** User also asked for quick-open with popular/nearby airports pre-loaded when focus enters the input (separate backlog item)
+- **Status:** Ready for commit
+
 ## Status as of 2026-07-21 (Perf: Reduced auto-center animation duration)
 
 ✅ **Perf tuning: Auto-center animation duration reduced to 400ms**
