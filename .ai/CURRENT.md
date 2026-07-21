@@ -4,13 +4,16 @@
 
 ## Status as of 2026-07-21 (Evening)
 
-✅ **Infrastructure Complete: `.ai/CURRENT.md` commit-blocking hook**
+✅ **Infrastructure Complete: All `.ai/` commit hooks**
 - Commit `f78832d` — "feat: automate .ai/CURRENT.md upkeep via commit-blocking hook"
-- New `.claude/hooks/check-current-md.sh` script (PreToolUse hook on `git commit *`)
-- Blocks commits unless `.ai/CURRENT.md` is staged; bypass with `--no-current-check`
-- Configured in `.claude/settings.json` (team-wide policy)
-- Documented in CLAUDE.md + `.agents/architect.md`
-- ✨ **Note:** Hook will activate in the next session or after `/hooks` UI reload (settings watcher was initialized before script was created). No code changes needed; the infrastructure is fully in place.
+  - `.claude/hooks/check-current-md.sh` → blocks commits unless `.ai/CURRENT.md` staged; bypass with `--no-current-check`
+- Commit `TBD` — "feat: add BACKLOG auto-cleanup and ARCHITECTURE/DECISIONS nudge hooks"
+  - `.claude/hooks/backlog-cleanup.sh` → auto-removes lines marked `✅ ` from `.ai/BACKLOG.md`, re-stages file
+  - `.claude/hooks/nudge-docs.sh` → suggests updating ARCHITECTURE/DECISIONS when `app.py`, `storage.py`, or `enrichment/` files change (soft nudge, not a block)
+- All three configured in `.claude/settings.json` (team-wide policy)
+- Documented in CLAUDE.md, `.agents/architect.md`, and BACKLOG.md
+- Tested: pipe-test + JSON validation ✓
+- ✨ **Note:** Hooks will activate in the next session or after `/hooks` UI reload (settings watcher initialized before new scripts created). No code changes needed; infrastructure is fully in place.
 
 ✅ **Feature Complete: Dynamic zones configuration**
 - Commit `b2d49fb` — "feat: load zone configuration from config/zones.json"

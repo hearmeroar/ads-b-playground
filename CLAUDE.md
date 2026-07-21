@@ -29,9 +29,12 @@ This file is large (210KB) and mixes stable architectural facts, historical rati
 4. Optionally read `.ai/BACKLOG.md` if adding features or proposing ideas.
 
 **Before creating a commit:**
-If your changes represent an architecturally-significant decision (new data source, changed priority chain, changed storage approach, new constraint), add an entry to `.ai/DECISIONS.md` (format: date, problem, decision, reason, tradeoffs). Update `.ai/ARCHITECTURE.md` if the current-state map itself changed. Update `.ai/CURRENT.md` if the active task status changed. Place new parked ideas in `.ai/BACKLOG.md`, not DECISIONS.md.
+If your changes represent an architecturally-significant decision (new data source, changed priority chain, changed storage approach, new constraint), add an entry to `.ai/DECISIONS.md` (format: date, problem, decision, reason, tradeoffs). Update `.ai/ARCHITECTURE.md` if the current-state map itself changed. Update `.ai/CURRENT.md` if the active task status changed. Place new parked ideas in `.ai/BACKLOG.md`, not DECISIONS.md. Mark completed backlog items with `✅ ` prefix (e.g., `✅ **Item Name**`) — they are auto-pruned on commit.
 
-**Note:** `.ai/CURRENT.md` updates are mechanically enforced — `git commit` will block unless `.ai/CURRENT.md` is part of the staged changes (via a `.claude/settings.json` PreToolUse hook). To bypass for commits that genuinely don't change task status, append `--no-current-check` to the `git commit` command.
+**Mechanical enforcement (via `.claude/settings.json` PreToolUse hooks):**
+1. `.ai/CURRENT.md` must be staged unless `--no-current-check` flag is appended to `git commit`.
+2. `.ai/BACKLOG.md` completed items (marked `✅ `) are automatically removed before commit and the file is re-staged.
+3. If `app.py`, `storage.py`, or `enrichment/` files are staged, nudge suggesting to review/update `.ai/ARCHITECTURE.md` and/or `.ai/DECISIONS.md` (soft reminder, not a block).
 
 **What NOT to write in `.ai/` files:**
 - Temporary debugging traces or "tried X, didn't work" logs (keep those in CURRENT.md only while actively working, then remove them).

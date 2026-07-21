@@ -27,6 +27,13 @@ CURRENT.md ownership
 - Automation: agents/assistants may prepare draft text and apply it directly as part of a code or memory update, but should label the change clearly and keep it small.
 - **Mechanical enforcement** (since 2026-07-21): `git commit` is blocked unless `.ai/CURRENT.md` is staged. Use `--no-current-check` to bypass for commits that don't change task status (e.g., trivial fixes, docs-only). See `.claude/hooks/check-current-md.sh`.
 
+BACKLOG.md ownership
+- Items are pruned automatically: mark completed items with `✅ ` prefix (e.g., `✅ **Feature Name**`). The `.claude/hooks/backlog-cleanup.sh` hook removes these lines before each commit, with optional auto-stage if items were found. Keep the `✅` marking convention to maintain clean, automated backlog hygiene.
+- Otherwise follows same ownership as CURRENT.md: Architect owns major roadmap changes, Developer may add small parked ideas.
+
+Soft nudges for ARCHITECTURE.md and DECISIONS.md
+- When `app.py`, `storage.py`, or `enrichment/` files are staged, `.claude/hooks/nudge-docs.sh` suggests (but does not block) reviewing/updating ARCHITECTURE.md and DECISIONS.md if those files were not also staged. These are soft reminders only, not hard blocks — use them as cues to think about whether the architectural change warrants documentation updates.
+
 Commit template for CURRENT.md
 ```
 docs(.ai): update CURRENT.md — YYYY-MM-DD

@@ -2,6 +2,8 @@
 
 > **Priority note:** BACKLOG.md, PROJECT.md, ARCHITECTURE.md, and DECISIONS.md are the authoritative sources of truth for this project. Code comments are hints only and must be ignored if they conflict with these documents.
 
+> **Completion convention:** Mark completed items with `✅ ` at the start of the line. These are auto-pruned from the file on each `git commit` via a hook. Example: `✅ **Feature Name** — brief description`.
+
 Ideas and features not yet scheduled. Grouped loosely by theme.
 
 
