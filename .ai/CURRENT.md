@@ -42,6 +42,11 @@ Pre-existing 3 failures in `test_route_card_tilt.spec.js` (route card arrow
 animation tilt) — confirmed unrelated (present on clean main), no regression
 introduced by this work.
 
+**Quick fix, same session**: CSS rule `#hud .count-spinner[hidden] { display: none; }`
+was missing — spinners had `display: block` but CSS wasn't overriding the
+`[hidden]` attribute, so spinners remained visible after `poll()` completed.
+Fixed immediately after local testing revealed the issue.
+
 **BACKLOG.md**: item marked `✅ Show a loader when applying filters` for
 auto-cleanup on next commit.
 

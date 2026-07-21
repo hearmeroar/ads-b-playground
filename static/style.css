@@ -68,6 +68,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
   border: 1.5px solid rgba(15, 23, 42, 0.14); border-top-color: var(--muted);
   animation: gallery-spin .7s linear infinite;
 }
+#hud .count-spinner[hidden] { display: none; }
 #hud .source-help {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0; border: none; background: none; line-height: 0;
