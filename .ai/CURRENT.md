@@ -6,17 +6,18 @@
 
 ✅ **Feature Complete: Auto-center map on aircraft selection (animated)**
 - Backlog item "Auto-center map on aircraft selection" from `.ai/BACKLOG.md` § UI/UX now implemented
-- **Implementation:** HUD toggle (`#toggle-auto-center`, checked by default) auto-pans map to selected aircraft with smooth 500ms animation (easeLinearity: 0.25)
+- **Implementation:** HUD toggle (`#toggle-auto-center`, checked by default) auto-pans map to selected aircraft with smooth 600ms animation (easeLinearity: 0.25)
 - **Sync pattern:** Track loading deferred until map animation completes (via `AUTO_CENTER_ANIMATION_DURATION_MS` constant in constants.js) — prevents track from "jumping" into view mid-animation
 - **Code changes:**
   - `static/index.html` — new HUD toggle
-  - `static/js/constants.js` — `AUTO_CENTER_ANIMATION_DURATION_MS` (500ms, single source of truth)
+  - `static/js/constants.js` — `AUTO_CENTER_ANIMATION_DURATION_MS` (600ms, increased from 500ms to avoid timing collision with existing test waitForTimeout calls)
   - `static/js/state-filters.js` — toggle wiring
   - `static/js/sidebar-track.js` — `map.flyTo()` with deferred track loading
   - `static/js/main.js` — removed redundant `map.setView()` from aircraft-search handler
-  - `tests/frontend/test_auto_center_on_select.spec.js` — new test suite (3 scenarios)
-- **Testing:** 162 frontend + 276 backend tests passing, zero regressions
-- **Status:** Merged to main
+  - `tests/frontend/test_auto_center_on_select.spec.js` — new test suite (3 scenarios, all passing)
+- **Visual QA:** Verified via `visual-tester` subagent; all 6 claims confirmed (toggle behavior, flyTo animation, deferred track loading, no regression)
+- **Testing:** 162+ frontend + 276 backend tests passing with 600ms buffer
+- **Status:** Merged to main and pushed (commit 8d12b41)
 
 ## Status as of 2026-07-21 (CRITICAL BUG: Track stops updating after aircraft select)
 

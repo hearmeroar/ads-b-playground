@@ -42,6 +42,7 @@ requires.
 | Item | Effort | Value | Category | Read |
 |---|---|---|---|---|
 | **[CRITICAL BUG]** Track stops updating after aircraft select | S | High | Frontend UX / Bug | **BLOCKER:** Track renders & updates *before* selection (live polling). Clicking marker → track stops updating, becomes stale. Historical track fetch may interfere with live trail. See Bugs section. |
+| **[BUG]** `capture-test-run.sh` hook not updating test markers in session | XS–S | High | Testing | Verification hook (`PostToolUse`) that captures real test run exit codes to `.claude/test-runs/` not being triggered/updating during session. Blocks `require-verification.sh` gate from verifying current test state. See Bugs section. |
 | Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
 | Selected aircraft styling & visual highlight | XS–S | Medium | Frontend UX | Visual distinction when an aircraft is selected: highlight marker, glow, or change icon/color to signal active selection state. |
 | Auto-center map on aircraft selection | XS | Medium | Frontend UX | Automatic map pan/zoom to center on selected aircraft, rather than requiring manual center-map button click. |
@@ -107,6 +108,29 @@ requires.
 6. Check if track layer is still present in map layers after selection
 
 **Next steps:** Trace `selectAircraft()` → `loadTrack()` flow to see if historical track interferes with live trail. Check if `liveTrailById` continues being updated in poll loop. Verify `trackLayerGroup` isn't removed between polls.
+
+---
+
+### Verification hook: `capture-test-run.sh` not updating `.claude/test-runs/` markers during session
+
+**Symptom:**
+- `capture-test-run.sh` is registered as a `PostToolUse` hook in `.claude/settings.json` to capture real test run exit codes into `.claude/test-runs/{backend,frontend,live_check}.json`
+- A real `npx playwright test` run executed this session did NOT update `.claude/test-runs/frontend.json` — file retained an old timestamp (17:30:00Z from a previous session)
+- Related: `require-verification.sh` (`PreToolUse` hook in the git commit chain) depends on these markers being fresh; without live updates, the gate cannot verify current test state
+
+**Impact:** Mechanical verification gate (`require-verification.sh`) cannot reliably prove that staged changes pass tests, since the test-run markers are not being kept up-to-date by the hook.
+
+**Root cause (TBD):**
+- Unclear whether `PostToolUse` hooks are fully active in the current session. `.claude/settings.json` was modified 2026-07-21 to add `PostToolUse` array (not a pre-existing config key that might require reload), so activation timing vs. session lifecycle is unknown.
+- Alternatively, hook shell script might not be executing correctly, or exit code parsing logic has a bug
+
+**Verification steps:**
+1. Check if `.claude/test-runs/` directory exists and `.gitignore` is correct
+2. Run a real `pytest tests/backend/test_health.py` or `npx playwright test` command in the next session
+3. Immediately after test completes, verify that `.claude/test-runs/backend.json` or `.claude/test-runs/frontend.json` has been updated with current timestamp and correct `exit_code`
+4. If not updated, check: (a) whether `PostToolUse` hook fires at all (add a debug log to `.claude/hooks/capture-test-run.sh` to verify execution), (b) whether the tool_response parsing is correct, (c) whether `run_in_background` tests are being captured
+
+**Next steps:** Full live-fire verification at session start. If hook isn't firing, check whether settings reload or `/hooks` UI action is needed to activate newly-added PostToolUse hooks mid-session.
 
 ---
 
