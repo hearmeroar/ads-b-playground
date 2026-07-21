@@ -4,10 +4,12 @@
 
 > **Completion convention:** Mark completed items with `✅ ` at the start of the line. These are auto-pruned from the file on each `git commit` via a hook. Example: `✅ **Feature Name** — brief description`.
 
-> **Speed/value convention (added 2026-07-21):** every item added to or
-> materially edited in this file must carry a Speed × Value estimate,
-> recorded as a row in the "At a glance" table immediately below. Speed
-> is effort/complexity — `XS` (<2h), `S` (0.25–1 day), `M` (1–2 days),
+> **Effort/value convention (added 2026-07-21, renamed from "Speed" same
+> day — "Speed" read as execution velocity, not effort/size, which is
+> what the column actually measures):** every item added to or
+> materially edited in this file must carry an Effort × Value estimate,
+> recorded as a row in the "At a glance" table immediately below. Effort
+> is complexity/size — `XS` (<2h), `S` (0.25–1 day), `M` (1–2 days),
 > `L` (2–3 days), `XL` (3+ days, or blocked pending research/a decision).
 > Value is expected product impact if shipped today — `Low` / `Medium` /
 > `High` — judged against this app's actual current use (single-tenant
@@ -25,13 +27,13 @@ line left its body orphaned with no heading. Completed multi-paragraph
 items are now deleted in full rather than title-only-marked, to avoid
 recreating that problem.)*
 
-## At a glance — Speed × Value (as of 2026-07-21)
+## At a glance — Effort × Value (as of 2026-07-21)
 
 Sorted best-first (cheap + valuable at the top). Full item detail is in the
 sections below; this table is the quick-scan summary the convention above
 requires.
 
-| Item | Speed | Value | Read |
+| Item | Effort | Value | Read |
 |---|---|---|---|
 | Local track persistence & smoothing (frontend) | S | Med–High | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
 | Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Highest standalone value in the backlog; worth scheduling deliberately |
