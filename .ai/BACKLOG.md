@@ -4,6 +4,18 @@
 
 > **Completion convention:** Mark completed items with `✅ ` at the start of the line. These are auto-pruned from the file on each `git commit` via a hook. Example: `✅ **Feature Name** — brief description`.
 
+> **Speed/value convention (added 2026-07-21):** every item added to or
+> materially edited in this file must carry a Speed × Value estimate,
+> recorded as a row in the "At a glance" table immediately below. Speed
+> is effort/complexity — `XS` (<2h), `S` (0.25–1 day), `M` (1–2 days),
+> `L` (2–3 days), `XL` (3+ days, or blocked pending research/a decision).
+> Value is expected product impact if shipped today — `Low` / `Medium` /
+> `High` — judged against this app's actual current use (single-tenant
+> hobby tracker), not hypothetical future scale. Re-score an item (don't
+> just re-add a row) whenever its scope or estimate changes materially.
+> See `.agents/architect.md` § "BACKLOG.md ownership" for who's expected
+> to keep this current.
+
 Ideas and features not yet scheduled. Grouped loosely by theme.
 
 *(Note: this file went through several rounds of the `backlog-cleanup.sh`
@@ -13,6 +25,38 @@ line left its body orphaned with no heading. Completed multi-paragraph
 items are now deleted in full rather than title-only-marked, to avoid
 recreating that problem.)*
 
+## At a glance — Speed × Value (as of 2026-07-21)
+
+Sorted best-first (cheap + valuable at the top). Full item detail is in the
+sections below; this table is the quick-scan summary the convention above
+requires.
+
+| Item | Speed | Value | Read |
+|---|---|---|---|
+| `C0`-category enrichment special-case | S | Med–High | Quick win — real data-correctness bug (heuristics can badge a ground vehicle with a plausible-looking but wrong country/operator) |
+| Local track persistence & smoothing (frontend) | S | Med–High | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
+| Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Highest standalone value in the backlog; worth scheduling deliberately |
+| Health check endpoint (`/api/health`) | XS–S | Medium | Cheap once the admin-only-vs-public question is answered — currently blocked on that decision, not on effort |
+| Seamless login without page reload | M | Medium | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
+| Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Shareable/deep-linkable view; reusable layout could also serve collection cards |
+| Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
+| Airline metadata enrichment (alliance/country/website) | L | Medium | Needs a source-validation phase before implementation, not just coding time |
+| Dark mode | M | Medium | Visible polish; CSS touches sidebar+HUD, not a single component |
+| External links: UTM params / `rel` / variableized host | S | Low | Mostly hygiene (`noreferrer`) + analytics tagging this app doesn't otherwise use |
+| UI/CSS framework evaluation (POC only) | S | Low | Cheap experiment; no user-facing payoff until a real migration follows (unscoped, separate cost) |
+| Register an AirLabs API key | XS | Low | Trivial, but a pure prerequisite — does nothing standalone |
+| Exercise `.agents/ui.md` on a real task | XS–S | Low | Process/meta value only, not user-facing |
+| Sidebar search/filter within collection | S | Low | Only matters once a user's collection is large; defer until it is |
+| Metrics export (`/metrics`, Prometheus) | M | Low–Med | Ops/observability value, no urgency for a single-tenant app |
+| Collection panel bulk operations | M | Low | Speculative — no evidence the collection is big enough to need bulk actions yet |
+| Adaptive polling intervals | M | Low | Defer until an actual quota-pressure incident, not before |
+| Load testing | M | Low | Only relevant if traffic ever exceeds single-user hobby scale |
+| Live network tests (CI-gated) | M | Low | Low ROI unless upstreams start breaking often (not observed so far) |
+| Contributor guide | S | Low | Speculative — depends on this project ever getting contributors |
+| Route prediction from velocity vector (Layer 3 route validation) | L | Low–Med | Speculative extension of Layer 2; no user ask driving it yet |
+| Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Blocked — no free/no-signup source identified yet |
+| Aircraft serial number (MSN) field | XL (blocked) | Low | Blocked — no verified data source yet, needs research first |
+| *(Historical track interpolation, listed separately below)* | — | — | Duplicate of the two track-smoothing items above; fold into one of them rather than tracking a third time |
 
 Goal: surface additional airline metadata (alliance, country, website) in the
 sidebar and collection views whenever available, sourcing from the existing
