@@ -41,6 +41,30 @@ Auto-drafted note for `RADIUS_SOURCES` changes (since 2026-07-21)
 - `.claude/hooks/radius-sources-draft-note.sh` inspects the staged `app.py` diff for hunks that actually mention `RADIUS_SOURCES`. If found, it prepends a `## Draft note (auto-generated)` section to the top of `.ai/CURRENT.md` containing the real diff hunk, stages the file, and lets the commit proceed with a `systemMessage` pointing this out.
 - This is a draft, not a finished entry — replace it with a real summary (or delete it if redundant) before the *next* commit that touches `app.py`. It runs first in the hook chain specifically so its auto-staging of `.ai/CURRENT.md` also satisfies `check-current-md.sh` for a `RADIUS_SOURCES`-only commit.
 
+Visual QA enforcement for frontend commits (since 2026-07-21)
+- `.claude/hooks/check-visual-qa.sh` blocks `git commit` whenever the
+  staged diff touches `static/index.html`, `static/style.css`, or any
+  `static/js/*.js` file, unless `.claude/visual-qa-report.json` exists,
+  its `diff_hash` field matches a freshly recomputed hash of the staged
+  diff for exactly those files, and every entry in its `claims` array has
+  verdict `"confirmed"`.
+- The report is produced by the `visual-tester` subagent
+  (`.claude/agents/visual-tester.md`), which drives a real Playwright
+  browser session and verifies each visible-behavior claim through three
+  independent channels (DOM/structure, computed style, screenshot pixel
+  diff) before writing the report. See `.agents/visual-qa.md` for the
+  full rationale and `.claude/agents/visual-tester.md` for the exact hash
+  procedure/report schema.
+- Bypass: `--no-visual-check` appended to the `git commit` command — same
+  escape-hatch convention as `--no-current-check` above, intended for
+  commits with no visible-behavior claim to verify (or a genuine
+  emergency), not a routine workaround.
+- This hook has no auto-staging side effect (unlike
+  `radius-sources-draft-note.sh`/`backlog-cleanup.sh`) — it's a pure
+  pass/fail gate, registered right after `check-current-md.sh` in the
+  hook chain since both are hard blocks, ahead of the side-effecting and
+  soft-nudge hooks.
+
 Commit template for CURRENT.md
 ```
 docs(.ai): update CURRENT.md — YYYY-MM-DD

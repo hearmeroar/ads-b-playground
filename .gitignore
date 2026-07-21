@@ -15,5 +15,6 @@ playwright-report/
 .app.db
 .app.db-wal
 .app.db-shm
+.claude/visual-qa-report.json
 PROD_INFRA_NOTES.md
 PLAN_NOTES.md

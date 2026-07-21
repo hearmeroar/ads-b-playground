@@ -44,7 +44,7 @@ requests (see CLAUDE.md § "Tests"). Reuse that same approach:
   relevant area, prefer extending/running that spec (with a temporary
   `page.screenshot()` or assertion added) over writing a whole new script.
 - Put any throwaway script/output in the scratchpad directory, not the
-  repo, unless the check is meant to become a permanent spec (see Step 5).
+  repo, unless the check is meant to become a permanent spec (see Step 6).
 - The app's normal dev port is 5051 and the Playwright test port is 5050
   (`playwright.config.js` starts it automatically) — never launch on any
   other port; see CLAUDE.md § "Commands" for why (Google OAuth redirect
@@ -82,7 +82,56 @@ Don't rely on a single channel for any one claim:
 Match evidence to claim type — don't run a pixel diff for a claim that a
 plain `.isVisible()` check already answers exactly.
 
-## Step 5 — Report
+## Step 5 — Write the machine-readable report (required, gates the commit)
+
+**A `git commit` touching `static/index.html`, `static/style.css`, or any
+`static/js/*.js` is mechanically blocked by `.claude/hooks/
+check-visual-qa.sh` unless this step produces a valid, fresh report.**
+This isn't optional bookkeeping — it's how the hook knows verification
+actually ran, and ran against the diff currently staged.
+
+**Order matters**: the changes under test must already be `git add`-ed
+*before* you compute the hash below — the hook recomputes the same hash
+from what's staged at commit time, so if anything changes after you
+write the report, the hash will no longer match and the commit will be
+blocked again (correctly — it means unverified code snuck in after the
+check).
+
+1. Compute the exact set of staged "visually checkable" files (same
+   pattern the hook uses):
+   ```bash
+   staged_visual_files="$(git diff --cached --name-only | grep -E '^static/(index\.html|style\.css|js/.*\.js)$' | sort)"
+   ```
+2. Hash the staged diff over exactly that file set (portable — try
+   `sha256sum`, fall back to `shasum -a 256` on macOS):
+   ```bash
+   diff_hash="$(git diff --cached -- $staged_visual_files | (sha256sum 2>/dev/null || shasum -a 256) | awk '{print $1}')"
+   ```
+3. Write `.claude/visual-qa-report.json` at the repo root (already
+   gitignored — it's a per-check artifact, never committed) with every
+   claim from Step 1 and its verdict from Step 4:
+   ```json
+   {
+     "generated_at": "<ISO 8601 timestamp>",
+     "diff_hash": "<the hash from step 2>",
+     "claims": [
+       {"claim": "<atomic claim text>", "verdict": "confirmed", "evidence": "<selector/value/screenshot path>"}
+     ]
+   }
+   ```
+   `.claims` must be non-empty. If the task genuinely made no
+   visible-behavior claim (e.g. a pure refactor with no intended
+   rendering change), write one claim to that effect — e.g. `"claim":
+   "no visual regression: rendering is unchanged before/after"` — and
+   verify it the same way (pixel diff empty / DOM unchanged), rather than
+   leaving `claims` empty. An empty or missing report is treated by the
+   hook exactly like "verification never ran."
+4. Every claim needs verdict exactly `"confirmed"` for the commit to
+   proceed — `"not confirmed"`/`"partial"` will block it, which is the
+   point: don't write `"confirmed"` for anything you didn't actually
+   verify through Step 4's channels.
+
+## Step 6 — Report to whoever asked
 
 Produce one list, in this shape, and nothing more elaborate:
 
@@ -116,3 +165,10 @@ Then, separately:
 - Never run the app on a port other than 5051 (normal) or 5050 (test).
 - Clean up any throwaway script/server process you started before
   finishing.
+- Never write `"confirmed"` into `.claude/visual-qa-report.json` for a
+  claim you didn't actually run through Step 4 — that report is what
+  unblocks a real commit; a fabricated pass defeats the entire point of
+  this agent existing.
+- Don't hand-edit `.claude/visual-qa-report.json`'s `diff_hash` to make it
+  match — always compute it fresh per Step 5, from the diff actually
+  staged at that moment.

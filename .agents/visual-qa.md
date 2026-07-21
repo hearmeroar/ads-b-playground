@@ -85,6 +85,34 @@ Guardrails
   own snapshot tooling already does it — same "match existing idioms"
   principle as `.agents/ui.md`.
 
+Mechanical enforcement (since 2026-07-21)
+- This is no longer only a convention — `.claude/hooks/check-visual-qa.sh`
+  (wired into `.claude/settings.json`'s `git commit` `PreToolUse` chain)
+  **blocks the commit** whenever staged changes touch `static/index.html`,
+  `static/style.css`, or any `static/js/*.js` file, unless
+  `.claude/visual-qa-report.json` exists, its `diff_hash` matches a fresh
+  hash of the currently staged diff for those files, and every one of its
+  `claims` has verdict `"confirmed"`. The report is produced by the
+  `visual-tester` subagent (`.claude/agents/visual-tester.md`) — see that
+  file for the exact schema and hash procedure.
+- The hash-matching is what prevents a stale pass: if anything changes
+  after `visual-tester` ran (a further edit, a different file staged), the
+  recomputed hash no longer matches the report's, and the commit is
+  blocked again until `visual-tester` reruns against the new diff.
+- **Escape hatch**: `--no-visual-check` appended to the `git commit`
+  command, for a commit with genuinely no visible-behavior claim (a
+  comment-only change) or a real emergency — same convention as
+  `check-current-md.sh`'s `--no-current-check`. Not a routine bypass; a
+  claim with nothing to verify should still get one line in the report
+  (e.g. "no visual regression: rendering unchanged") per
+  `visual-tester.md`'s Step 5, rather than reaching for this flag by
+  default.
+- Required workflow order: stage the change (`git add`) → invoke
+  `visual-tester` (Agent tool, `subagent_type: visual-tester`) with the
+  task's claims → it writes the report against what's now staged → commit.
+  Staging *after* running `visual-tester` invalidates the hash and re-locks
+  the commit, so don't reorder this.
+
 When to act
 - A task/PR claims a specific visible change and there's any doubt
   whether it actually shipped (common after a large refactor, a
