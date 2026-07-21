@@ -1,8 +1,12 @@
 # Agents README
 
 This folder contains lightweight role descriptions for a small in-repo
-agent team: Architect, Developer, Reviewer, UI. Files are guidance only —
-agents are textual helpers for humans and must not run autonomously.
+agent team: Architect, Developer, Reviewer, UI, Visual QA. Files are
+guidance only — agents are textual helpers for humans and must not run
+autonomously. (Visual QA's operational counterpart, a real invocable
+Claude Code subagent, lives at `.claude/agents/visual-tester.md` — that
+file drives Playwright itself; this folder's `visual-qa.md` is its
+rationale/checklist, same split as any other role here.)
 
 ## Principles
 
@@ -32,6 +36,10 @@ This convention ensures AI agents work from the single source of truth for proje
   `static/js/*.js`), read `.agents/ui.md` first — it lists the required UI
   patterns (help popovers, tooltip mechanism, hide-vs-disable rule) and the
   load-order constraint this project enforces.
+- Before marking a UI task complete, use `.agents/visual-qa.md` (or invoke
+  the `visual-tester` subagent directly) to confirm the claimed visible
+  change actually happened in a real browser, not just that the diff reads
+  correctly.
 
 ## Quick SOP (summary)
 

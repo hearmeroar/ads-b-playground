@@ -2,6 +2,27 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Docs: new Visual QA role + visual-tester subagent)
+
+✅ **Added a Visual QA role to the in-repo agent team**, to close a gap
+none of Architect/Developer/Reviewer/UI cover: confirming that a UI change
+claimed in a task/PR *actually happened* in the running app (element
+appeared/disappeared, style changed, interaction works), not just that the
+diff reads correctly.
+- `.agents/visual-qa.md` — the playbook (role, scope, method: claim
+  checklist → reuse existing Playwright/fixture mocks → drive a real
+  scenario → verify via DOM/computed-style/pixel-diff → score each claim
+  → report), same style as `ui.md`/`reviewer.md`.
+- `.claude/agents/visual-tester.md` — the operational counterpart: a real
+  invocable Claude Code subagent (frontmatter `tools: Bash, Read, Glob,
+  Grep, Write`) that runs the playbook's steps directly, callable via the
+  Agent tool as `visual-tester`.
+- `.agents/README.md` updated to list the new role and point to it before
+  marking a UI task complete.
+- Doc-only change, no app code touched; no new tests needed (the
+  `visual-tester` subagent itself *is* the tool that would exercise
+  Playwright for future UI verification tasks).
+
 ## Status as of 2026-07-21 (Bug fix: C-category heuristic fields leaked real-looking but wrong data)
 
 ✅ **Bug fix: `category_code` never reached the backend on a real marker
