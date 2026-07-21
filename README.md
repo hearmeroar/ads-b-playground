@@ -275,6 +275,13 @@ environment. **Migrating an existing deployment** that still has the old
 over — it's idempotent, safe to run more than once, and never deletes the
 old files.
 
+**Health check endpoint (`/api/health`)** — a public, unauthenticated HTTP endpoint
+for deployment monitoring. Returns `{"status": "ok"}` with HTTP 200 when the app is
+healthy (including SQLite connectivity). Returns `{"status": "degraded", "message": "..."}` 
+with HTTP 503 if the database connection fails. The response deliberately omits
+operational details (quotas, configuration, per-source state) to keep the signal clean.
+Useful for Kubernetes probes, load-balancer health checks, or uptime monitoring.
+
 **OpenSky may be intermittently blocked from Northflank (or any Google
 Cloud/AWS/other hyperscaler-hosted deployment)**: OpenSky's own FAQ states
 they may block hyperscaler IP ranges outright due to abuse, and this was
