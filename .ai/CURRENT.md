@@ -4,16 +4,16 @@
 
 ## Status as of today (Backlog: Change default zone to London)
 
-✅ **Change default zone to London (Heathrow) — COMPLETED**
-- **Effort:** XS (one-liner config changes)
-- **Value:** Medium (UX improvement for UK-based use)
+✅ **Change default zone configuration — COMPLETED**
+- **Effort:** XS (configuration updates)
+- **Value:** Medium (UX improvement via zone-search flexibility)
 - **Changes:**
-  - `app.py`: Updated default zone config in `_load_zone_config()` from Serbia (44.0, 21.0) to London (51.47, -0.46)
-  - `config/zones.json`: Updated default zone center coordinates and reset `active_zone_id` to "default"
-  - **Tests updated** (276 backend tests): All zone-dependent tests updated to use London coordinates:
+  - `app.py`: Updated default zone config in `_load_zone_config()`
+  - `config/zones.json`: Updated default zone center coordinates and reset `active_zone_id`
+  - **Tests updated** (276 backend tests): All zone-dependent tests updated:
     * `test_api_config`: Expected center coordinates updated
-    * `test_airports.py`: Fixtures changed from Belgrade (LYBE) to London (EGLL) area (5 tests)
-    * `test_metar_sigmet.py`: METAR_SAMPLE, NEARBY_SIGMET, NEARBY_MULTI_POLYGON_SIGMET fixtures updated to London coordinates
+    * `test_airports.py`: Fixtures updated for default zone area (5 tests)
+    * `test_metar_sigmet.py`: Test fixtures updated for default zone coordinates
   - All 276 backend tests passing
 - **Backlog status:** Item marked ✅ COMPLETED
 - **Commit:** chore: change default zone to London (Heathrow) from Serbia

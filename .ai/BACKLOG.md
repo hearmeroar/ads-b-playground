@@ -42,7 +42,7 @@ requires.
 | Item | Effort | Value | Category | Read |
 |---|---|---|---|---|
 | **[CRITICAL BUG]** Track stops updating after aircraft select | S | High | Frontend UX / Bug | **BLOCKER:** Track renders & updates *before* selection (live polling). Clicking marker → track stops updating, becomes stale. Historical track fetch may interfere with live trail. See Bugs section. |
-| Change default zone to London (Heathrow) | XS | Medium | DevOps | One-liner config: `AREA_CENTER = {lat: 51.47, lon: -0.46}`, update `config/zones.json` default zone_id. Improves UX for UK-based use (current Serbia is arbitrary). |
+| Change default zone to London (Heathrow) | XS | Medium | DevOps | ✅ COMPLETED — Updated default AREA_CENTER via zone-search configuration. |
 | **[BUG]** `capture-test-run.sh` hook not updating test markers in session | XS–S | High | Testing | Verification hook (`PostToolUse`) that captures real test run exit codes to `.claude/test-runs/` not being triggered/updating during session. Blocks `require-verification.sh` gate from verifying current test state. See Bugs section. |
 | Keyboard navigation in airport search results | XS–S | Medium | Frontend UX | Arrow keys (↑↓) to navigate, first item highlighted by default, Enter to select. Quick win for faster keyboard-only airport navigation. |
 | Airport search quick-open with pre-loaded results | XS–S | Medium | Frontend UX | When input focus enters #zone-search-input, immediately show list of popular/nearby airports (no typing needed). Options: (1) hardcoded popular list (London/Paris/Berlin), (2) 10 nearest airports to current AREA_CENTER. Improves speed for frequent zone-switching. |

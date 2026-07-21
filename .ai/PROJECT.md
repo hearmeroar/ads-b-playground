@@ -2,7 +2,7 @@
 
 ## What this is
 
-A **single-tenant live aircraft tracker** built with no framework, no build step, and no signup/API-key data sources — Flask proxies seven independent data feeds (OpenSky, adsb.fi, adsb.lol, adsb.one, airplanes.live, FlightAware AeroAPI, FlightRadar24, plus adsbdb.com for lazy enrichment) to a static Leaflet map and a vanilla-JS frontend. Users can save favorite aircraft to a personal collection (Google OAuth login, SQLite persistence). All components share one source of truth: `AREA_CENTER` (currently Serbia, 44°N 21°E, 220 nm radius), though the Airports layer extends globally.
+A **single-tenant live aircraft tracker** built with no framework, no build step, and no signup/API-key data sources — Flask proxies seven independent data feeds (OpenSky, adsb.fi, adsb.lol, adsb.one, airplanes.live, FlightAware AeroAPI, FlightRadar24, plus adsbdb.com for lazy enrichment) to a static Leaflet map and a vanilla-JS frontend. Users can save favorite aircraft to a personal collection (Google OAuth login, SQLite persistence). All components share one source of truth: `AREA_CENTER` (configurable via zone-search, 220 nm radius), though the Airports layer extends globally.
 
 **Goals:**
 - Operate offline (all external data proxied; Leaflet/tiles vendored locally).

@@ -151,8 +151,8 @@ sources so the architecture (caching, error handling) is uniform, even though
 most of the radius sources and FlightAware itself may not need a CORS workaround.
 
 **OpenSky endpoints proxied by `app.py`:**
-- `/api/states` → `/states/all`, bbox-filtered via `BBOX` (currently centered
-  on Serbia, `41.5–46.5°N, 17–25°E`). Cached for `MIN_INTERVAL` (10s) — no
+- `/api/states` → `/states/all`, bbox-filtered via `BBOX` (computed from
+  `AREA_CENTER`, configurable via zone-search). Cached for `MIN_INTERVAL` (10s) — no
   matter how many frontend polls land in that window, OpenSky is hit at most
   once. On a 429 or network error, the last good response is re-served with
   `stale`/`error` flags instead of failing the request. A 429 also forwards
@@ -426,18 +426,15 @@ only ever trusts an explicit `routeSource` override, not the generic
 per-entry lookup, for these two fields.
 
 **Area coupling:** All location-based constants derive from one `AREA_CENTER`
-(`{"lat": 44.0, "lon": 21.0}` by default) in `app.py`, loaded from
-`config/zones.json` at import (`_load_zone_config()`, `ZONES_FILE` env var
-overridable; falls back to the same hardcoded default if the file is
-missing/malformed): `BBOX` is computed from it, every
+(configurable via `config/zones.json` at import via `_load_zone_config()`, 
+`ZONES_FILE` env var overridable): `BBOX` is computed from it, every
 `RADIUS_SOURCES[*]["center"]` is set to it (with the appropriate
 `dist`/`radius` field per API), and `/api/config` exposes it (plus
 `AREA_ZOOM`, the initial map zoom level) so the frontend's `map.setView()`
 call in `static/js/map-init.js` fetches the backend-owned values and self-corrects
-if they drift. `map-init.js` has a hardcoded fallback (the original `[44.0, 21.0], 8`)
-so the map paints synchronously without waiting for `/api/config`; the fetch then
-happens and adjusts the view immediately if the backend differs. No more
-manual sync of six independent constants. `/api/config` also exposes
+if they drift. `map-init.js` has a hardcoded fallback so the map paints synchronously 
+without waiting for `/api/config`; the fetch then happens and adjusts the view 
+immediately if the backend differs. No more manual sync of six independent constants. `/api/config` also exposes
 `radius_nm` (`AREA_RADIUS_NM`, 220) — the shared query radius every
 `RADIUS_SOURCES` entry's `center` is built from — which drives the
 scan-radius range rings below.
@@ -1041,8 +1038,7 @@ because photographer name and photo URL come from an external API.
   literal word "Unknown" rather than hiding the row (see Identity
   enrichment below). Plus **two new fields unique to FlightAware**:
   `originAirport` and `destinationAirport` (displayed as "Route" in the
-  Identity group,
-  `"Catania-Fontanarossa Airport (CTA) → Belgrade Nikola Tesla Int'l (BEG)"`). `trackDeg` falls back to adsb.fi/airplanes.live's
+  Identity group, formatted as `"Airport Name (IATA) → Destination (IATA)"`). `trackDeg` falls back to adsb.fi/airplanes.live's
   `calc_track` when `track` is absent (observed on military aircraft).
   `icao24` (the transponder hex address — already the Map key every marker
   is stored/looked up under, and the shared dedup key across all five
@@ -1303,7 +1299,7 @@ because photographer name and photo URL come from an external API.
     `TYPE_CODE_TABLE`/curated-airline vocabulary. Coverage is real but
     regionally lopsided: ~49% of the CSV's 520,000 rows globally, but only
     ~4% of aircraft actually seen live over this app's own coverage area
-    (Balkans) — still strictly additive over having nothing, which is why
+    — still strictly additive over having nothing, which is why
     it shipped anyway. **A pre-existing data bug was found and fixed while
     adding this**: the placeholder `_PLACEHOLDER_RECORDS` table used to
     have 7 hand-written entries, but cross-checking each ICAO24 hex against
@@ -1936,9 +1932,9 @@ because photographer name and photo URL come from an external API.
   literal text "Not confirmed" (`.route-not-confirmed`, muted italic)
   rather than showing a specific, likely-wrong city pair. This isn't a
   rare edge case: live research across 100+ real aircraft found roughly a
-  **quarter of all adsbdb routes land in Reject** (e.g. a real aircraft
-  cruising over the Balkans whose callsign resolved to `JFK→DEL` or
-  `ICN→TSN`, thousands of km away) — naming the wrong cities would be more
+  **quarter of all adsbdb routes land in Reject** (e.g. aircraft whose
+  callsign resolved to distant-region airport pairs thousands of km away) 
+  — naming the wrong cities would be more
   misleading than a plain "unconfirmed". **Low-band routes still show the
   real airport pair**, prefixed with `⚠` and styled via `.route-warning`
   (amber) — unlike Reject, a Low route is plausibly still correct, just
@@ -2978,9 +2974,8 @@ because photographer name and photo URL come from an external API.
   (`list_map_airports()`/`airports_in_bbox()`/`/api/airports`), alongside
   its pre-existing `nearest_airport()` tests — a genuinely different
   dataset (OurAirports, not the OpenFlights table `nearest_airport()`
-  uses), reusing Belgrade Nikola Tesla (BEG/LYBE) as the same worked
-  example since it's a real, stable entry in both tables: `list_map_airports()`
-  finds it with the right `type`/`country`/`country_name`/`municipality` and excludes
+  uses), using real, stable entries in both tables as worked examples: 
+  `list_map_airports()` finds entries with the right `type`/`country`/`country_name`/`municipality` and excludes
   `closed` airports by default (proven against the same dataset with
   `include_closed=True`); `airports_in_bbox()` filters correctly by bounds
   and degrades to an empty list (not an exception) for non-numeric or
@@ -3072,10 +3067,9 @@ because photographer name and photo URL come from an external API.
   fix above shipped — still groups under "Heavy", not "Unknown / no info".
   `tests/backend/test_collections.py` covers the matching server side:
   `POST /api/collection` with `lat`/`lon` resolves and stores `location`
-  (using a real, stable OpenFlights entry — Belgrade Nikola Tesla, `BEG` —
-  not a fixture-only value) with `nearest_airport` correctly re-resolving
-  on a re-save to different coordinates (London Heathrow, `LHR`), and a
-  save with no coordinates stores `location: null`.
+  (using real, stable OpenFlights entries — not fixture-only values) with 
+  `nearest_airport` correctly re-resolving on a re-save to different coordinates, 
+  and a save with no coordinates stores `location: null`.
   `tests/backend/test_airports.py` covers `enrichment/airports.py`'s
   `nearest_airport()` directly (no HTTP mocking needed, same category as
   `test_enrichment.py`): a close real match, distance ordering between a

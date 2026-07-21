@@ -1,6 +1,6 @@
 # ADS-B Playground
 
-A single-page live aircraft tracker for Serbia and its neighboring region.
+A single-page live aircraft tracker covering a configurable geographic region.
 No build step — a Flask backend proxies five free ADS-B data sources plus
 FlightAware AeroAPI, and a static Leaflet page polls them and renders
 aircraft as color-coded markers. The no-build-step choice fits the
