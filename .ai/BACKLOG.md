@@ -42,7 +42,11 @@ requires.
 | Item | Effort | Value | Category | Read |
 |---|---|---|---|---|
 | Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
+| airframes.io as aircraft enrichment source | L | Med–High | Data sources | Aircraft history/lifecycle data (accidents, incidents, operator changes); lazy-fetch tier below adsbdb. Research API access, coverage, and integration into sidebar's new History section. |
+| RapidAPI flight data APIs — research | S | Medium | Data sources | Audit RapidAPI collection for gaps vs. current seven sources; identify if any free/no-key APIs offer better coverage for real-time or metadata. |
+| Flystack airline logo — research and integration | L | Med–High | Data sources | Specialized airline logo service; research API access model, coverage, licensing, rate limits vs. current two-tier approach. Integration could improve logo hit rate for niche airlines. |
 | Planespotters as third data source (metadata enrichment) | L | High | Data sources | Helicopter + rare aircraft coverage gap; requires API research, integration into enrichment chain, dedup/priority |
+| Free tier API and user registration system | M–L | High | Backend | Enable multi-user deployments with API keys, rate limiting, quota management. Requires registration endpoint, token generation, SQLite user role/quota schema, middleware. |
 | Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Frontend UX | Highest standalone value in the backlog; worth scheduling deliberately |
 | Health check endpoint (`/api/health`) | XS–S | Medium | DevOps | Public unauthenticated endpoint for Northflank/uptime-monitor health checks. Decision made 2026-07-21: public minimal response (DECISIONS.md). |
 | Seamless login without page reload | M | Medium | Frontend UX | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
@@ -255,9 +259,94 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 
 - **Aircraft serial number (MSN)** — Add aircraft manufacturer serial number field. No verified source yet (adsbdb has `msn` field for some aircraft; needs validation against real data). Research required before prioritizing. (See personal memory for fuller context.)
 
+## Backend infrastructure
+
+- **Free tier API and user registration system**
+
+Goal: transition from single-tenant (Google OAuth login only) to multi-tenant with
+free and paid tiers, enabling self-service registration, API key management, and
+quota/rate-limit enforcement per user.
+
+Motivation: current architecture assumes one user (Google login, unlimited collection
+storage). A free-tier signup + API tier system enables:
+- External applications to consume aircraft data via a stable, rate-limited API.
+- Operators to self-register without Google OAuth dependency.
+- Quota enforcement (e.g., free tier: 100 requests/hour, paid: 10k requests/hour).
+- Revenue model (if desired in future) without code restructuring.
+
+Acceptance criteria:
+- New `/api/register` endpoint (POST `{email, password, username}`) creates a free-tier
+  user, hashes password, stores in SQLite `users` table (augment existing schema with
+  `tier` enum `['free', 'paid', 'admin']`, `password_hash`, `api_key_hash`,
+  `quota_limit_requests_per_hour`, `created_at`, `last_login_at`). Returns `{user_id,
+  api_key, tier}` on success, 400 on duplicate email, 409 if registration is disabled.
+- Google OAuth still works as today (deprecated once all existing users migrate or
+  OAuth credential expires). New Google logins trigger account creation/linkage.
+- `/api/auth/login` endpoint (POST `{email, password}`) for password-based login,
+  returns session cookie + `{user_id, api_key, tier}`.
+- `/api/auth/logout` clears session.
+- `/api/user/profile` (GET, authenticated) returns `{user_id, email, username, tier,
+  api_key, quota_used_this_hour, quota_limit}`. PATCH `{username, email, password}`
+  to update, password change requires old password verification.
+- `/api/user/api-keys` (GET, authenticated) lists all active keys + creation date + last
+  used. POST generates new key, DELETE revokes by key id.
+- New `/api/data/*` endpoints (or extend existing) to require API-key auth (Bearer token
+  in `Authorization` header) when accessed externally, with rate-limit headers
+  (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`). Session auth
+  (current Google login) remains unrestricted for the web frontend.
+- Rate-limit middleware in Flask (`app.py`): check `Authorization` header or session
+  cookie, look up user + tier in SQLite, enforce `quota_limit` per hour via a
+  `rate_limit_requests` table (user_id, hour_bucket, request_count). On 429, return
+  `{error: "rate_limit_exceeded", retry_after_seconds: X}`.
+- `/api/admin/tier-override` (admin-only) to manually upgrade a user to paid (or
+  downgrade) — useful for testing + future billing integration.
+- SQLite schema changes: extend `users` table; new `rate_limit_requests` table
+  (user_id, hour_bucket, request_count); new `api_key_usage` table for audit
+  (user_id, api_key, accessed_endpoint, timestamp, status_code) — optional, for
+  future analytics.
+- Tests: backend unit tests for registration/login/API-key flow, password hashing
+  (use `werkzeug.security.generate_password_hash`), rate-limit enforcement, tier
+  upgrades. Playwright tests for registration UI (if new form added) or curl tests
+  for API-only registration.
+- Frontend: optional — if this is API-only, no frontend change needed (existing Google
+  login continues to work). If self-service registration UI is desired, add a
+  `/register` route + form in `static/index.html`.
+
+Implementation notes:
+1. Password security: use `werkzeug.security.generate_password_hash(..., method='pbkdf2:sha256')`,
+   store hash only (never plaintext), verify with `check_password_hash()`.
+2. API key generation: `secrets.token_urlsafe(32)` for user display, hash the same way
+   for storage (never store keys plaintext). Prefix with `flywme_` for easy identification.
+3. Rate limiting: hour-bucket approach (store `datetime.now().replace(minute=0, second=0, microsecond=0)`
+   as key, not per-second) scales better than per-request checks; clean up expired buckets
+   once per hour or on startup.
+4. Session vs. API key auth:
+   - Frontend: continue using Flask session cookie (from Google OAuth or `/api/auth/login`).
+   - External API consumers: Bearer token in `Authorization: Bearer <api_key>`. Middleware
+     checks which auth method is present and validates accordingly.
+5. Migration path: existing Google OAuth users keep their collections; on first Google
+   login after this feature ships, a new free-tier account is auto-created and linked
+   to the Google `sub` (add `oauth_provider` + `oauth_id` columns to `users` table to
+   support future multi-OAuth linking).
+6. Rate limit tiers (configurable via env vars):
+   - Free: 100 requests/hour (equivalent to 1 poll + enrichment calls = ~10 req/poll × 10
+     polls/hour = manageable).
+   - Paid: 10,000 requests/hour (or unlimited, TBD).
+   - Admin: unlimited.
+7. Documentation: update CLAUDE.md § "Aircraft collection" with new auth/API section.
+   Add `/api/register`, `/api/auth/*`, `/api/user/*` to schema/openapi if applicable.
+
+Estimate: 2–3 dev days (backend routes + SQLite schema + middleware + tests + migration logic).
+
 ## Data sources & enrichment
 
-- **Planespotters as third data source (metadata enrichment)** — Integrate Planespotters' aircraft database (type, registration, manufacturer, year, country) as a live enrichment tier, positioned **below adsbdb but above Flywme** in the priority chain. Unlike the current photo-gallery integration (fetch-on-click, no live markers), this would add aircraft metadata to every marker that passes through enrichment, helping helicopters and rare aircraft that OpenSky doesn't cover. Requires: (1) API audit — confirm what Planespotters' metadata endpoint(s) expose and rate limits (likely requires API key or scraping their web interface, both contrary to "no signup" posture — worth validating before committing); (2) route `/api/planespotters/<icao24>` or `/api/planespotters?registration=...` (keyed by both ICAO24 and registration since coverage differs); (3) enrich_identity() tier sitting below adsbdb; (4) cache strategy (metadata rarely changes, but poll-time fetches would cost quota); (5) dedup logic if Planespotters returns ICAO24+registration pairs that conflict with live OpenSky data (live wins, as always); (6) tests covering the enrichment tier and the new route. Acceptance criteria: selected aircraft show Planespotters-sourced type/year/manufacturer when available, badged in dev mode as source; Planespotters data never overwrites a live value; helicopter/rare-aircraft coverage visibly improves. Estimate: 2–3 dev days (API research + integration + testing), pending feasibility of Planespotters API access without signup/key.
+- **airframes.io as aircraft enrichment source** — Integrate airframes.io (https://airframes.io) as a lazy-fetch enrichment tier for aircraft history, airframe metadata, accidents, incidents, and maintenance records. Unlike adsbdb.com (which provides registration + type + operator + route), airframes.io complements with historical/lifecycle data about the specific airframe. Requires: (1) **API feasibility audit** — determine access model (free/paid/API key), rate limits, coverage (global vs. regional), data freshness, response format, and whether bulk-download or per-ICAO24 queries are supported; (2) **Coverage audit** — test against 50–100 real aircraft, compare to adsbdb's own coverage and identify what airframes.io uniquely provides (e.g., accident history, operator changes, write-offs); (3) **Priority placement** — decide where in enrichment chain it sits vs. adsbdb/Planespotters/Flywme (likely below adsbdb, since adsbdb is already live/current, airframes.io is historical/reference); (4) if approved, implement `/api/airframes/<icao24>` lazy-fetch route (click-only, not polled), cache indefinitely like adsbdb, and surface new fields in sidebar under a new History group or within Aircraft Identity; (5) tests covering the lazy fetch, cache hit/miss, and multi-source badge rendering. Acceptance criteria: feasibility decision in `.ai/DECISIONS.md` with API terms and coverage findings; if adopted, new sidebar group or expanded Identity section shows airframe history (first registered, operator changes, incidents) with adsbdb/adsbdb source badges. Estimate: 2–3 dev days (API research + integration + testing), pending feasibility phase.
+  - **AeroDataBox API** — popular developer tool; flight schedules, aircraft status, airport info; free tier with monthly request limit.
+  - **Flight Data (Travelpayouts)** — from tourism network; cached historical flight price data, routes, trends; free tier.
+  - **Aviation Edge / Aviationstack** — large data aggregators; real-time aircraft tracking, IATA/ICAO databases; limited free tier (hundreds of requests/month).
+  - **Lufthansa Open API** — airline's own developer program; basic schedules for Lufthansa carriers; free access.
+  
+  Requires: (1) scan the collection for additional APIs beyond these four, (2) for each shortlisted API, document: signup requirement, free tier availability, monthly request limit, rate-limit structure, data freshness, coverage (global vs. regional), licensing, and required auth headers, (3) compare to existing seven sources (OpenSky/adsb.fi/adsb.lol/adsb.one/airplanes.live/adsbdb/FlightAware/FlightRadar24) to identify actual gaps this could fill (e.g., real-time crew/catering data, historical scheduling, airline-specific feeds), (4) record findings + "adopt/investigate further/skip" recommendation in `.ai/DECISIONS.md` with reasoning. Acceptance criteria: research summary in DECISIONS.md with table of findings (API name, access model, coverage, monthly quota, pros/cons vs. existing sources), at least one API flagged as worth deeper evaluation if promising; decision on whether to pursue integration of any API. Estimate: 0.5–1 dev day (audit + documentation, no implementation).
 
 - **Register and configure an AirLabs API key** — Sign up at
   https://airlabs.co/ and obtain an API key for potential use as a data
