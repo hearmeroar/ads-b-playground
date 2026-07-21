@@ -39,7 +39,7 @@ def test_metar_proxies_with_bbox(client, mock_get):
     assert resp.get_json() == METAR_SAMPLE
 
     _, kwargs = mock_get.call_args
-    assert kwargs["params"]["bbox"] == "48.97,-4.46,53.97,3.54"
+    assert kwargs["params"]["bbox"] == "48.970748,-4.459909,53.970748,3.540091"
     assert kwargs["params"]["format"] == "json"
 
 

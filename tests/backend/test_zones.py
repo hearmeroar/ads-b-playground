@@ -20,16 +20,17 @@ import app
 
 
 LONDON_HEATHROW = {"lat": 51.470748, "lon": -0.459909}
+PARIS_CDG = {"lat": 49.00896, "lon": 2.554117}
 
 
 def test_apply_zone_updates_area_center_and_bbox():
-    app._apply_zone(LONDON_HEATHROW, 9, 150, "EGLL")
-    assert app.AREA_CENTER == {"lat": LONDON_HEATHROW["lat"], "lon": LONDON_HEATHROW["lon"]}
+    app._apply_zone(PARIS_CDG, 9, 150, "LFPG")
+    assert app.AREA_CENTER == {"lat": PARIS_CDG["lat"], "lon": PARIS_CDG["lon"]}
     assert app.AREA_ZOOM == 9
     assert app.AREA_RADIUS_NM == 150
-    assert app._active_zone_id == "EGLL"
-    assert app.BBOX["lamin"] == LONDON_HEATHROW["lat"] - app.BBOX_HALF_HEIGHT_DEG
-    assert app.BBOX["lamax"] == LONDON_HEATHROW["lat"] + app.BBOX_HALF_HEIGHT_DEG
+    assert app._active_zone_id == "LFPG"
+    assert app.BBOX["lamin"] == PARIS_CDG["lat"] - app.BBOX_HALF_HEIGHT_DEG
+    assert app.BBOX["lamax"] == PARIS_CDG["lat"] + app.BBOX_HALF_HEIGHT_DEG
     assert app.AREA_RADIUS_KM == 150 * 1.852
 
 
@@ -38,18 +39,18 @@ def test_apply_zone_updates_radius_sources_centers():
     # explicitly rewriting these, the four radius sources would keep
     # querying the *old* location forever after a zone change.
     original_centers = {name: dict(cfg["center"]) for name, cfg in app.RADIUS_SOURCES.items()}
-    app._apply_zone(LONDON_HEATHROW, app.AREA_ZOOM, app.AREA_RADIUS_NM, "EGLL")
+    app._apply_zone(PARIS_CDG, app.AREA_ZOOM, app.AREA_RADIUS_NM, "LFPG")
     for name, cfg in app.RADIUS_SOURCES.items():
-        assert cfg["center"]["lat"] == LONDON_HEATHROW["lat"]
-        assert cfg["center"]["lon"] == LONDON_HEATHROW["lon"]
+        assert cfg["center"]["lat"] == PARIS_CDG["lat"]
+        assert cfg["center"]["lon"] == PARIS_CDG["lon"]
         assert cfg["center"] != original_centers[name]
 
 
 def test_apply_zone_updates_flightaware_query():
     original_query = app.FLIGHTAWARE_QUERY
-    app._apply_zone(LONDON_HEATHROW, app.AREA_ZOOM, app.AREA_RADIUS_NM, "EGLL")
+    app._apply_zone(PARIS_CDG, app.AREA_ZOOM, app.AREA_RADIUS_NM, "LFPG")
     assert app.FLIGHTAWARE_QUERY != original_query
-    assert str(LONDON_HEATHROW["lat"] - app.BBOX_HALF_HEIGHT_DEG) in app.FLIGHTAWARE_QUERY
+    assert str(PARIS_CDG["lat"] - app.BBOX_HALF_HEIGHT_DEG) in app.FLIGHTAWARE_QUERY
 
 
 def test_apply_zone_updates_flightradar24_bounds(monkeypatch):
@@ -61,7 +62,7 @@ def test_apply_zone_updates_flightradar24_bounds(monkeypatch):
 
     monkeypatch.setattr(app._fr24_client, "get_bounds", fake_get_bounds)
     original_bounds = app.FLIGHTRADAR24_BOUNDS
-    app._apply_zone(LONDON_HEATHROW, app.AREA_ZOOM, app.AREA_RADIUS_NM, "EGLL")
+    app._apply_zone(PARIS_CDG, app.AREA_ZOOM, app.AREA_RADIUS_NM, "LFPG")
     assert calls, "get_bounds() must be re-called on every zone change"
     assert app.FLIGHTRADAR24_BOUNDS == "fake-bounds-string"
     assert app.FLIGHTRADAR24_BOUNDS != original_bounds
@@ -77,9 +78,9 @@ def test_apply_zone_survives_flightradar24_failure(monkeypatch):
 
     monkeypatch.setattr(app._fr24_client, "get_bounds", failing_get_bounds)
     original_bounds = app.FLIGHTRADAR24_BOUNDS
-    app._apply_zone(LONDON_HEATHROW, app.AREA_ZOOM, app.AREA_RADIUS_NM, "EGLL")
+    app._apply_zone(PARIS_CDG, app.AREA_ZOOM, app.AREA_RADIUS_NM, "LFPG")
     assert app.FLIGHTRADAR24_BOUNDS == original_bounds
-    assert app.AREA_CENTER == {"lat": LONDON_HEATHROW["lat"], "lon": LONDON_HEATHROW["lon"]}
+    assert app.AREA_CENTER == {"lat": PARIS_CDG["lat"], "lon": PARIS_CDG["lon"]}
 
 
 def test_apply_zone_clears_location_scoped_caches():
@@ -91,7 +92,7 @@ def test_apply_zone_clears_location_scoped_caches():
     app._metar_cache.update({"data": [], "ts": 123.0})
     app._sigmet_cache.update({"data": [], "ts": 123.0})
 
-    app._apply_zone(LONDON_HEATHROW, app.AREA_ZOOM, app.AREA_RADIUS_NM, "EGLL")
+    app._apply_zone(PARIS_CDG, app.AREA_ZOOM, app.AREA_RADIUS_NM, "LFPG")
 
     assert app._cache["data"] is None
     for cfg in app.RADIUS_SOURCES.values():
@@ -149,6 +150,9 @@ def test_maybe_reload_zone_from_disk_picks_up_external_change():
     # Simulates a *different* gunicorn worker having already applied and
     # persisted a zone change — this process's own globals must still be at
     # their pre-test values until _maybe_reload_zone_from_disk() runs.
+    # First, change to a different zone (Paris) so we know the test isn't
+    # already at the target zone (Heathrow).
+    app._apply_zone(PARIS_CDG, app.AREA_ZOOM, app.AREA_RADIUS_NM, "LFPG")
     assert app.AREA_CENTER != {"lat": LONDON_HEATHROW["lat"], "lon": LONDON_HEATHROW["lon"]}
 
     with open(app.ZONES_FILE, "w") as f:
@@ -179,6 +183,10 @@ def test_api_config_picks_up_external_zone_change(client):
     # /api/config itself calls _maybe_reload_zone_from_disk() — a GET
     # against it must see a change another worker persisted, not just the
     # explicit test above calling the reload function directly.
+    # First, change to a different zone (Paris) so we know the test isn't
+    # already at the target zone (Heathrow).
+    app._apply_zone(PARIS_CDG, app.AREA_ZOOM, app.AREA_RADIUS_NM, "LFPG")
+
     with open(app.ZONES_FILE, "w") as f:
         json.dump({
             "active_zone_id": "EGLL",
