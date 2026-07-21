@@ -34,7 +34,10 @@ If your changes represent an architecturally-significant decision (new data sour
 **Mechanical enforcement** (commit-time hooks in `.claude/settings.json` that
 back the rules above — staging `.ai/CURRENT.md`, auto-pruning `✅`-marked
 `.ai/BACKLOG.md` items, nudging on `app.py`/`storage.py`/`enrichment/`
-changes): see `.agents/architect.md` for the full hook behavior and
+changes, and — since 2026-07-21 — blocking a commit unless pytest/Playwright/
+a real curl against a running server actually ran and passed for whatever
+area the commit touches, closing the "tests passed but the real endpoint
+404s" gap): see `.agents/architect.md` for the full hook behavior and
 bypass flags.
 
 **What NOT to write in `.ai/` files:**

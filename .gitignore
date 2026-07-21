@@ -17,3 +17,4 @@ playwright-report/
 .app.db-shm
 PROD_INFRA_NOTES.md
 PLAN_NOTES.md
+.claude/test-runs/

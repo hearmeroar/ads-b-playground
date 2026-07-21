@@ -2,6 +2,56 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Automation: mechanical verification gate before commit)
+
+✅ **New: `.claude/hooks/capture-test-run.sh` + `.claude/hooks/require-verification.sh`**
+- **Why**: the `/api/health` bug two entries below shipped because pytest
+  (Flask test client, bypasses the real HTTP path) passed while the actual
+  registered route was wrong — and the mistake was reported as "done"
+  without anyone curling the real server. The user asked, correctly, for
+  automation that makes an agent *prove* a change works rather than assert
+  it, using dedicated reviewer/visual-tester tooling instead of the user
+  acting as manual QA.
+- **Design**: `capture-test-run.sh` (`PostToolUse`, matcher `Bash`, no
+  `if`) records the *real* `tool_response.exitCode` of any `pytest`,
+  `playwright test`, or `curl` against `127.0.0.1:5051`/`5050` into
+  `.claude/test-runs/{backend,frontend,live_check}.json`.
+  `require-verification.sh` (`PreToolUse`, `if: Bash(git commit *)`, last
+  in the existing hook chain) denies the commit unless the staged diff's
+  touched area has a marker that is both **exit-0** and **newer than the
+  last edit** to the files it covers — `app.py`/`storage.py`/
+  `enrichment/`/`tests/backend/` → needs `backend`; `static/`/
+  `tests/frontend/` → needs `frontend`; a new/changed `@app.route(...)` in
+  `app.py`'s staged diff → needs `live_check` specifically, since that's
+  the exact class of bug (path registered wrong) a Flask-test-client unit
+  test cannot catch. Bypass: `--no-verify-check`. Full writeup:
+  `.agents/architect.md`'s "Mechanical verification gate" section.
+- **Verification of the hooks themselves** (done directly, not assumed):
+  piped crafted JSON payloads straight into both scripts (bypassing the
+  live session's own hook chain, to avoid the self-referential problem of
+  testing a git-commit-blocking hook from inside a session that already
+  has git-commit-blocking hooks active and reacts to conversational
+  context, not just literal command text — this ate a lot of the session's
+  effort before being abandoned as the wrong test strategy). Confirmed:
+  `capture-test-run.sh` records both a passing (`exit 0`) and a failing
+  (`exit 1`) pytest run correctly, and a real curl hit; `require-
+  verification.sh` denies with no marker, denies with a stale/failing
+  marker, and allows with a fresh passing one.
+- **Known gap, found honestly rather than glossed over**: a real
+  `.venv/bin/pytest tests/backend/test_health.py -q` run during this same
+  session did *not* update `.claude/test-runs/backend.json` through the
+  live hook chain — the file still held an earlier direct-test artifact.
+  One `PreToolUse` deny during scratch-repo testing did appear to come
+  from `require-verification.sh` verbatim, suggesting `PreToolUse` (an
+  array entry appended to an already-watched list) picked up live while
+  `PostToolUse` (a brand-new top-level key) did not — consistent with this
+  file's own earlier note that new hook config sometimes needs a fresh
+  session/`/hooks` reload to fully activate. **Needs confirming at the
+  start of the next session**: run a real `pytest`/`curl` and check
+  `.claude/test-runs/*.json` actually updates before trusting the gate is
+  fully live.
+- `.claude/test-runs/` added to `.gitignore`.
+
 ## Status as of 2026-07-21 (Bug fix: `/api/health` route path was missing `/api` prefix)
 
 ✅ **Bug fix: `/api/health` route definition missing `/api` prefix**
