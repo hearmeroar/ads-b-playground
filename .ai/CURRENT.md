@@ -2,6 +2,22 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Feature Complete: Auto-center map on aircraft selection)
+
+✅ **Feature Complete: Auto-center map on aircraft selection (animated)**
+- Backlog item "Auto-center map on aircraft selection" from `.ai/BACKLOG.md` § UI/UX now implemented
+- **Implementation:** HUD toggle (`#toggle-auto-center`, checked by default) auto-pans map to selected aircraft with smooth 500ms animation (easeLinearity: 0.25)
+- **Sync pattern:** Track loading deferred until map animation completes (via `AUTO_CENTER_ANIMATION_DURATION_MS` constant in constants.js) — prevents track from "jumping" into view mid-animation
+- **Code changes:**
+  - `static/index.html` — new HUD toggle
+  - `static/js/constants.js` — `AUTO_CENTER_ANIMATION_DURATION_MS` (500ms, single source of truth)
+  - `static/js/state-filters.js` — toggle wiring
+  - `static/js/sidebar-track.js` — `map.flyTo()` with deferred track loading
+  - `static/js/main.js` — removed redundant `map.setView()` from aircraft-search handler
+  - `tests/frontend/test_auto_center_on_select.spec.js` — new test suite (3 scenarios)
+- **Testing:** 162 frontend + 276 backend tests passing, zero regressions
+- **Status:** Merged to main
+
 ## Status as of 2026-07-21 (CRITICAL BUG: Track stops updating after aircraft select)
 
 🚨 **Added critical bug to backlog: Track stops updating on aircraft selection**
