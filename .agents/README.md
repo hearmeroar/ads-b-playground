@@ -1,7 +1,7 @@
 # Agents README
 
 This folder contains lightweight role descriptions for a small in-repo
-agent team: Architect, Developer, Reviewer. Files are guidance only —
+agent team: Architect, Developer, Reviewer, UI. Files are guidance only —
 agents are textual helpers for humans and must not run autonomously.
 
 ## Principles
@@ -28,6 +28,10 @@ This convention ensures AI agents work from the single source of truth for proje
 - Read the relevant role file before starting a task.
 - Link ADRs / `.ai/` entries in PR descriptions when a change affects architecture.
 - Follow branch / commit / PR conventions in `.agents/developer.md`.
+- For frontend/layout/interaction work (`static/index.html`, `static/style.css`,
+  `static/js/*.js`), read `.agents/ui.md` first — it lists the required UI
+  patterns (help popovers, tooltip mechanism, hide-vs-disable rule) and the
+  load-order constraint this project enforces.
 
 ## Quick SOP (summary)
 

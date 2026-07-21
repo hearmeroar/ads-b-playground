@@ -2,6 +2,26 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Night, continued)
+
+✅ **Automation: auto-draft CURRENT.md note when `RADIUS_SOURCES` changes**
+- New `.claude/hooks/radius-sources-draft-note.sh`: on `git commit`, inspects
+  the staged `app.py` diff for hunks that actually mention `RADIUS_SOURCES`
+  (not just any `app.py` edit, unlike the existing name-only `nudge-docs.sh`)
+  and, if found, prepends a `## Draft note (auto-generated)` section
+  containing the real diff hunk to the top of this file, stages it, and lets
+  the commit proceed with a `systemMessage`.
+- Wired into `.claude/settings.json` as the **first** hook in the
+  `git commit` chain — its auto-staging of `.ai/CURRENT.md` also satisfies
+  `check-current-md.sh` for a `RADIUS_SOURCES`-only commit that would
+  otherwise need `--no-current-check`.
+- Documented in `.agents/architect.md` (the file that actually documents this
+  repo's hook chain now — CLAUDE.md's own "Mechanical enforcement" section
+  just points there).
+- The note is a **draft**, not a finished entry — replace or delete it
+  before the next commit touching `app.py`, same convention as any other
+  auto-generated note.
+
 ## Status as of 2026-07-21 (Night)
 
 ✅ **UX: Collections cards — drop long category caption, better "Where spotted"**

@@ -34,6 +34,11 @@ BACKLOG.md ownership
 Soft nudges for ARCHITECTURE.md and DECISIONS.md
 - When `app.py`, `storage.py`, or `enrichment/` files are staged, `.claude/hooks/nudge-docs.sh` suggests (but does not block) reviewing/updating ARCHITECTURE.md and DECISIONS.md if those files were not also staged. These are soft reminders only, not hard blocks — use them as cues to think about whether the architectural change warrants documentation updates.
 
+Auto-drafted note for `RADIUS_SOURCES` changes (since 2026-07-21)
+- `RADIUS_SOURCES` (in `app.py`) is the single source of truth for the four anonymous radius sources (adsb.fi/adsb.lol/adsb.one/airplanes.live) — changing an entry is architecturally significant per the "Before creating a commit" rule above, but a plain name-based nudge can't tell that apart from any other `app.py` edit.
+- `.claude/hooks/radius-sources-draft-note.sh` inspects the staged `app.py` diff for hunks that actually mention `RADIUS_SOURCES`. If found, it prepends a `## Draft note (auto-generated)` section to the top of `.ai/CURRENT.md` containing the real diff hunk, stages the file, and lets the commit proceed with a `systemMessage` pointing this out.
+- This is a draft, not a finished entry — replace it with a real summary (or delete it if redundant) before the *next* commit that touches `app.py`. It runs first in the hook chain specifically so its auto-staging of `.ai/CURRENT.md` also satisfies `check-current-md.sh` for a `RADIUS_SOURCES`-only commit.
+
 Commit template for CURRENT.md
 ```
 docs(.ai): update CURRENT.md — YYYY-MM-DD

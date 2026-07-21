@@ -1,8 +1,107 @@
 {
-  "active_zone_id": "default",
+  "active_zone_id": "KSFO",
   "zones": {
     "default": {
-      "center": {"lat": 44.0, "lon": 21.0},
+      "center": {
+        "lat": 44.0,
+        "lon": 21.0
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "EGKK": {
+      "center": {
+        "lat": 51.148744,
+        "lon": -0.185739
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "ULLI": {
+      "center": {
+        "lat": 59.800301,
+        "lon": 30.262501
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "UKKM": {
+      "center": {
+        "lat": 50.6035,
+        "lon": 30.1919
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "UMMS": {
+      "center": {
+        "lat": 53.888071,
+        "lon": 28.039964
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "EPWA": {
+      "center": {
+        "lat": 52.165699,
+        "lon": 20.9671
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "RU-10156": {
+      "center": {
+        "lat": 55.417222,
+        "lon": 36.862623
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "UKFB": {
+      "center": {
+        "lat": 44.691822,
+        "lon": 33.57462
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "XK-0018": {
+      "center": {
+        "lat": 42.64596,
+        "lon": 21.1627
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "YPAD": {
+      "center": {
+        "lat": -34.947512,
+        "lon": 138.533393
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "ZLDL": {
+      "center": {
+        "lat": 37.125286,
+        "lon": 97.268658
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "VIDP": {
+      "center": {
+        "lat": 28.55563,
+        "lon": 77.09519
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "KSFO": {
+      "center": {
+        "lat": 37.619806,
+        "lon": -122.374821
+      },
       "zoom": 8,
       "radius_nm": 220
     }

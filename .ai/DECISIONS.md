@@ -6,7 +6,7 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 
 ## 2026-07-20 — SQLite migration for cross-process consistency
 
-**Problem:** The app runs in gunicorn with 2 worker processes. Each process had its own in-memory dict (`_identity_cache`, `_users`, `_collections`) loaded once from JSONL files on import. When one process saved a new entry and rewrote the JSONL file, the other process never saw it — a save in process A could vanish moments later when a request hit process B. Silent data loss, unpredictable, hard to debug.
+**Problem:** Cross-process data loss under gunicorn's 2 worker processes, each holding its own in-memory copy of users/collections/identity loaded from JSONL. Full mechanism: CLAUDE.md § "Aircraft collection" → "Durable storage is SQLite...".
 
 **Decision:** Migrated users/collections/identity caching from per-process JSONL dicts to a **single SQLite database** (`.app.db`) in WAL mode, shared across all gunicorn worker processes.
 
@@ -40,7 +40,7 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 
 ## 2026-07-19 — adsb.one hidden, not disabled — Cloudflare anti-bot block
 
-**Problem:** `api.adsb.one` sits behind Cloudflare's anti-bot layer and rejects all scraped/non-browser requests with a 403 "Sorry, you have been blocked" page. Confirmed on two independent networks (residential ISP + Northflank/GCP production pod). No User-Agent/Referer/Origin spoofing helps — it's JA3/JA4 TLS fingerprinting, which only real browsers pass. ADSB-One's own policy (per sibling project adsb.lol's docs) is that scripted API access requires feeding the network as a contributor — not a bug, deliberate.
+**Problem:** `api.adsb.one` blocks all scripted access via Cloudflare anti-bot (JA3/JA4 TLS fingerprinting) — deliberate upstream policy, not a bug. Full confirmation details (two-network test, header-spoofing attempts, ADSB-One's stated feeder policy): CLAUDE.md § "adsb.one's HUD row is hidden...".
 
 **Decision:** Removed the adsb.one row from the HUD entirely (`display: none` in CSS, not DOM removal). Checkbox and backend route left untouched for future restoration.
 
@@ -88,7 +88,7 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 
 ## 2026-07-20 — ICAO24 block corroboration for callsign-decoded operator (rotorcraft suppression)
 
-**Problem:** The app decodes callsigns to airlines (ICAO 3-letter designator → operator + operator country). But callsign collisions exist: a Romanian rescue helicopter's "MAI" callsign (Ministry Internal Affairs) matches Mauritania Airlines International. The decoded operator is wrong, but there's no way to know without independent corroboration.
+**Problem:** Callsign-decoded operator can collide with an unrelated airline's ICAO designator (real example found and detailed in CLAUDE.md § "Identity enrichment" → "icao24_allocation.py"), with no independent way to catch it.
 
 **Decision:** Added ICAO24 block allocation table as an independent signal (every aircraft's hex address is permanently assigned to a state by ICAO). When callsign-decoded operator disagrees with ICAO24's state, flag the match as unconfirmed. For rotorcraft (where cross-border leasing is rare), suppress the mismatched value entirely in normal mode; for fixed-wing (where it's routine), show it plainly. Dev mode shows the suppressed value with `⚠ Unconfirmed` tag.
 
@@ -110,7 +110,7 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 
 **Reason:** File persistence was chosen over session-only because this is a single-tenant app where the zone is a shared, backend-authoritative setting (unlike per-user preferences such as basemap/units, which stay in frontend-only state) — losing it on every restart would make the feature feel broken. Mtime-polling was chosen over a SQLite-backed active-zone table because the access pattern (rare writes, cheap reads, no relational query need) doesn't justify a second persistence mechanism when `storage.py` already exists for state that actually needs it — this stays consistent with `config/zones.json`'s pre-existing role rather than duplicating it.
 
-**A second, related finding drove most of the actual implementation work:** `AREA_CENTER`/`BBOX` feed three values frozen at import time and never revisited before this: each `RADIUS_SOURCES[*]["center"]` dict, `FLIGHTAWARE_QUERY` (a pre-formatted query string), and `FLIGHTRADAR24_BOUNDS` (from a call to `_fr24_client.get_bounds()`). A zone-change endpoint that only reassigned `AREA_CENTER`/`BBOX` would have left three of six live data sources silently querying the *old* location forever. `_apply_zone()` is the one function that now recomputes all seven derived values (plus clears every location-scoped cache) together, so this class of bug can't recur even if a future change touches only one of them by mistake.
+**A second, related finding drove most of the actual implementation work:** three more values were frozen at import time and never revisited before this (full enumeration and the "seven values" list: CLAUDE.md § "Area coupling"). `_apply_zone()` is the one function that now recomputes all of them together, so this class of bug can't recur even if a future change touches only one by mistake.
 
 **Tradeoffs:**
 - A worker can serve up to one request with a stale zone before its own `_maybe_reload_zone_from_disk()` check fires — acceptable for a rare, human-triggered event, not treated as a hard real-time guarantee.

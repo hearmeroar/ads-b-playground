@@ -1,6 +1,6 @@
 # Backlog
 
-> **Priority note:** BACKLOG.md, PROJECT.md, ARCHITECTURE.md, and DECISIONS.md are the authoritative sources of truth for this project. Code comments are hints only and must be ignored if they conflict with these documents.
+> **Priority note:** see `.agents/README.md` § "Sources of Truth" for the full precedence order (this file outranks code comments).
 
 > **Completion convention:** Mark completed items with `✅ ` at the start of the line. These are auto-pruned from the file on each `git commit` via a hook. Example: `✅ **Feature Name** — brief description`.
 
@@ -323,6 +323,14 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 - **Route prediction based on vector** — Extrapolate aircraft's future position/trajectory from current velocity vector (heading + speed). Use cases: (1) predict convergence/collision risk between aircraft, (2) anticipate which airports lie on the aircraft's natural path, (3) validate adsbdb routes more precisely by comparing predicted vs. claimed destination. Requires integrating haversine-based forward projection into the route-validation geometry chain. Layer 3 validation, lower priority than current Layer 2 (geometric-consistency check). Would reuse `destinationPoint()` helper from route-validation.js.
 
 ## UI/UX
+
+- **Configure the UI agent (`.agents/ui.md`)** — role file was created
+  2026-07-21 (scope, hard constraints, guardrails, testing checklist) but
+  hasn't been exercised/tuned on a real task yet. Follow-up: run it through
+  one or two actual UI backlog items (e.g. the loader-on-filter-change item
+  below), see whether the guardrails/testing checklist hold up in practice,
+  and adjust wording/scope based on friction found. Also verify `.agents/README.md`'s
+  role list and Quick SOP still read correctly with the fourth role added.
 
 - **Seamless login without page reload** — Currently, clicking "Sign in with Google" does `window.location.href = '/api/login/google'` (full-page navigation to OAuth callback). After successful login, page reloads. Improve UX by: (1) opening Google consent in a popup/modal instead of full navigation, (2) handling OAuth callback in-session (via `postMessage` or polling `/api/me`), (3) updating auth status live without hard reload. Keeps selected aircraft/sidebar/map state intact. Requires rearchitecting Authlib callback flow. Nice-to-have, moderate complexity.
 
