@@ -318,6 +318,8 @@ const zoneSearchInput = document.getElementById('zone-search-input');
 const zoneSearchResults = document.getElementById('zone-search-results');
 const zoneSearchStatusEl = document.getElementById('zone-search-status');
 let zoneSearchDebounceTimer = null;
+let zoneSearchResultsData = [];    // airports array behind the currently rendered options, same order
+let zoneSearchHighlightIndex = -1; // index into zoneSearchResultsData / #zone-search-results children; -1 = none
 
 function setZoneSearchStatus(message, isError) {
   if (!message) {
@@ -331,10 +333,25 @@ function setZoneSearchStatus(message, isError) {
   zoneSearchStatusEl.classList.toggle('error', !!isError);
 }
 
+function setZoneSearchHighlight(index) {
+  const options = zoneSearchResults.children;
+  if (!options.length) {
+    zoneSearchHighlightIndex = -1;
+    return;
+  }
+  zoneSearchHighlightIndex = ((index % options.length) + options.length) % options.length;
+  Array.from(options).forEach((opt, i) => {
+    opt.classList.toggle('active', i === zoneSearchHighlightIndex);
+  });
+  options[zoneSearchHighlightIndex].scrollIntoView({ block: 'nearest' });
+}
+
 function renderZoneSearchResults(airports) {
   zoneSearchResults.innerHTML = '';
+  zoneSearchResultsData = airports;
   if (!airports.length) {
     zoneSearchDropdown.classList.remove('open');
+    zoneSearchHighlightIndex = -1;
     return;
   }
   airports.forEach((airport) => {
@@ -356,6 +373,7 @@ function renderZoneSearchResults(airports) {
     zoneSearchResults.appendChild(opt);
   });
   zoneSearchDropdown.classList.add('open');
+  setZoneSearchHighlight(0);
 }
 
 function selectZoneSearchResult(airport) {
@@ -409,6 +427,8 @@ zoneSearchInput.addEventListener('input', () => {
   if (query.length < 2) {
     zoneSearchResults.innerHTML = '';
     zoneSearchDropdown.classList.remove('open');
+    zoneSearchHighlightIndex = -1;
+    zoneSearchResultsData = [];
     return;
   }
   zoneSearchDebounceTimer = setTimeout(() => {
@@ -423,6 +443,21 @@ zoneSearchInput.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     zoneSearchDropdown.classList.remove('open');
     zoneSearchInput.blur();
+    return;
+  }
+  if (!zoneSearchDropdown.classList.contains('open') || !zoneSearchResultsData.length) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    setZoneSearchHighlight(zoneSearchHighlightIndex + 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    setZoneSearchHighlight(zoneSearchHighlightIndex - 1);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (zoneSearchHighlightIndex >= 0) {
+      selectZoneSearchResult(zoneSearchResultsData[zoneSearchHighlightIndex]);
+    }
   }
 });
 document.addEventListener('click', () => zoneSearchDropdown.classList.remove('open'));

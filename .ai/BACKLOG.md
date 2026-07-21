@@ -24,6 +24,16 @@
 > `Data sources`, `Testing`, `Documentation`, `Prediction`. This tag
 > makes it easy to scan by domain and coordinate related work.
 
+> **Status column convention (added 2026-07-22):** every row in the "At a
+> glance" table includes a `Status` column that shows completion state:
+> - `✅` — item completed, marked for auto-pruning on next commit
+> - `🚨` — CRITICAL blocker, needs immediate fix
+> - `🐛` — known bug, not just a feature idea
+> - `⏳` — in progress or partially complete
+> - (blank) — not yet started. This makes it easy to see at a glance which
+> items are done vs. active vs. urgent without reading the last column's
+> description text.
+
 Ideas and features not yet scheduled. Grouped loosely by theme.
 
 *(Note: this file went through several rounds of the `backlog-cleanup.sh`
@@ -39,45 +49,46 @@ Sorted best-first (cheap + valuable at the top). Full item detail is in the
 sections below; this table is the quick-scan summary the convention above
 requires.
 
-| Item | Effort | Value | Category | Read |
-|---|---|---|---|---|
-| **[CRITICAL BUG]** Track stops updating after aircraft select | S | High | Frontend UX / Bug | **BLOCKER:** Track renders & updates *before* selection (live polling). Clicking marker → track stops updating, becomes stale. Historical track fetch may interfere with live trail. See Bugs section. |
-| Change default zone to London (Heathrow) | XS | Medium | DevOps | ✅ COMPLETED — Updated default AREA_CENTER via zone-search configuration. |
-| **[BUG]** `capture-test-run.sh` hook not updating test markers in session | XS–S | High | Testing | Verification hook (`PostToolUse`) that captures real test run exit codes to `.claude/test-runs/` not being triggered/updating during session. Blocks `require-verification.sh` gate from verifying current test state. See Bugs section. |
-| Keyboard navigation in airport search results | XS–S | Medium | Frontend UX | Arrow keys (↑↓) to navigate, first item highlighted by default, Enter to select. Quick win for faster keyboard-only airport navigation. |
-| Airport search quick-open with pre-loaded results | XS–S | Medium | Frontend UX | When input focus enters #zone-search-input, immediately show list of popular/nearby airports (no typing needed). Options: (1) hardcoded popular list (London/Paris/Berlin), (2) 10 nearest airports to current AREA_CENTER. Improves speed for frequent zone-switching. |
-| Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
-| Selected aircraft styling & visual highlight | XS–S | Medium | Frontend UX | Visual distinction when an aircraft is selected: highlight marker, glow, or change icon/color to signal active selection state. |
-| Auto-center map on aircraft selection | XS | Medium | Frontend UX | Automatic map pan/zoom to center on selected aircraft, rather than requiring manual center-map button click. |
-| Marker coloring modes (alternative to source-based) | S | Medium | Frontend UX | Toggle/option to disable source-based aircraft coloring; implement alternative modes: uniform color, color by category, color by altitude, etc. |
-| Altitude profile graph (time-series plot) | M | Med–High | Frontend UX | Graph showing selected aircraft's altitude over time, visualizes climb/cruise/descent phases and helps understand flight profile. |
-| airframes.io as aircraft enrichment source | L | Med–High | Data sources | Aircraft history/lifecycle data (accidents, incidents, operator changes); lazy-fetch tier below adsbdb. Research API access, coverage, and integration into sidebar's new History section. |
-| RapidAPI flight data APIs — research | S | Medium | Data sources | Audit RapidAPI collection for gaps vs. current seven sources; identify if any free/no-key APIs offer better coverage for real-time or metadata. |
-| Flystack airline logo — research and integration | L | Med–High | Data sources | Specialized airline logo service; research API access model, coverage, licensing, rate limits vs. current two-tier approach. Integration could improve logo hit rate for niche airlines. |
-| Planespotters as third data source (metadata enrichment) | L | High | Data sources | Helicopter + rare aircraft coverage gap; requires API research, integration into enrichment chain, dedup/priority |
-| Free tier API and user registration system | M–L | High | Backend | Enable multi-user deployments with API keys, rate limiting, quota management. Requires registration endpoint, token generation, SQLite user role/quota schema, middleware. |
-| Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Frontend UX | Highest standalone value in the backlog; worth scheduling deliberately |
-| **Data source flags filter** | S–M | Med–High | Frontend UX | **HIGH PRIORITY** — Research data quality flags (dbFlags, NIC/NACp/NACv, messageType) across all sources; implement HUD filter to show/hide aircraft by flag state. Improves visibility of data quality. See UI/UX section. |
-| Health check endpoint (`/api/health`) | XS–S | Medium | DevOps | Public unauthenticated endpoint for Northflank/uptime-monitor health checks. Decision made 2026-07-21: public minimal response (DECISIONS.md). |
-| Seamless login without page reload | M | Medium | Frontend UX | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
-| Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Frontend UX | Shareable/deep-linkable view; reusable layout could also serve collection cards |
-| Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Backend | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
-| Airline metadata enrichment (alliance/country/website) | L | Medium | Data sources | Needs a source-validation phase before implementation, not just coding time |
-| Dark mode | M | Medium | Frontend UX | Visible polish; CSS touches sidebar+HUD, not a single component |
-| External links: UTM params / `rel` / variableized host | S | Low | Frontend UX | Mostly hygiene (`noreferrer`) + analytics tagging this app doesn't otherwise use |
-| UI/CSS framework evaluation (POC only) | S | Low | Frontend UX | Cheap experiment; no user-facing payoff until a real migration follows (unscoped, separate cost) |
-| Register an AirLabs API key | XS | Low | Data sources | Trivial, but a pure prerequisite — does nothing standalone |
-| Exercise `.agents/ui.md` on a real task | XS–S | Low | Documentation | Process/meta value only, not user-facing |
-| Sidebar search/filter within collection | S | Low | Frontend UX | Only matters once a user's collection is large; defer until it is |
-| Metrics export (`/metrics`, Prometheus) | M | Low–Med | DevOps | Ops/observability value, no urgency for a single-tenant app |
-| Collection panel bulk operations | M | Low | Frontend UX | Speculative — no evidence the collection is big enough to need bulk actions yet |
-| Adaptive polling intervals | M | Low | Backend | Defer until an actual quota-pressure incident, not before |
-| Load testing | M | Low | Testing | Only relevant if traffic ever exceeds single-user hobby scale |
-| Live network tests (CI-gated) | M | Low | Testing | Low ROI unless upstreams start breaking often (not observed so far) |
-| Route prediction from velocity vector (Layer 3 route validation) | L | Low–Med | Prediction | Speculative extension of Layer 2; no user ask driving it yet |
-| Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Data sources | Blocked — no free/no-signup source identified yet |
-| Aircraft serial number (MSN) field | XL (blocked) | Low | Data sources | Blocked — no verified data source yet, needs research first |
-| Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Frontend UX | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
+| Item | Effort | Value | Category | Status | Read |
+|---|---|---|---|---|---|
+| **[CRITICAL BUG]** Track stops updating after aircraft select | S | High | Frontend UX / Bug | 🚨 | **BLOCKER:** Track renders & updates *before* selection (live polling). Clicking marker → track stops updating, becomes stale. Historical track fetch may interfere with live trail. See Bugs section. |
+| Rework UI for data quality filter (Status flags + Signal type) | S | Medium | Frontend UX | | Polish visual hierarchy, spacing, responsive behavior of recently-shipped filter. Improve label clarity, add inline help text, test mobile layouts. See UI/UX section. |
+| Change default zone to London (Heathrow) | XS | Medium | DevOps | ✅ | Updated default AREA_CENTER via zone-search configuration. |
+| **[BUG]** `capture-test-run.sh` hook not updating test markers in session | XS–S | High | Testing | 🐛 | Verification hook (`PostToolUse`) that captures real test run exit codes to `.claude/test-runs/` not being triggered/updating during session. Blocks `require-verification.sh` gate from verifying current test state. See Bugs section. |
+| Keyboard navigation in airport search results | XS–S | Medium | Frontend UX | ✅ | Arrow keys (↑↓) to navigate, first item highlighted by default, Enter to select. All 5 new tests pass + 5 existing tests. Completed 2026-07-22. |
+| Airport search quick-open with pre-loaded results | XS–S | Medium | Frontend UX | | When input focus enters #zone-search-input, immediately show list of popular/nearby airports (no typing needed). Options: (1) hardcoded popular list (London/Paris/Berlin), (2) 10 nearest airports to current AREA_CENTER. Improves speed for frequent zone-switching. |
+| Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
+| Selected aircraft styling & visual highlight | XS–S | Medium | Frontend UX | | Visual distinction when an aircraft is selected: highlight marker, glow, or change icon/color to signal active selection state. |
+| Auto-center map on aircraft selection | XS | Medium | Frontend UX | ✅ | Automatic map pan/zoom to center on selected aircraft, rather than requiring manual center-map button click. Completed 2026-07-21. |
+| Marker coloring modes (alternative to source-based) | S | Medium | Frontend UX | | Toggle/option to disable source-based aircraft coloring; implement alternative modes: uniform color, color by category, color by altitude, etc. |
+| Altitude profile graph (time-series plot) | M | Med–High | Frontend UX | | Graph showing selected aircraft's altitude over time, visualizes climb/cruise/descent phases and helps understand flight profile. |
+| airframes.io as aircraft enrichment source | L | Med–High | Data sources | | Aircraft history/lifecycle data (accidents, incidents, operator changes); lazy-fetch tier below adsbdb. Research API access, coverage, and integration into sidebar's new History section. |
+| RapidAPI flight data APIs — research | S | Medium | Data sources | | Audit RapidAPI collection for gaps vs. current seven sources; identify if any free/no-key APIs offer better coverage for real-time or metadata. |
+| Flystack airline logo — research and integration | L | Med–High | Data sources | | Specialized airline logo service; research API access model, coverage, licensing, rate limits vs. current two-tier approach. Integration could improve logo hit rate for niche airlines. |
+| Planespotters as third data source (metadata enrichment) | L | High | Data sources | | Helicopter + rare aircraft coverage gap; requires API research, integration into enrichment chain, dedup/priority |
+| Free tier API and user registration system | M–L | High | Backend | | Enable multi-user deployments with API keys, rate limiting, quota management. Requires registration endpoint, token generation, SQLite user role/quota schema, middleware. |
+| Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Frontend UX | | Highest standalone value in the backlog; worth scheduling deliberately |
+| **Data source flags filter** | S–M | Med–High | Frontend UX | | **HIGH PRIORITY** — Research data quality flags (dbFlags, NIC/NACp/NACv, messageType) across all sources; implement HUD filter to show/hide aircraft by flag state. Improves visibility of data quality. See UI/UX section. |
+| Health check endpoint (`/api/health`) | XS–S | Medium | DevOps | ✅ | Public unauthenticated endpoint for Northflank/uptime-monitor health checks. Decision made 2026-07-21: public minimal response (DECISIONS.md). Completed. |
+| Seamless login without page reload | M | Medium | Frontend UX | | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
+| Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Frontend UX | | Shareable/deep-linkable view; reusable layout could also serve collection cards |
+| Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Backend | | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
+| Airline metadata enrichment (alliance/country/website) | L | Medium | Data sources | | Needs a source-validation phase before implementation, not just coding time |
+| Dark mode | M | Medium | Frontend UX | | Visible polish; CSS touches sidebar+HUD, not a single component |
+| External links: UTM params / `rel` / variableized host | S | Low | Frontend UX | | Mostly hygiene (`noreferrer`) + analytics tagging this app doesn't otherwise use |
+| UI/CSS framework evaluation (POC only) | S | Low | Frontend UX | | Cheap experiment; no user-facing payoff until a real migration follows (unscoped, separate cost) |
+| Register an AirLabs API key | XS | Low | Data sources | | Trivial, but a pure prerequisite — does nothing standalone |
+| Exercise `.agents/ui.md` on a real task | XS–S | Low | Documentation | | Process/meta value only, not user-facing |
+| Sidebar search/filter within collection | S | Low | Frontend UX | | Only matters once a user's collection is large; defer until it is |
+| Metrics export (`/metrics`, Prometheus) | M | Low–Med | DevOps | | Ops/observability value, no urgency for a single-tenant app |
+| Collection panel bulk operations | M | Low | Frontend UX | | Speculative — no evidence the collection is big enough to need bulk actions yet |
+| Adaptive polling intervals | M | Low | Backend | | Defer until an actual quota-pressure incident, not before |
+| Load testing | M | Low | Testing | | Only relevant if traffic ever exceeds single-user hobby scale |
+| Live network tests (CI-gated) | M | Low | Testing | | Low ROI unless upstreams start breaking often (not observed so far) |
+| Route prediction from velocity vector (Layer 3 route validation) | L | Low–Med | Prediction | | Speculative extension of Layer 2; no user ask driving it yet |
+| Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Data sources | | Blocked — no free/no-signup source identified yet |
+| Aircraft serial number (MSN) field | XL (blocked) | Low | Data sources | | Blocked — no verified data source yet, needs research first |
+| Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Frontend UX | | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
 | *(Historical track interpolation, listed separately below)* | — | — | Duplicate of the two track-smoothing items above; fold into one of them rather than tracking a third time |
 
 ## Bugs
@@ -503,6 +514,33 @@ Phase 2 — Implementation (1–2h):
 Estimate: S–M total (1–2 dev days: 1–2h research + 1–2h implementation + 0.5–1h testing)
 
 **Status:** Added to backlog 2026-07-21, marked HIGH PRIORITY for next session.
+
+---
+
+- **Rework UI for data quality filter (Status flags + Signal type)**
+
+Goal: Polish and refine the recently-shipped data quality filter (`static/index.html` lines 307–342) to improve visual hierarchy, responsive behavior, label clarity, and mobile usability. The filter is functionally complete and shipping but needs UX refinement.
+
+Motivation: The current chip-checkbox layout for Status flags works but has rough edges — spacing could be tighter, grouping could be clearer (Status flags vs. Signal type sections), inline help text is minimal, and mobile responsiveness hasn't been tested. A quick polish pass improves discoverability and reduces UI noise.
+
+Acceptance criteria:
+1. **Visual hierarchy & grouping**: Clearly distinguish Status flags section from Signal type section (visual separator, distinct colors or heading styles). Group radio-like behavior more clearly (Signal type is OR logic within its section; Status flags are independent checkboxes).
+2. **Compact spacing**: Reduce margins/padding between chips, tighten group layout, ensure filter UI doesn't dominate HUD at mobile widths.
+3. **Label clarity**: Tooltips or inline `(?)` for each flag name (e.g., what exactly is "Military" or "Interesting" vs. the raw dbFlags terminology). Consider renaming labels to be more self-explanatory.
+4. **Mobile responsiveness**: Test filter UI at 320px, 480px, 768px widths; ensure checkboxes remain clickable, no text truncation or layout break.
+5. **Default state**: Verify "All" default (Signal type showing all, Status flags all unchecked) is intuitive and documented.
+6. **Tests**: Add a Playwright snapshot test for filter UI at three breakpoints (mobile/tablet/desktop) to catch future regressions.
+
+Implementation notes:
+1. Review current chip styling (`static/style.css` lines defining `.chip-checkbox-list`, `.data-quality-group`); tighten padding, consider a visual divider between Status and Signal sections.
+2. Add inline `(?)` tooltips or `title` attributes to ambiguous flag names (Military, Interesting, PIA, LADD — these come from adsb.fi dbFlags and need explanation).
+3. Consider a compact mode for mobile: stack sections vertically, reduce chip size on small screens (use `@media (max-width: 480px)` for tighter layout).
+4. Verify signal-type help popover wording is clear; expand if needed.
+5. Document the filter's OR logic and default behavior in CLAUDE.md or a dedicated `.ai/DECISIONS.md` entry for future reference.
+
+Estimate: S (1–2h of polish + testing, no new functionality)
+
+**Status:** Added to backlog 2026-07-22; eligible for a quick polish pass after first user feedback on the shipped filter.
 
 ---
 

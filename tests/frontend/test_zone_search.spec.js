@@ -9,11 +9,26 @@ const HEATHROW = {
   country_name: 'United Kingdom', municipality: 'London', iata: 'LHR', icao: 'EGLL',
 };
 
+// London Gatwick — for multi-result and wraparound navigation tests.
+const GATWICK = {
+  ident: 'EGKK', type: 'large_airport', name: 'London Gatwick Airport',
+  lat: 51.153662, lon: -0.182183, elevation_ft: 202, country: 'GB',
+  country_name: 'United Kingdom', municipality: 'London', iata: 'LGW', icao: 'EGKK',
+};
+
 async function mockAirportSearch(page, counts) {
   await page.route('**/api/airports/search**', (route) => {
     counts.n = (counts.n || 0) + 1;
     counts.lastUrl = route.request().url();
     route.fulfill({ json: { airports: [HEATHROW] } });
+  });
+}
+
+async function mockAirportSearchMulti(page, counts) {
+  await page.route('**/api/airports/search**', (route) => {
+    counts.n = (counts.n || 0) + 1;
+    counts.lastUrl = route.request().url();
+    route.fulfill({ json: { airports: [HEATHROW, GATWICK] } });
   });
 }
 
@@ -159,4 +174,127 @@ test('a failed zone change shows an inline error and leaves the map untouched', 
   const centerAfter = await page.evaluate(() => map.getCenter());
   expect(centerAfter.lat).toBeCloseTo(centerBefore.lat, 3);
   expect(centerAfter.lng).toBeCloseTo(centerBefore.lng, 3);
+});
+
+test('the first result is highlighted by default when results render', async ({ page }) => {
+  const counts = {};
+  await mockAirportSearch(page, counts);
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  await page.fill('#zone-search-input', 'heathrow');
+  await page.waitForTimeout(500);
+
+  await expect(page.locator('#zone-search-results .dropdown-option').first()).toHaveClass(/active/);
+});
+
+test('ArrowDown and ArrowUp navigate through results with wraparound', async ({ page }) => {
+  const counts = {};
+  await mockAirportSearchMulti(page, counts);
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  await page.fill('#zone-search-input', 'london');
+  await page.waitForTimeout(500);
+
+  // First result should be highlighted by default
+  await expect(page.locator('#zone-search-results .dropdown-option').nth(0)).toHaveClass(/active/);
+  await expect(page.locator('#zone-search-results .dropdown-option').nth(1)).not.toHaveClass(/active/);
+
+  // ArrowDown moves to second result
+  await page.press('#zone-search-input', 'ArrowDown');
+  await expect(page.locator('#zone-search-results .dropdown-option').nth(0)).not.toHaveClass(/active/);
+  await expect(page.locator('#zone-search-results .dropdown-option').nth(1)).toHaveClass(/active/);
+
+  // ArrowDown again wraps back to first result
+  await page.press('#zone-search-input', 'ArrowDown');
+  await expect(page.locator('#zone-search-results .dropdown-option').nth(0)).toHaveClass(/active/);
+  await expect(page.locator('#zone-search-results .dropdown-option').nth(1)).not.toHaveClass(/active/);
+
+  // ArrowUp from first wraps to last result
+  await page.press('#zone-search-input', 'ArrowUp');
+  await expect(page.locator('#zone-search-results .dropdown-option').nth(0)).not.toHaveClass(/active/);
+  await expect(page.locator('#zone-search-results .dropdown-option').nth(1)).toHaveClass(/active/);
+});
+
+test('Enter selects the currently-highlighted result, not just the first', async ({ page }) => {
+  const searchCounts = {};
+  const zoneCounts = {};
+  const statesCounts = { n: 0 };
+  await mockAirportSearchMulti(page, searchCounts);
+  await mockZonesActive(page, zoneCounts, {});
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  await page.route('**/api/states', (route) => {
+    statesCounts.n += 1;
+    route.fulfill({ json: { states: [] } });
+  });
+
+  await page.fill('#zone-search-input', 'london');
+  await page.waitForTimeout(500);
+
+  // Move highlight to second result (Gatwick)
+  await page.press('#zone-search-input', 'ArrowDown');
+
+  // Press Enter to select the highlighted (Gatwick) result
+  await page.press('#zone-search-input', 'Enter');
+  await page.waitForTimeout(300);
+
+  // Verify the zone change request went to Gatwick, not Heathrow
+  expect(zoneCounts.n).toBe(1);
+  expect(zoneCounts.lastBody.zone_id).toBe('EGKK');
+  expect(zoneCounts.lastBody.lat).toBeCloseTo(GATWICK.lat, 4);
+  expect(zoneCounts.lastBody.lon).toBeCloseTo(GATWICK.lon, 4);
+
+  // Verify the input value updated to Gatwick
+  expect(await page.inputValue('#zone-search-input')).toContain('London Gatwick Airport');
+
+  // Verify poll() was called
+  expect(statesCounts.n).toBeGreaterThan(0);
+});
+
+test('Enter and Arrows do nothing when the dropdown is closed', async ({ page }) => {
+  const searchCounts = {};
+  const zoneCounts = {};
+  await mockAirportSearch(page, searchCounts);
+  await mockZonesActive(page, zoneCounts, {});
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  await page.fill('#zone-search-input', 'heathrow');
+  await page.waitForTimeout(500);
+
+  // Close the dropdown with Escape
+  await page.press('#zone-search-input', 'Escape');
+  await expect(page.locator('#zone-search')).not.toHaveClass(/open/);
+
+  // Press Enter while dropdown is closed — should do nothing
+  await page.press('#zone-search-input', 'Enter');
+  await page.waitForTimeout(300);
+
+  // No zone change request should have been made
+  expect(zoneCounts.n).toBeUndefined();
+
+  // Dropdown should still be closed
+  await expect(page.locator('#zone-search')).not.toHaveClass(/open/);
+});
+
+test('Escape still closes the dropdown (regression test)', async ({ page }) => {
+  const counts = {};
+  await mockAirportSearch(page, counts);
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  await page.fill('#zone-search-input', 'heathrow');
+  await page.waitForTimeout(500);
+
+  // Dropdown should be open
+  await expect(page.locator('#zone-search')).toHaveClass(/open/);
+
+  // Press Escape to close
+  await page.press('#zone-search-input', 'Escape');
+
+  // Dropdown should be closed
+  await expect(page.locator('#zone-search')).not.toHaveClass(/open/);
 });

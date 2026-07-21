@@ -2,6 +2,32 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-22 (Feature: Keyboard navigation in airport search dropdown)
+
+✅ **Keyboard navigation for zone-search results — COMPLETED**
+- **Effort:** XS–S (~4 hours, implementation + tests)
+- **Value:** Medium (UX: keyboard-only users, faster zone-switching workflows)
+- **Feature acceptance criteria met:**
+  - ✅ Arrow keys (↑↓) navigate through results with wraparound (up from first→last, down from last→first)
+  - ✅ First result highlighted by default when results appear (not after first keypress)
+  - ✅ Enter selects the currently-highlighted result, triggering zone change
+  - ✅ Escape closes dropdown (existing behavior, preserved)
+  - ✅ Highlighting resets appropriately as results re-render (each new debounce tick)
+- **Implementation:**
+  - `state-filters.js`: Two new module-level state vars (`zoneSearchResultsData`, `zoneSearchHighlightIndex`)
+  - `state-filters.js`: New helper `setZoneSearchHighlight(index)` — owns wraparound math, CSS class toggling, scroll-into-view
+  - `state-filters.js`: Extended `keydown` listener (Escape untouched, new ArrowDown/ArrowUp/Enter handlers)
+  - CSS: No changes — reused existing `.dropdown-option.active` class (blue tint + bold, same style as category/basemap dropdowns)
+- **Tests:** 5 new Playwright tests added to `test_zone_search.spec.js`:
+  1. First result highlighted by default
+  2. ArrowDown/ArrowUp navigate with wraparound
+  3. Enter selects the highlighted (not first) result
+  4. Enter/Arrows no-op when dropdown is closed (regression guard)
+  5. Escape still closes dropdown (regression guard)
+- **Test suite totals:** All 10 zone-search tests pass (5 existing + 5 new); full frontend suite 177/184 pass (7 skipped, 2 pre-existing failures unrelated)
+- **Backlog status:** Item marked ✅ COMPLETED
+- **Commit:** feat: add keyboard navigation to airport search dropdown (↑↓ arrows, Enter to select, Escape to close)
+
 ## Status as of 2026-07-22 (Feature: Data quality filter — Status flags + Signal type)
 
 ✅ **Data quality filter fully implemented — COMPLETED**
