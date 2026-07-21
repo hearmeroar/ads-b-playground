@@ -99,3 +99,22 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 - Increases complexity of the "which source to display" logic for Operator Country. Mitigated by documenting the rule clearly in dev-mode tooltips.
 
 **References:** CLAUDE.md § "Identity enrichment" → "icao24_allocation.py", § "Registered Owner is a brand new field" (context on three-way country confusion that prompted this)
+
+---
+
+## 2026-07-21 — Runtime zone switching: file persistence + mtime-poll cross-worker sync
+
+**Problem:** `config/zones.json` (loaded 2026-07-20, commit `b2d49fb`) only ever loaded once at import time — there was no way to change the app's coverage area without editing the file by hand and restarting. Building a search-driven "jump to this airport" feature meant deciding how a runtime zone change should behave under this app's actual deployment shape: 2 gunicorn worker processes, each with its own copy of `AREA_CENTER`/`BBOX`/etc. as plain module globals (the same structural issue `storage.py`'s SQLite migration, 2026-07-20, already solved for collections/identity).
+
+**Decision:** Zone changes persist to `config/zones.json` (survive a restart, matching the file's existing role as the single source of truth for the coverage area) rather than staying session-only in memory. Cross-worker propagation uses a cheap `os.path.getmtime()` poll (`_maybe_reload_zone_from_disk()`, called at the top of every route that reads a zone-derived value) rather than a second SQLite table — a zone change is a rare, low-frequency event, so a stat-call-per-request is negligible next to the outbound HTTP calls those routes already make, and it reuses the existing file rather than adding new schema.
+
+**Reason:** File persistence was chosen over session-only because this is a single-tenant app where the zone is a shared, backend-authoritative setting (unlike per-user preferences such as basemap/units, which stay in frontend-only state) — losing it on every restart would make the feature feel broken. Mtime-polling was chosen over a SQLite-backed active-zone table because the access pattern (rare writes, cheap reads, no relational query need) doesn't justify a second persistence mechanism when `storage.py` already exists for state that actually needs it — this stays consistent with `config/zones.json`'s pre-existing role rather than duplicating it.
+
+**A second, related finding drove most of the actual implementation work:** `AREA_CENTER`/`BBOX` feed three values frozen at import time and never revisited before this: each `RADIUS_SOURCES[*]["center"]` dict, `FLIGHTAWARE_QUERY` (a pre-formatted query string), and `FLIGHTRADAR24_BOUNDS` (from a call to `_fr24_client.get_bounds()`). A zone-change endpoint that only reassigned `AREA_CENTER`/`BBOX` would have left three of six live data sources silently querying the *old* location forever. `_apply_zone()` is the one function that now recomputes all seven derived values (plus clears every location-scoped cache) together, so this class of bug can't recur even if a future change touches only one of them by mistake.
+
+**Tradeoffs:**
+- A worker can serve up to one request with a stale zone before its own `_maybe_reload_zone_from_disk()` check fires — acceptable for a rare, human-triggered event, not treated as a hard real-time guarantee.
+- Radius/zoom are deliberately left untouched by a zone change (center-only) — a v1 scope decision; extending the search UI to also offer a radius override is a possible follow-up, not built here.
+- `_persist_zone_config()`'s disk write is best-effort (an unwritable `config/zones.json` doesn't fail the request) — matches this app's existing pattern of treating disk persistence as an optimization (e.g. the track cache), not a hard requirement, for state that isn't the source of truth for anything else running in the same request.
+
+**References:** CLAUDE.md § "Zone search", `app.py`'s `_apply_zone()`/`_persist_zone_config()`/`_maybe_reload_zone_from_disk()` docstrings, `.ai/BACKLOG.md`'s superseded "make the app's geographic view zone easy to change" item

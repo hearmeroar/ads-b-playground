@@ -53,7 +53,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 import storage
 from enrichment.aircraft_enrichment import enrich_identity
-from enrichment.airports import airports_in_bbox, nearest_airport
+from enrichment.airports import airports_in_bbox, nearest_airport, search_airports
 
 try:
     from dotenv import load_dotenv
@@ -110,6 +110,151 @@ BBOX = {
 
 # Same circle in km, for consumers that measure distance that way
 AREA_RADIUS_KM = AREA_RADIUS_NM * 1.852
+
+# mtime of ZONES_FILE as of the last time this process applied a zone —
+# used by _maybe_reload_zone_from_disk() below to detect a zone change made
+# by a *different* gunicorn worker process (see api_zones_set_active()) and
+# to avoid a worker re-applying the exact zone it just wrote itself. Recorded
+# now, at import time, so the very first request into a freshly started
+# worker doesn't spuriously think the file "changed" relative to nothing.
+try:
+    _zones_file_mtime = os.path.getmtime(ZONES_FILE)
+except OSError:
+    _zones_file_mtime = None
+
+
+def _apply_zone(center, zoom, radius_nm, zone_id):
+    """Recompute every value derived from the app's coverage-area center —
+    the runtime counterpart to the import-time block above. Exists because
+    AREA_CENTER/BBOX feed three *more* values that are otherwise frozen at
+    import time and never revisited: each RADIUS_SOURCES[*]["center"] dict,
+    FLIGHTAWARE_QUERY (a pre-formatted "-latlong" string), and
+    FLIGHTRADAR24_BOUNDS (from a call to _fr24_client.get_bounds()). A zone
+    change that only reassigns AREA_CENTER/BBOX would leave three of six
+    live data sources silently querying the *old* location forever — this
+    function is the one place all seven derived values move together.
+
+    Also clears every location-scoped cache (states, the four radius
+    sources, FlightAware, FlightRadar24, METAR, SIGMET — the same set
+    tests/backend/conftest.py's reset_caches fixture already enumerates)
+    so the very next poll after a zone change doesn't re-serve one more
+    round of stale-region data before each cache's own TTL would have
+    naturally expired.
+
+    Does not touch ZONES_FILE itself — see _persist_zone_config() for the
+    disk-write half and _maybe_reload_zone_from_disk() for how a *different*
+    gunicorn worker picks up a change this function alone can't give it
+    (each worker is a separate process with its own copy of these globals).
+    """
+    global AREA_CENTER, AREA_ZOOM, AREA_RADIUS_NM, BBOX, AREA_RADIUS_KM, _active_zone_id
+    global FLIGHTAWARE_QUERY, FLIGHTRADAR24_BOUNDS
+
+    AREA_CENTER = {"lat": float(center["lat"]), "lon": float(center["lon"])}
+    AREA_ZOOM = zoom
+    AREA_RADIUS_NM = radius_nm
+    BBOX = {
+        "lamin": AREA_CENTER["lat"] - BBOX_HALF_HEIGHT_DEG,
+        "lamax": AREA_CENTER["lat"] + BBOX_HALF_HEIGHT_DEG,
+        "lomin": AREA_CENTER["lon"] - BBOX_HALF_WIDTH_DEG,
+        "lomax": AREA_CENTER["lon"] + BBOX_HALF_WIDTH_DEG,
+    }
+    AREA_RADIUS_KM = AREA_RADIUS_NM * 1.852
+    _active_zone_id = zone_id
+
+    for _cfg in RADIUS_SOURCES.values():
+        _cfg["center"] = {"lat": AREA_CENTER["lat"], "lon": AREA_CENTER["lon"], _cfg["dist_param"]: AREA_RADIUS_NM}
+
+    FLIGHTAWARE_QUERY = '-latlong "{lamin} {lomin} {lamax} {lomax}"'.format(**BBOX)
+
+    try:
+        FLIGHTRADAR24_BOUNDS = _fr24_client.get_bounds({
+            "tl_y": BBOX["lamax"], "tl_x": BBOX["lomin"],
+            "br_y": BBOX["lamin"], "br_x": BBOX["lomax"],
+        })
+    except Exception:
+        # Same broad catch as cached_flightradar24() elsewhere in this file —
+        # a failed bounds recompute (e.g. FlightRadar24 blocking this
+        # process) shouldn't break the rest of the zone change; the old
+        # bounds simply stay in effect for that one source until it works.
+        pass
+
+    _cache["data"] = None
+    _cache["ts"] = 0.0
+    for _cfg in RADIUS_SOURCES.values():
+        _cfg["cache"]["data"] = None
+        _cfg["cache"]["ts"] = 0.0
+    _flightaware_cache["data"] = None
+    _flightaware_cache["ts"] = 0.0
+    _flightradar24_cache["data"] = None
+    _flightradar24_cache["ts"] = 0.0
+    _metar_cache["data"] = None
+    _metar_cache["ts"] = 0.0
+    _sigmet_cache["data"] = None
+    _sigmet_cache["ts"] = 0.0
+
+
+def _persist_zone_config(center, zoom, radius_nm, zone_id):
+    """Write the new zone into ZONES_FILE's `zones` dict (keyed by
+    `zone_id`) and make it the active one, so the change survives a
+    restart — the explicitly chosen persistence model for this feature
+    (over a session-only in-memory change). Best-effort: an unwritable
+    ZONES_FILE (permissions, read-only filesystem) leaves the in-memory
+    zone change from _apply_zone() in effect for this process but doesn't
+    fail the request over it, matching this app's general pattern of
+    treating disk persistence as an optimization, not a hard requirement
+    (see e.g. the track cache's own best-effort save/load).
+    """
+    global _zones_file_mtime
+    try:
+        cfg = _load_zone_config()
+        cfg.setdefault("zones", {})
+        cfg["zones"][zone_id] = {"center": center, "zoom": zoom, "radius_nm": radius_nm}
+        cfg["active_zone_id"] = zone_id
+        with open(ZONES_FILE, "w") as f:
+            json.dump(cfg, f, indent=2)
+        _zones_file_mtime = os.path.getmtime(ZONES_FILE)
+    except OSError:
+        pass
+
+
+def _maybe_reload_zone_from_disk():
+    """Cross-worker sync: this app runs under gunicorn with multiple worker
+    processes (see storage.py's own docstring for the identical problem
+    that motivated moving collections/identity to SQLite), each with its
+    own copy of AREA_CENTER/BBOX/etc. as plain module globals. A zone
+    change applied by the worker that handled the POST only updates that
+    worker's own memory — without this, every *other* worker would keep
+    querying the old location until the process happened to restart.
+
+    Called at the top of every route that reads a zone-derived value
+    per-request. Cheap: a single os.path.getmtime() stat call, negligible
+    next to the outbound HTTP calls these routes already make. Compares
+    against the mtime recorded the last time *this* process applied a
+    zone (at import, or via its own _persist_zone_config() call) — a
+    worker reloading the exact file it just wrote itself is a correct
+    no-op here, not a redundant reapply, since _zones_file_mtime is
+    updated at write time too.
+    """
+    global _zones_file_mtime
+    try:
+        mtime = os.path.getmtime(ZONES_FILE)
+    except OSError:
+        return
+    if _zones_file_mtime is not None and mtime <= _zones_file_mtime:
+        return
+    _zones_file_mtime = mtime
+    cfg = _load_zone_config()
+    zone_id = cfg["active_zone_id"]
+    zone = cfg["zones"][zone_id]
+    if (
+        zone_id == _active_zone_id
+        and zone["center"] == AREA_CENTER
+        and zone["radius_nm"] == AREA_RADIUS_NM
+        and zone["zoom"] == AREA_ZOOM
+    ):
+        return
+    _apply_zone(zone["center"], zone["zoom"], zone["radius_nm"], zone_id)
+
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
@@ -583,6 +728,41 @@ def api_config():
     # backend-owned AREA_CENTER instead of a hardcoded constant it has to
     # keep in sync by hand — see map-init.js. Pure local values, no I/O, so
     # (like /api/identity) this is deliberately uncached.
+    _maybe_reload_zone_from_disk()
+    return jsonify({
+        "center": AREA_CENTER,
+        "zoom": AREA_ZOOM,
+        "radius_nm": AREA_RADIUS_NM,
+        "bbox": BBOX,
+        "active_zone_id": _active_zone_id,
+    })
+
+
+@app.route("/api/zones/active", methods=["POST"])
+def api_zones_set_active():
+    # Moves the app's entire coverage area — not just the Leaflet view — to
+    # a new center, picked via the airport search box (static/js/
+    # state-filters.js, backed by /api/airports/search above). See
+    # _apply_zone()'s docstring for why this can't be a simple
+    # AREA_CENTER/BBOX reassignment: RADIUS_SOURCES/FLIGHTAWARE_QUERY/
+    # FLIGHTRADAR24_BOUNDS and every location-scoped cache all have to move
+    # together, or three of six live sources would keep querying the old
+    # location. Zoom/radius are deliberately left untouched (only `center`
+    # moves) — a v1 scope decision, not an oversight; `zone_id` defaults to
+    # "custom" so an ad-hoc airport pick doesn't need to match one of
+    # config/zones.json's named presets.
+    body = request.get_json(silent=True) or {}
+    lat, lon = body.get("lat"), body.get("lon")
+    if (
+        not isinstance(lat, (int, float)) or isinstance(lat, bool)
+        or not isinstance(lon, (int, float)) or isinstance(lon, bool)
+        or not (-90 <= lat <= 90) or not (-180 <= lon <= 180)
+    ):
+        return jsonify({"error": "invalid_coordinates"}), 400
+    zone_id = body.get("zone_id") or "custom"
+    center = {"lat": lat, "lon": lon}
+    _apply_zone(center, AREA_ZOOM, AREA_RADIUS_NM, zone_id)
+    _persist_zone_config(center, AREA_ZOOM, AREA_RADIUS_NM, zone_id)
     return jsonify({
         "center": AREA_CENTER,
         "zoom": AREA_ZOOM,
@@ -612,6 +792,7 @@ def _track_error_response(cached, message):
 
 @app.route("/api/states")
 def api_states():
+    _maybe_reload_zone_from_disk()
     now = time.time()
 
     if _cache["data"] is not None and now - _cache["ts"] < MIN_INTERVAL:
@@ -750,6 +931,7 @@ def cached_radius_source(url, cache, min_interval, headers=None, params=None, em
 
 
 def radius_source_response(name):
+    _maybe_reload_zone_from_disk()
     cfg = RADIUS_SOURCES[name]
     return cached_radius_source(cfg["url"].format(**cfg["center"]), cfg["cache"], cfg["min_interval"])
 
@@ -785,6 +967,7 @@ def api_adsbone():
 
 @app.route("/api/flightaware")
 def api_flightaware():
+    _maybe_reload_zone_from_disk()
     if not FLIGHTAWARE_API_KEY:
         return jsonify({"flights": [], "error": "not_configured"})
     return cached_radius_source(
@@ -797,6 +980,7 @@ def api_flightaware():
 
 @app.route("/api/flightradar24")
 def api_flightradar24():
+    _maybe_reload_zone_from_disk()
     return cached_flightradar24()
 
 
@@ -1208,6 +1392,7 @@ def _sigmet_intersects_area(sigmet):
 
 @app.route("/api/metar")
 def api_metar():
+    _maybe_reload_zone_from_disk()
     now = time.time()
     if _metar_cache["data"] is not None and now - _metar_cache["ts"] < METAR_MIN_INTERVAL:
         return jsonify(_metar_cache["data"])
@@ -1227,6 +1412,7 @@ def api_metar():
 
 @app.route("/api/sigmet")
 def api_sigmet():
+    _maybe_reload_zone_from_disk()
     now = time.time()
     if _sigmet_cache["data"] is not None and now - _sigmet_cache["ts"] < SIGMET_MIN_INTERVAL:
         return jsonify(_sigmet_cache["data"])
@@ -1278,6 +1464,7 @@ def api_airports():
     # checklist — only sent when the user has actually narrowed the
     # selection, so an old/simple caller that never passes it still gets
     # every type, unfiltered, exactly like before this param existed.
+    _maybe_reload_zone_from_disk()
     bbox_param = request.args.get("bbox")
     if bbox_param:
         try:
@@ -1294,6 +1481,22 @@ def api_airports():
         types=types,
     )
     return jsonify({"airports": airports})
+
+
+@app.route("/api/airports/search")
+def api_airports_search():
+    # Backs the zone-switcher's search box (static/js/state-filters.js) —
+    # a text query (name/IATA/ICAO/city/country substring) resolved against
+    # the same global OurAirports dataset /api/airports uses, not scoped to
+    # the current zone/viewport, since the whole point is finding an
+    # airport somewhere else to jump to. No caching, same zero-I/O
+    # rationale as /api/airports and /api/identity/<icao24> above.
+    query = request.args.get("q", "")
+    try:
+        limit = min(int(request.args.get("limit", 20)), 50)
+    except (TypeError, ValueError):
+        limit = 20
+    return jsonify({"airports": search_airports(query, limit=limit)})
 
 
 if __name__ == "__main__":

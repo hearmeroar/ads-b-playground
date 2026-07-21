@@ -422,8 +422,11 @@ only ever trusts an explicit `routeSource` override, not the generic
 per-entry lookup, for these two fields.
 
 **Area coupling:** All location-based constants derive from one `AREA_CENTER`
-(`{"lat": 44.0, "lon": 21.0}`) in `app.py`: `BBOX` is computed from it,
-every `RADIUS_SOURCES[*]["center"]` is set to it (with the appropriate
+(`{"lat": 44.0, "lon": 21.0}` by default) in `app.py`, loaded from
+`config/zones.json` at import (`_load_zone_config()`, `ZONES_FILE` env var
+overridable; falls back to the same hardcoded default if the file is
+missing/malformed): `BBOX` is computed from it, every
+`RADIUS_SOURCES[*]["center"]` is set to it (with the appropriate
 `dist`/`radius` field per API), and `/api/config` exposes it (plus
 `AREA_ZOOM`, the initial map zoom level) so the frontend's `map.setView()`
 call in `static/js/map-init.js` fetches the backend-owned values and self-corrects
@@ -434,6 +437,104 @@ manual sync of six independent constants. `/api/config` also exposes
 `radius_nm` (`AREA_RADIUS_NM`, 220) — the shared query radius every
 `RADIUS_SOURCES` entry's `center` is built from — which drives the
 scan-radius range rings below.
+
+**This coupling is a hard constraint that runtime zone changes (below) must
+respect, not just the import-time load described above**: `AREA_CENTER`/
+`BBOX` feed **three more values frozen at import time**, not re-read
+per-request — `RADIUS_SOURCES[*]["center"]`, `FLIGHTAWARE_QUERY` (a
+pre-formatted `-latlong "..."` string), and `FLIGHTRADAR24_BOUNDS` (from a
+call to `_fr24_client.get_bounds()`). Any code that moves the coverage area
+at runtime has to recompute all seven values together — see `_apply_zone()`
+immediately below, which exists specifically to be the one place that does.
+
+**Zone search** (`#zone-search` in the HUD, `static/js/state-filters.js`,
+`enrichment/airports.py`'s `search_airports()`, `app.py`'s `_apply_zone()`/
+`_persist_zone_config()`/`_maybe_reload_zone_from_disk()` + `POST
+/api/zones/active`): lets the user move the app's entire coverage area —
+not just the Leaflet view — by typing an airport name/IATA/ICAO/city/country
+and picking a result, rather than hand-editing `config/zones.json` and
+restarting.
+- **Search** (`GET /api/airports/search?q=...`) runs against the same
+  global OurAirports dataset the Airports layer already loads
+  (`enrichment/airports.py`'s `_MAP_AIRPORTS` — see that section above for
+  why OurAirports over OpenFlights), not a separate index — a flat scan
+  over ~85,700 rows is sub-millisecond, the same "rare event, no index
+  needed" reasoning as `nearest_airport()`'s own linear scan, though this
+  one runs per keystroke rather than per click, which is why the frontend
+  debounces (`ZONE_SEARCH_DEBOUNCE_MS`, 250ms) and both sides enforce a
+  2-character minimum query length. Ranking is four tiers: exact IATA/ICAO
+  code match, then the query as a prefix of the *whole* name/municipality/
+  country, then as a prefix of some *word* within one of those fields
+  (without this third tier, searching "heathrow" would rank an obscure
+  small airport literally named "Heathrow Airport" correctly but leave
+  "London Heathrow Airport" — whose name doesn't *start* with the query —
+  in the lowest, substring-only tier, which is backwards from what a user
+  typing a recognizable landmark name expects), then any substring match.
+  File order (large → small airports, per the vendored data's own sort) is
+  preserved within each tier. `limit` is capped server-side at 50
+  regardless of what's requested. No caching — same zero-I/O rationale as
+  `/api/airports` and `/api/identity/<icao24>`.
+- **`_apply_zone(center, zoom, radius_nm, zone_id)`** is the one function
+  that moves all seven derived values together (see the hard-constraint
+  note above) and clears every location-scoped cache (`_cache`, the four
+  `RADIUS_SOURCES` caches, `_flightaware_cache`, `_flightradar24_cache`,
+  `_metar_cache`, `_sigmet_cache` — the exact set
+  `tests/backend/conftest.py`'s `reset_caches` fixture already enumerates)
+  so the next poll after a zone change doesn't re-serve one more round of
+  stale-region data before each cache's own TTL would have naturally
+  expired. A failed `_fr24_client.get_bounds()` call (FlightRadar24
+  blocking this process, same known risk as its regular polling — see
+  that section above) is caught and leaves the old bounds in place rather
+  than aborting the rest of the zone change.
+- **Persists to `config/zones.json`** (`_persist_zone_config()`, keyed by
+  the picked airport's ICAO, or `"custom"` if absent) rather than staying
+  session-only — a zone change survives a restart, the explicitly chosen
+  design (over an in-memory-only change) since this is a single-tenant
+  app where the zone is backend-authoritative shared state, unlike a
+  per-user preference like basemap/units. Best-effort: an unwritable file
+  doesn't fail the request, matching this app's general "disk persistence
+  is an optimization, not a hard requirement" posture elsewhere (e.g. the
+  track cache).
+- **Cross-worker sync**: this app runs under gunicorn with multiple worker
+  processes (see storage.py's own docstring for the identical problem that
+  motivated moving collections/identity to SQLite), each with its own copy
+  of `AREA_CENTER`/etc. as plain module globals — a zone change applied by
+  the worker that handled the `POST` only updates that worker's own
+  memory. Rather than adding a second SQLite-backed table for a rare,
+  low-frequency write, `_maybe_reload_zone_from_disk()` compares
+  `os.path.getmtime(ZONES_FILE)` against the mtime recorded the last time
+  *this* process applied a zone, and reloads+reapplies via `_apply_zone()`
+  if the file changed underneath it — called at the top of every route
+  that reads a zone-derived value per-request (`/api/config`,
+  `/api/states`, the four radius-source routes via
+  `radius_source_response()`, `/api/flightaware`, `/api/flightradar24`,
+  `/api/metar`, `/api/sigmet`, `/api/airports`). A single cheap
+  `getmtime()` stat call is negligible next to the outbound HTTP calls
+  these routes already make. A worker can therefore serve up to one
+  request with a stale zone before its own next check — accepted, not
+  treated as a hard real-time guarantee, for a rare human-triggered event.
+- **`POST /api/zones/active`** (body `{lat, lon, zone_id}`) validates
+  coordinates (400 `invalid_coordinates` for anything non-numeric or out
+  of `[-90,90]`/`[-180,180]`), calls `_apply_zone()` then
+  `_persist_zone_config()`, and returns the same shape `/api/config` does
+  — the frontend reuses that response directly rather than making a
+  second round trip. **Radius and zoom are deliberately left untouched**
+  (only `center` moves) — a v1 scope decision, not an oversight; a future
+  version could let the search UI also offer a radius override.
+- **Frontend**: the zone-search box is the one HUD input that isn't a
+  click-only `.dropdown-trigger` button like the basemap/category pickers
+  — it's a real `<input>` (`.zone-search-input`), reusing
+  `.dropdown-menu`/`.dropdown-option` only for the results list. Selecting
+  a result calls `map.setView()` with the response's center (keeping the
+  current zoom) and `poll()` immediately rather than waiting for the next
+  `POLL_INTERVAL_MS` tick. The Airports layer's own viewport-scoped
+  re-fetch needs no explicit nudge — `map.setView()` fires Leaflet's
+  `moveend`, which `map-init.js`'s `scheduleAirportsRefresh` already
+  listens on — but METAR/SIGMET are timer-only (no `moveend` listener), so
+  their refresh functions are called explicitly when those layers are
+  enabled. A failed `POST` shows an inline status message
+  (`#zone-search-status`) and leaves the map untouched rather than failing
+  silently.
 
 **Scan-radius range rings** (`static/js/map-init.js`, toggled via
 `#toggle-scan-radius` in the HUD, wired in `static/js/state-filters.js`):
@@ -2879,6 +2980,40 @@ because photographer name and photo URL come from an external API.
   `airport-icon-large-airport`; and the `(?)` popover opens with explanatory
   text and closes on an outside click, the same mechanism the weather
   layers use.
+- `tests/backend/test_zones.py` covers the zone-search feature's backend:
+  `_apply_zone()` updates `AREA_CENTER`/`BBOX`/`AREA_RADIUS_KM` **and**
+  explicitly asserts `RADIUS_SOURCES[*]["center"]`/`FLIGHTAWARE_QUERY`/
+  `FLIGHTRADAR24_BOUNDS` change too (the regression this design exists to
+  prevent — a test that only checked `AREA_CENTER` wouldn't catch a future
+  change that reintroduces the "three frozen values" bug), with
+  `_fr24_client.get_bounds` mocked and its failure path (bare exception,
+  old bounds kept) covered separately; every location-scoped cache is
+  asserted cleared; `POST /api/zones/active` covers the happy path,
+  invalid-coordinate 400s, `zone_id` defaulting to `"custom"`, and disk
+  persistence; `_maybe_reload_zone_from_disk()` is covered both directly
+  (simulating a different worker's write via `os.utime()` to force the
+  mtime forward) and through `/api/config`'s own call to it. `search_airports()`
+  and `/api/airports/search` are covered in `test_airports.py` alongside
+  the pre-existing map-layer dataset tests: empty/short-query guards,
+  exact-code-match-first ranking, the word-boundary-prefix tier (asserting
+  "London Heathrow Airport" outranks a plain substring match), case
+  insensitivity, closed-airport exclusion, and the server-side `limit`
+  clamp. `conftest.py`'s `reset_caches` fixture redirects `ZONES_FILE` to a
+  throwaway per-test file and restores the pre-test zone via `_apply_zone()`
+  itself afterward (not a hand-rolled undo), since `_apply_zone()` mutates
+  a wide set of module globals that would otherwise leak between tests.
+- `test_zone_search.spec.js` covers the frontend: typing below the 2-char
+  minimum fires no request; a valid query (past the debounce) fetches
+  `/api/airports/search` and renders results; selecting a result posts to
+  `/api/zones/active`, recenters the map, and triggers an immediate
+  `/api/states` call rather than waiting for the next poll tick; a failed
+  `POST` shows the inline status message and leaves the map's center
+  unchanged. `/api/zones/active` is always mocked in this spec, never hit
+  for real — the shared Playwright `webServer` is one long-lived process
+  reused across the whole parallel test run (`playwright.config.js`'s
+  `reuseExistingServer`), so a real POST would mutate the actual
+  `config/zones.json` on disk and leak zone state into every other
+  concurrently-running spec.
 - `tests/backend/test_flightradar24.py` mocks the `FlightRadarAPI` SDK
   directly (`monkeypatch.setattr(app._fr24_client, "get_flights", ...)`) —
   the first backend test file that isn't mocking `app.requests.get`/`.post`,

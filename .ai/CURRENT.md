@@ -2,7 +2,38 @@
 
 *(Updated after each significant session or task completion)*
 
-## Status as of 2026-07-21 (Evening)
+## Status as of 2026-07-21 (Night)
+
+✅ **Feature Complete: Airport search → runtime zone switching**
+- New: `enrichment/airports.py`'s `search_airports()` (ranked name/IATA/ICAO/
+  city/country search over the OurAirports dataset) + `/api/airports/search`
+- New: `app.py`'s `_apply_zone()` — the single function that recomputes
+  every value derived from `AREA_CENTER`/`BBOX` on a zone change:
+  `RADIUS_SOURCES[*]["center"]`, `FLIGHTAWARE_QUERY`, `FLIGHTRADAR24_BOUNDS`,
+  and every location-scoped cache (previously three of those were frozen at
+  import time and never revisited — the bug this function exists to close)
+- New: `POST /api/zones/active` (picks a new center; radius/zoom untouched
+  in this pass) + `_persist_zone_config()` (writes to `config/zones.json`)
+  + `_maybe_reload_zone_from_disk()` (mtime-poll cross-worker sync, since
+  this app runs 2 gunicorn workers with independent memory — see
+  `storage.py`'s docstring for the identical class of bug)
+- New: HUD search box (`static/js/state-filters.js`'s zone-search block) —
+  selecting a result posts to `/api/zones/active`, recenters the map, and
+  calls `poll()` immediately rather than waiting for the next tick
+- Tests: `tests/backend/test_zones.py` (new), `test_airports.py` (search
+  coverage added), `tests/frontend/test_zone_search.spec.js` (new) — full
+  backend suite 255/255, frontend suite passing (pre-existing, unrelated
+  `test_route_card_tilt.spec.js` failures confirmed present on `main` too,
+  not caused by this work)
+- **Corrects prior doc drift**: the "Dynamic zones configuration" entry
+  below (commit `b2d49fb`) had claimed a `/api/zones` endpoint and a wired
+  frontend picker already existed — verified false before starting this
+  work; that commit only added zone *loading* at import time and extended
+  `/api/config` to report it read-only. This session is what actually
+  builds the mutation path and UI.
+- Backlog item ✅ COMPLETED (see `.ai/BACKLOG.md`; superseded the originally
+  envisioned fixed-preset-dropdown design with airport search instead)
+- ADR: `.ai/DECISIONS.md`, 2026-07-21 entry
 
 ✅ **Infrastructure Complete: All `.ai/` commit hooks**
 - Commit `f78832d` — "feat: automate .ai/CURRENT.md upkeep via commit-blocking hook"
@@ -15,13 +46,17 @@
 - Tested: pipe-test + JSON validation ✓
 - ✨ **Note:** Hooks will activate in the next session or after `/hooks` UI reload (settings watcher initialized before new scripts created). No code changes needed; infrastructure is fully in place.
 
-✅ **Feature Complete: Dynamic zones configuration**
+✅ **Zone config loading (corrected 2026-07-21 — this entry previously
+overstated what shipped)**
 - Commit `b2d49fb` — "feat: load zone configuration from config/zones.json"
-- `config/zones.json` now defines named coverage zones (default + region presets)
-- Backend `/api/zones` endpoint added (no data destructive changes)
-- `/api/config` now includes `active_zone_id` and canonical `radius_nm`/`bbox`
-- Frontend zone-picker dropdown wired in HUD; UI-only (no persistence yet)
-- Backlog item ✅ COMPLETED
+- `config/zones.json` loaded at import time (a single `default` zone at
+  this commit, not multiple presets)
+- `/api/config` extended to report `active_zone_id`/canonical `radius_nm`/`bbox`
+- **No `/api/zones` route and no frontend picker were actually added at this
+  commit**, despite this section previously claiming both — verified via
+  `git show b2d49fb --stat` and a repo-wide grep before starting the
+  "Airport search → runtime zone switching" work above, which is what
+  actually built the mutation endpoint and UI
 
 ✅ **Feature Complete: Airports layer toggles**
 - Commit `8d4679d` — "UI: replace airports layer checkbox with accessible switch control"

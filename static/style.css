@@ -169,6 +169,24 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .dropdown-icon { flex: none; color: var(--muted); }
 #hud .dropdown-option.active .dropdown-icon { color: #1a73e8; }
 
+/* Zone-search box (#zone-search-block): a text <input>, not a click-only
+   .dropdown-trigger button like the basemap/category pickers — styled to
+   match their look (same background/border/radius/padding) but without
+   `display:flex`, which behaves inconsistently on a replaced <input>
+   element. Reuses .dropdown/.dropdown-menu/.dropdown-option as-is for the
+   results list/open-state toggling. */
+#hud .zone-search-input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; color: var(--ink);
+  background: #eef0f3; border: 1px solid var(--border); border-radius: 7px;
+  padding: 6px 9px;
+}
+#hud .zone-search-input:focus { outline: none; border-color: #1a73e8; }
+#hud .zone-search-option { flex-direction: column; align-items: flex-start; gap: 1px; }
+#hud .zone-search-result-name { font-weight: 600; }
+#hud .zone-search-result-meta { font-size: 11px; color: var(--muted); }
+#hud .zone-search-status { font-size: 11px; color: var(--muted); margin-top: 6px; }
+#hud .zone-search-status.error { color: #dc2626; }
+
 #hud .hud-footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 #hud .status { font-size: 11px; color: var(--muted); }
 #hud .status + .status { margin-top: 2px; }

@@ -188,6 +188,76 @@ def list_map_airports(include_closed=False, types=None):
     return result
 
 
+def search_airports(query, limit=20):
+    """Search OurAirports dataset for airports matching the query string.
+
+    Returns up to `limit` airports (capped at 50 server-side, never more).
+    Search is case-insensitive and matches across name, IATA, ICAO,
+    municipality, and country_name fields.
+
+    Ranking, four tiers, in order: (1) exact IATA/ICAO code match, (2) the
+    query is a prefix of the *whole* name/municipality/country (e.g. "lon"
+    → "London..."), (3) the query is a prefix of some *word* within one of
+    those fields (e.g. "heathrow" → "London Heathrow Airport" — without this
+    tier, a query matching the second/third word of a well-known airport's
+    name would rank below an obscure airport whose name happens to start
+    with that word, which is backwards from what a user searching by a
+    recognizable landmark name expects), (4) any substring match anywhere
+    else. Preserves file order within each tier (large/medium/small
+    airports first, per the vendored data's own sort order).
+
+    Returns a list of airport dicts with fields: ident, type, name, lat, lon,
+    elevation_ft, country, municipality, iata, icao, country_name.
+    """
+    if not query or not _MAP_AIRPORTS:
+        return []
+
+    query = query.strip().lower()
+    if len(query) < 2:
+        return []
+
+    limit = min(int(limit or 20), 50)
+
+    exact_matches = []
+    prefix_matches = []
+    word_prefix_matches = []
+    substring_matches = []
+
+    for a in _MAP_AIRPORTS:
+        if a.get("type") == "closed":
+            continue
+
+        # Build searchable fields
+        iata_lower = (a.get("iata") or "").lower()
+        icao_lower = (a.get("icao") or "").lower()
+        name_lower = (a.get("name") or "").lower()
+        municipality_lower = (a.get("municipality") or "").lower()
+        country_iso = a.get("country")
+        country_obj = country_by_iso(country_iso)
+        country_name_lower = (country_obj["name"] if country_obj else "").lower()
+
+        fields = [name_lower, municipality_lower, country_name_lower]
+
+        if iata_lower == query or icao_lower == query:
+            exact_matches.append(a)
+        elif any(f.startswith(query) for f in fields):
+            prefix_matches.append(a)
+        elif any(word.startswith(query) for f in fields for word in f.split()):
+            word_prefix_matches.append(a)
+        elif any(query in f for f in fields) or query in iata_lower or query in icao_lower:
+            substring_matches.append(a)
+
+    result = exact_matches + prefix_matches + word_prefix_matches + substring_matches
+
+    # Add country_name to each result (matching list_map_airports() behavior)
+    enriched = []
+    for a in result[:limit]:
+        country_obj = country_by_iso(a.get("country"))
+        enriched.append({**a, "country_name": country_obj["name"] if country_obj else None})
+
+    return enriched
+
+
 def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False, center=None, radius_km=None, types=None):
     """Airports within a lat/lon bounding box — what the frontend actually
     renders. The full global list is stored (see the module docstring), but

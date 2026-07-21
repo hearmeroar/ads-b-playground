@@ -5,7 +5,7 @@ list_map_airports()/airports_in_bbox() (the OurAirports-backed map layer
 dataset) and the /api/airports route, which does need the `client` fixture
 since it's a real Flask route."""
 
-from enrichment.airports import airports_in_bbox, list_map_airports, nearest_airport
+from enrichment.airports import airports_in_bbox, list_map_airports, nearest_airport, search_airports
 
 
 def test_nearest_airport_finds_close_match():
@@ -170,3 +170,88 @@ def test_api_airports_no_types_param_returns_every_type(client):
     assert resp.status_code == 200
     icaos = [a["icao"] for a in resp.get_json()["airports"]]
     assert "LYBE" in icaos
+
+
+# --- search_airports() (backs the zone-switcher's search box) --------------
+
+def test_search_airports_empty_or_short_query_returns_nothing():
+    assert search_airports("") == []
+    assert search_airports(None) == []
+    assert search_airports("b") == []  # below the 2-char minimum
+
+
+def test_search_airports_exact_code_match_ranks_first():
+    results = search_airports("beg")
+    assert results  # a real, stable worked example
+    assert results[0]["icao"] == "LYBE"
+    assert results[0]["iata"] == "BEG"
+
+
+def test_search_airports_matches_by_name_city_and_country():
+    by_name = search_airports("Nikola Tesla")
+    assert any(a["icao"] == "LYBE" for a in by_name)
+    by_city = search_airports("Belgrade")
+    assert any(a["icao"] == "LYBE" for a in by_city)
+    by_country = search_airports("Serbia")
+    assert any(a["icao"] == "LYBE" for a in by_country)
+
+
+def test_search_airports_is_case_insensitive():
+    assert search_airports("BEG")[0]["icao"] == "LYBE"
+    assert search_airports("beg")[0]["icao"] == "LYBE"
+    assert search_airports("BeG")[0]["icao"] == "LYBE"
+
+
+def test_search_airports_prefix_beats_substring():
+    # "London" is a prefix of many airport/city names; a name-prefix match
+    # must rank ahead of an airport that merely contains "london" deeper in
+    # its name/municipality/country fields.
+    results = search_airports("london heathrow")
+    assert results
+    assert results[0]["icao"] == "EGLL"
+
+
+def test_search_airports_excludes_closed_airports():
+    results = search_airports("Nikola Tesla")
+    assert all(a["type"] != "closed" for a in results)
+
+
+def test_search_airports_limit_is_respected_and_capped():
+    assert len(search_airports("airport", limit=3)) <= 3
+    # A caller-supplied limit above the server-side ceiling is clamped, not
+    # honored outright — same defensive posture as /api/airports/search's
+    # own clamp on the raw query-string value.
+    assert len(search_airports("airport", limit=1000)) <= 50
+
+
+def test_search_airports_result_shape_matches_map_layer():
+    result = search_airports("beg")[0]
+    for key in ("ident", "type", "name", "lat", "lon", "elevation_ft", "country", "municipality", "iata", "icao", "country_name"):
+        assert key in result
+
+
+# --- /api/airports/search route ---------------------------------------------
+
+def test_api_airports_search_finds_worked_example(client):
+    resp = client.get("/api/airports/search", query_string={"q": "beg"})
+    assert resp.status_code == 200
+    icaos = [a["icao"] for a in resp.get_json()["airports"]]
+    assert "LYBE" in icaos
+
+
+def test_api_airports_search_missing_query_returns_empty(client):
+    resp = client.get("/api/airports/search")
+    assert resp.status_code == 200
+    assert resp.get_json()["airports"] == []
+
+
+def test_api_airports_search_malformed_limit_falls_back_to_default(client):
+    resp = client.get("/api/airports/search", query_string={"q": "beg", "limit": "not-a-number"})
+    assert resp.status_code == 200
+    assert "LYBE" in [a["icao"] for a in resp.get_json()["airports"]]
+
+
+def test_api_airports_search_limit_clamped_server_side(client):
+    resp = client.get("/api/airports/search", query_string={"q": "airport", "limit": "500"})
+    assert resp.status_code == 200
+    assert len(resp.get_json()["airports"]) <= 50

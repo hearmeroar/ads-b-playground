@@ -1,3 +1,5 @@
+import json
+import os
 from unittest.mock import MagicMock
 
 import pytest
@@ -56,7 +58,25 @@ def reset_caches(monkeypatch, tmp_path):
     app._metar_cache.update({"data": None, "ts": 0.0})
     app._sigmet_cache.clear()
     app._sigmet_cache.update({"data": None, "ts": 0.0})
+    # Zone config (config/zones.json, _apply_zone()): redirect ZONES_FILE to
+    # a throwaway file per test, same rationale as TRACK_CACHE_FILE above —
+    # a test that calls /api/zones/active must never write the repo's real
+    # config/zones.json. _apply_zone() also mutates a wide set of
+    # module-level globals (AREA_CENTER, BBOX, RADIUS_SOURCES[*]["center"],
+    # FLIGHTAWARE_QUERY, FLIGHTRADAR24_BOUNDS, ...) that would otherwise
+    # leak into whichever test runs next, so the pre-test zone is restored
+    # via _apply_zone() itself after each test — the same function under
+    # test, not a hand-rolled undo, so the restore path is exercised too.
+    zones_file = tmp_path / "zones.json"
+    zones_file.write_text(json.dumps({
+        "active_zone_id": "default",
+        "zones": {"default": {"center": dict(app.AREA_CENTER), "zoom": app.AREA_ZOOM, "radius_nm": app.AREA_RADIUS_NM}},
+    }))
+    monkeypatch.setattr(app, "ZONES_FILE", str(zones_file))
+    monkeypatch.setattr(app, "_zones_file_mtime", os.path.getmtime(str(zones_file)))
+    _orig_zone = (dict(app.AREA_CENTER), app.AREA_ZOOM, app.AREA_RADIUS_NM, app._active_zone_id)
     yield
+    app._apply_zone(_orig_zone[0], _orig_zone[1], _orig_zone[2], _orig_zone[3])
 
 
 @pytest.fixture(autouse=True)

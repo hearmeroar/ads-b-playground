@@ -120,6 +120,16 @@
   </div>
   <div class="label">aircraft in view</div>
 
+  <div class="filter-block" id="zone-search-block">
+    <div class="filter-title">Jump to airport</div>
+    <div class="dropdown" id="zone-search">
+      <input type="text" id="zone-search-input" class="zone-search-input"
+             placeholder="Airport, city, IATA/ICAO..." autocomplete="off">
+      <div class="dropdown-menu" id="zone-search-results"></div>
+    </div>
+    <div class="zone-search-status" id="zone-search-status" hidden></div>
+  </div>
+
   <div class="filter-block" id="search-block">
     <input type="text" id="aircraft-search" placeholder="Search by ICAO (hex)"
            autocomplete="off" maxlength="6" style="width:100%; padding:6px 9px; font-size:12px; border:1px solid var(--border); border-radius:7px; box-sizing:border-box; font-family:monospace;">

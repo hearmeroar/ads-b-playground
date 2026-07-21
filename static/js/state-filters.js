@@ -288,6 +288,123 @@ basemapOptions.forEach((opt) => {
 });
 document.addEventListener('click', () => basemapDropdown.classList.remove('open'));
 
+// Zone search — a text input + live-filtered results list (backed by
+// /api/airports/search, enrichment/airports.py) that moves the app's whole
+// coverage area, not just the Leaflet view: selecting a result posts to
+// /api/zones/active (app.py's _apply_zone()/_persist_zone_config()), which
+// recomputes AREA_CENTER/BBOX and every value derived from them (the four
+// radius sources' own query centers, FlightAware's bbox query, FlightRadar24's
+// bounds — see CLAUDE.md/_apply_zone()'s docstring for why all of those have
+// to move together), then reuses that response to recenter the map and
+// re-poll immediately. This is the one HUD input that isn't a click-only
+// .dropdown-trigger button like the basemap/category pickers above — it
+// reuses their .dropdown-menu/.dropdown-option markup for the results list,
+// but the trigger itself is a real <input>, styled via .zone-search-input.
+const ZONE_SEARCH_DEBOUNCE_MS = 250;
+const zoneSearchDropdown = document.getElementById('zone-search');
+const zoneSearchInput = document.getElementById('zone-search-input');
+const zoneSearchResults = document.getElementById('zone-search-results');
+const zoneSearchStatusEl = document.getElementById('zone-search-status');
+let zoneSearchDebounceTimer = null;
+
+function setZoneSearchStatus(message, isError) {
+  if (!message) {
+    zoneSearchStatusEl.hidden = true;
+    zoneSearchStatusEl.textContent = '';
+    zoneSearchStatusEl.classList.remove('error');
+    return;
+  }
+  zoneSearchStatusEl.hidden = false;
+  zoneSearchStatusEl.textContent = message;
+  zoneSearchStatusEl.classList.toggle('error', !!isError);
+}
+
+function renderZoneSearchResults(airports) {
+  zoneSearchResults.innerHTML = '';
+  if (!airports.length) {
+    zoneSearchDropdown.classList.remove('open');
+    return;
+  }
+  airports.forEach((airport) => {
+    const opt = document.createElement('div');
+    opt.className = 'dropdown-option zone-search-option';
+
+    const code = airport.iata || airport.icao || '';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'zone-search-result-name';
+    nameEl.textContent = code ? (airport.name + ' (' + code + ')') : airport.name;
+
+    const metaEl = document.createElement('span');
+    metaEl.className = 'zone-search-result-meta';
+    metaEl.textContent = [airport.municipality, airport.country_name].filter(Boolean).join(', ');
+
+    opt.appendChild(nameEl);
+    opt.appendChild(metaEl);
+    opt.addEventListener('click', () => selectZoneSearchResult(airport));
+    zoneSearchResults.appendChild(opt);
+  });
+  zoneSearchDropdown.classList.add('open');
+}
+
+function selectZoneSearchResult(airport) {
+  zoneSearchInput.value = airport.name;
+  zoneSearchDropdown.classList.remove('open');
+  zoneSearchResults.innerHTML = '';
+  setZoneSearchStatus('Moving to ' + airport.name + '…', false);
+
+  fetch('/api/zones/active', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      lat: airport.lat,
+      lon: airport.lon,
+      zone_id: airport.icao || airport.ident || undefined,
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error('zone_change_failed');
+      return res.json();
+    })
+    .then((cfg) => {
+      map.setView([cfg.center.lat, cfg.center.lon], map.getZoom());
+      setZoneSearchStatus(null);
+      poll(); // re-fetch aircraft immediately instead of waiting for the next tick
+      // Airports layer re-fetches on its own: setView() fires Leaflet's
+      // moveend, which map-init.js's scheduleAirportsRefresh already
+      // listens on. METAR/SIGMET are timer-only (no moveend listener), so
+      // they need an explicit nudge when enabled.
+      if (weatherMetarState.enabled) refreshMetar();
+      if (weatherSigmetState.enabled) refreshSigmet();
+    })
+    .catch(() => {
+      setZoneSearchStatus('Could not switch zone — try again.', true);
+    });
+}
+
+zoneSearchInput.addEventListener('input', () => {
+  const query = zoneSearchInput.value.trim();
+  clearTimeout(zoneSearchDebounceTimer);
+  if (query.length < 2) {
+    zoneSearchResults.innerHTML = '';
+    zoneSearchDropdown.classList.remove('open');
+    return;
+  }
+  zoneSearchDebounceTimer = setTimeout(() => {
+    fetch('/api/airports/search?q=' + encodeURIComponent(query) + '&limit=8')
+      .then((res) => res.json())
+      .then((data) => renderZoneSearchResults(data.airports || []))
+      .catch(() => {});
+  }, ZONE_SEARCH_DEBOUNCE_MS);
+});
+zoneSearchInput.addEventListener('click', (e) => e.stopPropagation());
+zoneSearchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    zoneSearchDropdown.classList.remove('open');
+    zoneSearchInput.blur();
+  }
+});
+document.addEventListener('click', () => zoneSearchDropdown.classList.remove('open'));
+
 // Custom dropdown (a styled <div>, not a native <select> — see #category-filter
 // markup) for the category filter. Its selected value is tracked here rather
 // than read from a form-element `.value`, since it's built from plain divs.

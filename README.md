@@ -104,6 +104,12 @@ in-memory dict.
   scales with real-world significance (a major hub renders bigger than a
   small strip), heliports get their own distinct glyph, and closed airports
   are hidden. Click a marker for its name, codes, place, and elevation.
+- **Jump to any airport** — a search box in the HUD (name, IATA/ICAO code,
+  city, or country) moves the app's entire tracked area to a different
+  airport worldwide, not just the map view: the four free radius sources,
+  FlightAware, and FlightRadar24 all start querying the new location, and
+  the choice survives a restart. Radius and zoom stay as they were — only
+  the center moves.
 - **Icons by category** — each aircraft category (fixed-wing weight classes,
   rotorcraft, glider, lighter-than-air, parachutist, ultralight, UAV) renders
   with its own distinct SVG silhouette from the

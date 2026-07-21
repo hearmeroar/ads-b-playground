@@ -7,37 +7,20 @@
 Ideas and features not yet scheduled. Grouped loosely by theme.
 
 
-Goal: make the app's geographic "view zone" easy to change and switch at runtime.
-
-Motivation: currently the coverage area (AREA_CENTER, AREA_RADIUS_NM, BBOX)
-is defined and duplicated across multiple places in the codebase (`app.py`,
-frontend constants, radius-source center fields). Changing it is error-prone.
-
-Proposal / Acceptance criteria:
-	lists named zones. Each zone may be defined as:
-	- center: {lat, lon} + radius_nm
-	- bbox: {lamin, lomin, lamax, lomax}
-	- airport: IATA/ICAO code (resolved server-side to coordinates) + radius_nm
-	with the active zone id and list of presets.
-	selecting a zone updates map view and re-queries radius sources with the
-	new parameters without touching hardcoded constants.
-	AREA_CENTER/AREA_RADIUS_NM and serves as the fallback.
-
-Implementation notes / next steps:
-1. Add `config/zones.json` with a `default` example + two region presets.
-2. Update `app.py` to load zones and add `/api/zones` (no destructive changes).
-3. Make `/api/config` include `active_zone_id` and a canonical `radius_nm`/`bbox`.
-4. Adjust frontend `map-init.js` and `state-filters.js` to fetch `/api/zones`
-	 and wire a simple dropdown. Start with UI only (no persistence), then add
-	 session persistence or per-user preference later.
-5. Add tests: backend unit test for `/api/zones`, frontend test for dropdown.
-
-Risks / Notes:
-- This is a medium touch across both backend and frontend; start backend first
-	to expose a stable API the frontend can adopt incrementally.
-- Airport resolution (IATA/ICAO → lat/lon) can reuse existing `enrichment/airports.py`.
-
-Estimate: 2–4 dev days (backend + frontend + tests) depending on polishing.
+already loading at import time (`b2d49fb`) but had no mutation path; this
+session added `search_airports()` (`enrichment/airports.py`) +
+`/api/airports/search`, and `app.py`'s `_apply_zone()`/
+`_persist_zone_config()`/`_maybe_reload_zone_from_disk()` + `POST
+/api/zones/active`, wired to a new HUD search box
+(`static/js/state-filters.js`'s zone-search block) that recenters the map
+and re-polls immediately on selection. Went with search-over-airports
+rather than the originally-envisioned fixed preset dropdown — reuses the
+already-global OurAirports dataset instead of hand-curating a zones list,
+and still persists to `config/zones.json` (keyed by the picked airport's
+ICAO) so a restart keeps the last-chosen zone. See CLAUDE.md's "Zone
+search" section and `.ai/DECISIONS.md`'s 2026-07-21 entry for the
+persistence/cross-worker-sync design. Radius/zoom intentionally untouched
+(center-only) — left as a possible follow-up, not done here.
 
 
 Goal: surface additional airline metadata (alliance, country, website) in the
