@@ -2,6 +2,15 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (CRITICAL BUG: Track rendering broken on aircraft select)
+
+🚨 **Added critical bug to backlog: Track rendering does not appear after selecting aircraft**
+- **Symptom:** Clicking a marker opens the sidebar with aircraft details, but no historical track (OpenSky) or local trail renders on the map
+- **Impact:** Core feature blockers users from seeing aircraft flight paths
+- **Added to:** `.ai/BACKLOG.md` § "Bugs" with full symptom description, affected code locations, suspected root causes, and verification steps
+- **Priority:** Top of "At a glance" table (CRITICAL severity)
+- **Status:** Logged, waiting for investigation and fix in next session
+
 ## Status as of 2026-07-21 (Backlog: Add three new data source research items + two Frontend UX features)
 
 ✅ **Added three new backlog research items for data sources:**

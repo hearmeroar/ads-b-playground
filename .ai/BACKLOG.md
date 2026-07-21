@@ -41,6 +41,7 @@ requires.
 
 | Item | Effort | Value | Category | Read |
 |---|---|---|---|---|
+| **[CRITICAL BUG]** Track rendering broken on aircraft select | S | High | Frontend UX / Bug | **BLOCKER:** Historical track from OpenSky does not render; local trail also missing. Both should appear after clicking a marker. See Bugs section. |
 | Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
 | Selected aircraft styling & visual highlight | XS–S | Medium | Frontend UX | Visual distinction when an aircraft is selected: highlight marker, glow, or change icon/color to signal active selection state. |
 | Auto-center map on aircraft selection | XS | Medium | Frontend UX | Automatic map pan/zoom to center on selected aircraft, rather than requiring manual center-map button click. |
@@ -73,6 +74,36 @@ requires.
 | Aircraft serial number (MSN) field | XL (blocked) | Low | Data sources | Blocked — no verified data source yet, needs research first |
 | Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Frontend UX | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
 | *(Historical track interpolation, listed separately below)* | — | — | Duplicate of the two track-smoothing items above; fold into one of them rather than tracking a third time |
+
+## Bugs
+
+### [CRITICAL] Track rendering broken on aircraft select
+
+**Symptom:** When a user clicks a marker to select an aircraft, the sidebar opens and shows the aircraft's details, but no track (historical path) renders on the map. Neither the OpenSky historical track nor the local live-trail fallback appears.
+
+**Impact:** Core feature — users cannot see the path an aircraft has taken. Breaks situational awareness and navigation understanding.
+
+**Affected code:**
+- `static/js/sidebar-track.js` → `loadTrack()` / `selectAircraft()` — responsible for fetching and drawing historical track
+- `static/js/main.js` → poll loop — responsible for building `liveTrailById` local fallback
+- `static/js/icons.js` → `syncMarkers()` — updates marker state on each poll
+
+**Suspected root causes (TBD):**
+1. Track layer group not being added to the map after being built
+2. `loadTrack()` fetch failing silently without fallback to local trail
+3. `liveTrailById` not being populated during polling
+4. `trackLayerGroup` being cleared/removed unexpectedly on subsequent polls
+
+**Verification steps:**
+1. Click any marker to select an aircraft
+2. Observe sidebar opens with aircraft details
+3. Observe map for a track line (should be multi-colored polyline by altitude)
+4. Check browser console for fetch errors or exceptions
+5. Verify `trackLayerGroup` exists on `window` and contains features
+
+**Next steps:** Debug via console inspection of `trackLayerGroup`, inspect `/api/track/<icao24>` response, trace `drawTrack()` call, verify fallback path in `liveTrailById`.
+
+---
 
 Goal: surface additional airline metadata (alliance, country, website) in the
 sidebar and collection views whenever available, sourcing from the existing
@@ -389,7 +420,7 @@ Estimate: 2–3 dev days (backend routes + SQLite schema + middleware + tests + 
 
 - **Selected aircraft styling & visual highlight** — When an aircraft marker is selected (sidebar opens), apply a visual distinction to the marker itself (e.g., glow/halo, icon color change, border highlight, or larger size) to make the selection state visually obvious on the map without requiring the user to locate the sidebar. Currently, no marker styling changes on selection, so the connection between the open sidebar and the selected aircraft on the map is implicit. Acceptance criteria: selected marker is visually distinct from unselected ones; change reverses when sidebar closes or a different aircraft is selected; styling works across all source colors and category icons. Implementation: small CSS `.selected` class applied to the marker's DOM, or a `L.circleMarker` overlay positioned on the selected aircraft's location. Estimate: XS–S (a few style rules + a toggle in `selectAircraft()`/`deselectAircraft()`).
 
-- **Auto-center map on aircraft selection** — When a marker is clicked and the sidebar opens, automatically pan/zoom the map to center on the selected aircraft (equivalent to the manual `#sidebar-center-map` button click, but triggered automatically on selection). Improves discoverability and reduces clicks for users. Acceptance criteria: selection auto-centers without requiring button click; if aircraft is already in viewport, skip pan for smoothness; zoom level is preserved (no forced zoom); toggling can be off-by-default or user-configurable via a HUD toggle. Implementation: call `map.setView([lat, lon], map.getZoom())` (or with a slight zoom-in for smaller screens) inside `selectAircraft()` after data loads. Estimate: XS (one line in `selectAircraft()`; optional: add a HUD toggle for ~S effort).
+- **Auto-center map on aircraft selection** — When a marker is clicked and the sidebar opens, automatically pan/zoom the map to center on the selected aircraft (equivalent to the manual `#sidebar-center-map` button click, but triggered automatically on selection). Improves discoverability and reduces clicks for users. Acceptance criteria: selection auto-centers without requiring button click; **transition must be animated** (smooth pan, not instant jump) so the user can visually follow the map moving to the target; if aircraft is already in viewport, skip pan for smoothness; zoom level is preserved (no forced zoom); toggling can be off-by-default or user-configurable via a HUD toggle. Implementation: use Leaflet's built-in animated methods (Leaflet 1.9.4 already vendored at `static/leaflet/`): `map.flyTo([lat, lon], map.getZoom())` for smooth animated pan+zoom (default ~0.25s duration based on distance), or `map.panTo([lat, lon], { animate: true })` if zoom must stay exactly fixed; call inside `selectAircraft()` after data loads. Estimate: XS (Leaflet's animation built-in, no extra dependency; one line in `selectAircraft()`; optional: add a HUD toggle for ~S effort).
 
 - **Marker coloring modes (alternative to source-based)** — Currently, all aircraft markers are colored by their data source (`SOURCE_COLORS`: OpenSky/adsb.fi/adsb.lol/adsb.one/airplanes.live/FlightAware/FlightRadar24 each get a distinct color). This differentiates data sources visually but can also reduce clarity when focusing on aircraft themselves. Add a HUD option to switch coloring modes: (1) **Source-based** (current default: each source gets its own color), (2) **Category-based** (light/heavy/rotorcraft/etc. get distinct colors, regardless of source — highlights what type of aircraft is visible), (3) **Altitude-based** (gradient: green for ground level, yellow/orange for medium altitude, red for high altitude — helps spot relative altitude at a glance), (4) **Uniform** (all markers one neutral color, minimalist). Acceptance criteria: HUD dropdown or segmented-control picker (`#marker-coloring-mode` or similar) defaults to source-based; switching mode re-colors all visible markers instantly; mode is persisted to `sessionStorage` across page interactions (reset on reload); dev mode still shows source badges regardless of coloring mode. Implementation: extract the coloring logic from `categoryIcon()` into a shared `colorForMarker(marker, colorMode)` function that dispatches on mode and returns the appropriate hex color; call it from `iconFor()` and `syncMarkers()`. Estimate: S (logic extraction + HUD UI + re-render hook).
 
