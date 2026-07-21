@@ -4,8 +4,8 @@ import pytest
 
 
 def test_health_happy_path(client):
-    """Happy path: /health returns 200 with {"status": "ok"}."""
-    response = client.get("/health")
+    """Happy path: /api/health returns 200 with {"status": "ok"}."""
+    response = client.get("/api/health")
     assert response.status_code == 200
     data = json.loads(response.data)
     assert data["status"] == "ok"
@@ -20,7 +20,7 @@ def test_health_degraded_on_db_error(client, monkeypatch):
 
     monkeypatch.setattr(storage, "get_connection", mock_get_connection)
 
-    response = client.get("/health")
+    response = client.get("/api/health")
     assert response.status_code == 503
     data = json.loads(response.data)
     assert data["status"] == "degraded"
@@ -29,7 +29,7 @@ def test_health_degraded_on_db_error(client, monkeypatch):
 
 def test_health_response_does_not_leak_secrets(client):
     """Negative test: response must NOT include quotas, config, or per-source health."""
-    response = client.get("/health")
+    response = client.get("/api/health")
     data = json.loads(response.data)
     data_str = json.dumps(data)
 
