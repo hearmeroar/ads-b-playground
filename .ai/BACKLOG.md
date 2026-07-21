@@ -42,6 +42,7 @@ requires.
 | Item | Effort | Value | Category | Read |
 |---|---|---|---|---|
 | Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
+| Planespotters as third data source (metadata enrichment) | L | High | Data sources | Helicopter + rare aircraft coverage gap; requires API research, integration into enrichment chain, dedup/priority |
 | Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Frontend UX | Highest standalone value in the backlog; worth scheduling deliberately |
 | Health check endpoint (`/api/health`) | XS–S | Medium | DevOps | Public unauthenticated endpoint for Northflank/uptime-monitor health checks. Decision made 2026-07-21: public minimal response (DECISIONS.md). |
 | Seamless login without page reload | M | Medium | Frontend UX | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
@@ -255,6 +256,8 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 - **Aircraft serial number (MSN)** — Add aircraft manufacturer serial number field. No verified source yet (adsbdb has `msn` field for some aircraft; needs validation against real data). Research required before prioritizing. (See personal memory for fuller context.)
 
 ## Data sources & enrichment
+
+- **Planespotters as third data source (metadata enrichment)** — Integrate Planespotters' aircraft database (type, registration, manufacturer, year, country) as a live enrichment tier, positioned **below adsbdb but above Flywme** in the priority chain. Unlike the current photo-gallery integration (fetch-on-click, no live markers), this would add aircraft metadata to every marker that passes through enrichment, helping helicopters and rare aircraft that OpenSky doesn't cover. Requires: (1) API audit — confirm what Planespotters' metadata endpoint(s) expose and rate limits (likely requires API key or scraping their web interface, both contrary to "no signup" posture — worth validating before committing); (2) route `/api/planespotters/<icao24>` or `/api/planespotters?registration=...` (keyed by both ICAO24 and registration since coverage differs); (3) enrich_identity() tier sitting below adsbdb; (4) cache strategy (metadata rarely changes, but poll-time fetches would cost quota); (5) dedup logic if Planespotters returns ICAO24+registration pairs that conflict with live OpenSky data (live wins, as always); (6) tests covering the enrichment tier and the new route. Acceptance criteria: selected aircraft show Planespotters-sourced type/year/manufacturer when available, badged in dev mode as source; Planespotters data never overwrites a live value; helicopter/rare-aircraft coverage visibly improves. Estimate: 2–3 dev days (API research + integration + testing), pending feasibility of Planespotters API access without signup/key.
 
 - **Register and configure an AirLabs API key** — Sign up at
   https://airlabs.co/ and obtain an API key for potential use as a data

@@ -2,6 +2,10 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of today (Backlog: Add Planespotters data source)
+
+⏳ **Add Planespotters as third data source to backlog** — User request (в беклог – добавить planespotters третьим источником, должно помочь для вертолетов и редких самолетов). Added to BACKLOG.md "At a glance" table with effort L (2–3 days), value High, category Data sources. Full item in "Data sources & enrichment" section notes this requires API feasibility research first (Planespotters' no-signup posture is TBD). Positioned below adsbdb but above Flywme in enrichment priority.
+
 ## Status as of 2026-07-21 (Docs: Backlog organization)
 
 ✅ **Organize backlog by Category tag** — Added Category/Tag convention to BACKLOG.md (7 categories: Frontend UX, Backend, DevOps, Data sources, Testing, Documentation, Prediction), added Category column to "At a glance" table, tagged all 22 items, removed low-value "Contributor guide". Enables quick domain scanning and coordinates related work across areas.
