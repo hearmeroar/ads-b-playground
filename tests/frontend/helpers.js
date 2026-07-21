@@ -11,7 +11,12 @@ function fixture(name) {
 // Individual tests can override any of these by registering a more specific
 // page.route() afterwards — Playwright gives priority to the most recently
 // registered matching route.
-async function mockAllSources(page) {
+// skipHealth (boolean): if true, don't mock /api/health (lets it hit the real backend)
+async function mockAllSources(page, { skipHealth = false } = {}) {
+  // Don't mock /api/health by default (tests for health check need the real endpoint)
+  if (!skipHealth) {
+    await page.route('**/api/health', (route) => route.fulfill({ json: { status: 'ok' } }));
+  }
   await page.route('**/api/states', (route) => route.fulfill({ json: fixture('states.json') }));
   await page.route('**/api/adsbfi', (route) => route.fulfill({ json: fixture('adsbfi.json') }));
   await page.route('**/api/airplaneslive', (route) => route.fulfill({ json: fixture('airplaneslive.json') }));

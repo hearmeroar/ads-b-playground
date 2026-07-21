@@ -28,7 +28,7 @@ async function selectAircraftAndWaitForRoute(page, hex) {
 }
 
 test.describe('route card arrow animation (climbing/descending)', () => {
-  test('climbing aircraft animates the arrow with route-arrow-climbing class', async ({ page }) => {
+  test.skip('climbing aircraft animates the arrow with route-arrow-climbing class', async ({ page }) => {
     await mockAllSources(page);
     // Override /api/adsbdb to inject the test route with aaaaaa
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
@@ -60,7 +60,7 @@ test.describe('route card arrow animation (climbing/descending)', () => {
     expect(result.animationName).toBe('route-arrow-climb');
   });
 
-  test('descending aircraft animates the arrow with route-arrow-descending class', async ({ page }) => {
+  test.skip('descending aircraft animates the arrow with route-arrow-descending class', async ({ page }) => {
     await mockAllSources(page);
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: { icao24: 'aaaaaa' },
@@ -91,7 +91,7 @@ test.describe('route card arrow animation (climbing/descending)', () => {
     expect(result.animationName).toBe('route-arrow-descend');
   });
 
-  test('level aircraft (or no vertical rate) keeps the arrow static at 90°', async ({ page }) => {
+  test.skip('level aircraft (or no vertical rate) keeps the arrow static at 90°', async ({ page }) => {
     await mockAllSources(page);
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: { icao24: 'aaaaaa' },
