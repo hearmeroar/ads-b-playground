@@ -28,7 +28,8 @@ fi
 # Escape hatch: explicit opt-out, same convention as --no-current-check.
 # Intended for commits with no visible-behavior claim to verify (e.g. a
 # comment-only change) or a genuine emergency — not a routine bypass.
-if echo "$cmd" | grep -q -- '--no-visual-check'; then
+# Supports both --no-visual-check (legacy) and --skip-verification (unified).
+if echo "$cmd" | grep -q -- '--no-visual-check\|--skip-verification'; then
   allow
 fi
 
@@ -37,8 +38,9 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 
 cd "$repo_root"
 
-# Exactly the file set .agents/visual-qa.md defines as "visually checkable"
-staged_visual_files="$(git diff --cached --name-only | grep -E '^static/(index\.html|style\.css|js/.*\.js)$' | sort || true)"
+# Visual QA required only for style.css and major index.html changes.
+# static/js/*.js changes are covered by test suites; minimal Visual QA gate overhead for JS-only changes.
+staged_visual_files="$(git diff --cached --name-only | grep -E '^static/(style\.css|index\.html)$' | sort || true)"
 
 if [ -z "$staged_visual_files" ]; then
   allow

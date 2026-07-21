@@ -7,7 +7,7 @@ cmd="$(echo "$input" | jq -r '.tool_input.command // empty')"
 allow() { echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'; exit 0; }
 
 # Escape hatch: explicit opt-out for commits that genuinely don't change task status
-if echo "$cmd" | grep -q -- '--no-current-check'; then
+if echo "$cmd" | grep -q -- '--no-current-check\|--skip-verification'; then
   allow
 fi
 

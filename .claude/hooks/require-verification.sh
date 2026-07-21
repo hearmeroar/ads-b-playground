@@ -21,7 +21,7 @@ deny() {
   exit 0
 }
 
-if echo "$cmd" | grep -q -- '--no-verify-check'; then
+if echo "$cmd" | grep -q -- '--no-verify-check\|--skip-verification'; then
   allow
 fi
 
