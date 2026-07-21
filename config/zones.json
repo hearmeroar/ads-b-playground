@@ -3,8 +3,8 @@
   "zones": {
     "default": {
       "center": {
-        "lat": 44.0,
-        "lon": 21.0
+        "lat": 51.47,
+        "lon": -0.46
       },
       "zoom": 8,
       "radius_nm": 220
@@ -109,6 +109,30 @@
       "center": {
         "lat": 44.818401,
         "lon": 20.309099
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "EGLL": {
+      "center": {
+        "lat": 51.470748,
+        "lon": -0.459909
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "1CL9": {
+      "center": {
+        "lat": 34.001038,
+        "lon": -118.212606
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "EIDW": {
+      "center": {
+        "lat": 53.428713,
+        "lon": -6.262121
       },
       "zoom": 8,
       "radius_nm": 220

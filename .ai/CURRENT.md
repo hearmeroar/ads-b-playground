@@ -2,7 +2,23 @@
 
 *(Updated after each significant session or task completion)*
 
-## Status as of today (Backlog: Browser autocomplete + keyboard/quick-open search)
+## Status as of today (Backlog: Change default zone to London)
+
+✅ **Change default zone to London (Heathrow) — COMPLETED**
+- **Effort:** XS (one-liner config changes)
+- **Value:** Medium (UX improvement for UK-based use)
+- **Changes:**
+  - `app.py`: Updated default zone config in `_load_zone_config()` from Serbia (44.0, 21.0) to London (51.47, -0.46)
+  - `config/zones.json`: Updated default zone center coordinates and reset `active_zone_id` to "default"
+  - **Tests updated** (276 backend tests): All zone-dependent tests updated to use London coordinates:
+    * `test_api_config`: Expected center coordinates updated
+    * `test_airports.py`: Fixtures changed from Belgrade (LYBE) to London (EGLL) area (5 tests)
+    * `test_metar_sigmet.py`: METAR_SAMPLE, NEARBY_SIGMET, NEARBY_MULTI_POLYGON_SIGMET fixtures updated to London coordinates
+  - All 276 backend tests passing
+- **Backlog status:** Item marked ✅ COMPLETED
+- **Commit:** chore: change default zone to London (Heathrow) from Serbia
+
+## Status as of previous (Backlog: Browser autocomplete + keyboard/quick-open search)
 
 ✅ **Disabled browser autocomplete in airport search + added two backlog items**
 - **HTML:** Added `spellcheck="false"`, `data-1p-ignore`, `data-lpignore`, `data-form-type="other"` to `#zone-search-input` to suppress browser autocomplete/password managers that obscure the search dropdown results

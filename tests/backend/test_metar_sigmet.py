@@ -4,15 +4,15 @@ import app
 from conftest import make_response
 
 METAR_SAMPLE = [
-    {"icaoId": "LWSK", "rawOb": "METAR LWSK 181320Z 24004KT 9999 FEW055 38/17 Q1009 NOSIG",
-     "lat": 41.952, "lon": 21.627, "wdir": 240, "wspd": 4, "visib": "6+", "fltCat": "VFR"},
+    {"icaoId": "EGLL", "rawOb": "METAR EGLL 181320Z 24004KT 9999 FEW055 18/10 Q1012 NOSIG",
+     "lat": 51.471, "lon": -0.459, "wdir": 240, "wspd": 4, "visib": "6+", "fltCat": "VFR"},
 ]
 
 # One SIGMET whose polygon overlaps the test app's BBOX area (roughly
-# Serbia, see app.AREA_CENTER), one whose polygon is nowhere near it.
+# London, see app.AREA_CENTER), one whose polygon is nowhere near it.
 NEARBY_SIGMET = {
-    "icaoId": "LYBA", "hazard": "TURB", "qualifier": "SEV", "firName": "BEOGRAD",
-    "coords": [{"lat": 44.0, "lon": 21.0}, {"lat": 45.0, "lon": 22.0}],
+    "icaoId": "EGLL", "hazard": "TURB", "qualifier": "SEV", "firName": "LONDON",
+    "coords": [{"lat": 51.0, "lon": -1.0}, {"lat": 52.0, "lon": 0.5}],
 }
 FAR_SIGMET = {
     "icaoId": "FAOR", "hazard": "ICE", "qualifier": "SEV", "firName": "JOHANNESBURG",
@@ -24,9 +24,9 @@ FAR_SIGMET = {
 # the first version of _sigmet_intersects_area, which assumed the flat shape
 # unconditionally.
 NEARBY_MULTI_POLYGON_SIGMET = {
-    "icaoId": "LYBA", "hazard": "TS", "qualifier": "EMBD", "firName": "BEOGRAD", "geom": "AREAS",
+    "icaoId": "EGLL", "hazard": "TS", "qualifier": "EMBD", "firName": "LONDON", "geom": "AREAS",
     "coords": [
-        [{"lat": 43.0, "lon": 20.0}, {"lat": 43.0, "lon": 21.0}, {"lat": 44.0, "lon": 21.0}],
+        [{"lat": 51.0, "lon": -1.0}, {"lat": 51.0, "lon": 0.5}, {"lat": 52.0, "lon": 0.5}],
         [{"lat": -50.0, "lon": 100.0}, {"lat": -51.0, "lon": 101.0}, {"lat": -50.0, "lon": 101.0}],
     ],
 }
@@ -39,7 +39,7 @@ def test_metar_proxies_with_bbox(client, mock_get):
     assert resp.get_json() == METAR_SAMPLE
 
     _, kwargs = mock_get.call_args
-    assert kwargs["params"]["bbox"] == "41.5,17.0,46.5,25.0"
+    assert kwargs["params"]["bbox"] == "48.97,-4.46,53.97,3.54"
     assert kwargs["params"]["format"] == "json"
 
 
@@ -73,7 +73,7 @@ def test_sigmet_filters_to_nearby_area_only(client, mock_get):
     assert resp.status_code == 200
     data = resp.get_json()
     assert len(data) == 1
-    assert data[0]["icaoId"] == "LYBA"
+    assert data[0]["icaoId"] == "EGLL"
 
 
 def test_sigmet_handles_multi_polygon_geom_areas(client, mock_get):
@@ -82,7 +82,7 @@ def test_sigmet_handles_multi_polygon_geom_areas(client, mock_get):
     assert resp.status_code == 200  # must not 500 on the nested-rings shape
     data = resp.get_json()
     assert len(data) == 1
-    assert data[0]["icaoId"] == "LYBA"
+    assert data[0]["icaoId"] == "EGLL"
 
 
 def test_sigmet_is_cached(client, mock_get):

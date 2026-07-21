@@ -73,7 +73,7 @@ def _load_zone_config():
         "active_zone_id": "default",
         "zones": {
             "default": {
-                "center": {"lat": 44.0, "lon": 21.0},
+                "center": {"lat": 51.47, "lon": -0.46},
                 "zoom": 8,
                 "radius_nm": 220,
             }

@@ -119,10 +119,10 @@ def test_airports_in_bbox_types_filter():
 # --- /api/airports route ---------------------------------------------------
 
 def test_api_airports_with_bbox(client):
-    resp = client.get("/api/airports", query_string={"bbox": "44.5,20.0,45.1,20.6"})
+    resp = client.get("/api/airports", query_string={"bbox": "51.0,-1.0,52.0,0.0"})
     assert resp.status_code == 200
     icaos = [a["icao"] for a in resp.get_json()["airports"]]
-    assert "LYBE" in icaos
+    assert "EGLL" in icaos
 
 
 def test_api_airports_scoped_to_scan_zone(client):
@@ -137,28 +137,28 @@ def test_api_airports_scoped_to_scan_zone(client):
 
 def test_api_airports_without_bbox_falls_back_to_home_region(client):
     # No bbox param — falls back to this app's own BBOX (AREA_CENTER's
-    # neighborhood), which comfortably contains Belgrade.
+    # neighborhood), which comfortably contains London Heathrow.
     resp = client.get("/api/airports")
     assert resp.status_code == 200
     icaos = [a["icao"] for a in resp.get_json()["airports"]]
-    assert "LYBE" in icaos
+    assert "EGLL" in icaos
 
 
 def test_api_airports_malformed_bbox_falls_back_to_home_region(client):
     resp = client.get("/api/airports", query_string={"bbox": "not,a,valid,bbox"})
     assert resp.status_code == 200
     icaos = [a["icao"] for a in resp.get_json()["airports"]]
-    assert "LYBE" in icaos
+    assert "EGLL" in icaos
 
 
 def test_api_airports_types_param_filters_result(client):
     resp = client.get(
         "/api/airports",
-        query_string={"bbox": "44.5,20.0,45.1,20.6", "types": "large_airport"},
+        query_string={"bbox": "51.0,-1.0,52.0,0.0", "types": "large_airport"},
     )
     assert resp.status_code == 200
     airports = resp.get_json()["airports"]
-    assert airports  # Belgrade Nikola Tesla itself should still be there
+    assert airports  # London Heathrow itself should still be there
     assert all(a["type"] == "large_airport" for a in airports)
 
 
@@ -166,10 +166,10 @@ def test_api_airports_no_types_param_returns_every_type(client):
     # No `types` at all (the pre-existing caller shape) must stay unfiltered
     # — a request that never mentions the param behaves exactly as it did
     # before this filter was added.
-    resp = client.get("/api/airports", query_string={"bbox": "44.5,20.0,45.1,20.6"})
+    resp = client.get("/api/airports", query_string={"bbox": "51.0,-1.0,52.0,0.0"})
     assert resp.status_code == 200
     icaos = [a["icao"] for a in resp.get_json()["airports"]]
-    assert "LYBE" in icaos
+    assert "EGLL" in icaos
 
 
 # --- search_airports() (backs the zone-switcher's search box) --------------
