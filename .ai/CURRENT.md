@@ -2,6 +2,15 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Perf: Reduced auto-center animation duration)
+
+✅ **Perf tuning: Auto-center animation duration reduced to 400ms**
+- Changed `AUTO_CENTER_ANIMATION_DURATION_MS` from 600ms to 400ms
+- Improves responsiveness on aircraft selection, faster map centering
+- Existing tests maintain 800ms `waitForTimeout` safety margin
+- **Commit:** perf: reduce auto-center animation duration to 400ms
+- **Status:** Tests passing (276 backend, 162 frontend)
+
 ## Status as of 2026-07-21 (Feature Complete: Auto-center map on aircraft selection)
 
 ✅ **Feature Complete: Auto-center map on aircraft selection (animated)**
