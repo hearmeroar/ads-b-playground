@@ -148,6 +148,12 @@
           {
             "type": "command",
             "if": "Bash(git commit *)",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/check-visual-qa.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "if": "Bash(git commit *)",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/backlog-cleanup.sh\"",
             "timeout": 10
           },

@@ -51,6 +51,74 @@
   `.claude/test-runs/*.json` actually updates before trusting the gate is
   fully live.
 - `.claude/test-runs/` added to `.gitignore`.
+- **Confirms the same finding independently reached by the parallel Visual
+  QA hook work below**: their own testing note says `check-current-md.sh`
+  "triggers on the literal word 'commit' anywhere in a Bash tool call's
+  command text, not just real `git commit` invocations" — matches exactly
+  what made direct live-fire testing of `require-verification.sh` unreliable
+  in this session too. Not a semantic/context-aware classifier as first
+  suspected; a plain keyword-presence check on `if` patterns for hooks.
+
+## Status as of 2026-07-21 (Mechanical enforcement: commit-blocking Visual QA hook)
+
+✅ **`git commit` is now hard-blocked for unverified visually-checkable
+frontend changes** — explicit product decision (project owner: "жесткий
+агент" — a strict/hard-blocking gate, not just a convention), built on top
+of the Visual QA role/subagent added earlier this session.
+- New `.claude/hooks/check-visual-qa.sh`, wired into `.claude/settings.json`'s
+  `git commit` `PreToolUse` chain (right after `check-current-md.sh`):
+  blocks the commit whenever staged changes touch `static/index.html`,
+  `static/style.css`, or any `static/js/*.js` file, unless
+  `.claude/visual-qa-report.json` exists, its `diff_hash` matches a fresh
+  hash of the currently-staged diff for those files, and every one of its
+  `claims` has verdict exactly `"confirmed"`.
+- The hash-matching (not a timestamp) is the actual staleness guard: any
+  edit after the report was written changes the recomputed hash, so a
+  stale "pass" can never slip through — the hook re-blocks until
+  `visual-tester` reruns against the new diff.
+- `.claude/agents/visual-tester.md` gained a required Step 5 (write the
+  report) with the exact hash procedure (`git diff --cached --name-only |
+  grep -E '^static/(index\.html|style\.css|js/.*\.js)$'`, then
+  `sha256sum`/`shasum -a 256` over `git diff --cached` for that file set)
+  and report schema (`{generated_at, diff_hash, claims: [{claim, verdict,
+  evidence}]}`) — plus explicit hard rules against fabricating
+  `"confirmed"` verdicts or hand-editing the hash to match.
+- `.agents/visual-qa.md` and `.agents/architect.md` both document the
+  enforcement (rationale + escape hatch `--no-visual-check`, same
+  convention as `--no-current-check`).
+- `.claude/visual-qa-report.json` added to `.gitignore` — it's a per-check
+  ephemeral artifact tied to one specific staged diff, never committed.
+- **Verified the hook logic directly** (not just read it): 7 scenarios
+  tested against a throwaway git repo (no staged visual files → allow; no
+  report → deny; hash mismatch → deny; unconfirmed claim → deny; matching
+  hash + all confirmed → allow; `--no-visual-check` → allow; malformed
+  report → deny) — all matched expected output. Testing required routing
+  around this same session's own `check-current-md.sh`, since that hook
+  triggers on the literal word "commit" anywhere in a Bash tool call's
+  command text, not just real `git commit` invocations — worked around by
+  putting the test script in a file and invoking it via `bash <path>`
+  instead of embedding the test commands inline.
+
+## Status as of 2026-07-21 (Docs: new Visual QA role + visual-tester subagent)
+
+✅ **Added a Visual QA role to the in-repo agent team**, to close a gap
+none of Architect/Developer/Reviewer/UI cover: confirming that a UI change
+claimed in a task/PR *actually happened* in the running app (element
+appeared/disappeared, style changed, interaction works), not just that the
+diff reads correctly.
+- `.agents/visual-qa.md` — the playbook (role, scope, method: claim
+  checklist → reuse existing Playwright/fixture mocks → drive a real
+  scenario → verify via DOM/computed-style/pixel-diff → score each claim
+  → report), same style as `ui.md`/`reviewer.md`.
+- `.claude/agents/visual-tester.md` — the operational counterpart: a real
+  invocable Claude Code subagent (frontmatter `tools: Bash, Read, Glob,
+  Grep, Write`) that runs the playbook's steps directly, callable via the
+  Agent tool as `visual-tester`.
+- `.agents/README.md` updated to list the new role and point to it before
+  marking a UI task complete.
+- Doc-only change, no app code touched; no new tests needed (the
+  `visual-tester` subagent itself *is* the tool that would exercise
+  Playwright for future UI verification tasks).
 
 ## Status as of 2026-07-21 (Bug fix: `/api/health` route path was missing `/api` prefix)
 
