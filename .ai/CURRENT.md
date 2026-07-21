@@ -2,6 +2,16 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Architectural decision: `/api/health` endpoint access control)
+
+✅ **Architectural Decision: `/api/health` endpoint is public with minimal response (not admin-only)**
+- **Decision:** Endpoint returns `{"status": "ok"/"degraded"}` without authentication.
+- **Reasoning:** Single-tenant deployment on Northflank expects unauthenticated `/health`; admin-only adds complexity without real security benefit. Operator already controls infrastructure; no multi-user data to hide.
+- **Response scope:** Only exposes liveness (200/503) and minimal error message. Deliberately omits quotas, zone config, per-source health, cache state.
+- **Unblocks:** BACKLOG.md item "Health check endpoint" — ready for Developer to implement.
+- **References:** `.ai/DECISIONS.md` 2026-07-21 entry.
+- **Implementation checklist:** Added to BACKLOG.md entry; includes SQLite connection check, test coverage (happy + degraded paths), README documentation.
+
 ## Status as of 2026-07-21 (Bug fix: C-category heuristic fields leaked real-looking but wrong data)
 
 ✅ **Bug fix: `category_code` never reached the backend on a real marker

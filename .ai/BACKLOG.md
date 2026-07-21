@@ -37,7 +37,7 @@ requires.
 |---|---|---|---|
 | Local track persistence & smoothing (frontend) | S | Med–High | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
 | Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Highest standalone value in the backlog; worth scheduling deliberately |
-| Health check endpoint (`/api/health`) | XS–S | Medium | Cheap once the admin-only-vs-public question is answered — currently blocked on that decision, not on effort |
+| Health check endpoint (`/api/health`) | XS–S | Medium | Public unauthenticated endpoint for Northflank/uptime-monitor health checks. Decision made 2026-07-21: public minimal response (DECISIONS.md). |
 | Seamless login without page reload | M | Medium | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
 | Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Shareable/deep-linkable view; reusable layout could also serve collection cards |
 | Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
