@@ -159,7 +159,6 @@ Tests:
 
 Estimate: 0.5–1 developer day (mostly frontend wiring + one E2E test).
 
-- Make 'Undo' buttons in Collection more prominent (UX)
 
 Goal: when a user removes a saved collection card, the in-UI undo affordance
 should be highly visible and actionable (not a disabled control), reducing
@@ -227,7 +226,6 @@ Implementation notes:
 
 Estimate: 0.5–1 developer day (backend change + unit tests + minor frontend dev-mode message).
 
-- Gallery arrow hit-zone: make arrow click area full container height
 
 Goal: expand the clickable/touch target for the gallery's previous/next
 arrow controls so they occupy the full vertical height of the gallery
@@ -305,6 +303,14 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 - **Aircraft serial number (MSN)** — Add aircraft manufacturer serial number field. No verified source yet (adsbdb has `msn` field for some aircraft; needs validation against real data). Research required before prioritizing. (See personal memory for fuller context.)
 
 ## Data sources & enrichment
+
+- **Register and configure an AirLabs API key** — Sign up at
+  https://airlabs.co/ and obtain an API key for potential use as a data
+  source/enrichment tier (already listed as a candidate under "Additional
+  airline metadata enrichment" above). Requires evaluating pricing/rate
+  limits against this project's "no signup, no token" default posture
+  (see CLAUDE.md's Architecture section) before actually wiring it in —
+  this item is just the account/key setup step, not integration.
 
 - **Adaptive polling intervals** — Currently fixed 10s/12s for all sources. Could reduce traffic/quota by polling only enabled sources, or reduce frequency for sources known to update slowly (METAR/SIGMET at 300s vs. aircraft at 10s). Aeris project (`kewonit/aeris`) has a reference implementation for similar idea. Worth reviewing if quota ever becomes tight.
 
@@ -645,7 +651,6 @@ Implementation notes:
 
 Estimate: 0.5–1 dev days (helper + replacements + license audit note + tests).
 
-UI: Replace airports layer checkboxes with toggles
 
 Motivation:
  - HUD's airports layer currently uses checkboxes styled as rows; accessible toggles (on/off switches) provide clearer affordance, match other UI controls, and convey immediate state.

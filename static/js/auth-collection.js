@@ -425,8 +425,12 @@ function renderCollectionCard(card) {
     undoBtn.className = 'collection-card-undo-btn';
     undoBtn.textContent = 'Undo';
     undoBtn.addEventListener('click', () => undoRemoveCard(card));
+    const hint = document.createElement('div');
+    hint.className = 'collection-card-undo-hint';
+    hint.textContent = 'Undo available this session';
     overlay.appendChild(label);
     overlay.appendChild(undoBtn);
+    overlay.appendChild(hint);
     el.appendChild(overlay);
     return el;
   }

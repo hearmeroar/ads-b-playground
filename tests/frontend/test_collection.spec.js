@@ -303,6 +303,15 @@ test('removing a card dims it with an Undo action instead of deleting it outrigh
   await expect(page.locator('.collection-card.removed')).toHaveCount(1);
   await expect(page.locator('.collection-card-removed-label')).toHaveText('Removed');
 
+  // The Undo button itself must be a clearly visible, non-disabled control —
+  // not implied-disabled by the card's own dimming (see the CSS comment on
+  // `.collection-card.removed .collection-card-photo-wrap/-body`, which
+  // scopes the dim/greyscale to the underlying photo/body only).
+  const undoBtn = page.locator('.collection-card-undo-btn');
+  await expect(undoBtn).toBeVisible();
+  await expect(undoBtn).toBeEnabled();
+  await expect(page.locator('.collection-card-undo-hint')).toHaveText('Undo available this session');
+
   await page.click('.collection-card-undo-btn');
   await page.waitForTimeout(150);
   expect(restoredBody).not.toBeNull();

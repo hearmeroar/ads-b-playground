@@ -4,6 +4,23 @@
 
 ## Status as of 2026-07-21 (Night)
 
+✅ **UX: Collection panel Undo button made more prominent**
+- Bug: `.collection-card.removed` applied `opacity: 0.45; filter: grayscale(0.6)`
+  to the whole card element, which also washed out the (fully clickable,
+  non-disabled) Undo button to 45% opacity — reading as greyed-out/disabled
+  even though it wasn't.
+- Fixed by scoping the dim/greyscale to `.collection-card-photo-wrap`/
+  `.collection-card-body` only, leaving the "Removed"/Undo overlay at full
+  opacity. Restyled `.collection-card-undo-btn` as a solid primary-color
+  pill (was a muted white pill sharing styling with the "Removed" label) and
+  added a small `.collection-card-undo-hint` ("Undo available this session")
+  under it.
+- `static/style.css`, `static/js/auth-collection.js`.
+- Test: extended the existing `removeCardWithUndo` case in
+  `tests/frontend/test_collection.spec.js` to assert the button is visible,
+  enabled, and the hint text renders — 11/11 passing.
+- BACKLOG item ✅ COMPLETED.
+
 ✅ **Bug fix: scan-radius rings didn't follow a zone-search switch**
 - `selectZoneSearchResult()` (`static/js/state-filters.js`) moved the map
   view on zone change but never rebuilt `scanRadiusLayer` — the rings
