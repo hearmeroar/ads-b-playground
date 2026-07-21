@@ -105,9 +105,10 @@ function hideNonAircraft() {
 
 // Purely presentational (no data to (re)fetch), so — like devModeToggle
 // above — this mutates the map directly instead of triggering poll().
-// scanRadiusLayer (map-init.js) is reassigned once /api/config resolves;
+// scanRadiusLayer (map-init.js) is reassigned once /api/config resolves,
+// and again on every zone-search switch (selectZoneSearchResult() below);
 // reading it here (rather than capturing it at listener-registration time)
-// picks up that later value automatically.
+// picks up whichever value is current automatically.
 const scanRadiusToggle = document.getElementById('toggle-scan-radius');
 scanRadiusToggle.addEventListener('change', () => {
   if (scanRadiusToggle.checked) scanRadiusLayer.addTo(map);
@@ -367,6 +368,15 @@ function selectZoneSearchResult(airport) {
     })
     .then((cfg) => {
       map.setView([cfg.center.lat, cfg.center.lon], map.getZoom());
+      // Scan-radius rings are centered where they were built (initial
+      // /api/config load) and don't otherwise track the map view — without
+      // rebuilding them here they'd keep circling the old zone's center.
+      if (cfg && cfg.center && cfg.radius_nm) {
+        const wasShown = map.hasLayer(scanRadiusLayer);
+        if (wasShown) map.removeLayer(scanRadiusLayer);
+        scanRadiusLayer = buildScanRadiusLayer(cfg.center.lat, cfg.center.lon, cfg.radius_nm);
+        if (wasShown) scanRadiusLayer.addTo(map);
+      }
       setZoneSearchStatus(null);
       poll(); // re-fetch aircraft immediately instead of waiting for the next tick
       // Airports layer re-fetches on its own: setView() fires Leaflet's

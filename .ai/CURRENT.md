@@ -4,6 +4,19 @@
 
 ## Status as of 2026-07-21 (Night)
 
+✅ **Bug fix: scan-radius rings didn't follow a zone-search switch**
+- `selectZoneSearchResult()` (`static/js/state-filters.js`) moved the map
+  view on zone change but never rebuilt `scanRadiusLayer` — the rings
+  stayed circling the *old* zone's center after switching airports, unlike
+  every other location-scoped layer (Airports, METAR/SIGMET), which the
+  same handler already refreshes.
+- Fixed by rebuilding `scanRadiusLayer` from the `/api/zones/active`
+  response's `center`/`radius_nm`, the same remove/rebuild/re-add pattern
+  `map-init.js`'s initial `/api/config` handler already uses — preserves
+  on/off visibility across the rebuild.
+- Test: `tests/frontend/test_zone_search.spec.js` — new case asserts the
+  rings both stay visible and recenter on the new zone.
+
 ✅ **Feature Complete: Airport search → runtime zone switching**
 - New: `enrichment/airports.py`'s `search_airports()` (ranked name/IATA/ICAO/
   city/country search over the OurAirports dataset) + `/api/airports/search`

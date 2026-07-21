@@ -106,6 +106,37 @@ test('selecting a result recenters the map and re-polls immediately', async ({ p
   expect(await page.inputValue('#zone-search-input')).toContain('London Heathrow Airport');
 });
 
+test('selecting a result rebuilds the scan-radius rings around the new center', async ({ page }) => {
+  const searchCounts = {};
+  const zoneCounts = {};
+  await mockAirportSearch(page, searchCounts);
+  await mockZonesActive(page, zoneCounts, {});
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  // Turn the rings on before switching zones so the rebuilt layer must also
+  // stay visible, not just correctly centered.
+  await page.check('#toggle-scan-radius');
+
+  await page.fill('#zone-search-input', 'heathrow');
+  await page.waitForTimeout(500);
+  await page.click('.zone-search-option');
+  await page.waitForTimeout(300);
+
+  const shown = await page.evaluate(() => map.hasLayer(scanRadiusLayer));
+  expect(shown).toBe(true);
+
+  const ringCenter = await page.evaluate(() => {
+    let center = null;
+    scanRadiusLayer.eachLayer((l) => {
+      if (l instanceof L.Circle) center = l.getLatLng();
+    });
+    return center;
+  });
+  expect(ringCenter.lat).toBeCloseTo(HEATHROW.lat, 3);
+  expect(ringCenter.lng).toBeCloseTo(HEATHROW.lon, 3);
+});
+
 test('a failed zone change shows an inline error and leaves the map untouched', async ({ page }) => {
   const searchCounts = {};
   const zoneCounts = {};
