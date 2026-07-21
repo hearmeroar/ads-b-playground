@@ -2,12 +2,14 @@
 
 *(Updated after each significant session or task completion)*
 
-## Status as of 2026-07-21 (CRITICAL BUG: Track rendering broken on aircraft select)
+## Status as of 2026-07-21 (CRITICAL BUG: Track stops updating after aircraft select)
 
-🚨 **Added critical bug to backlog: Track rendering does not appear after selecting aircraft**
-- **Symptom:** Clicking a marker opens the sidebar with aircraft details, but no historical track (OpenSky) or local trail renders on the map
-- **Impact:** Core feature blockers users from seeing aircraft flight paths
-- **Added to:** `.ai/BACKLOG.md` § "Bugs" with full symptom description, affected code locations, suspected root causes, and verification steps
+🚨 **Added critical bug to backlog: Track stops updating on aircraft selection**
+- **Symptom:** Track renders and updates normally while aircraft is being tracked by live polling. Clicking a marker to select → sidebar opens → track stops updating and becomes stale.
+- **Key detail:** Not "track never renders" but "track updates stop after selection" — the live trail update in the poll loop breaks after `selectAircraft()` runs
+- **Root cause hypothesis:** Historical track fetch (`loadTrack()`) may be interfering with or overwriting the live trail layer
+- **Impact:** Core feature regression — track becomes unusable once selected; users lose live position updates
+- **Added to:** `.ai/BACKLOG.md` § "Bugs" with detailed symptom, affected code, verification steps, and debugging guidance
 - **Priority:** Top of "At a glance" table (CRITICAL severity)
 - **Status:** Logged, waiting for investigation and fix in next session
 

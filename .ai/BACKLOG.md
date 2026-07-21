@@ -41,7 +41,7 @@ requires.
 
 | Item | Effort | Value | Category | Read |
 |---|---|---|---|---|
-| **[CRITICAL BUG]** Track rendering broken on aircraft select | S | High | Frontend UX / Bug | **BLOCKER:** Historical track from OpenSky does not render; local trail also missing. Both should appear after clicking a marker. See Bugs section. |
+| **[CRITICAL BUG]** Track stops updating after aircraft select | S | High | Frontend UX / Bug | **BLOCKER:** Track renders & updates *before* selection (live polling). Clicking marker → track stops updating, becomes stale. Historical track fetch may interfere with live trail. See Bugs section. |
 | Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
 | Selected aircraft styling & visual highlight | XS–S | Medium | Frontend UX | Visual distinction when an aircraft is selected: highlight marker, glow, or change icon/color to signal active selection state. |
 | Auto-center map on aircraft selection | XS | Medium | Frontend UX | Automatic map pan/zoom to center on selected aircraft, rather than requiring manual center-map button click. |
@@ -77,31 +77,36 @@ requires.
 
 ## Bugs
 
-### [CRITICAL] Track rendering broken on aircraft select
+### [CRITICAL] Track rendering stops updating after aircraft selection
 
-**Symptom:** When a user clicks a marker to select an aircraft, the sidebar opens and shows the aircraft's details, but no track (historical path) renders on the map. Neither the OpenSky historical track nor the local live-trail fallback appears.
+**Symptom:** 
+- **Before click:** Track *is* rendering and updating on the map as the aircraft moves (from live polling data + OpenSky historical track when available)
+- **After click:** User clicks marker to select aircraft → sidebar opens correctly with aircraft details → **but track stops updating and becomes stale** (no longer follows the aircraft's current position on subsequent polls)
 
-**Impact:** Core feature — users cannot see the path an aircraft has taken. Breaks situational awareness and navigation understanding.
+**Impact:** Core feature regression — track becomes unusable once an aircraft is selected. Users cannot see live flight path updates. Breaks navigational awareness.
+
+**Key detail:** This is NOT "track never renders" — it's "track stops updating after selection." The issue likely involves the track layer being disconnected from the poll loop or overwritten/cleared unexpectedly.
 
 **Affected code:**
-- `static/js/sidebar-track.js` → `loadTrack()` / `selectAircraft()` — responsible for fetching and drawing historical track
-- `static/js/main.js` → poll loop — responsible for building `liveTrailById` local fallback
-- `static/js/icons.js` → `syncMarkers()` — updates marker state on each poll
+- `static/js/sidebar-track.js` → `selectAircraft()` / `loadTrack()` — historical track fetch & render (may interfere with live trail)
+- `static/js/main.js` → poll loop in `syncMarkers()` — should continue updating `liveTrailById` after selection
+- `static/js/icons.js` → `syncMarkers()` — updates marker state; may clear track layer unexpectedly
 
 **Suspected root causes (TBD):**
-1. Track layer group not being added to the map after being built
-2. `loadTrack()` fetch failing silently without fallback to local trail
-3. `liveTrailById` not being populated during polling
-4. `trackLayerGroup` being cleared/removed unexpectedly on subsequent polls
+1. Historical track layer from `loadTrack()` replaces/overwrites the live trail, breaking subsequent updates
+2. `liveTrailById` not being added to map or not being updated during subsequent polls after selection
+3. `trackLayerGroup` being removed/cleared on a poll after it was built during `selectAircraft()`
+4. Track layer group not being re-added to map on subsequent `drawTrack()` calls
 
 **Verification steps:**
-1. Click any marker to select an aircraft
-2. Observe sidebar opens with aircraft details
-3. Observe map for a track line (should be multi-colored polyline by altitude)
-4. Check browser console for fetch errors or exceptions
-5. Verify `trackLayerGroup` exists on `window` and contains features
+1. Observe a marker moving across the map (track trail should be visible behind it)
+2. Click the marker to select it
+3. Watch the map — track should continue updating as aircraft moves; check if it stops or becomes stale
+4. Open browser console: check `window.trackLayerGroup` before/after click
+5. Monitor network tab for `/api/track/<icao24>` requests and watch if `liveTrailById` is still being populated
+6. Check if track layer is still present in map layers after selection
 
-**Next steps:** Debug via console inspection of `trackLayerGroup`, inspect `/api/track/<icao24>` response, trace `drawTrack()` call, verify fallback path in `liveTrailById`.
+**Next steps:** Trace `selectAircraft()` → `loadTrack()` flow to see if historical track interferes with live trail. Check if `liveTrailById` continues being updated in poll loop. Verify `trackLayerGroup` isn't removed between polls.
 
 ---
 
