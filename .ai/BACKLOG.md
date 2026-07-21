@@ -259,6 +259,13 @@ Implementation notes:
 	 other filters. Persist in sessionStorage only.
 
 Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
+
+**Status:** WIP implementation exists on branch `wip/smoothing-marker-interpolation` (pushed to GitHub 2026-07-21). Frontend marker interpolation (`tweenMarkerTo()` via `requestAnimationFrame`, 800ms tween) works smoothly, but two unresolved issues block feature completion:
+  1. **Track layer rendering invisible**: When smoothing enabled, track polylines are added to map (`map.hasLayer()=true`, correct pane, 80+ segments with valid coordinates/colors) but don't render visibly. Diagnostics (pane/z-index, coordinate format, load-order) inconclusive; root cause likely in Leaflet render-cycle interaction with marker tweening.
+  2. **Track doesn't update on polls**: Track loaded once on aircraft selection but never refreshed on subsequent polls, regardless of smoothing state. Attempted fix (adding `loadTrack()` to `poll()` loop) incomplete due to time constraints.
+
+Recommendation: resume with fresh approach: (a) minimal Playwright test case isolating track render failure, (b) inspect actual DOM/computed styles when invisible, (c) step through Leaflet internals. Current branch preserves all implementation work; main branch unaffected.
+
 ## Aircraft metadata
 
 - **Aircraft serial number (MSN)** — Add aircraft manufacturer serial number field. No verified source yet (adsbdb has `msn` field for some aircraft; needs validation against real data). Research required before prioritizing. (See personal memory for fuller context.)
