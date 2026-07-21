@@ -25,6 +25,7 @@ CURRENT.md ownership
 - Primary owner: **Architect** — responsible for major architectural status and strategic direction.
 - Secondary: **Developer** may apply small, non-controversial updates directly to `/.ai/CURRENT.md` when they reflect an already-completed implementation or a narrow operational status change. Larger roadmap or architecture-status revisions should still involve the Architect.
 - Automation: agents/assistants may prepare draft text and apply it directly as part of a code or memory update, but should label the change clearly and keep it small.
+- **Mechanical enforcement** (since 2026-07-21): `git commit` is blocked unless `.ai/CURRENT.md` is staged. Use `--no-current-check` to bypass for commits that don't change task status (e.g., trivial fixes, docs-only). See `.claude/hooks/check-current-md.sh`.
 
 Commit template for CURRENT.md
 ```

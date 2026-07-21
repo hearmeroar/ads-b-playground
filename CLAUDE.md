@@ -31,6 +31,8 @@ This file is large (210KB) and mixes stable architectural facts, historical rati
 **Before creating a commit:**
 If your changes represent an architecturally-significant decision (new data source, changed priority chain, changed storage approach, new constraint), add an entry to `.ai/DECISIONS.md` (format: date, problem, decision, reason, tradeoffs). Update `.ai/ARCHITECTURE.md` if the current-state map itself changed. Update `.ai/CURRENT.md` if the active task status changed. Place new parked ideas in `.ai/BACKLOG.md`, not DECISIONS.md.
 
+**Note:** `.ai/CURRENT.md` updates are mechanically enforced — `git commit` will block unless `.ai/CURRENT.md` is part of the staged changes (via a `.claude/settings.json` PreToolUse hook). To bypass for commits that genuinely don't change task status, append `--no-current-check` to the `git commit` command.
+
 **What NOT to write in `.ai/` files:**
 - Temporary debugging traces or "tried X, didn't work" logs (keep those in CURRENT.md only while actively working, then remove them).
 - Duplication of README's install/run instructions (link to README instead).
