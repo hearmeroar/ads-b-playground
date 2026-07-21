@@ -18,6 +18,12 @@
 > See `.agents/architect.md` § "BACKLOG.md ownership" for who's expected
 > to keep this current.
 
+> **Category/Tag convention (added 2026-07-21):** every item in the "At a
+> glance" table must include a `Category` column that briefly identifies
+> the area it touches — one of: `Frontend UX`, `Backend`, `DevOps`,
+> `Data sources`, `Testing`, `Documentation`, `Prediction`. This tag
+> makes it easy to scan by domain and coordinate related work.
+
 Ideas and features not yet scheduled. Grouped loosely by theme.
 
 *(Note: this file went through several rounds of the `backlog-cleanup.sh`
@@ -33,31 +39,30 @@ Sorted best-first (cheap + valuable at the top). Full item detail is in the
 sections below; this table is the quick-scan summary the convention above
 requires.
 
-| Item | Effort | Value | Read |
-|---|---|---|---|
-| Local track persistence & smoothing (frontend) | S | Med–High | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
-| Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Highest standalone value in the backlog; worth scheduling deliberately |
-| Health check endpoint (`/api/health`) | XS–S | Medium | Public unauthenticated endpoint for Northflank/uptime-monitor health checks. Decision made 2026-07-21: public minimal response (DECISIONS.md). |
-| Seamless login without page reload | M | Medium | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
-| Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Shareable/deep-linkable view; reusable layout could also serve collection cards |
-| Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
-| Airline metadata enrichment (alliance/country/website) | L | Medium | Needs a source-validation phase before implementation, not just coding time |
-| Dark mode | M | Medium | Visible polish; CSS touches sidebar+HUD, not a single component |
-| External links: UTM params / `rel` / variableized host | S | Low | Mostly hygiene (`noreferrer`) + analytics tagging this app doesn't otherwise use |
-| UI/CSS framework evaluation (POC only) | S | Low | Cheap experiment; no user-facing payoff until a real migration follows (unscoped, separate cost) |
-| Register an AirLabs API key | XS | Low | Trivial, but a pure prerequisite — does nothing standalone |
-| Exercise `.agents/ui.md` on a real task | XS–S | Low | Process/meta value only, not user-facing |
-| Sidebar search/filter within collection | S | Low | Only matters once a user's collection is large; defer until it is |
-| Metrics export (`/metrics`, Prometheus) | M | Low–Med | Ops/observability value, no urgency for a single-tenant app |
-| Collection panel bulk operations | M | Low | Speculative — no evidence the collection is big enough to need bulk actions yet |
-| Adaptive polling intervals | M | Low | Defer until an actual quota-pressure incident, not before |
-| Load testing | M | Low | Only relevant if traffic ever exceeds single-user hobby scale |
-| Live network tests (CI-gated) | M | Low | Low ROI unless upstreams start breaking often (not observed so far) |
-| Contributor guide | S | Low | Speculative — depends on this project ever getting contributors |
-| Route prediction from velocity vector (Layer 3 route validation) | L | Low–Med | Speculative extension of Layer 2; no user ask driving it yet |
-| Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Blocked — no free/no-signup source identified yet |
-| Aircraft serial number (MSN) field | XL (blocked) | Low | Blocked — no verified data source yet, needs research first |
-| Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
+| Item | Effort | Value | Category | Read |
+|---|---|---|---|---|
+| Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
+| Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Frontend UX | Highest standalone value in the backlog; worth scheduling deliberately |
+| Health check endpoint (`/api/health`) | XS–S | Medium | DevOps | Public unauthenticated endpoint for Northflank/uptime-monitor health checks. Decision made 2026-07-21: public minimal response (DECISIONS.md). |
+| Seamless login without page reload | M | Medium | Frontend UX | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
+| Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Frontend UX | Shareable/deep-linkable view; reusable layout could also serve collection cards |
+| Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Backend | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
+| Airline metadata enrichment (alliance/country/website) | L | Medium | Data sources | Needs a source-validation phase before implementation, not just coding time |
+| Dark mode | M | Medium | Frontend UX | Visible polish; CSS touches sidebar+HUD, not a single component |
+| External links: UTM params / `rel` / variableized host | S | Low | Frontend UX | Mostly hygiene (`noreferrer`) + analytics tagging this app doesn't otherwise use |
+| UI/CSS framework evaluation (POC only) | S | Low | Frontend UX | Cheap experiment; no user-facing payoff until a real migration follows (unscoped, separate cost) |
+| Register an AirLabs API key | XS | Low | Data sources | Trivial, but a pure prerequisite — does nothing standalone |
+| Exercise `.agents/ui.md` on a real task | XS–S | Low | Documentation | Process/meta value only, not user-facing |
+| Sidebar search/filter within collection | S | Low | Frontend UX | Only matters once a user's collection is large; defer until it is |
+| Metrics export (`/metrics`, Prometheus) | M | Low–Med | DevOps | Ops/observability value, no urgency for a single-tenant app |
+| Collection panel bulk operations | M | Low | Frontend UX | Speculative — no evidence the collection is big enough to need bulk actions yet |
+| Adaptive polling intervals | M | Low | Backend | Defer until an actual quota-pressure incident, not before |
+| Load testing | M | Low | Testing | Only relevant if traffic ever exceeds single-user hobby scale |
+| Live network tests (CI-gated) | M | Low | Testing | Low ROI unless upstreams start breaking often (not observed so far) |
+| Route prediction from velocity vector (Layer 3 route validation) | L | Low–Med | Prediction | Speculative extension of Layer 2; no user ask driving it yet |
+| Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Data sources | Blocked — no free/no-signup source identified yet |
+| Aircraft serial number (MSN) field | XL (blocked) | Low | Data sources | Blocked — no verified data source yet, needs research first |
+| Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Frontend UX | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
 | *(Historical track interpolation, listed separately below)* | — | — | Duplicate of the two track-smoothing items above; fold into one of them rather than tracking a third time |
 
 Goal: surface additional airline metadata (alliance, country, website) in the
@@ -346,7 +351,6 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 
 ## Documentation
 
-- **Contributor guide** — CLAUDE.md is comprehensive but dense. A shorter "getting started for contributors" could help. Blocked on: whether this project will ever have contributors.
 
 ---
 

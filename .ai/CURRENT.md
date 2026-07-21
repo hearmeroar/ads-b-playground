@@ -2,6 +2,10 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Docs: Backlog organization)
+
+✅ **Organize backlog by Category tag** — Added Category/Tag convention to BACKLOG.md (7 categories: Frontend UX, Backend, DevOps, Data sources, Testing, Documentation, Prediction), added Category column to "At a glance" table, tagged all 22 items, removed low-value "Contributor guide". Enables quick domain scanning and coordinates related work across areas.
+
 ## Status as of 2026-07-21 (Automation: mechanical verification gate before commit)
 
 ✅ **New: `.claude/hooks/capture-test-run.sh` + `.claude/hooks/require-verification.sh`**
