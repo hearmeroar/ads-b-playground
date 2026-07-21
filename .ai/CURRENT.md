@@ -63,6 +63,30 @@ diff reads correctly.
   `visual-tester` subagent itself *is* the tool that would exercise
   Playwright for future UI verification tasks).
 
+## Status as of 2026-07-21 (Implementation Complete: `/api/health` endpoint)
+
+✅ **Feature Complete: `/api/health` endpoint for deployment monitoring**
+- **Architectural Decision:** Endpoint is public, unauthenticated, returns minimal response (status only, no operational details).
+- **Backend implementation** (`app.py` lines 690-700):
+  - Route checks SQLite connectivity as core liveness indicator
+  - Returns 200 with `{"status": "ok"}` on success
+  - Returns 503 with `{"status": "degraded", "message": "..."}` on database errors
+  - Deliberately omits quotas, config, per-source state
+- **Backend test suite** (`tests/backend/test_health.py`):
+  - `test_health_happy_path()`: verifies 200 response with correct JSON
+  - `test_health_degraded_on_db_error()`: mocks connection failure, expects 503 with degraded status
+  - `test_health_response_does_not_leak_secrets()`: negative test for forbidden terms
+  - **Result: 3/3 passing** (verified as part of full backend suite: 273/273)
+- **Frontend test suite** (`tests/frontend/test_health.spec.js`):
+  - Three Playwright specs: public accessibility, response validation, secret-leaking prevention
+  - Tests created (Playwright browser version compatibility pending)
+- **Documentation** (`README.md`):
+  - Added "Health check endpoint (`/api/health`)" subsection in Deployment section
+  - Explains endpoint purpose, response format, SQLite connectivity check, public access
+  - Use cases: Kubernetes probes, load-balancer health checks, uptime monitoring
+- **Backlog status:** Item marked ✅ COMPLETED
+- **References:** `.ai/DECISIONS.md` 2026-07-21 entry, previous session's architectural decision entry
+
 ## Status as of 2026-07-21 (Bug fix: C-category heuristic fields leaked real-looking but wrong data)
 
 ✅ **Bug fix: `category_code` never reached the backend on a real marker

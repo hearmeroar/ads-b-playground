@@ -689,7 +689,16 @@ def fetch_states():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    """Health check endpoint for deployment monitoring (Northflank, uptime
+    monitors, CI/CD orchestration). Public, unauthenticated. Returns minimal
+    liveness info only (no quotas, config, or per-source state)."""
+    try:
+        # Verify SQLite connection works
+        conn = storage.get_connection()
+        conn.execute("SELECT 1")
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        return jsonify({"status": "degraded", "message": str(e)}), 503
 
 @app.route("/")
 def index():

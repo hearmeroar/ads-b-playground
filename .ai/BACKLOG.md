@@ -4,10 +4,12 @@
 
 > **Completion convention:** Mark completed items with `✅ ` at the start of the line. These are auto-pruned from the file on each `git commit` via a hook. Example: `✅ **Feature Name** — brief description`.
 
-> **Speed/value convention (added 2026-07-21):** every item added to or
-> materially edited in this file must carry a Speed × Value estimate,
-> recorded as a row in the "At a glance" table immediately below. Speed
-> is effort/complexity — `XS` (<2h), `S` (0.25–1 day), `M` (1–2 days),
+> **Effort/value convention (added 2026-07-21, renamed from "Speed" same
+> day — "Speed" read as execution velocity, not effort/size, which is
+> what the column actually measures):** every item added to or
+> materially edited in this file must carry an Effort × Value estimate,
+> recorded as a row in the "At a glance" table immediately below. Effort
+> is complexity/size — `XS` (<2h), `S` (0.25–1 day), `M` (1–2 days),
 > `L` (2–3 days), `XL` (3+ days, or blocked pending research/a decision).
 > Value is expected product impact if shipped today — `Low` / `Medium` /
 > `High` — judged against this app's actual current use (single-tenant
@@ -25,17 +27,17 @@ line left its body orphaned with no heading. Completed multi-paragraph
 items are now deleted in full rather than title-only-marked, to avoid
 recreating that problem.)*
 
-## At a glance — Speed × Value (as of 2026-07-21)
+## At a glance — Effort × Value (as of 2026-07-21)
 
 Sorted best-first (cheap + valuable at the top). Full item detail is in the
 sections below; this table is the quick-scan summary the convention above
 requires.
 
-| Item | Speed | Value | Read |
+| Item | Effort | Value | Read |
 |---|---|---|---|
 | Local track persistence & smoothing (frontend) | S | Med–High | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
 | Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Highest standalone value in the backlog; worth scheduling deliberately |
-| Health check endpoint (`/api/health`) | XS–S | Medium | Cheap once the admin-only-vs-public question is answered — currently blocked on that decision, not on effort |
+| Health check endpoint (`/api/health`) | XS–S | Medium | Public unauthenticated endpoint for Northflank/uptime-monitor health checks. Decision made 2026-07-21: public minimal response (DECISIONS.md). |
 | Seamless login without page reload | M | Medium | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
 | Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Shareable/deep-linkable view; reusable layout could also serve collection cards |
 | Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
@@ -55,6 +57,7 @@ requires.
 | Route prediction from velocity vector (Layer 3 route validation) | L | Low–Med | Speculative extension of Layer 2; no user ask driving it yet |
 | Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Blocked — no free/no-signup source identified yet |
 | Aircraft serial number (MSN) field | XL (blocked) | Low | Blocked — no verified data source yet, needs research first |
+| Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
 | *(Historical track interpolation, listed separately below)* | — | — | Duplicate of the two track-smoothing items above; fold into one of them rather than tracking a third time |
 
 Goal: surface additional airline metadata (alliance, country, website) in the
@@ -282,6 +285,50 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 
 
 - **Dark mode** — Basemap picker already supports dark styles (CARTO Dark, Esri Dark), but sidebar/HUD don't adapt. CSS `prefers-color-scheme` media query support would help. Low priority.
+
+- **Per-category icons for ground vehicles/obstacles (C0-C5)** — `iconFor()`
+  (`static/js/icons.js`) currently draws the exact same neutral-grey
+  `towerIcon()` glyph for *every* item flagged `isGroundVehicle: true` or
+  `categoryGroup === 'surface_obstacle'`, regardless of which DO-260B
+  C-code it actually is. But the codes mean genuinely different things
+  (`ADSBEXCHANGE_CATEGORY_LABELS`, `render-details.js`): C1 "Surface
+  vehicle — emergency", C2 "Surface vehicle — service", C3 "Point
+  obstacle", C4 "Cluster obstacle", C5 "Line obstacle" — an emergency
+  vehicle and a fixed obstacle are not the same kind of thing to spot on
+  the map at a glance, the same reasoning that already gives real aircraft
+  category groups their own distinct glyphs. Separately, **objects with no
+  category info at all** (C0, or a ground vehicle flagged purely by the
+  registration/callsign heuristics in `looksLikeGroundVehicle()` with no
+  `category` field at all) need an explicit "unknown ground object" glyph
+  distinct from both the categorized ones and the real-aircraft "unknown"
+  silhouette (`UNKNOWN_GLYPH`) — right now they silently fall into the same
+  bucket as every other ground vehicle via the tower icon, which reads as
+  "we know what this is" when the app in fact doesn't. Low priority: purely
+  cosmetic, nothing is broken or misleading today beyond a slightly
+  under-differentiated icon set — the C0-C5 identity-field-hiding and
+  heuristic-suppression behavior (see `.ai/DECISIONS.md` 2026-07-21 entries)
+  already handles the *data* side correctly regardless of which icon
+  renders.
+  - Acceptance criteria: distinct icon/color per C1 (emergency vehicle),
+    C2 (service vehicle), C3/C4/C5 (obstacle — could share one "obstacle"
+    glyph family or get three, TBD during implementation), and a separate
+    "unknown ground object" glyph for C0/no-category. Category dropdown
+    filter and dev-mode "all aircraft" table are out of scope unless
+    trivial to extend alongside.
+  - Implementation notes: extend `CATEGORY_GLYPHS`/`ICON_BUILDERS`
+    (`icons.js`) with new entries keyed by the existing `surface_obstacle`
+    group isn't granular enough — `categoryGroupFor()` already collapses
+    C1-C5 into one `surface_obstacle` bucket, so this needs either a new,
+    more granular grouping just for icon selection (reusing the raw
+    `categoryCode`/`item.category` string directly, the same field
+    `looksLikeGroundVehicle()` already reads) or a small `groundVehicleIcon
+    (categoryCode)` helper consulted before falling back to `towerIcon()`.
+    Source new SVG glyphs from the same vendored ADS-B Radar icon set if a
+    fitting one exists there, otherwise a small MDI glyph (Apache-2.0, same
+    vendoring convention as `GROUP_ICONS`/the airport-layer icons).
+  - Estimate: 0.25–0.5 dev day (a few new small SVGs + one dispatch
+    function + Playwright coverage extending `test_filters.spec.js`'s
+    existing ground-vehicle fixture).
 
 - **Sidebar search/filter** — Once collection grows large, searching within saved aircraft by callsign/type/operator would help. Not urgent for current use case.
 

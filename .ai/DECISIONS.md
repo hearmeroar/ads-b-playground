@@ -118,3 +118,32 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 - `_persist_zone_config()`'s disk write is best-effort (an unwritable `config/zones.json` doesn't fail the request) — matches this app's existing pattern of treating disk persistence as an optimization (e.g. the track cache), not a hard requirement, for state that isn't the source of truth for anything else running in the same request.
 
 **References:** CLAUDE.md § "Zone search", `app.py`'s `_apply_zone()`/`_persist_zone_config()`/`_maybe_reload_zone_from_disk()` docstrings, `.ai/BACKLOG.md`'s superseded "make the app's geographic view zone easy to change" item
+
+---
+
+## 2026-07-21 — `/api/health` endpoint: public with minimal response (not admin-only)
+
+**Problem:** Deployment monitoring requires a health check endpoint (Northflank health checks, external uptime monitoring, CI/CD orchestration). Should it require authentication (admin-only) or be public?
+
+**Decision:** Public endpoint with intentionally minimal response.
+
+**Reason:** 
+- Single-tenant, non-SaaS deployment — operator controls and owns all infrastructure; no multi-user confidentiality boundary to protect.
+- Cloud platform norms — Northflank expects unauthenticated `/health` for native orchestration; admin-only complicates platform integration without adding real security (app already protected by OAuth).
+- Operational state ≠ user data — quota numbers and upstream source status can be withheld from the response while still exposing "is app alive?"
+- Operational simplicity — admin-only requires token management and CI/CD configuration overhead, not justified for personal deployment.
+
+**Tradeoffs:**
+- Public endpoint exposes that the app exists and is running (minimal risk for personal tracker).
+- Response intentionally omits quota numbers, zone config, per-source reachability, and other operational details operator already sees in HUD.
+- Unauthenticated monitoring is standard cloud practice; trust placed in network boundary (Northflank controls access to deployment).
+
+**Implementation checklist:**
+- Add `/api/health` route returning `{"status": "ok"}` (200) on success.
+- Check: Flask alive, SQLite connection succeeds, no I/O startup errors.
+- Return `{"status": "degraded", "message": "..."}` (503) if core dependencies fail.
+- Do NOT include: OpenSky quota, per-source health, zone config, cache state.
+- Document in README as monitoring/orchestration endpoint, not external API.
+- Add test coverage: happy path (200), degraded path (503).
+
+**References:** BACKLOG.md "Health check endpoint" (now unblocked)
