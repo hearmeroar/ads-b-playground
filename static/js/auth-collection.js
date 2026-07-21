@@ -25,9 +25,15 @@ const collectionPanelEl = document.getElementById('collection-panel');
 const collectionPanelTitleEl = document.getElementById('collection-panel-title');
 const collectionPanelGridEl = document.getElementById('collection-panel-grid');
 const collectionPanelCloseBtn = document.getElementById('collection-panel-close');
+const collectionViewButtons = document.querySelectorAll('.collection-view-btn');
 const sidebarSaveCollectionBtn = document.getElementById('sidebar-save-collection');
 
 let currentUser = null; // { sub, email, name, picture } | null
+
+// 'cards' (default, full photo + all details) or 'compact' (thumbnail row) —
+// session-only like every other display preference in this app (unit
+// system, dev mode, basemap all reset on reload too), no localStorage.
+let collectionViewMode = 'cards';
 
 // icao24 -> card, mirrors this session's view of the server's collection —
 // refreshed after login and kept in sync on every save/unsave (never
@@ -521,7 +527,7 @@ function renderCollectionPanel(cards, liveCount) {
     collectionPanelGridEl.appendChild(header);
 
     const groupGrid = document.createElement('div');
-    groupGrid.className = 'collection-group-grid';
+    groupGrid.className = 'collection-group-grid' + (collectionViewMode === 'compact' ? ' compact' : '');
     for (const card of groupCards) groupGrid.appendChild(renderCollectionCard(card));
     collectionPanelGridEl.appendChild(groupGrid);
   }
@@ -571,6 +577,20 @@ async function undoRemoveCard(card) {
 
 collectionPanelCloseBtn.addEventListener('click', () => {
   collectionPanelEl.setAttribute('hidden', '');
+});
+
+collectionViewButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.view;
+    if (mode === collectionViewMode) return;
+    collectionViewMode = mode;
+    collectionViewButtons.forEach((b) => {
+      const active = b.dataset.view === mode;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    renderCollectionPanelFromState();
+  });
 });
 
 document.addEventListener('keydown', (e) => {

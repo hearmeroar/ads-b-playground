@@ -165,6 +165,54 @@ test('opens the collection panel and renders cards grouped by category', async (
   await expect(page.locator('.collection-card-subtitle').first()).toHaveText('A320');
 });
 
+test('Cards/Compact view toggle switches the grid layout and survives a re-render', async ({ page }) => {
+  await page.route('**/api/collection', (route) => {
+    if (route.request().method() === 'GET') {
+      route.fulfill({ json: { cards: [
+        {
+          id: 'card1', user_id: 'u1', icao24: 'aaaaaa', saved_at: 1752835200,
+          snapshot: { registration: 'TC-LGY', aircraftType: 'A20N', operator: 'Test Air', categoryGroup: 'unknown' },
+          photo_url: null, photo_link: null, photo_photographer: null,
+        },
+      ] } });
+    } else {
+      route.continue();
+    }
+  });
+  await page.route('**/api/collection/card1', (route) => route.fulfill({ json: { ok: true } }));
+
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await openCollectionPanel(page);
+
+  // Cards view is the default: the toggle shows it active and the grid
+  // carries no 'compact' modifier class.
+  await expect(page.locator('.collection-view-btn[data-view="cards"]')).toHaveClass(/active/);
+  await expect(page.locator('.collection-view-btn[data-view="cards"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.collection-view-btn[data-view="compact"]')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.collection-group-grid')).not.toHaveClass(/compact/);
+
+  await page.click('.collection-view-btn[data-view="compact"]');
+
+  await expect(page.locator('.collection-view-btn[data-view="compact"]')).toHaveClass(/active/);
+  await expect(page.locator('.collection-view-btn[data-view="compact"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.collection-view-btn[data-view="cards"]')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.collection-group-grid')).toHaveClass(/compact/);
+  // Same card markup either way — the compact class just reflows it via CSS.
+  await expect(page.locator('.collection-card-title').first()).toHaveText('TC-LGY');
+
+  // Removing a card re-renders the grid from scratch (renderCollectionPanelFromState) —
+  // the chosen view mode must survive that re-render, not silently reset to Cards.
+  await page.click('.collection-card-icon-btn');
+  await page.waitForTimeout(150);
+  await expect(page.locator('.collection-card.removed')).toBeVisible();
+  await expect(page.locator('.collection-group-grid')).toHaveClass(/compact/);
+
+  // Switching back to Cards drops the modifier class again.
+  await page.click('.collection-view-btn[data-view="cards"]');
+  await expect(page.locator('.collection-group-grid')).not.toHaveClass(/compact/);
+});
+
 test('a card saved before the categoryGroup fix (no categoryGroup, only categoryDisplay) still groups correctly, not under Unknown', async ({ page }) => {
   // Regression for a real report: cards saved prior to the categoryGroup
   // snapshot fix already had a correct categoryDisplay (that field never

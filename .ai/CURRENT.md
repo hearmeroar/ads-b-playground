@@ -2,6 +2,51 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Night, continued further)
+
+✅ **UX: Cards / Compact view toggle for the collection panel**
+- Picked up mid-implementation from an untracked, uncommitted working-tree
+  state left over from a prior session (code was already functionally
+  written — HTML toggle, JS state + handler, CSS reflow — but undocumented,
+  untested, and unverified). This entry is that session's actual landing.
+- `#collection-view-toggle` (`static/index.html`, in `#collection-panel-header`)
+  is a two-button segmented control (`Cards` / `Compact`, same visual family
+  as `#motion-filter`'s three-button group) alongside the panel's existing
+  close button.
+- `collectionViewMode` (`static/js/auth-collection.js`, session-only, no
+  `localStorage` — same convention as unit system/dev mode/basemap) drives
+  a `.compact` modifier class on `.collection-group-grid`, applied in
+  `renderCollectionPanel()`. Clicking a toggle button updates
+  `aria-pressed`/`.active` and re-renders via the existing
+  `renderCollectionPanelFromState()` — so the chosen mode survives a
+  save/remove/undo re-render instead of resetting to Cards.
+- Compact mode reuses the exact same `.collection-card-*` DOM
+  (`renderCollectionCard()` has no separate compact builder) — `style.css`
+  just reflows it into a 64px-thumbnail single row and hides the
+  meta/footer detail lines, so both view modes can never drift out of sync
+  with each other as card content evolves.
+- **Housekeeping found while finishing this**: `config/zones.json` also had
+  an uncommitted `active_zone_id: "KMDW"` (Chicago Midway) sitting in the
+  working tree — leftover from manually exercising the airport-search zone
+  switch, not intentional config. Reverted to `default` (Serbia) before
+  committing.
+- Test: new case in `tests/frontend/test_collection.spec.js` — default
+  Cards state, switching to Compact toggles `aria-pressed`/`.active` and
+  the `.compact` class, mode survives a card removal re-render, switching
+  back to Cards drops the modifier. Full frontend suite: 144/144 passing
+  outside the pre-existing, unrelated `test_route_card_tilt.spec.js`
+  failures (confirmed present on a clean `main` checkout too, not caused by
+  this work — see below).
+- **Found, not fixed (flagging, out of scope for this session)**: backend
+  suite has 9 pre-existing failures, all in `test_airports.py`/
+  `test_metar_sigmet.py`/`test_index.py::test_api_config` — confirmed
+  present on a clean `main` stash too, so not introduced by this session.
+  All look zone/BBOX-related (empty results, config assertion mismatch);
+  likely fallout from the airport-search zone-switching feature
+  (`0cbf6db`/`8721b35`) not being fully reflected in these tests' fixtures/
+  assumptions. Worth a dedicated look next session — currently undocumented
+  anywhere as a known-broken state.
+
 ## Status as of 2026-07-21 (Night, continued)
 
 ✅ **Automation: auto-draft CURRENT.md note when `RADIUS_SOURCES` changes**

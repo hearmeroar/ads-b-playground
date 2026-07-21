@@ -777,6 +777,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
   padding: 18px 24px; font-weight: 700; font-size: 16px; flex: none;
   border-bottom: 1px solid var(--border);
 }
+#collection-panel-header-actions { display: flex; align-items: center; gap: 14px; }
 #collection-panel-close {
   width: 32px; height: 32px; border-radius: 50%; border: none;
   background: rgba(15, 23, 42, 0.06); color: var(--ink);
@@ -784,6 +785,17 @@ html, body { margin: 0; padding: 0; height: 100%; }
   display: flex; align-items: center; justify-content: center;
 }
 #collection-panel-close:hover { background: rgba(15, 23, 42, 0.12); }
+/* Cards / Compact display switcher — a segmented control, same visual
+   family as #motion-filter's three-button group. */
+#collection-view-toggle {
+  display: flex; background: rgba(15, 23, 42, 0.06); border-radius: 999px; padding: 3px;
+}
+.collection-view-btn {
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--muted);
+  background: none; border: none; border-radius: 999px; cursor: pointer;
+  padding: 5px 12px;
+}
+.collection-view-btn.active { background: var(--card-bg); color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18); }
 #collection-panel-grid {
   overflow: auto; padding: 20px 24px 32px; flex: 1;
   max-width: 1100px; width: 100%; margin: 0 auto;
@@ -885,6 +897,43 @@ html, body { margin: 0; padding: 0; height: 100%; }
   font-size: 10px; color: var(--muted); background: rgba(255, 255, 255, 0.85);
   padding: 1px 8px; border-radius: 999px;
 }
+
+/* Compact view — same card markup as above, reflowed into a small photo +
+   single-column row rather than a photo-topped grid tile. Reuses every
+   .collection-card-* class as-is (no separate DOM builder) so both view
+   modes stay in sync automatically as the card content evolves. */
+.collection-group-grid.compact {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.collection-group-grid.compact .collection-card {
+  display: flex; flex-direction: row; align-items: center; border-radius: 10px;
+}
+.collection-group-grid.compact .collection-card-photo-wrap {
+  width: 64px; height: 64px; aspect-ratio: unset; flex: none;
+}
+.collection-group-grid.compact .collection-card-photo-placeholder { font-size: 10px; text-align: center; }
+.collection-group-grid.compact .collection-card-body {
+  padding: 6px 12px; flex: 1; min-width: 0;
+}
+.collection-group-grid.compact .collection-card-title { font-size: 14px; }
+.collection-group-grid.compact .collection-card-subtitle {
+  font-size: 12px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.collection-group-grid.compact .collection-card-category {
+  margin-top: 4px; font-size: 11px; padding: 1px 7px;
+}
+/* Operator/country/manufacturer meta rows and the saved-at/location footer
+   are dropped in compact mode — that's the whole point of "compact": one
+   row per aircraft, not a stack of detail lines. Still one click away via
+   the Cards toggle. */
+.collection-group-grid.compact .collection-card-meta,
+.collection-group-grid.compact .collection-card-footer { display: none; }
+.collection-group-grid.compact .collection-card-icon-btn {
+  position: static; margin: 0 10px; flex: none;
+  width: 30px; height: 30px; box-shadow: none; background: transparent;
+}
+.collection-group-grid.compact .collection-card-icon-btn:hover { background: rgba(15, 23, 42, 0.08); }
+.collection-group-grid.compact .collection-card-removed-overlay { flex-direction: row; gap: 10px; padding: 0 12px; }
 
 /* Airport marker popup (airportPopupHtml() in map-init.js) — reworked from
    Leaflet's plain default popup (unstyled <b>/<br> text, the same look
