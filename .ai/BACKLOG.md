@@ -6,21 +6,12 @@
 
 Ideas and features not yet scheduled. Grouped loosely by theme.
 
-
-already loading at import time (`b2d49fb`) but had no mutation path; this
-session added `search_airports()` (`enrichment/airports.py`) +
-`/api/airports/search`, and `app.py`'s `_apply_zone()`/
-`_persist_zone_config()`/`_maybe_reload_zone_from_disk()` + `POST
-/api/zones/active`, wired to a new HUD search box
-(`static/js/state-filters.js`'s zone-search block) that recenters the map
-and re-polls immediately on selection. Went with search-over-airports
-rather than the originally-envisioned fixed preset dropdown — reuses the
-already-global OurAirports dataset instead of hand-curating a zones list,
-and still persists to `config/zones.json` (keyed by the picked airport's
-ICAO) so a restart keeps the last-chosen zone. See CLAUDE.md's "Zone
-search" section and `.ai/DECISIONS.md`'s 2026-07-21 entry for the
-persistence/cross-worker-sync design. Radius/zoom intentionally untouched
-(center-only) — left as a possible follow-up, not done here.
+*(Note: this file went through several rounds of the `backlog-cleanup.sh`
+commit hook before it was noticed that the hook only strips a single line
+starting with `✅` — for a multi-paragraph item, marking just the title
+line left its body orphaned with no heading. Completed multi-paragraph
+items are now deleted in full rather than title-only-marked, to avoid
+recreating that problem.)*
 
 
 Goal: surface additional airline metadata (alliance, country, website) in the
@@ -124,35 +115,6 @@ automated sync pipeline is required for the chosen source.
  scope and can be broken into smaller PRs.
 
 
-Goal: when a user removes a saved collection card, the in-UI undo affordance
-should be highly visible and actionable (not a disabled control), reducing
-friction for accidental deletes.
-
-Motivation: current UX dims the removed card and shows an undo button that is
-easy to miss or appears disabled; users may not notice the ability to undo or
-are uncertain whether the action succeeded.
-
-Acceptance criteria:
-- The removed card is visually dimmed but retains a clearly visible, contrasty
-  Undo button (primary-style, not disabled) and an inline "Removed · Undo"
-  affordance that stands out from the muted card background.
-- Clicking Undo restores the card immediately and removes the ghost state.
-- If the user navigates away or refreshes, the action is final (the "undo"
-  state is session-scoped), consistent with current behaviour, but the UI must
-  make this clear (small hint text: "Undo available this session").
-
-Implementation notes:
-1. Update `static/style.css` with a `.collection-card-undo` primary variant
-	(color, padding, pointer cursor) and ensure `[hidden]` rules don't hide it.
-2. Change `auth-collection.js`'s `removeCardWithUndo()` to add a visible undo
-	button (not `disabled`) and start a short timer to visually expire the undo
-	affordance if desired; keep the existing backend `DELETE` behaviour (it is
-	already immediate). The undo handler should re-POST the saved snapshot.
-3. Add a Playwright test that removes a card, asserts the Undo button is visible
-	(not disabled), clicks it, and verifies the card reappears.
-
-Estimate: 0.25–0.5 dev days (CSS + small JS change + E2E test).
-
 - Special-case enrichment rules for `C0` (surface/ground) category
 
 Goal: avoid inferring identity fields (country, operator, registration-derived
@@ -190,32 +152,6 @@ Implementation notes:
 
 Estimate: 0.5–1 developer day (backend change + unit tests + minor frontend dev-mode message).
 
-
-Goal: expand the clickable/touch target for the gallery's previous/next
-arrow controls so they occupy the full vertical height of the gallery
-container. This reduces misclicks when users tap near the image top/bottom
-edge on mobile or small screens.
-
-Acceptance criteria:
-- Clicking/tapping anywhere vertically within the gallery container on the
-  left/right edge triggers the previous/next action respectively.
-- No visible layout changes besides the arrows remaining visually centered.
-- Playwright/E2E test covers top/middle/bottom click positions inside the
-  container for both arrows and asserts slide changes.
-
-Implementation notes:
-1. CSS: set `.gallery-nav`/`.gallery-prev`/`.gallery-next` to `height: 100%`
-	and use `display:flex; align-items:center; justify-content:center;` so the
-	visual arrow stays centered while the hit area spans the container.
-2. Ensure the nav elements are placed above the image (z-index) without
-	blocking any required pointer events on other controls (dots, credits).
-3. JS: no change expected to gallery logic; event handlers already attached to
-	the arrow buttons. If handlers rely on click-target sizing, adapt to
-	prevent race conditions with drag gestures.
-4. Tests: add `tests/frontend/test_photo.spec.js` checks for clicks near the
-	top and bottom of the left/right halves of the gallery container.
-
-Estimate: 0.25–0.5 dev days (CSS tweak + one E2E test).
 
 - Map update frequency and track smoothing (polling & interpolation)
 
@@ -301,29 +237,6 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 - **Collection panel bulk operations** — Currently can save/unsave one aircraft at a time. Backlog idea: bulk export (JSON), bulk delete, filtering within collection. No firm priority.
 
 
-Goal: simplify the per-card snapshot shown in the Collections panel by removing the opaque category description and replacing it with a clear, actionable "Where spotted" area that tells the user exactly where and when the airframe was seen in this session or when the snapshot was taken.
-
-Motivation: the current category description on saved cards (e.g. "A3 — Large (...)") is redundant and not the most useful snippet for a saved aircraft. Users asked for clearer location/context: nearest airport, distance, coordinates and time of the observed position — information that helps recall why the aircraft was saved.
-
-Acceptance criteria:
- - The saved card UI no longer displays the long category description string. Instead, it shows a concise category badge (e.g. "A3 · Large") with no long parenthetical weight range.
- - Each card shows a `Where spotted` line with the best-available capture context in this precedence order:
-	 1. `nearest_airport` (name + IATA/ICAO) + distance in km (when `location.nearest_airport` is available in the snapshot), e.g. "Near Belgrade Nikola Tesla (BEG) · ~12 km";
-	 2. Else: coordinates as `lat, lon` plus a humanized distance from the project's `AREA_CENTER` (e.g. "44.7866, 20.4489 · 12 km from center"); include the observed `ts`/`saved_at` timestamp formatted in local time if present.
-	 3. Also show the data source that provided the observed position (OpenSky / adsb.fi / adsbdb / local trail) as a small badge.
- - Backend `POST /api/collection` continues to accept `location` as before, but the server must ensure the stored snapshot contains `location.nearest_airport` when valid (resolve server-side on save if `lat`/`lon` provided). If nearest airport cannot be resolved, store `location:{lat,lon}` only.
- - Existing saved cards without `nearest_airport` self-heal in the UI: when the Collections panel opens, client-side logic derives and displays the best fallback (coordinates + distance) if `nearest_airport` is missing; no data loss.
-
-Implementation notes / next steps:
-1. Backend: modify `api_collection_save()` (`app.py`) to call `enrichment/airports.nearest_airport(lat, lon)` on save when `lat`/`lon` are present and augment the persisted `location` field with `nearest_airport` (name, iata, icao, distance_km). Keep `location` nullable when coordinates are absent.
-2. Frontend: update `auth-collection.js`'s `renderCollectionCard()` so it no longer prints the full `categoryDisplay` parenthetical text; instead render a compact badge plus a `Where spotted` row assembled from `card.location.nearest_airport` or `card.location.lat/lon` + `card.saved_at` and a small source badge.
-3. Ensure `SNAPSHOT_FIELDS`/`storage.save_collection()` allow `location.nearest_airport` through; when saving from the sidebar, include `lat`/`lon` (the sidebar already has them) so the backend can resolve the airport server-side rather than trusting client computation.
-4. Backfill: no mandatory migration — a saved card without `nearest_airport` displays fallback coordinates; optionally add a one-off background migration script later to enrich existing rows if desired.
-5. Tests: add backend unit test for `POST /api/collection` that supplies `lat`/`lon` and asserts `location.nearest_airport` is stored; add Playwright test verifying the Collections panel card shows the new `Where spotted` text for a saved card with `nearest_airport`, and falls back to coordinates when absent.
-
-Estimate: 0.25–0.5 dev days (backend augmentation + small frontend render change + tests).
-
-
 - **Dark mode** — Basemap picker already supports dark styles (CARTO Dark, Esri Dark), but sidebar/HUD don't adapt. CSS `prefers-color-scheme` media query support would help. Low priority.
 
 - **Sidebar search/filter** — Once collection grows large, searching within saved aircraft by callsign/type/operator would help. Not urgent for current use case.
@@ -398,64 +311,6 @@ Implementation notes:
 	 not required for this change.
 
 Estimate: 0.5–1 dev days (frontend work + one Playwright smoke test).
-
-Bug: локальный трек иногда не рисуется (intermittent local-track draw failure)
-
-Симптомы:
-- Иногда при выборе самолёта исторический трек не рисуется даже если в сессии
-	были собраны локальные точки (live trail) — ничего в `trackLayerGroup` не
-	появляется, либо виден только пустой контейнер без линий.
-
-Шаги воспроизведения (приближённо):
-1. Открой страницу с несколькими самолётами в зоне (стандартный fixture).
-2. Выберите самолёт, у которого `/api/track/<icao24>` возвращает 404 (нет
-	 серверного трека). Наблюдайте, как фронтенд собирает локальную историю из
-	 опросов (polls) в память во время нескольких итераций опроса.
-3. Закройте сайдбар и снова откройте тот же самолёт.
-4. Иногда трек не рисуется — поведение нестабильно, воспроизводится не всегда.
-
-Ожидаемое поведение:
-- Локальный трек (последние N точек из poll) всегда рисуется при открытии
-	сайдбара для самолёта, если серверный `/api/track` отсутствует.
-
-Критерии приёма / минимальный фикс:
-- Исправить причину пропуска отрисовки и добавить регрессионный тест
-	(Playwright): симулировать последовательные poll-обновления, закрыть/открыть
-	сайдбар и убедиться, что трек отрисован.
-- При невозможности восстановить полную причину — добавить защитный
-	fallback: если `trackLayerGroup` пуст и `localTrailCache[icao24]` не пуст,
-	форсированно построить polyline из кеша и логировать причину в консоль.
-
-Возможные причины (предварительная диагностика):
-- Гонка по состояниям: `localTrailCache` обновляется асинхронно и
-	`selectAircraft()` вызывается до того, как кеш сериализовался/популярен.
-- Капы/тримы: кеш обрезается/очищается при закрытии сайдбара из-за гонки
-	lifecycle handlers (debounce/clear). 
-- Редкая ошибка рендеринга Leaflet: polyline создаётся но сразу очищается
-	другим кодом (clear/re-sync) в той же итерации event loop.
-
-Отладочные шаги / быстрый план фикса:
-1. Добавить подробные временные логи (dev-mode) в `selectAircraft()` и в
-	 код, который читает `localTrailCache` при отрисовке трека; логировать
-	 количество точек и источник (local vs server).
-2. В `selectAircraft()` добавить синхронную проверку: если server track
-	 отсутствует и `localTrailCache[icao24]` есть — немедленно нарисовать
-	 полилинию как fallback (atomic path) перед любыми `clearStaleMarkers`/
-	 `syncMarkers()` вызовами, чтобы избежать гонок.
-3. Написать Playwright-спек: мокать `/api/track/<icao24>` → 404, мокать
-	 последовательные `/api/states` ответы с точками, затем закрыть/открыть
-	 сайдбар и assert на наличие `trackLayerGroup.getLayers().length > 0`.
-
-Оценка: 0.25–0.75 dev days (логирование + форсированный fallback + E2E тест).
-
-
-Завершено 2026-07-21. Исходная гипотеза о недостаточном fallback-рендере была
-неправильна; истинная причина — spurious sidebar close на cross-source dedup
-handoffs. `clearStaleMarkers()` вызывала `deselectAircraft()` при любом
-изменении priority, даже если самолёт был жив в другом источнике. Fix:
-переместил deselection logic в конец `poll()`, где есть полный view всех
-marker maps. Регрессионный тест в `test_track.spec.js` покрывает 3-poll
-sequence с handoff. Backend + Frontend суиты: 255+149 passed.
 
 --
 
@@ -630,21 +485,3 @@ Implementation notes:
 	hrefs continue to be respected when desired.
 
 Estimate: 0.5–1 dev days (helper + replacements + license audit note + tests).
-
-
-Motivation:
- - HUD's airports layer currently uses checkboxes styled as rows; accessible toggles (on/off switches) provide clearer affordance, match other UI controls, and convey immediate state.
-
-Acceptance criteria:
- - Replace the HUD `#toggle-airports` checkbox with a semantic toggle control (button role="switch" or input type="checkbox" with .toggle class) visually styled as a switch.
- - Behavior unchanged: toggling on fetches `/api/airports` for current bbox; toggling off clears the cluster layer immediately and stops further fetches.
- - Keyboard focusable, accessible ARIA states (`aria-checked`) and label.
- - Playwright test: toggling shows/hides airports and preserves debounced fetch behavior.
-
-Implementation notes:
-1. Reused the existing `<label class="switch"><input type="checkbox">` pattern from other source/layer toggles in `static/index.html` — no new `.toggle` class or `button.role-switch` needed.
-2. Added per-size airport type checklist (`#airports-type-list`) with checkboxes for `large_airport`, `medium_airport`, `small_airport`, `heliport`, `seaplane_base`, `balloonport` — hidden until the layer is enabled.
-3. Wired `#toggle-airports` in `state-filters.js` to fetch `/api/airports?bbox=...&types=...` on enable, clear the cluster layer on disable, and re-fetch on pan (debounced) or type-checklist change.
-4. Added `#airports-help` popover with explanation of the layer.
-5. Tests live in `tests/frontend/test_airports_layer.spec.js` (8 tests): default-off, enable renders airports, pan re-fetches, disable stops fetches, popup content + heliport icon class, type checklist visibility and defaults, type checkbox toggling re-fetches with updated types param, help popover open/close.
-Estimate: 0.25 dev days (markup + CSS + wiring + E2E tests).
