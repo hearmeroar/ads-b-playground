@@ -55,6 +55,7 @@ requires.
 | Route prediction from velocity vector (Layer 3 route validation) | L | Low–Med | Speculative extension of Layer 2; no user ask driving it yet |
 | Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Blocked — no free/no-signup source identified yet |
 | Aircraft serial number (MSN) field | XL (blocked) | Low | Blocked — no verified data source yet, needs research first |
+| Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
 | *(Historical track interpolation, listed separately below)* | — | — | Duplicate of the two track-smoothing items above; fold into one of them rather than tracking a third time |
 
 Goal: surface additional airline metadata (alliance, country, website) in the
@@ -282,6 +283,50 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 
 
 - **Dark mode** — Basemap picker already supports dark styles (CARTO Dark, Esri Dark), but sidebar/HUD don't adapt. CSS `prefers-color-scheme` media query support would help. Low priority.
+
+- **Per-category icons for ground vehicles/obstacles (C0-C5)** — `iconFor()`
+  (`static/js/icons.js`) currently draws the exact same neutral-grey
+  `towerIcon()` glyph for *every* item flagged `isGroundVehicle: true` or
+  `categoryGroup === 'surface_obstacle'`, regardless of which DO-260B
+  C-code it actually is. But the codes mean genuinely different things
+  (`ADSBEXCHANGE_CATEGORY_LABELS`, `render-details.js`): C1 "Surface
+  vehicle — emergency", C2 "Surface vehicle — service", C3 "Point
+  obstacle", C4 "Cluster obstacle", C5 "Line obstacle" — an emergency
+  vehicle and a fixed obstacle are not the same kind of thing to spot on
+  the map at a glance, the same reasoning that already gives real aircraft
+  category groups their own distinct glyphs. Separately, **objects with no
+  category info at all** (C0, or a ground vehicle flagged purely by the
+  registration/callsign heuristics in `looksLikeGroundVehicle()` with no
+  `category` field at all) need an explicit "unknown ground object" glyph
+  distinct from both the categorized ones and the real-aircraft "unknown"
+  silhouette (`UNKNOWN_GLYPH`) — right now they silently fall into the same
+  bucket as every other ground vehicle via the tower icon, which reads as
+  "we know what this is" when the app in fact doesn't. Low priority: purely
+  cosmetic, nothing is broken or misleading today beyond a slightly
+  under-differentiated icon set — the C0-C5 identity-field-hiding and
+  heuristic-suppression behavior (see `.ai/DECISIONS.md` 2026-07-21 entries)
+  already handles the *data* side correctly regardless of which icon
+  renders.
+  - Acceptance criteria: distinct icon/color per C1 (emergency vehicle),
+    C2 (service vehicle), C3/C4/C5 (obstacle — could share one "obstacle"
+    glyph family or get three, TBD during implementation), and a separate
+    "unknown ground object" glyph for C0/no-category. Category dropdown
+    filter and dev-mode "all aircraft" table are out of scope unless
+    trivial to extend alongside.
+  - Implementation notes: extend `CATEGORY_GLYPHS`/`ICON_BUILDERS`
+    (`icons.js`) with new entries keyed by the existing `surface_obstacle`
+    group isn't granular enough — `categoryGroupFor()` already collapses
+    C1-C5 into one `surface_obstacle` bucket, so this needs either a new,
+    more granular grouping just for icon selection (reusing the raw
+    `categoryCode`/`item.category` string directly, the same field
+    `looksLikeGroundVehicle()` already reads) or a small `groundVehicleIcon
+    (categoryCode)` helper consulted before falling back to `towerIcon()`.
+    Source new SVG glyphs from the same vendored ADS-B Radar icon set if a
+    fitting one exists there, otherwise a small MDI glyph (Apache-2.0, same
+    vendoring convention as `GROUP_ICONS`/the airport-layer icons).
+  - Estimate: 0.25–0.5 dev day (a few new small SVGs + one dispatch
+    function + Playwright coverage extending `test_filters.spec.js`'s
+    existing ground-vehicle fixture).
 
 - **Sidebar search/filter** — Once collection grows large, searching within saved aircraft by callsign/type/operator would help. Not urgent for current use case.
 
