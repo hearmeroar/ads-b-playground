@@ -2,14 +2,18 @@
 
 *(Updated after each significant session or task completion)*
 
-## Status as of 2026-07-21 (Backlog: Add three new data source research items)
+## Status as of 2026-07-21 (Backlog: Add three new data source research items + two Frontend UX features)
 
 ✅ **Added three new backlog research items for data sources:**
 - **Flystack airline logo (research + integration)** — Specialized airline logo service. Research API access, coverage vs. current soaring-symbols/airframesio tiers, licensing. Effort L, Value Med–High. If approved, implement as tier 3 in logo manifest.
 - **RapidAPI flight data APIs (research)** — Exploratory audit with 4 initial candidates: AeroDataBox API (schedules/status), Flight Data/Travelpayots (historical prices), Aviation Edge/Aviationstack (tracking), Lufthansa Open API (schedules). All candidates must support free tier. Effort S, Value Medium. Findings → DECISIONS.md.
 - **airframes.io (research + integration)** — Aircraft history/lifecycle enrichment (accidents, incidents, operator changes, write-offs). Lazy-fetch tier below adsbdb, similar to adsbdb's click-only model. Effort L, Value Med–High. New History sidebar group or expanded Aircraft Identity section if approved.
 
-All three positioned in "Data sources & enrichment" backlog section with acceptance criteria, effort estimates, and research gates before implementation. RapidAPI item includes specific context for known candidate APIs and free-tier constraints alignment with project's "no signup" posture.
+✅ **Added two Frontend UX features to backlog:**
+- **Selected aircraft styling & visual highlight** — Apply visual distinction to selected marker (glow, color change, size) so selection state is obvious on map. Effort XS–S, Value Medium.
+- **Auto-center map on aircraft selection** — Automatic map pan to center on selected aircraft (replaces manual button click). Effort XS, Value Medium (optional HUD toggle for ~S).
+
+All items positioned in backlog with acceptance criteria, effort estimates, and implementation notes. Data sources items include research gates before implementation.
 
 ## Status as of 2026-07-21 (Bug fix: cleanup falling tests, restore test suite green)
 
