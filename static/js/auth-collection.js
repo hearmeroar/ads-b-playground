@@ -322,10 +322,15 @@ function formatCardSavedAt(savedAtSeconds) {
   });
 }
 
-// "What was nearby" — the nearest-airport lookup app.py resolves
-// server-side at save time (enrichment/airports.py, a local OpenFlights-
-// derived table, no network call per save). Falls back to bare
-// coordinates if the airports table had nothing (e.g. failed to load).
+// "Where spotted" — the nearest-airport lookup app.py resolves server-side
+// at save time (enrichment/airports.py, a local OpenFlights-derived table,
+// no network call per save) is always preferred. When that lookup came back
+// empty (airports table failed to load — not the common case, but possible),
+// falls back to bare coordinates plus a humanized distance from the app's
+// own scan-zone center (currentAreaCenter, map-init.js/state-filters.js) via
+// the shared haversineDistanceKm() (route-validation.js) — so even the
+// fallback line says something concrete ("12 km from center") rather than
+// just raw lat/lon a user has to mentally place themselves.
 function formatCardLocation(location) {
   if (!location) return null;
   const airport = location.nearest_airport;
@@ -335,7 +340,13 @@ function formatCardLocation(location) {
     return `Near ${place} · ~${Math.round(airport.distance_km)} km`;
   }
   if (location.lat != null && location.lon != null) {
-    return `${location.lat.toFixed(2)}, ${location.lon.toFixed(2)}`;
+    const coords = `${location.lat.toFixed(2)}, ${location.lon.toFixed(2)}`;
+    if (currentAreaCenter) {
+      const distKm = haversineDistanceKm(
+        location.lat, location.lon, currentAreaCenter.lat, currentAreaCenter.lon);
+      return `${coords} · ~${Math.round(distKm)} km from center`;
+    }
+    return coords;
   }
   return null;
 }
@@ -392,12 +403,14 @@ function renderCollectionCard(card) {
   // index.html's script order — has always finished executing by the
   // time a card is actually rendered (a panel open/render only ever
   // happens from a later user action, never at page-load time).
+  // Compact badge only ("A3 · Large") — the longer one-sentence
+  // CATEGORY_DESCRIPTIONS caption used to render right below it, but the
+  // project owner asked for a simpler card; the full description is still
+  // one click away in the sidebar's own Category row for whoever wants it.
   const categoryParts = splitCategoryDisplay(snapshot.categoryDisplay);
   if (categoryParts) {
     appendCardRow(body, 'collection-card-category', null,
       categoryParts.code ? `${categoryParts.code} · ${categoryParts.label}` : categoryParts.label);
-    const description = CATEGORY_DESCRIPTIONS[categoryParts.label];
-    if (description) appendCardRow(body, 'collection-card-category-desc', null, description);
   }
 
   appendCardRow(body, 'collection-card-meta', airlineLogoHtml(snapshot.callsign), snapshot.operator);

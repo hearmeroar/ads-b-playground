@@ -222,6 +222,9 @@ test('a card shows category, operator, operator country, manufacturer/model, sav
   await openCollectionPanel(page);
 
   await expect(page.locator('.collection-card-category')).toHaveText('A3 · Large');
+  // The long one-sentence category caption (CATEGORY_DESCRIPTIONS) no longer
+  // renders on the card — just the compact badge above.
+  await expect(page.locator('.collection-card-category-desc')).toHaveCount(0);
   await expect(page.locator('.collection-card-meta').nth(0)).toHaveText('Test Air');
   await expect(page.locator('.collection-card-meta').nth(1)).toHaveText('Switzerland');
   await expect(page.locator('.collection-card-meta').nth(1).locator('.fi')).toBeVisible();
@@ -231,7 +234,14 @@ test('a card shows category, operator, operator country, manufacturer/model, sav
   await expect(page.locator('.collection-card-footer-row').nth(1)).toContainText('~3 km');
 });
 
-test('a card with no location falls back to plain coordinates, and omits rows for absent fields', async ({ page }) => {
+test('a card with no location falls back to plain coordinates plus distance from the scan-zone center, and omits rows for absent fields', async ({ page }) => {
+  // Pin /api/config's center to the exact fixture coordinates below, so the
+  // "distance from center" fallback (formatCardLocation(), auth-collection.js)
+  // is a deterministic 0 km rather than depending on whatever real zone
+  // happens to be active in config/zones.json when this suite runs.
+  await page.route('**/api/config', (route) => route.fulfill({ json: {
+    center: { lat: 44.0, lon: 21.0 }, zoom: 8, radius_nm: 220, active_zone_id: 'default',
+  } }));
   await page.route('**/api/collection', (route) => {
     if (route.request().method() === 'GET') {
       route.fulfill({ json: { cards: [{
@@ -251,7 +261,7 @@ test('a card with no location falls back to plain coordinates, and omits rows fo
 
   await expect(page.locator('.collection-card-category')).toHaveCount(0);
   await expect(page.locator('.collection-card-meta')).toHaveCount(0);
-  await expect(page.locator('.collection-card-footer-row').nth(1)).toHaveText('44.00, 21.00');
+  await expect(page.locator('.collection-card-footer-row').nth(1)).toHaveText('44.00, 21.00 · ~0 km from center');
 });
 
 test('shows a descriptive empty state with an icon when there is nothing saved', async ({ page }) => {

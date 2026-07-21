@@ -368,6 +368,7 @@ function selectZoneSearchResult(airport) {
     })
     .then((cfg) => {
       map.setView([cfg.center.lat, cfg.center.lon], map.getZoom());
+      if (cfg && cfg.center) currentAreaCenter = cfg.center;
       // Scan-radius rings are centered where they were built (initial
       // /api/config load) and don't otherwise track the map view — without
       // rebuilding them here they'd keep circling the old zone's center.

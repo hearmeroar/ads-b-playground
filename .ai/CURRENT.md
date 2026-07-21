@@ -4,6 +4,36 @@
 
 ## Status as of 2026-07-21 (Night)
 
+✅ **UX: Collections cards — drop long category caption, better "Where spotted"**
+- Removed the long one-sentence `CATEGORY_DESCRIPTIONS` caption from saved
+  collection cards — just the compact "A3 · Large" badge remains (the full
+  sentence is still one click away in the sidebar's own Category row).
+- `formatCardLocation()` (`auth-collection.js`) now has a real fallback tier
+  when `location.nearest_airport` is empty: bare coordinates plus a
+  humanized "~N km from center" distance from the app's current scan-zone
+  center, via the existing `haversineDistanceKm()` (`route-validation.js`).
+  Previously this case rendered bare `"44.00, 21.00"` with no distance
+  context at all.
+- New `currentAreaCenter` global (`map-init.js`), kept in sync on both the
+  initial `/api/config` load and every runtime zone-search switch
+  (`state-filters.js`'s `selectZoneSearchResult()`) — `null` until the first
+  `/api/config` resolves, in which case the fallback just shows bare
+  coordinates (documented, not a bug).
+- **Scoped down from the backlog item's full spec**: skipped the "source
+  badge (OpenSky/adsb.fi/adsbdb/local trail) that provided the position"
+  requirement — no code path anywhere currently threads which live source
+  supplied a given aircraft's `lat`/`lon` at save time, and fabricating that
+  plumbing would have blown well past this item's 0.25–0.5 day estimate.
+  Left as a genuine gap if ever revisited, not silently dropped.
+- `static/style.css`'s now-unused `.collection-card-category-desc` rule
+  removed.
+- Tests: `tests/frontend/test_collection.spec.js` — asserts the description
+  caption no longer renders, and the no-nearest-airport case now expects
+  `"44.00, 21.00 · ~0 km from center"` (pinned via a mocked `/api/config` so
+  the distance is deterministic regardless of whatever zone is actually
+  active in `config/zones.json`). 11/11 passing.
+- BACKLOG item ✅ COMPLETED.
+
 ✅ **UX: Collection panel Undo button made more prominent**
 - Bug: `.collection-card.removed` applied `opacity: 0.45; filter: grayscale(0.6)`
   to the whole card element, which also washed out the (fully clickable,

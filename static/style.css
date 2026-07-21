@@ -832,7 +832,6 @@ html, body { margin: 0; padding: 0; height: 100%; }
   color: var(--ink); background: rgba(15, 23, 42, 0.06);
   padding: 2px 8px; border-radius: 999px;
 }
-.collection-card-category-desc { font-size: 12px; color: var(--muted); margin-top: 5px; }
 .collection-card-meta { font-size: 13px; color: var(--ink); margin-top: 5px; }
 .collection-card-footer {
   margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);

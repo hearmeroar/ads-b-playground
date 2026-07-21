@@ -72,10 +72,19 @@ function buildScanRadiusLayer(centerLat, centerLon, radiusNm) {
 // already loaded); the toggle defaults to off, so there's no visible gap.
 let scanRadiusLayer = L.layerGroup();
 
+// The backend's current AREA_CENTER — kept in sync here and by
+// selectZoneSearchResult() (state-filters.js) on a runtime zone switch, so
+// that a "no nearest airport" collection card (auth-collection.js's
+// formatCardLocation()) can still show a humanized "N km from center"
+// distance instead of bare coordinates. null until the first /api/config
+// resolves; a card save that races that window just shows bare coordinates.
+let currentAreaCenter = null;
+
 fetch('/api/config')
   .then((resp) => resp.json())
   .then((cfg) => {
     if (cfg && cfg.center) map.setView([cfg.center.lat, cfg.center.lon], cfg.zoom);
+    if (cfg && cfg.center) currentAreaCenter = cfg.center;
     if (cfg && cfg.center && cfg.radius_nm) {
       const wasShown = map.hasLayer(scanRadiusLayer);
       if (wasShown) map.removeLayer(scanRadiusLayer);

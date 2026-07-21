@@ -328,7 +328,6 @@ Estimate: 1–3 dev days (backend config + frontend interpolation + tests).
 
 - **Collection panel bulk operations** — Currently can save/unsave one aircraft at a time. Backlog idea: bulk export (JSON), bulk delete, filtering within collection. No firm priority.
 
-Collections: remove category description from card; improve "where spotted"
 
 Goal: simplify the per-card snapshot shown in the Collections panel by removing the opaque category description and replacing it with a clear, actionable "Where spotted" area that tells the user exactly where and when the airframe was seen in this session or when the snapshot was taken.
 
