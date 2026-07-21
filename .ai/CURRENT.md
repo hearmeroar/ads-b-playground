@@ -2,6 +2,49 @@
 
 *(Updated after each significant session or task completion)*
 
+## Status as of 2026-07-21 (Night, filter loader completed)
+
+✅ **UX: Show loader when applying filters** — a small unobtrusive spinner/loader that appears whenever a HUD filter change triggers a re-poll (`poll()`), so the UI doesn't appear unresponsive during the network round trip. Four controls are in scope:
+- **Source toggles** (6 controls, `#toggle-opensky` etc) — re-used existing
+  `showSourceCountSpinner()` mechanism (`static/js/main.js:104-111`) and
+  added `toggle.disabled = true` in the click handler. `updateCounts()`
+  (`:113-124`) re-enables with a guard to avoid clobbering OpenSky's
+  quota lockout: `if (name !== 'opensky' || !openskyQuotaLock)
+  toggle.disabled = false;` — covers the one real regression risk.
+- **Motion filter** segmented control (`#motion-filter`, 3 buttons) — added
+  spinner element `id="motion-filter-spinner"` next to the label via
+  `<div class="filter-title">` reflow (flex/gap layout added to
+  `static/style.css:114`), disabled all buttons, then re-enabled in
+  `poll().finally()` (`static/js/state-filters.js:31-41`).
+- **Category filter** custom dropdown (`#category-filter`, `.dropdown-trigger`
+  button) — same spinner pattern + disable/re-enable logic
+  (`state-filters.js:439-449`).
+- **Hide non-aircraft** checkbox (`#toggle-hide-junk`) — spinner element
+  `id="hide-junk-spinner"` next to the label, disables checkbox + shows
+  spinner, re-enables in `.finally()` via named handler
+  (`static/js/main.js:98-110`).
+
+**CSS** (`static/style.css`):
+- `:95` — new `#hud .switch:has(input:disabled) { opacity: 0.5; }` for
+  checkbox dimming (including source toggles).
+- `:140` — new `#hud .seg-btn:disabled { opacity: 0.5; cursor: not-allowed; }`.
+- `:149` — new `#hud .dropdown-trigger:disabled { opacity: 0.5; cursor:
+  not-allowed; }`.
+- `:114` — existing `.filter-title` changed to `display:flex; align-items:
+  center; gap:6px;` so spinners sit inline.
+
+**Tests** (`tests/frontend/test_filter_loader.spec.js`): 5 new Playwright
+specs — motion/category/hide-junk filter loaders show spinner + disable
+control during poll, hide/re-enable after; source toggle disables itself
+mid-flight; quota-lockout non-regression (a poll from another control
+doesn't clear OpenSky's lockout). Full frontend suite: 149/152 passing.
+Pre-existing 3 failures in `test_route_card_tilt.spec.js` (route card arrow
+animation tilt) — confirmed unrelated (present on clean main), no regression
+introduced by this work.
+
+**BACKLOG.md**: item marked `✅ Show a loader when applying filters` for
+auto-cleanup on next commit.
+
 ## Status as of 2026-07-21 (Night, continued further)
 
 ✅ **UX: Cards / Compact view toggle for the collection panel**

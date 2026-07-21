@@ -36,7 +36,12 @@ motionFilterButtons.forEach((btn) => {
     motionFilterButtons.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     currentMotionFilter = btn.dataset.value;
-    poll(); // apply right away instead of waiting for the next 12s tick
+    motionFilterButtons.forEach((b) => { b.disabled = true; });
+    document.getElementById('motion-filter-spinner').hidden = false;
+    poll().finally(() => { // apply right away instead of waiting for the next 12s tick
+      motionFilterButtons.forEach((b) => { b.disabled = false; });
+      document.getElementById('motion-filter-spinner').hidden = true;
+    });
   });
 });
 function passesMotionFilter(onGround) {
@@ -444,7 +449,12 @@ categoryOptions.forEach((opt) => {
     categoryValueWrap.innerHTML = categoryIconHtml(currentCategoryFilter) +
       '<span class="dropdown-value">' + opt.textContent + '</span>';
     categoryDropdown.classList.remove('open');
-    poll(); // apply right away instead of waiting for the next 12s tick
+    categoryTrigger.disabled = true;
+    document.getElementById('category-filter-spinner').hidden = false;
+    poll().finally(() => { // apply right away instead of waiting for the next 12s tick
+      categoryTrigger.disabled = false;
+      document.getElementById('category-filter-spinner').hidden = true;
+    });
   });
 });
 document.addEventListener('click', () => categoryDropdown.classList.remove('open'));

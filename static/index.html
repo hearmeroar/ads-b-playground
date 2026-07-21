@@ -230,7 +230,7 @@
   </div>
 
   <div class="filter-block">
-    <div class="filter-title">Show</div>
+    <div class="filter-title"><span>Show</span><span class="count-spinner" id="motion-filter-spinner" hidden></span></div>
     <div class="segmented" id="motion-filter">
       <button type="button" class="seg-btn active" data-value="all">All</button>
       <button type="button" class="seg-btn" data-value="airborne">Air</button>
@@ -273,7 +273,7 @@
   </div>
 
   <div class="filter-block">
-    <div class="filter-title">Category</div>
+    <div class="filter-title"><span>Category</span><span class="count-spinner" id="category-filter-spinner" hidden></span></div>
     <div class="dropdown" id="category-filter">
       <button type="button" class="dropdown-trigger">
         <span class="dropdown-value-wrap">
@@ -306,6 +306,7 @@
   <div class="filter-block">
     <div class="source-row" title="Filters out surface vehicles, obstacles, and reference/test beacons (e.g. tower transponders) that get reported alongside real aircraft">
       <span class="source-name">Hide non-aircraft</span>
+      <span class="count-spinner" id="hide-junk-spinner" hidden></span>
       <label class="switch" style="--row-color:#6b7280">
         <input type="checkbox" id="toggle-hide-junk">
         <span class="switch-track"></span>

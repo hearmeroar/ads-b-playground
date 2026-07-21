@@ -92,10 +92,23 @@ for (const name of Object.keys(sourceToggles)) {
     } else {
       showSourceCountSpinner(name);
     }
+    // Disabled for the duration of the poll it triggers, so a second click
+    // mid-flight can't fire an overlapping request; updateCounts() (below)
+    // is what re-enables it once that poll lands.
+    sourceToggles[name].disabled = true;
     poll(); // refresh right away instead of waiting for the next 12s tick
   });
 }
-hideJunkToggle.addEventListener('change', poll);
+
+function handleHideJunkToggleChange() {
+  hideJunkToggle.disabled = true;
+  document.getElementById('hide-junk-spinner').hidden = false;
+  poll().finally(() => {
+    hideJunkToggle.disabled = false;
+    document.getElementById('hide-junk-spinner').hidden = true;
+  });
+}
+hideJunkToggle.addEventListener('change', handleHideJunkToggleChange);
 
 // Shown from the moment a source is enabled until the poll it triggers lands.
 // No "pending" state is tracked: updateCounts() runs at the end of every poll
@@ -119,6 +132,11 @@ function updateCounts(counts) {
     const el = document.getElementById('count-' + name);
     el.classList.remove('loading');
     el.textContent = enabled ? String(n) : ''; // also removes the spinner child
+    // Re-enable the toggle now that the poll it triggered has landed — except
+    // OpenSky while its own quota lockout holds the toggle disabled for an
+    // unrelated reason (applyOpenSkyQuotaLockout()); this poll may have been
+    // triggered by a completely different control, so it must not clobber that.
+    if (name !== 'opensky' || !openskyQuotaLock) sourceToggles[name].disabled = false;
   }
   document.getElementById('count').textContent = total;
 }

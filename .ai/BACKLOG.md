@@ -122,42 +122,6 @@ automated sync pipeline is required for the chosen source.
 
  Estimate: 0.5–1 developer day for evaluation + POC; migration effort depends on
  scope and can be broken into smaller PRs.
-- Show a loader when applying filters (frontend UX)
-
-Goal: surface an unobtrusive, fast-loading spinner/loader whenever the user
-applies or toggles filters that trigger a re-poll or re-render (e.g. hide/show
-ground vehicles, category filters, source toggles), so the UI clearly indicates
-that the map and HUD are updating.
-
-Motivation: some filters trigger networked fetches or expensive sync work and
-the current UI can look static/unchanged during that time, leading users to
-click repeatedly or be uncertain whether the filter applied.
-
-Acceptance criteria:
-- A small loader/spinner appears next to the HUD filter controls (or inside
-	the source-count slots) immediately when a filter change is made and remains
-	visible until the poll/render completes.
-- The loader does not block interaction with unrelated controls, but disables
-	the specific control being applied to avoid duplicate requests.
-- No regressions: existing spinner used for source-counts remains compatible
-	and the new loader is consistent with the project's visual style.
-
-Implementation notes:
-1. Reuse the existing `.count-spinner` CSS and JS wiring where possible; add a
-	 generic `showFilterLoader(key)` / `hideFilterLoader(key)` API that maps a
-	 named control to its spinner element.
-2. On filter change handlers, call `showFilterLoader(filterKey)` before
-	 triggering the fetch, and `hideFilterLoader(filterKey)` in `poll().finally()`
-	 or after render completion for that specific control.
-3. For filters that trigger no-network-only client-side work, ensure the
-	 loader is shown for the duration of the UI update cycle (microtask) to
-	 provide a consistent UX.
-
-Tests:
-- Add a Playwright spec that toggles a filter and asserts the loader becomes
-	visible and then disappears when the HUD updates.
-
-Estimate: 0.5–1 developer day (mostly frontend wiring + one E2E test).
 
 
 Goal: when a user removes a saved collection card, the in-UI undo affordance
