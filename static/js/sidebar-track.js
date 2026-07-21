@@ -597,7 +597,6 @@ function selectAircraft(icao24) {
   updateSaveButtonState(); // auth-collection.js — reflects saved/C0-disabled state for this aircraft
   trackUsesLiveFallback = false;
   drawTrack(null); // never leave the previously selected aircraft's path visible
-  loadTrack(icao24);
 
   const details = detailsById.get(icao24);
   if (details) {
@@ -607,8 +606,27 @@ function selectAircraft(icao24) {
     sidebarRouteEl.innerHTML = '';
     sidebarDetailsEl.innerHTML = '';
   }
+
+  // If auto-center animates the map, defer track loading until animation completes
+  // to avoid the track "jumping" into view during the pan
+  let trackLoadDelay = 0;
+  if (autoCenterOnSelect && details && details.lat != null && details.lon != null) {
+    map.flyTo([details.lat, details.lon], map.getZoom(), {
+      duration: AUTO_CENTER_ANIMATION_DURATION_MS / 1000, // convert ms to seconds for Leaflet
+      easeLinearity: 0.25
+    });
+    trackLoadDelay = AUTO_CENTER_ANIMATION_DURATION_MS; // match flyTo duration
+  }
+
   sidebarEl.classList.add('open');
   loadGallery(icao24, details && details.registration);
+
+  // Load track after animation (or immediately if no animation)
+  if (trackLoadDelay > 0) {
+    setTimeout(() => loadTrack(icao24), trackLoadDelay);
+  } else {
+    loadTrack(icao24);
+  }
   // categoryCode lives as a sibling of `info` on detailsById's entry (see
   // icons.js), not nested inside it — merge it in so loadIdentityEnrichment
   // (and loadAdsbdb, whose own `info` param flows into

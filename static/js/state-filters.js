@@ -94,6 +94,12 @@ adsbdbToggle.addEventListener('change', () => {
   adsbdbEnabled = adsbdbToggle.checked;
 });
 
+let autoCenterOnSelect = true;
+const autoCenterToggle = document.getElementById('toggle-auto-center');
+autoCenterToggle.addEventListener('change', () => {
+  autoCenterOnSelect = autoCenterToggle.checked;
+});
+
 // "Hide non-aircraft" filters out ground vehicles, obstacles, and
 // reference/test beacons that some feeders report using the same message
 // types as real aircraft. Signals used (any one is enough):

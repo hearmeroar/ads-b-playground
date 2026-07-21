@@ -1,4 +1,5 @@
 const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
+const AUTO_CENTER_ANIMATION_DURATION_MS = 600; // ms — duration of map.flyTo() when selecting an aircraft
 
 // Shared by render-details.js's formatVerticalRateUnit (sidebar text) and
 // icons.js's climb/descent marker-icon check, so "what counts as climbing"

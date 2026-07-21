@@ -578,9 +578,6 @@ document.getElementById('aircraft-search').addEventListener('keydown', (e) => {
 
   for (const [source, markerMap] of Object.entries(markerMapsBySource)) {
     if (markerMap.has(hex)) {
-      const marker = markerMap.get(hex);
-      const latlng = marker.getLatLng();
-      map.setView([latlng.lat, latlng.lng], map.getZoom());
       selectAircraft(hex);
       e.target.value = '';
       return;
