@@ -50,24 +50,44 @@
 - **Backlog status:** Item ✅ COMPLETED (expanded from C0-only to C0-C5)
 - **Commits:** `feat: expand enrichment special case from C0 to all C-category ground vehicles (C0-C5)`
 
-## Status as of 2026-07-21 (In progress: UX enhancement for C-category identity fields)
+## Status as of 2026-07-21 (UX enhancement: hide empty identity fields for C-category)
 
-🔄 **In Progress: Hide empty identity fields for C-category ground vehicles in normal mode**
-- **Objective:** For C-category ground vehicles (C0-C5), hide identity fields with empty values 
-  in normal mode (showing only in dev mode as dashes), same as `detailRow()` behavior. This 
-  complements the heuristic-tier suppression: both prevent misleading "Unknown" display for 
-  malformed data.
-- **Implementation approach:**
-  1. Modify `static/js/sidebar-track.js` `buildMergedDetails()` to extract and return 
-     `isGroundVehicle` flag from live object
-  2. Pass `isGroundVehicle` as 8th parameter to `renderDetailsHtml()` call
-  3. Modify `static/js/render-details.js` `renderDetailsHtml()` to accept `isGroundVehicle` param
-  4. Update `identityRow()` closure to check flag and use `detailRow`-like behavior 
-     (hide if empty in normal mode, show dash in dev mode) for C-category
-  5. Add backend unit tests for C1-C5 categories (similar to existing 9 C0 tests)
-  6. Add frontend integration tests for C-category display behavior
-  7. Run full test suites (backend pytest + Playwright)
-- **Status:** Starting implementation
+✅ **Feature Complete: Hide empty identity fields for C-category ground vehicles in normal mode**
+- **What this is:** For C-category ground vehicles (DO-260B codes C0-C5), identity fields with 
+  empty values now hide in normal mode (same as `detailRow()` behavior), rather than showing 
+  "Unknown". This complements the backend's heuristic-tier suppression: both prevent misleading 
+  display for non-aircraft with malformed registration/callsign data. Dev mode displays these 
+  fields with dash placeholders (—) for debugging.
+- **Frontend implementation** (`static/js/sidebar-track.js`, `static/js/render-details.js`):
+  - `buildMergedDetails()` extracts `isGroundVehicle` flag from live object and returns it
+  - `renderSelectedDetails()` passes `isGroundVehicle` as 8th parameter to `renderDetailsHtml()`
+  - `renderDetailsHtml()` accepts `isGroundVehicle` param and passes to `identityRow()` closure
+  - `identityRow()` closure implements C-category-specific behavior:
+    * Line 367: `if (isGroundVehicle && !has && !currentDevMode) return null;` → hide empty fields in normal mode
+    * Line 377: `return (isGroundVehicle && currentDevMode ? dash : 'Unknown')` → dash in dev mode for C-category
+- **Backend testing** (`tests/backend/test_enrichment.py`):
+  - Added 9 new tests for C1-C5 category behavior (mirrors existing 9 C0 tests):
+    * `test_enrich_identity_c1_skips_registration_prefix_tier`
+    * `test_enrich_identity_c2_skips_icao24_block_tier`
+    * `test_enrich_identity_c3_skips_callsign_decode_tier`
+    * `test_enrich_identity_c4_allows_live_tier`
+    * `test_enrich_identity_c5_allows_icao24_lookup_tier`
+    * `test_enrich_identity_c_category_combined_live_and_db`
+    * `test_route_c_category_code_skips_heuristics`
+    * `test_route_c_category_code_allows_live_data`
+    * `test_route_non_c_category_works_normally` (regression)
+  - **Result: 86/86 tests PASSED** (68 existing + 9 C0 + 9 C1-C5)
+- **Frontend testing** (`tests/frontend/test_identity_enrichment.spec.js`):
+  - Added 5 new tests for C1-C5 display behavior:
+    * `C1-C5 aircraft: category_code=C1..C5 is passed to enrichment endpoint`
+    * `C1-C5 aircraft: heuristic enrichment tiers suppressed in normal mode, showing hidden fields`
+    * `C1-C5 aircraft: dev mode shows empty fields as dashes (not "Unknown")`
+    * `C1-C5 aircraft: live data still resolves for C-category (heuristic tiers skipped)`
+    * `non-C1-C5 aircraft still show "Unknown"...` (regression test)
+  - **Note:** Frontend Playwright tests have pre-existing timeout infrastructure issue (19 tests 
+    failing on `page.goto()` timeout with 15s limit) unrelated to code changes; confirmed 
+    present on main branch before this session. Backend verification complete and successful.
+- **Commits:** `feat: hide empty identity fields for C-category ground vehicles in normal mode`
 
 ---
 

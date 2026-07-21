@@ -666,3 +666,94 @@ def test_route_c0_category_code_non_c0_works_normally(client):
     data = resp.get_json()
     assert data["country"]["value"] == "Czech Republic"
     assert data["country"]["source"] == "registration_prefix"
+
+
+# --- C1-C5 category tests (expanded from C0-only to all C-category codes) ---
+
+def test_enrich_identity_c1_skips_registration_prefix_tier():
+    # C1: surface vehicle with high horizontal speed. Registration heuristic
+    # should be skipped just like C0.
+    result = enrich_identity("ffffff", registration="OK-SWC", category_code="C1")
+    assert result["country"] is None
+
+
+def test_enrich_identity_c2_skips_icao24_block_tier():
+    # C2: surface vehicle with very high horizontal speed. Even though the
+    # hex sits in a known ICAO24 block, heuristic is skipped for C2.
+    result = enrich_identity("4A35CE", category_code="C2")
+    assert result["country"] is None
+
+
+def test_enrich_identity_c3_skips_callsign_decode_tier():
+    # C3: surface vehicle with low horizontal speed. A valid callsign should
+    # not decode to an operator for C-category.
+    result = enrich_identity("ffffff", callsign="RYR123", category_code="C3")
+    assert result["operator"] is None
+    assert result["operator_country"] is None
+
+
+def test_enrich_identity_c4_allows_live_tier():
+    # C4: surface vehicle without high horizontal speed. Live data should
+    # still work for all C-category codes.
+    result = enrich_identity(
+        "ffffff",
+        known_country="Test Country",
+        known_operator="Test Operator",
+        category_code="C4"
+    )
+    assert result["country"]["value"] == "Test Country"
+    assert result["country"]["source"] == "live"
+    assert result["operator"]["value"] == "Test Operator"
+    assert result["operator"]["source"] == "live"
+
+
+def test_enrich_identity_c5_allows_icao24_lookup_tier():
+    # C5: fixed obstacle. Exact database matches should still work for
+    # C-category — icao24_lookup is precise, not a heuristic guess.
+    result = enrich_identity("49d3d3", category_code="C5")
+    assert result["country"]["value"] == "Czech Republic"
+    assert result["country"]["source"] == "icao24_lookup"
+    assert result["operator"]["value"] == "Smartwings"
+    assert result["registration"]["value"] == "OK-SWC"
+
+
+def test_enrich_identity_c_category_combined_live_and_db():
+    # C-category with both live data and database record: live wins, db
+    # fills gaps — just like C0. Verify with C2 as example.
+    result = enrich_identity(
+        "49d3d3",
+        known_country="Override",
+        category_code="C2"
+    )
+    assert result["country"]["value"] == "Override"
+    assert result["country"]["source"] == "live"
+    # DB record fills other fields
+    assert result["operator"]["value"] == "Smartwings"
+    assert result["registration"]["value"] == "OK-SWC"
+
+
+def test_route_c_category_code_skips_heuristics(client):
+    # End-to-end: C3 aircraft with malformed registration/callsign gets
+    # nothing from heuristics, even though both strings are present.
+    resp = client.get("/api/identity/ffffff?registration=MALFORMED&callsign=RYR123&category_code=C3")
+    data = resp.get_json()
+    assert data["country"] is None
+    assert data["operator"] is None
+    assert data["operator_country"] is None
+
+
+def test_route_c_category_code_allows_live_data(client):
+    # End-to-end: C4 with live data still uses it, even though heuristics
+    # are skipped.
+    resp = client.get("/api/identity/ffffff?known_country=Live+Country&category_code=C4")
+    data = resp.get_json()
+    assert data["country"]["value"] == "Live Country"
+    assert data["country"]["source"] == "live"
+
+
+def test_route_non_c_category_works_normally(client):
+    # Regression test: non-C-category (A3) aircraft still use heuristic tiers.
+    resp = client.get("/api/identity/ffffff?registration=OK-SWC&category_code=A3")
+    data = resp.get_json()
+    assert data["country"]["value"] == "Czech Republic"
+    assert data["country"]["source"] == "registration_prefix"

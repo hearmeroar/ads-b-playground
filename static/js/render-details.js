@@ -316,7 +316,7 @@ function splitAirportString(s) {
   return m ? { name: m[1], code: m[2] } : { name: s, code: null };
 }
 
-function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation, fieldNeedsCorroboration, categoryGroup) {
+function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation, fieldNeedsCorroboration, categoryGroup, isGroundVehicle) {
   fieldSources = fieldSources || {};
   fieldConfidence = fieldConfidence || {};
   fieldComputationBasis = fieldComputationBasis || {};
@@ -351,12 +351,20 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     return ' <span class="field-unconfirmed-tag">⚠ Unconfirmed</span>';
   }
   // Identity fields the enrichment pipeline can fill (Country/Operator/
-  // Manufacturer/Model/Year built): unlike detailRow, always renders — a
+  // Manufacturer/Model/Year built): for most aircraft, always renders — a
   // missing value shows the literal word "Unknown" rather than hiding the
   // row or falling back to dev-mode's dash, since these fields are
   // specifically meant to always resolve to *something* meaningful.
+  // For C-category ground vehicles (isGroundVehicle true), use detailRow-like
+  // behavior instead: hide empty fields in normal mode (show only as dash in
+  // dev mode), since malformed registrations/callsigns shouldn't produce
+  // misleading "Unknown" display.
   function identityRow(label, value, fieldKey, helpHtml) {
     const has = value != null && value !== '';
+    // C-category ground vehicles skip heuristic enrichment tiers (registration_prefix,
+    // icao24_block, callsign_decode) and rely only on live/adsbdb data. Showing
+    // "Unknown" for empty fields would falsely suggest enrichment was attempted.
+    if (isGroundVehicle && !has && !currentDevMode) return null;
     const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
     // Label + "(?)" icon are wrapped together in .identity-label-wrap, which
     // carries the min-width column-alignment that plain <b> used to have on
@@ -366,7 +374,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     // lighter weight/smaller size than a plain detailRow <b> — four-plus
     // rows of full-bold labels each now carrying their own icon read as too
     // heavy/loud as a block.
-    return '<span class="identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span> ' + (has ? value : 'Unknown') + badge + unconfirmedTagHtml(fieldKey);
+    return '<span class="identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span> ' + (has ? value : (isGroundVehicle && currentDevMode ? dash : 'Unknown')) + badge + unconfirmedTagHtml(fieldKey);
   }
   function renderGroup(title, rows, iconKey) {
     const filtered = rows.filter((r) => r != null);

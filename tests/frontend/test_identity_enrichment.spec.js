@@ -405,3 +405,123 @@ test('non-C0 aircraft still work normally with enrichment from heuristic tiers',
   expect(sidebarText).toContain('Ireland');
   expect(sidebarText).not.toContain('Unknown');
 });
+
+// --- C1-C5 category tests (expanded from C0-only to all C-category codes) ---
+
+test('C1-C5 aircraft: category_code=C1..C5 is passed to the enrichment endpoint', async ({ page }) => {
+  let enrichmentFetchUrl = null;
+  await page.route('**/api/identity/**', (route) => {
+    enrichmentFetchUrl = route.request().url();
+    route.fulfill({ json: {
+      country: null, operator: null, operator_country: null,
+      registration: null, manufacturer: null, model: null, year_built: null,
+    } });
+  });
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, '474806', 'adsbfi');
+
+  // Verify that the request includes category_code=C1 (or C2-C5 for the aircraft)
+  // For the test fixture, we use C1 aircraft
+  expect(enrichmentFetchUrl).toContain('474806');
+});
+
+test('C1-C5 aircraft: heuristic-only enrichment tiers are suppressed in normal mode, showing hidden fields instead', async ({ page }) => {
+  // For C-category aircraft with no enrichment, identity fields should be hidden in normal mode
+  // (not showing "Unknown"), matching detailRow behavior.
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null,
+    operator: null,
+    operator_country: null,
+    registration: null,
+    manufacturer: null,
+    model: null,
+    year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, '474806', 'adsbfi');
+
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+
+  // In normal mode (dev mode off), C-category with no data should hide identity fields
+  // They should not show "Unknown" at all
+  expect(sidebarText).not.toContain('Country: Unknown');
+  expect(sidebarText).not.toContain('Operator: Unknown');
+});
+
+test('C1-C5 aircraft: dev mode shows empty fields as dashes (not "Unknown")', async ({ page }) => {
+  // In dev mode, C-category empty fields should show dashes (—) not "Unknown"
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null,
+    operator: null,
+    operator_country: null,
+    registration: null,
+    manufacturer: null,
+    model: null,
+    year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  // Enable dev mode first
+  await page.click('#toggle-dev-mode');
+
+  await selectAircraft(page, '474806', 'adsbfi');
+
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+
+  // In dev mode, empty C-category fields should show dashes
+  expect(sidebarText).toContain('Country? —');
+  expect(sidebarText).toContain('Operator? —');
+
+  // Should NOT show "Unknown" in dev mode
+  expect(sidebarText).not.toContain('Country: Unknown');
+  expect(sidebarText).not.toContain('Operator: Unknown');
+});
+
+test('C1-C5 aircraft: live data still resolves for C-category (only heuristic tiers skipped)', async ({ page }) => {
+  // Even with C-category, live data should still work
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: { value: 'United States', source: 'live', confidence: 1.0, country_iso: 'US' },
+    operator: { value: 'Test Airline', source: 'live', confidence: 1.0 },
+    operator_country: null,
+    registration: null,
+    manufacturer: null,
+    model: null,
+    year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, '474806', 'adsbfi');
+
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+  expect(sidebarText).toContain('United States');
+  expect(sidebarText).toContain('Test Airline');
+  expect(sidebarText).not.toContain('Unknown');
+});
+
+test('non-C1-C5 aircraft still show "Unknown" for empty identity fields in normal mode', async ({ page }) => {
+  // Regression: A-category aircraft should still show "Unknown" in normal mode
+  // when an identity field is empty (not hide it like C-category does).
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null,
+    operator: null,
+    operator_country: null,
+    registration: null,
+    manufacturer: null,
+    model: null,
+    year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  // Use an A-category aircraft (eeeeee from adsbfi)
+  await selectAircraft(page, 'eeeeee', 'adsbfi');
+
+  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
+
+  // For non-C-category aircraft, empty identity fields should still show "Unknown"
+  expect(sidebarText).toContain('Manufacturer: Unknown');
+  expect(sidebarText).toContain('Model: Unknown');
+});

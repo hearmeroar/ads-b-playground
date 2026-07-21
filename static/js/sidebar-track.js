@@ -214,7 +214,7 @@ function buildMergedDetails(icao24) {
   }
   return {
     info, fieldSources, fieldConfidence, fieldComputationBasis, routeValidation,
-    fieldNeedsCorroboration, categoryGroup: live.categoryGroup,
+    fieldNeedsCorroboration, categoryGroup: live.categoryGroup, isGroundVehicle: live.isGroundVehicle,
   };
 }
 
@@ -226,7 +226,7 @@ function buildMergedDetails(icao24) {
 function renderSelectedDetails() {
   if (selectedIcao24 == null || !detailsById.has(selectedIcao24)) return;
   const m = buildMergedDetails(selectedIcao24);
-  const rendered = renderDetailsHtml(m.info, m.fieldSources, m.fieldConfidence, m.fieldComputationBasis, m.routeValidation, m.fieldNeedsCorroboration, m.categoryGroup);
+  const rendered = renderDetailsHtml(m.info, m.fieldSources, m.fieldConfidence, m.fieldComputationBasis, m.routeValidation, m.fieldNeedsCorroboration, m.categoryGroup, m.isGroundVehicle);
   sidebarHeaderEl.innerHTML = rendered.header;
   sidebarRouteEl.innerHTML = rendered.route;
   sidebarDetailsEl.innerHTML = rendered.body;
