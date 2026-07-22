@@ -43,6 +43,20 @@ awk -v count_file="$count_file" '
       gsub(/^[ \t]+|[ \t]+$/, "", f)
       if (f == "✅") { is_done = 1; break }
     }
+    # Legacy convention, still found in rows predating the Status-column
+    # convention: the checkmark is prefixed onto the Item cell itself
+    # (a row like: pipe, checkmark, Feature, pipe, dots, pipe), not its
+    # own column. The leading empty field split() produces (everything
+    # before the opening pipe) means the Item cell is always cells[2] --
+    # checked by itself, not looped with every cell above, so a checkmark
+    # appearing later in some other column (e.g. a Read/description cell
+    # that just mentions a sub-item shipped) is never mistaken for the
+    # whole row being done.
+    if (!is_done && n >= 2) {
+      item = cells[2]
+      gsub(/^[ \t]+|[ \t]+$/, "", item)
+      if (item ~ /^✅[ \t]/) { is_done = 1 }
+    }
     if (is_done) { removed++; next }
   }
   { print }
