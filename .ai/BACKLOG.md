@@ -55,6 +55,7 @@ requires.
 | ✅ **Rework UI for data quality filter** (Status flags + Signal type) | S | Medium | Frontend UX | | Polish visual hierarchy, spacing, responsive behavior of recently-shipped filter. Improve label clarity, add inline help text, test mobile layouts. See UI/UX section. |
 | **[BUG]** `capture-test-run.sh` hook not updating test markers in session | XS–S | High | Testing | 🐛 | Verification hook (`PostToolUse`) that captures real test run exit codes to `.claude/test-runs/` not being triggered/updating during session. Blocks `require-verification.sh` gate from verifying current test state. See Bugs section. |
 | ✅ **Airport search quick-open** with pre-loaded results | XS–S | Medium | Frontend UX | | When input focus enters #zone-search-input, immediately show list of popular/nearby airports (no typing needed). Options: (1) hardcoded popular list (London/Paris/Berlin), (2) 10 nearest airports to current AREA_CENTER. Improves speed for frequent zone-switching. |
+| Zone-search: auto-select text + re-show popular list on refocus | XS | Medium | Frontend UX | | Follow-up to the quick-open item above — its focus handler only shows the popular-airports list when the input is empty, so after picking one airport it stops helping on every later refocus. See UI/UX section. |
 | Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
 | **Research & adopt mature UI framework** | M | High | Frontend UX | | Mature UI framework (Bootstrap/Bulma/MDC/Tailwind) with 100+ pre-built components, tokens, dark mode support. v1 scope: research phase + POC + decision. Full proposal: `.ai/proposals/ui-framework-research-2026-07-22.md`. |
 | Selected aircraft styling & visual highlight | XS–S | Medium | Frontend UX | | Visual distinction when an aircraft is selected: highlight marker, glow, or change icon/color to signal active selection state. |
@@ -558,6 +559,40 @@ Estimate: S (1–2h of polish + testing, no new functionality)
 - **Altitude profile graph (time-series plot)** — Add a line or area chart to the sidebar (below the flight track section or in a new dedicated panel) showing the selected aircraft's altitude over time. This visualizes the flight profile: climb (departure to cruise altitude), level cruise, and descent (approaching destination) phases. Helps users understand the aircraft's flight progression at a glance. Acceptance criteria: graph plots altitude (meters or feet, per unit toggle) vs. timestamp; x-axis spans from first known position to now (updates live as new positions arrive); y-axis auto-scales to min/max altitude; hover/click points on the curve show exact time/altitude; graph is only shown when OpenSky `/api/track` data is available (or the local live-trail fallback has enough points); responsive sizing to fit sidebar width. Implementation: use a lightweight charting library (Recharts, Chart.js, or a custom SVG/canvas approach) vendored locally (no CDN per project convention); feed `trackLayerGroup`'s waypoint data directly into the chart; update on every `poll()` that loads new track segments. Wire into `renderSelectedDetails()` so the graph renders alongside other sidebar sections. Estimate: M (library integration + graph rendering + live updates).
 
 - **Airport search quick-open with pre-loaded results** — Speed up zone-switching for frequent users. When input focus enters `#zone-search-input` (user clicks or tabs into it), **immediately** show a pre-populated list of popular/frequently-visited airports without requiring any typing. Two design options to evaluate: (1) **Hardcoded popular list** — top 10 busiest airports globally (LHR/CDG/AMS/FRA/DEL/HND/LAX/ORD/DXB/HKG) or regionally curated list, quick to implement but less personalized; (2) **Nearest airports** — compute 10 closest airports to current `AREA_CENTER` using the same `nearest_airport()` haversine logic already in `enrichment/airports.py`, more contextual. Acceptance criteria: (1) clicking/focusing input shows results immediately (no character input needed), (2) typing any query filters/replaces the list as usual (existing behavior preserved), (3) can clear and re-populate by re-focusing the input, (4) visually distinguish "quick results" from user-typed query results (optional: muted styling or a "Popular" section header). Implementation: backend can pre-compute the list on load or on `/api/config` response (cheap: no per-request work); frontend `selectZoneSearchInput` focus handler calls `getZoneSearchResults([...preset list])` to populate dropdown immediately, then user's `input` event handler continues normal search flow if they type. Estimate: XS–S (depends on option: hardcoded ~XS, nearest-airports ~S if it needs a new `/api` endpoint or local computation).
+
+- **Zone-search: auto-select text + re-show popular list on refocus** — Follow-up
+  to the already-shipped "Airport search quick-open" feature
+  (`static/js/state-filters.js:555-563`). Today the `focus` handler on
+  `#zone-search-input` only calls `ensurePopularAirportsLoaded()` /
+  `renderZoneSearchResults()` when `zoneSearchInput.value.trim().length ===
+  0` — so the quick-open list only ever appears the *first* time the field
+  is focused. The moment a user picks an airport, `selectZoneSearchResult()`
+  sets `zoneSearchInput.value = airport.name` (line 493), and every
+  subsequent focus on the (now non-empty) input shows nothing until the
+  user manually clears the text first.
+  Acceptance criteria:
+  1. On `focus`, regardless of current value, the existing text is
+     auto-selected/highlighted (`zoneSearchInput.select()`) — so typing
+     immediately overwrites it, matching the standard browser
+     address-bar convention.
+  2. On `focus`, the same 10-airport popular/nearby list already built for
+     the empty-input case renders immediately, whether or not the field
+     currently holds a previously-picked airport's name.
+  3. Typing still replaces the popular list with live search results as
+     usual (existing `input` handler behavior, unchanged).
+  4. Clicking elsewhere / selecting a result still closes the dropdown and
+     leaves the newly-picked name in the field, same as today.
+  Implementation notes: in the `focus` listener, drop the
+  `value.trim().length === 0` guard before calling
+  `ensurePopularAirportsLoaded()`/`renderZoneSearchResults()` (call it
+  unconditionally on every focus), and add `zoneSearchInput.select()` at
+  the top of the same handler. `ensurePopularAirportsLoaded()` is already
+  memoized (`popularAirportsFetchPromise`), so this doesn't add a repeat
+  network call after the first load. Extend `test_zone_search.spec.js`
+  with a case that selects an airport, blurs, refocuses, and asserts both
+  the text is selected (`document.activeElement.selectionStart === 0` /
+  `selectionEnd === value.length`) and the popular list re-appears.
+  Estimate: XS (one guard removed + one `.select()` call + a test case).
 
 - **Seamless login without page reload** — Currently, clicking "Sign in with Google" does `window.location.href = '/api/login/google'` (full-page navigation to OAuth callback). After successful login, page reloads. Improve UX by: (1) opening Google consent in a popup/modal instead of full navigation, (2) handling OAuth callback in-session (via `postMessage` or polling `/api/me`), (3) updating auth status live without hard reload. Keeps selected aircraft/sidebar/map state intact. Requires rearchitecting Authlib callback flow. Nice-to-have, moderate complexity.
 
