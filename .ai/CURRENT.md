@@ -48,6 +48,20 @@ fresh `.claude/test-runs/*.json` markers just because tests were run this
 session — check the marker's own timestamp/exit code before relying on
 `require-verification.sh` passing.
 
+## 📋 Audit completed: Test suite redundancy & CI failures (2026-07-22)
+
+**Action taken:** Created `.ai/audits/test-suite-audit-2026-07-22.md` documenting:
+- CI red for 6 consecutive commits (active bug)
+- 2 failing tests: `test_dev_aircraft_table.spec.js:89` (hardcoded row count),
+  `test_identity_enrichment.spec.js:263` (category priority mismatch)
+- Redundancy: C0–C5 combinatorial clones, cross-layer duplication
+- Added backlog item linking the audit (status 🐛, effort M, value Med–High)
+
+**No code changes this session** — audit-only. Recommendations for remediation
+(parametrize C0–C5 tests, fix the 2 failures, trim frontend duplication) are
+documented in the audit file and linked from `.ai/BACKLOG.md`. A future
+session can pick this up as a concrete task if the user decides to act on it.
+
 ---
 
 **Next session:** Pick a backlog item from `.ai/BACKLOG.md`'s "At a glance"

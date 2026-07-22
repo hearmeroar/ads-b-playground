@@ -70,7 +70,6 @@ requires.
 | Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Frontend UX | | Shareable/deep-linkable view; reusable layout could also serve collection cards |
 | Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Backend | | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
 | Airline metadata enrichment (alliance/country/website) | L | Medium | Data sources | | Needs a source-validation phase before implementation, not just coding time |
-| Dark mode | M | Medium | Frontend UX | | Visible polish; CSS touches sidebar+HUD, not a single component |
 | External links: UTM params / `rel` / variableized host | S | Low | Frontend UX | | Mostly hygiene (`noreferrer`) + analytics tagging this app doesn't otherwise use |
 | UI/CSS framework evaluation (POC only) | S | Low | Frontend UX | | Cheap experiment; no user-facing payoff until a real migration follows (unscoped, separate cost) |
 | Register an AirLabs API key | XS | Low | Data sources | | Trivial, but a pure prerequisite — does nothing standalone |
@@ -78,6 +77,7 @@ requires.
 | Sidebar search/filter within collection | S | Low | Frontend UX | | Only matters once a user's collection is large; defer until it is |
 | Metrics export (`/metrics`, Prometheus) | M | Low–Med | DevOps | | Ops/observability value, no urgency for a single-tenant app |
 | Collection panel bulk operations | M | Low | Frontend UX | | Speculative — no evidence the collection is big enough to need bulk actions yet |
+| **[BUG]** Test suite audit: fix 2 CI failures + reduce redundant/brittle coverage | M | Medium–High | Testing | 🐛 | CI has been silently red for 6 commits (2026-07-21/22). Two failing tests encode effects instead of rules (`test_dev_aircraft_table.spec.js:89` hardcodes row count, `test_identity_enrichment.spec.js:263` expects exact category). Also: redundant C0–C5 parametrization in `test_enrichment.py` (6 clones), frontend re-testing backend logic, three-layer redundancy in `test_aircraft_category.py`. Full audit in `.ai/audits/test-suite-audit-2026-07-22.md`. Recommendations: fix the 2 failures, parametrize C0–C5 tests, trim frontend duplication. |
 | Adaptive polling intervals | M | Low | Backend | | Defer until an actual quota-pressure incident, not before |
 | Load testing | M | Low | Testing | | Only relevant if traffic ever exceeds single-user hobby scale |
 | Live network tests (CI-gated) | M | Low | Testing | | Low ROI unless upstreams start breaking often (not observed so far) |
