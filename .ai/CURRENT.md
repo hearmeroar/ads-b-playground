@@ -48,19 +48,30 @@ fresh `.claude/test-runs/*.json` markers just because tests were run this
 session — check the marker's own timestamp/exit code before relying on
 `require-verification.sh` passing.
 
-## 📋 Audit completed: Test suite redundancy & CI failures (2026-07-22)
+## 📋 Session completed: Audit + proposal design (2026-07-22)
 
-**Action taken:** Created `.ai/audits/test-suite-audit-2026-07-22.md` documenting:
-- CI red for 6 consecutive commits (active bug)
-- 2 failing tests: `test_dev_aircraft_table.spec.js:89` (hardcoded row count),
-  `test_identity_enrichment.spec.js:263` (category priority mismatch)
-- Redundancy: C0–C5 combinatorial clones, cross-layer duplication
-- Added backlog item linking the audit (status 🐛, effort M, value Med–High)
+**Action taken:**
 
-**No code changes this session** — audit-only. Recommendations for remediation
-(parametrize C0–C5 tests, fix the 2 failures, trim frontend duplication) are
-documented in the audit file and linked from `.ai/BACKLOG.md`. A future
-session can pick this up as a concrete task if the user decides to act on it.
+1. **Audit completed** — Created `.ai/audits/test-suite-audit-2026-07-22.md`
+   documenting test-suite redundancy and CI failures:
+   - CI red for 6 consecutive commits (active bug)
+   - 2 failing tests: `test_dev_aircraft_table.spec.js:89` (hardcoded row count),
+     `test_identity_enrichment.spec.js:263` (category priority mismatch)
+   - Redundancy: C0–C5 combinatorial clones, cross-layer duplication
+   - Backlog item 🐛 linking the audit
+   
+2. **Proposal designed** — Created `.ai/proposals/source-visibility-config-2026-07-22.md`
+   for operator-configurable source visibility (`config/sources.json`):
+   - Generalizes hardcoded adsb.one-hiding pattern into editable config
+   - Two-tier split: operator-config (invisible to user) vs. user-preference (session-only)
+   - v1 scope: per-source `visible` + `enabled_by_default` only
+   - Restart-only (no hot-reload), byte-identical defaults when absent
+   - Exact implementation details: backend loader, frontend bootstrap, test plan
+   - Backlog item (S effort, Medium value) linking the proposal
+
+**No code changes this session** — both audit and proposal are documentation-only.
+Implementation remains parked in the backlog, ready for a future session if the
+user decides to act.
 
 ---
 

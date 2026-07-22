@@ -77,6 +77,7 @@ requires.
 | Sidebar search/filter within collection | S | Low | Frontend UX | | Only matters once a user's collection is large; defer until it is |
 | Metrics export (`/metrics`, Prometheus) | M | Low–Med | DevOps | | Ops/observability value, no urgency for a single-tenant app |
 | Collection panel bulk operations | M | Low | Frontend UX | | Speculative — no evidence the collection is big enough to need bulk actions yet |
+| Operator-configurable source visibility | S | Medium | Backend / Frontend UX | | Generalizes hardcoded adsb.one-hiding pattern into an operator-editable `config/sources.json` (visible + enabled_by_default per source), following `config/zones.json` convention but restart-only (no hot-reload). v1 scope: source visibility only. Full design: `.ai/proposals/source-visibility-config-2026-07-22.md`. |
 | **[BUG]** Test suite audit: fix 2 CI failures + reduce redundant/brittle coverage | M | Medium–High | Testing | 🐛 | CI has been silently red for 6 commits (2026-07-21/22). Two failing tests encode effects instead of rules (`test_dev_aircraft_table.spec.js:89` hardcodes row count, `test_identity_enrichment.spec.js:263` expects exact category). Also: redundant C0–C5 parametrization in `test_enrichment.py` (6 clones), frontend re-testing backend logic, three-layer redundancy in `test_aircraft_category.py`. Full audit in `.ai/audits/test-suite-audit-2026-07-22.md`. Recommendations: fix the 2 failures, parametrize C0–C5 tests, trim frontend duplication. |
 | Adaptive polling intervals | M | Low | Backend | | Defer until an actual quota-pressure incident, not before |
 | Load testing | M | Low | Testing | | Only relevant if traffic ever exceeds single-user hobby scale |
@@ -561,7 +562,6 @@ Estimate: S (1–2h of polish + testing, no new functionality)
 - **Collection panel bulk operations** — Currently can save/unsave one aircraft at a time. Backlog idea: bulk export (JSON), bulk delete, filtering within collection. No firm priority.
 
 
-- **Dark mode** — Basemap picker already supports dark styles (CARTO Dark, Esri Dark), but sidebar/HUD don't adapt. CSS `prefers-color-scheme` media query support would help. Low priority.
 
 - **Per-category icons for ground vehicles/obstacles (C0-C5)** — `iconFor()`
   (`static/js/icons.js`) currently draws the exact same neutral-grey
