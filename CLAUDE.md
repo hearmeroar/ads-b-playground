@@ -60,25 +60,26 @@ git push origin main
 
 **Why this works:** Commit hooks fire on `git commit` and auto-prune ✅-marked backlog items, update CURRENT.md, etc. Direct pushes to main keep this atomic.
 
-### 2. Feature/Code Work → Feature Branch + Squash-Merge
+### 2. Feature/Code Work → Local-Only Feature Branch + Squash-Merge
 
-All code changes (app.py, storage.py, enrichment/, static/, tests/, etc.) are developed on a feature branch, then **squash-merged** into main and the remote branch is deleted. This ensures:
+All code changes (app.py, storage.py, enrichment/, static/, tests/, etc.) are developed on a **local-only** feature branch, then **squash-merged** into main. The feature branch is **never pushed to origin** — only the final squash commit on `main` is. This ensures:
 - Commit hooks run after the merge (squash-merge creates a new commit on main)
 - ✅-marked backlog items are auto-pruned when the merge commits
-- Remote branches are cleaned up automatically
+- No orphaned remote branch is ever created, so there's nothing to clean up
 - The commit history stays clean
 
 **When to use:** Any change that modifies production code, tests, or schema
 
 **Workflow:**
 ```bash
-# Create/switch to feature branch (e.g., from the designated branch in session instructions)
+# Create/switch to a local-only feature branch (e.g., from the designated
+# branch in session instructions) — do NOT push it to origin
 git checkout -b feature-name
 
-# Make commits, push for CI
+# Make commits locally, run tests locally (no CI run on this branch, since
+# it's never pushed — see the environment constraint below for why)
 git add .
 git commit -m "..."
-git push -u origin feature-name
 
 # When ready, merge back to main with squash
 git fetch origin main
@@ -88,20 +89,41 @@ git merge --squash feature-name
 git commit -m "Feature: <description>"  # Commit message for squash-merge
 git push origin main
 
-# Delete remote branch (the local is auto-cleaned since --squash doesn't create a branch reference)
-git push origin --delete feature-name
+# Local branch can be deleted freely (never pushed, so this is a purely
+# local, non-destructive cleanup):
+git branch -D feature-name
 ```
 
 **Why squash-merge:** 
 - Creates **one new commit on main**, which triggers hooks (unlike a fast-forward merge)
 - Backlog cleanup, CURRENT.md staging, and test-verification hooks all fire
-- Remote branch deletion removes orphaned branches
 - Keeps main's history linear and readable (feature-branch commits are internal working history)
+
+**Environment constraint — remote branches cannot be deleted here (found
+2026-07-22):** this environment's git remote is a local HTTP bridge
+(`127.0.0.1:<port>/git/<owner>/<repo>`, not a direct GitHub remote), and
+`git push origin --delete <branch>` against it returns a hard `403`
+(confirmed via `GIT_CURL_VERBOSE=1`: a structured response with its own
+`Request-Id`, from a distinct backend service, not a transient or
+client-side error) — a deliberate policy response, not something to retry
+or route around. The GitHub MCP toolset available in this session has no
+`delete_branch`/`delete_ref` tool either (only `create_branch`,
+`list_branches`, etc.), so there is no alternate path to delete a branch
+from a session. **Practical effect: any branch actually pushed to origin
+in this environment will sit there permanently** — an agent session
+cannot clean it up itself. The fix is to prevent the clutter rather than
+try to clean it up after the fact: keep feature branches **local-only** by
+default (per the workflow above), and only ever push a branch to origin
+when a real PR/CI review is genuinely wanted for that specific piece of
+work — in that case, expect the branch to need manual deletion by a human
+afterward (e.g. via GitHub's own PR-merge "Delete branch" button in the
+web UI, a different permission surface than a raw ref-delete push, or
+directly in GitHub's branch settings).
 
 **Decision Tree (which workflow to use):**
 
 1. **Does the change touch code?** (`app.py`, `storage.py`, `enrichment/`, `static/`, `tests/`, schema files)
-   - YES → Use feature branch + squash-merge
+   - YES → Use local-only feature branch + squash-merge
    - NO → Go to step 2
 
 2. **Is it a documentation-only change?** (`.ai/BACKLOG.md`, `.ai/CURRENT.md`, `.ai/DECISIONS.md`, README)
@@ -111,7 +133,7 @@ git push origin --delete feature-name
 **Error Signals:**
 
 - ✅-marked items still in `.ai/BACKLOG.md` after commit → Used wrong workflow (direct commit without triggering hooks, or failed to squash-merge)
-- Remote branch still visible after merge → Didn't run `git push origin --delete <branch>`
+- Remote feature branch visible on origin after a merge → Pushed the feature branch when it should have stayed local-only (see the environment constraint above — once pushed, it cannot be auto-deleted, so prevention is the only real fix)
 - Sidebar tests failing after a code change → Forgot to run tests before commit (verification hook should catch this, but verify locally with `npm test` first)
 
 **What NOT to write in `.ai/` files:**
