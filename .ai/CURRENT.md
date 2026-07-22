@@ -47,13 +47,3 @@ Practical effect: `capture-test-run.sh` can't be trusted to have populated
 fresh `.claude/test-runs/*.json` markers just because tests were run this
 session — check the marker's own timestamp/exit code before relying on
 `require-verification.sh` passing.
-
-## 🚀 In progress: Test suite audit (CI failures + redundancy reduction)
-
-**Work:** Fixing 2 failing frontend tests + parametrizing C0-C5 test clones.
-- ✅ test_dev_aircraft_table.spec.js: rewrote brittle row-count check to rule-based test
-- ✅ test_identity_enrichment.spec.js: fixed mock fixture isolation (removed aaaaaa from adsbfi)
-- ✅ test_enrichment.py: replaced 6 C0-C5 test clones with parametrized version (5 tests)
-- ✅ Consolidated frontend C0-C5 tests: removed 8 redundant backend-logic tests + 3 .skip tests
-
-**Pending:** Verify all tests pass (backend ✅ 308/308, frontend still running).

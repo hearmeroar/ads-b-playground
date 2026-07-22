@@ -13,7 +13,28 @@ function fixture(name) {
 // registered matching route.
 // skipHealth (boolean): if true, don't mock /api/health (lets it hit the real backend)
 async function mockAllSources(page, { skipHealth = false } = {}) {
-  // Don't mock /api/health by default (tests for health check need the real endpoint)
+  // Mock external tile requests (CARTO basemap tiles) - these were causing
+  // page.goto() to hang waiting for "load" event since external CDN was never responding
+  await page.route('https://basemaps.cartocdn.com/**', (route) => {
+    // Respond with a 1x1 transparent PNG to complete tile requests without network
+    const pngBuffer = Buffer.from([
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+      0x00, 0x00, 0x00, 0x0D, // IHDR chunk size
+      0x49, 0x48, 0x44, 0x52, // IHDR
+      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 pixel
+      0x08, 0x02, 0x00, 0x00, 0x00, // 8 bits per sample, color type 2
+      0x90, 0x77, 0x53, 0xDE, // CRC
+      0x00, 0x00, 0x00, 0x0C, // IDAT chunk size
+      0x49, 0x44, 0x41, 0x54, // IDAT
+      0x08, 0x99, 0x01, 0x01, 0x00, 0x00, 0xFE, 0xFF, 0x00, 0x00, 0x00, 0x02, // data
+      0x00, 0x01, 0xF6, 0x18, 0xDD, 0x8D, // CRC
+      0x00, 0x00, 0x00, 0x00, // IEND chunk size
+      0x49, 0x45, 0x4E, 0x44, // IEND
+      0xAE, 0x42, 0x60, 0x82, // CRC
+    ]);
+    route.fulfill({ contentType: 'image/png', body: pngBuffer });
+  });
+
   if (!skipHealth) {
     await page.route('**/api/health', (route) => route.fulfill({ json: { status: 'ok' } }));
   }
@@ -35,12 +56,27 @@ async function mockAllSources(page, { skipHealth = false } = {}) {
     country: null, operator: null, operator_country: null, registration: null,
     manufacturer: null, model: null, year_built: null, category: null,
   } }));
+  // Mock /api/identity/stats explicitly - specific to stats endpoint
+  await page.route('**/api/identity/stats', (route) => route.fulfill({ json: {
+    identity_count: 0, history_count: 0,
+  } }));
   // All-null default, same rationale as /api/identity above — a test that
   // wants to exercise adsbdb enrichment/route/photo-dedup overrides this
   // route itself.
   await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
     aircraft: null, flightroute: null,
   } }));
+  // Mock /api/config
+  await page.route('**/api/config', (route) => route.fulfill({ json: {
+    center: { lat: 51.47, lon: -0.46 },
+    zoom: 8,
+    radius_nm: 220,
+    bbox: [49.47, -2.46, 53.47, 1.54],
+    active_zone_id: 'default',
+  } }));
+  // Mock /api/me (auth check)
+  await page.route('**/api/me', (route) => route.fulfill({ json: { user: null } }));
+  // Don't mock airline-logos manifest — tests that check logos need the real manifest
 }
 
 // Counts markers by source color via the wrapper div's data-color attribute
