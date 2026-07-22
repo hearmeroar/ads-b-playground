@@ -66,6 +66,7 @@ test('a 404 track response leaves no polyline and throws no console error', asyn
 test('uses the collected live trail when OpenSky track history is rate limited', async ({ page }) => {
   // Mirrors two positions collected by consecutive polls from a free live
   // source. The track request itself stays on the default 404 mock.
+  await page.waitForFunction(() => airplanesliveMarkers.has('ffffff'));
   await page.evaluate(() => {
     recordLiveTrailPoint('ffffff', 44.4, 21.4, 600);
     recordLiveTrailPoint('ffffff', 44.45, 21.45, 650);
