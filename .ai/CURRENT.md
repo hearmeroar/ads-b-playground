@@ -48,30 +48,32 @@ fresh `.claude/test-runs/*.json` markers just because tests were run this
 session — check the marker's own timestamp/exit code before relying on
 `require-verification.sh` passing.
 
-## 📋 Session completed: Audit + proposal design (2026-07-22)
+## 📋 Session completed: Architecture planning wave (2026-07-22)
 
 **Action taken:**
 
-1. **Audit completed** — Created `.ai/audits/test-suite-audit-2026-07-22.md`
-   documenting test-suite redundancy and CI failures:
-   - CI red for 6 consecutive commits (active bug)
-   - 2 failing tests: `test_dev_aircraft_table.spec.js:89` (hardcoded row count),
-     `test_identity_enrichment.spec.js:263` (category priority mismatch)
-   - Redundancy: C0–C5 combinatorial clones, cross-layer duplication
-   - Backlog item 🐛 linking the audit
-   
-2. **Proposal designed** — Created `.ai/proposals/source-visibility-config-2026-07-22.md`
-   for operator-configurable source visibility (`config/sources.json`):
-   - Generalizes hardcoded adsb.one-hiding pattern into editable config
-   - Two-tier split: operator-config (invisible to user) vs. user-preference (session-only)
-   - v1 scope: per-source `visible` + `enabled_by_default` only
-   - Restart-only (no hot-reload), byte-identical defaults when absent
-   - Exact implementation details: backend loader, frontend bootstrap, test plan
-   - Backlog item (S effort, Medium value) linking the proposal
+1. **Test suite audit** — Created `.ai/audits/test-suite-audit-2026-07-22.md`
+   documenting CI red (6 commits), 2 failing tests, redundancy analysis.
+   Backlog item 🐛 filed for future parametrization + fixes.
 
-**No code changes this session** — both audit and proposal are documentation-only.
-Implementation remains parked in the backlog, ready for a future session if the
-user decides to act.
+2. **Operator-configurable sources proposal** — `.ai/proposals/source-visibility-config-2026-07-22.md`
+   Design approved. v1 scope: per-source visibility + enabled_by_default.
+   Backlog item (S, Medium) parked, ready for implementation.
+
+3. **UI framework research proposal** — `.ai/proposals/ui-framework-research-2026-07-22.md`
+   Mature UI framework (Bootstrap/Bulma/MDC/Tailwind) for consistent, fast component
+   development. Research phase approved. Backlog item (M, High) for POC + decision.
+
+4. **Map interaction requirements** — `.ai/proposals/map-interactions-minimal-requirements-2026-07-22.md`
+   Minimal baselines from competitive analysis: smooth zoom interpolation + no hangs at max zoom.
+   Documented for when map work resumes.
+
+5. **Memory layer** — Captured context in `.claude/projects/.../memory/`:
+   - ui_framework_discussion_2026-07-22.md (UI + Architect perspectives, decision matrix)
+   - map_interaction_requirements.md (quick reference)
+
+**No code changes this session** — pure architecture planning / documentation.
+All forward-looking specs parked in backlog with full design docs, ready for future implementation.
 
 ---
 
