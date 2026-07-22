@@ -36,3 +36,7 @@ Practical effect: `capture-test-run.sh` can't be trusted to have populated
 fresh `.claude/test-runs/*.json` markers just because tests were run this
 session — check the marker's own timestamp/exit code before relying on
 `require-verification.sh` passing.
+
+---
+
+*No active work items as of 2026-07-22. Workflow & Branching Convention documented in CLAUDE.md.*

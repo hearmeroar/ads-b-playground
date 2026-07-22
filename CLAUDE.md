@@ -40,6 +40,80 @@ area the commit touches, closing the "tests passed but the real endpoint
 404s" gap): see `.agents/architect.md` for the full hook behavior and
 bypass flags.
 
+## Workflow & Branching Convention
+
+**Two distinct workflows** are used depending on the type of change:
+
+### 1. Backlog/Documentation Changes → Direct-to-Main
+
+Edits to `.ai/BACKLOG.md`, `.ai/CURRENT.md`, `.ai/DECISIONS.md`, or README are **committed directly to main** with no branch. This keeps documentation overhead minimal and ensures the commit hooks (backlog-cleanup.sh, etc.) run correctly.
+
+**When to use:** Any change that doesn't touch production code (`app.py`, `storage.py`, `enrichment/`, `static/`, `tests/`)
+
+**Workflow:**
+```bash
+# Edit .ai/BACKLOG.md, .ai/CURRENT.md, README, etc.
+git add .ai/BACKLOG.md  # (or whatever file)
+git commit -m "..."     # Commit message describing the change
+git push origin main
+```
+
+**Why this works:** Commit hooks fire on `git commit` and auto-prune ✅-marked backlog items, update CURRENT.md, etc. Direct pushes to main keep this atomic.
+
+### 2. Feature/Code Work → Feature Branch + Squash-Merge
+
+All code changes (app.py, storage.py, enrichment/, static/, tests/, etc.) are developed on a feature branch, then **squash-merged** into main and the remote branch is deleted. This ensures:
+- Commit hooks run after the merge (squash-merge creates a new commit on main)
+- ✅-marked backlog items are auto-pruned when the merge commits
+- Remote branches are cleaned up automatically
+- The commit history stays clean
+
+**When to use:** Any change that modifies production code, tests, or schema
+
+**Workflow:**
+```bash
+# Create/switch to feature branch (e.g., from the designated branch in session instructions)
+git checkout -b feature-name
+
+# Make commits, push for CI
+git add .
+git commit -m "..."
+git push -u origin feature-name
+
+# When ready, merge back to main with squash
+git fetch origin main
+git checkout main
+git pull origin main
+git merge --squash feature-name
+git commit -m "Feature: <description>"  # Commit message for squash-merge
+git push origin main
+
+# Delete remote branch (the local is auto-cleaned since --squash doesn't create a branch reference)
+git push origin --delete feature-name
+```
+
+**Why squash-merge:** 
+- Creates **one new commit on main**, which triggers hooks (unlike a fast-forward merge)
+- Backlog cleanup, CURRENT.md staging, and test-verification hooks all fire
+- Remote branch deletion removes orphaned branches
+- Keeps main's history linear and readable (feature-branch commits are internal working history)
+
+**Decision Tree (which workflow to use):**
+
+1. **Does the change touch code?** (`app.py`, `storage.py`, `enrichment/`, `static/`, `tests/`, schema files)
+   - YES → Use feature branch + squash-merge
+   - NO → Go to step 2
+
+2. **Is it a documentation-only change?** (`.ai/BACKLOG.md`, `.ai/CURRENT.md`, `.ai/DECISIONS.md`, README)
+   - YES → Use direct-to-main
+   - NO (config, whitespace, etc.) → Depends on context; prefer direct-to-main unless it's a material code change
+
+**Error Signals:**
+
+- ✅-marked items still in `.ai/BACKLOG.md` after commit → Used wrong workflow (direct commit without triggering hooks, or failed to squash-merge)
+- Remote branch still visible after merge → Didn't run `git push origin --delete <branch>`
+- Sidebar tests failing after a code change → Forgot to run tests before commit (verification hook should catch this, but verify locally with `npm test` first)
+
 **What NOT to write in `.ai/` files:**
 - Temporary debugging traces or "tried X, didn't work" logs (keep those in CURRENT.md only while actively working, then remove them).
 - Duplication of README's install/run instructions (link to README instead).
