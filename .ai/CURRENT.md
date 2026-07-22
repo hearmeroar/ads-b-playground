@@ -19,17 +19,6 @@
 >   source file's own docstring), it's probably trying to be a changelog —
 >   trim it.
 
-## 🚨 Open: Track stops updating after aircraft selection (CRITICAL)
-
-**Symptom:** Track renders and updates normally while polling. Clicking a
-marker to select it → sidebar opens correctly → track stops updating and
-goes stale (no longer follows the aircraft on subsequent polls).
-
-**Suspected cause:** `loadTrack()`'s historical-track fetch may be
-overwriting or disconnecting the live-trail update path in the poll loop.
-Full symptom detail, affected code, and verification steps: `.ai/BACKLOG.md`
-§ Bugs. Not yet investigated.
-
 ## 🐛 Open: commit-hook `if` matcher fires unreliably
 
 `capture-test-run.sh`/`require-verification.sh`/`backlog-cleanup.sh` (and
