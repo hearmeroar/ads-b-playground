@@ -30,10 +30,6 @@ overwriting or disconnecting the live-trail update path in the poll loop.
 Full symptom detail, affected code, and verification steps: `.ai/BACKLOG.md`
 § Bugs. Not yet investigated.
 
----
-
-**✅ Completed (2026-07-22):** Airport search quick-open with region-based presets. Focus-triggered 10-airport preset per region, region detected via nearest OurAirports entry to AREA_CENTER, Europe fallback. Backend: enrichment/(countries|airports).py + app.py GET /api/airports/popular. Frontend: state-filters.js ensurePopularAirportsLoaded(). Tests: 283 backend passed, 175 frontend passed, all 60 IATA codes verified, curl route verification 200 OK.
-
 ## 🐛 Open: commit-hook `if` matcher fires unreliably
 
 `capture-test-run.sh`/`require-verification.sh`/`backlog-cleanup.sh` (and

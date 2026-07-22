@@ -233,9 +233,19 @@ html, body { margin: 0; padding: 0; height: 100%; }
 .plane-icon svg path,
 .plane-icon svg ellipse,
 .plane-icon svg circle {
-  stroke: #fff;
+  stroke: var(--marker-stroke-color, #fff);
   stroke-width: 0.5px;
   vector-effect: non-scaling-stroke;
+}
+/* Uniform aircraft color mode (toggled via #toggle-uniform-color): swaps
+   the marker outline from white to dark, matching the bright yellow fill
+   swap already done in icons.js's categoryIcon()/uavIcon(). Without this,
+   the CSS rule above always won over the SVG's own inline stroke="STROKE"
+   attribute (author stylesheet rules take priority over presentation
+   attributes, regardless of specificity), so the dark outline never
+   actually rendered even though the JS was computing it correctly. */
+body.uniform-color-mode {
+  --marker-stroke-color: #1a1a1a;
 }
 
 .dropdown-icon-container {

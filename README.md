@@ -82,6 +82,10 @@ in-memory dict.
   (Light, Dark, Voyager, Streets, Satellite, Terrain, Physical, Terrain
   Base, Hillshade — including a proper elevation-tint relief map) from a
   HUD dropdown.
+- **Uniform aircraft color** — HUD toggle (on by default) that paints every
+  aircraft marker in a single bright yellow with a dark outline, instead of
+  the default per-source color scheme. Useful for focusing on aircraft
+  position and movement without the visual distraction of multiple colors.
 - **Weather layers** — four independently toggleable, off-by-default HUD
   layers, any combination at once: live Precipitation radar and a
   short-range Forecast (nowcast) composite via

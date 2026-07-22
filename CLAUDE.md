@@ -536,6 +536,28 @@ restarting.
   enabled. A failed `POST` shows an inline status message
   (`#zone-search-status`) and leaves the map untouched rather than failing
   silently.
+- **Quick-open preset airports** (`GET /api/airports/popular`, `static/js/
+  state-filters.js`'s `focus` listener + `ensurePopularAirportsLoaded()`,
+  `enrichment/countries.py`'s `REGION_BY_COUNTRY_ISO` and `region_for_country_iso()`,
+  `enrichment/airports.py`'s `POPULAR_AIRPORTS_BY_REGION` / `popular_airports_for_region()`
+  / `region_for_coordinates()`, `app.py`'s cross-worker sync via
+  `_maybe_reload_zone_from_disk()`): when the zone-search input is focused
+  and empty, immediately shows a curated list of 10 airports for the region
+  matching the app's current `AREA_CENTER`, without requiring any typing.
+  Region detection works by finding the nearest OurAirports entry to the
+  current center, reading its ISO country code directly, and mapping it via
+  `REGION_BY_COUNTRY_ISO` to one of six curated regions (North America,
+  Europe, Asia & Middle East, Latin America & Caribbean, Africa, Australia &
+  Oceania) — falling back to Europe if the region can't be determined. The
+  10-airport list for each region is fixed in curated order (not re-ranked
+  like typed search), so frequent hub-jumpers can navigate without typing.
+  The preset airports are fetched once per page load, lazily on first focus
+  (via memoized `ensurePopularAirportsLoaded()`), following this app's
+  established "fetch only what was actually asked for" convention (adsbdb,
+  identity enrichment, and photo gallery are all click-triggered similarly).
+  Typing any characters replaces the preset list with typed-search results,
+  preserving all existing search behavior. Re-focusing shows the cached
+  preset without a second network request.
 
 **Scan-radius range rings** (`static/js/map-init.js`, toggled via
 `#toggle-scan-radius` in the HUD, wired in `static/js/state-filters.js`):
@@ -950,15 +972,24 @@ because photographer name and photo URL come from an external API.
   (reuses/moves/rotates existing markers in place rather than recreating the
   layer every poll). Marker color is source-specific (`SOURCE_COLORS`, whose
   key order is the canonical source priority list used to generalize the HUD
-  counts and toggle wiring). Each source can be hidden independently via its
-  HUD checkbox, which clears its markers immediately and triggers an immediate
-  `poll()` (rather than waiting up to `POLL_INTERVAL_MS` for the next tick) —
-  both on and off toggles re-run `poll()` so counts/markers never sit stale
-  after a toggle. **OpenSky, adsb.fi, adsb.lol and airplanes.live ship
-  checked**; FlightAware ships off (see above); adsb.one's row is hidden
-  from the HUD entirely (see above) rather than shipping an always-off
-  checkbox. Turning OpenSky off clears the quota line and any pending
-  OpenSky warning message.
+  counts and toggle wiring), unless the **"Uniform aircraft color"** toggle
+  (ships ON by default) is active — in which case all aircraft render in a
+  bright yellow fill with a dark outline instead of per-source colors.
+  **Implementation detail:** The toggle's state is read via `isUniformColorEnabled()`
+  (a getter in `state-filters.js` that reads the checkbox directly, not a
+  mirrored global), and `categoryIcon()`/`uavIcon()` in `icons.js` replace
+  both `COLOR` and `STROKE` template placeholders in each glyph before rendering.
+  The marker's `data-color` attribute continues to record the *true* per-source
+  color regardless of uniform mode — this decoupling keeps existing `colorCounts()`
+  test assertions passing unchanged, and preserves the provenance metadata for
+  dev-mode badges. Each source can be hidden independently via its HUD checkbox,
+  which clears its markers immediately and triggers an immediate `poll()` (rather
+  than waiting up to `POLL_INTERVAL_MS` for the next tick) — both on and off
+  toggles re-run `poll()` so counts/markers never sit stale after a toggle.
+  **OpenSky, adsb.fi, adsb.lol and airplanes.live ship checked**; FlightAware
+  ships off (see above); adsb.one's row is hidden from the HUD entirely (see
+  above) rather than shipping an always-off checkbox. Turning OpenSky off
+  clears the quota line and any pending OpenSky warning message.
 - **HUD counts** (`updateCounts()`) render as a pill per source, collapsed via
   `.source-count:empty` when the source is off. Between enabling a source and
   the poll it triggers landing, the slot holds a `.count-spinner` instead

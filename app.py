@@ -53,7 +53,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 import storage
 from enrichment.aircraft_enrichment import enrich_identity
-from enrichment.airports import airports_in_bbox, nearest_airport, search_airports
+from enrichment.airports import airports_in_bbox, nearest_airport, search_airports, popular_airports_for_region, region_for_coordinates
 
 try:
     from dotenv import load_dotenv
@@ -1507,6 +1507,17 @@ def api_airports_search():
     except (TypeError, ValueError):
         limit = 20
     return jsonify({"airports": search_airports(query, limit=limit)})
+
+
+@app.route("/api/airports/popular")
+def api_airports_popular():
+    # Zone-search quick-open preset: returns the 10 curated airports for
+    # the region that matches the app's current AREA_CENTER, or falls back
+    # to Europe if the region can't be determined. Uncached — same zero-I/O
+    # rationale as /api/airports/search above.
+    _maybe_reload_zone_from_disk()
+    region = region_for_coordinates(AREA_CENTER["lat"], AREA_CENTER["lon"]) or "Europe"
+    return jsonify({"region": region, "airports": popular_airports_for_region(region)})
 
 
 if __name__ == "__main__":

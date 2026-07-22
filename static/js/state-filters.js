@@ -114,6 +114,21 @@ function hideNonAircraft() {
   return hideJunkToggle.checked;
 }
 
+const uniformColorToggle = document.getElementById('toggle-uniform-color');
+function isUniformColorEnabled() {
+  return uniformColorToggle.checked;
+}
+// Mirrors the checkbox state onto <body> so style.css's
+// `body.uniform-color-mode` rule can override the marker outline color —
+// a plain CSS author-stylesheet rule always wins over an SVG element's own
+// presentation attribute (stroke="..."), so the JS-computed stroke color
+// alone can never win against style.css's own `.plane-icon svg path` rule
+// without this class-based hook. Called on load and on toggle change.
+function syncUniformColorBodyClass() {
+  document.body.classList.toggle('uniform-color-mode', isUniformColorEnabled());
+}
+syncUniformColorBodyClass();
+
 // Purely presentational (no data to (re)fetch), so — like devModeToggle
 // above — this mutates the map directly instead of triggering poll().
 // scanRadiusLayer (map-init.js) is reassigned once /api/config resolves,
@@ -320,6 +335,21 @@ const zoneSearchStatusEl = document.getElementById('zone-search-status');
 let zoneSearchDebounceTimer = null;
 let zoneSearchResultsData = [];    // airports array behind the currently rendered options, same order
 let zoneSearchHighlightIndex = -1; // index into zoneSearchResultsData / #zone-search-results children; -1 = none
+let popularAirportsCache = null;   // cached result of /api/airports/popular
+let popularAirportsFetchPromise = null; // memoized in-flight fetch
+
+function ensurePopularAirportsLoaded() {
+  if (!popularAirportsFetchPromise) {
+    popularAirportsFetchPromise = fetch('/api/airports/popular')
+      .then((res) => res.json())
+      .then((data) => {
+        popularAirportsCache = data;
+        return data.airports || [];
+      })
+      .catch(() => null);
+  }
+  return popularAirportsFetchPromise.then(() => popularAirportsCache ? popularAirportsCache.airports : null);
+}
 
 function setZoneSearchStatus(message, isError) {
   if (!message) {
@@ -439,6 +469,15 @@ zoneSearchInput.addEventListener('input', () => {
   }, ZONE_SEARCH_DEBOUNCE_MS);
 });
 zoneSearchInput.addEventListener('click', (e) => e.stopPropagation());
+zoneSearchInput.addEventListener('focus', () => {
+  if (zoneSearchInput.value.trim().length === 0) {
+    ensurePopularAirportsLoaded().then((airports) => {
+      if (airports && zoneSearchInput.value.trim().length === 0) {
+        renderZoneSearchResults(airports);
+      }
+    });
+  }
+});
 zoneSearchInput.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     zoneSearchDropdown.classList.remove('open');

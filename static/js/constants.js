@@ -78,6 +78,12 @@ const SOURCE_COLORS = {
   // Black, distinct from every live source above.
   flywme: '#000000',
 };
+// Uniform marker color mode (bright yellow fill, dark outline), toggled via
+// "Uniform aircraft color" HUD switch. Only affects the visual paint of
+// markers; data-color attribute still records the true per-source color for
+// provenance/testing purposes.
+const UNIFORM_MARKER_COLOR = '#ffd400';
+const UNIFORM_MARKER_STROKE_COLOR = '#1a1a1a';
 const SOURCE_DISPLAY_NAMES = {
   opensky: 'OpenSky', adsbfi: 'adsb.fi', adsblol: 'adsb.lol',
   adsbone: 'adsb.one', airplaneslive: 'airplanes.live', flightaware: 'FlightAware',
