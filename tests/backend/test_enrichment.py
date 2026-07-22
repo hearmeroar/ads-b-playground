@@ -670,38 +670,42 @@ def test_route_c0_category_code_non_c0_works_normally(client):
     assert data["country"]["source"] == "registration_prefix"
 
 
-# --- C1-C5 category tests (expanded from C0-only to all C-category codes) ---
+# --- C-category parametrized tests (C0-C5) ---
+# All C-category codes skip enrichment heuristics; only the category codes
+# differ. Parametrize to avoid 6 near-identical test clones.
 
-def test_enrich_identity_c1_skips_registration_prefix_tier():
-    # C1: surface vehicle with high horizontal speed. Registration heuristic
-    # should be skipped just like C0.
-    result = enrich_identity("ffffff", registration="OK-SWC", category_code="C1")
+import pytest
+
+@pytest.mark.parametrize("category_code", ["C0", "C1", "C2", "C3", "C4", "C5"])
+def test_enrich_identity_c_category_skips_registration_prefix_tier(category_code):
+    # All C-category codes: registration heuristic is skipped.
+    result = enrich_identity("ffffff", registration="OK-SWC", category_code=category_code)
     assert result["country"] is None
 
 
-def test_enrich_identity_c2_skips_icao24_block_tier():
-    # C2: surface vehicle with very high horizontal speed. Even though the
-    # hex sits in a known ICAO24 block, heuristic is skipped for C2.
-    result = enrich_identity("4A35CE", category_code="C2")
+@pytest.mark.parametrize("category_code", ["C0", "C1", "C2", "C3", "C4", "C5"])
+def test_enrich_identity_c_category_skips_icao24_block_tier(category_code):
+    # All C-category codes: icao24 block heuristic is skipped.
+    result = enrich_identity("4A35CE", category_code=category_code)
     assert result["country"] is None
 
 
-def test_enrich_identity_c3_skips_callsign_decode_tier():
-    # C3: surface vehicle with low horizontal speed. A valid callsign should
-    # not decode to an operator for C-category.
-    result = enrich_identity("ffffff", callsign="RYR123", category_code="C3")
+@pytest.mark.parametrize("category_code", ["C0", "C1", "C2", "C3", "C4", "C5"])
+def test_enrich_identity_c_category_skips_callsign_decode_tier(category_code):
+    # All C-category codes: callsign decode heuristic is skipped.
+    result = enrich_identity("ffffff", callsign="RYR123", category_code=category_code)
     assert result["operator"] is None
     assert result["operator_country"] is None
 
 
-def test_enrich_identity_c4_allows_live_tier():
-    # C4: surface vehicle without high horizontal speed. Live data should
-    # still work for all C-category codes.
+@pytest.mark.parametrize("category_code", ["C0", "C1", "C2", "C3", "C4", "C5"])
+def test_enrich_identity_c_category_allows_live_tier(category_code):
+    # All C-category codes: live data is still used.
     result = enrich_identity(
         "ffffff",
         known_country="Test Country",
         known_operator="Test Operator",
-        category_code="C4"
+        category_code=category_code
     )
     assert result["country"]["value"] == "Test Country"
     assert result["country"]["source"] == "live"
@@ -709,10 +713,10 @@ def test_enrich_identity_c4_allows_live_tier():
     assert result["operator"]["source"] == "live"
 
 
-def test_enrich_identity_c5_skips_icao24_lookup_tier():
-    # C5: fixed obstacle. Exact database matches are not trusted for
-    # C-category either — same as C0 (see the module docstring).
-    result = enrich_identity("49d3d3", category_code="C5")
+@pytest.mark.parametrize("category_code", ["C0", "C1", "C2", "C3", "C4", "C5"])
+def test_enrich_identity_c_category_skips_icao24_lookup_tier(category_code):
+    # All C-category codes: exact database matches are not trusted.
+    result = enrich_identity("49d3d3", category_code=category_code)
     assert result["country"] is None
     assert result["operator"] is None
     assert result["registration"] is None

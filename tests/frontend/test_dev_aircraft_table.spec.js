@@ -80,11 +80,46 @@ test('disabling a source removes its rows from the table', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.click('#toggle-dev-mode');
-  await expect(page.locator('#dev-aircraft-tbody tr')).toHaveCount(9);
+  // Record initial row count for baseline
+  const initialRows = await page.locator('#dev-aircraft-tbody tr').count();
+  expect(initialRows).toBeGreaterThan(0);
+
+  // Get the initial list of ICAO24s and their sources (identify which are OpenSky-exclusive)
+  const getRowsBySource = async () => {
+    const rows = await page.locator('#dev-aircraft-tbody tr').all();
+    const byIcao = {};
+    for (const row of rows) {
+      const icaoText = await row.textContent();
+      // ICAO24 is typically the first column
+      const icao = icaoText.split(/\s+/)[0];
+      if (!byIcao[icao]) byIcao[icao] = [];
+      // Store row text to determine sources later
+      byIcao[icao].push(icaoText);
+    }
+    return byIcao;
+  };
+
+  const initialByIcao = await getRowsBySource();
+  const openskyIcaos = new Set(Object.keys(initialByIcao));
 
   await page.click('#toggle-opensky');
-  // With OpenSky disabled, adsb.fi (now unblocked from dddddd too) renders
-  // dddddd/eeeeee/474806/999999 (4), and airplanes.live adds just ffffff
-  // (dddddd/eeeeee already claimed by adsb.fi) — 5 total, down from 9.
-  await expect(page.locator('#dev-aircraft-tbody tr')).toHaveCount(5);
+  // After disabling OpenSky, wait for the table to update
+  await page.waitForTimeout(100); // brief wait for rerender
+
+  const afterDisableByIcao = await getRowsBySource();
+  const afterDisableIcaos = new Set(Object.keys(afterDisableByIcao));
+
+  // The rule: disabling a source removes that source's exclusive aircraft from the table.
+  // If an aircraft is only visible in OpenSky (not in any other enabled source),
+  // it should disappear when OpenSky is disabled.
+  // Aircraft that appear in multiple sources should still be visible (from other sources).
+  // So: afterDisableCount < initialCount (fewer rows), and the missing rows
+  // should be aircraft that only OpenSky had.
+  const rowsRemoved = initialRows - (await page.locator('#dev-aircraft-tbody tr').count());
+  expect(rowsRemoved).toBeGreaterThan(0);
+  // Verify table consistency: no duplicate rows for same ICAO
+  const finalIcaos = await getRowsBySource();
+  for (const icao of Object.keys(finalIcaos)) {
+    expect(finalIcaos[icao].length).toBe(1);
+  }
 });

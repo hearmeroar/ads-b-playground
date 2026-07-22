@@ -47,36 +47,3 @@ Practical effect: `capture-test-run.sh` can't be trusted to have populated
 fresh `.claude/test-runs/*.json` markers just because tests were run this
 session — check the marker's own timestamp/exit code before relying on
 `require-verification.sh` passing.
-
-## 📋 Session completed: Architecture planning wave (2026-07-22)
-
-**Action taken:**
-
-1. **Test suite audit** — Created `.ai/audits/test-suite-audit-2026-07-22.md`
-   documenting CI red (6 commits), 2 failing tests, redundancy analysis.
-   Backlog item 🐛 filed for future parametrization + fixes.
-
-2. **Operator-configurable sources proposal** — `.ai/proposals/source-visibility-config-2026-07-22.md`
-   Design approved. v1 scope: per-source visibility + enabled_by_default.
-   Backlog item (S, Medium) parked, ready for implementation.
-
-3. **UI framework research proposal** — `.ai/proposals/ui-framework-research-2026-07-22.md`
-   Mature UI framework (Bootstrap/Bulma/MDC/Tailwind) for consistent, fast component
-   development. Research phase approved. Backlog item (M, High) for POC + decision.
-
-4. **Map interaction requirements** — `.ai/proposals/map-interactions-minimal-requirements-2026-07-22.md`
-   Minimal baselines from competitive analysis: smooth zoom interpolation + no hangs at max zoom.
-   Documented for when map work resumes.
-
-5. **Memory layer** — Captured context in `.claude/projects/.../memory/`:
-   - ui_framework_discussion_2026-07-22.md (UI + Architect perspectives, decision matrix)
-   - map_interaction_requirements.md (quick reference)
-
-**No code changes this session** — pure architecture planning / documentation.
-All forward-looking specs parked in backlog with full design docs, ready for future implementation.
-
----
-
-**Next session:** Pick a backlog item from `.ai/BACKLOG.md`'s "At a glance"
-table (sorted best-first) and update this file if a task turns out to
-still be open at the end of the session — otherwise a plain commit is enough.

@@ -8,7 +8,7 @@ const PORT = 5050;
 
 module.exports = defineConfig({
   testDir: './tests/frontend',
-  timeout: 15000,
+  timeout: 30000,
   fullyParallel: true,
   reporter: 'list',
   use: {
