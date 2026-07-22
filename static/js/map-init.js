@@ -203,7 +203,7 @@ for (const key of Object.keys(BASE_LAYERS)) {
     maxNativeZoom: cfg.maxNativeZoom,
   });
 }
-let currentBaseLayerKey = 'voyager';
+let currentBaseLayerKey = 'dark';
 baseLayers[currentBaseLayerKey].addTo(map);
 
 function setBaseLayer(key) {

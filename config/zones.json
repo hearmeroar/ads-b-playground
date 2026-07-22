@@ -1,10 +1,10 @@
 {
-  "active_zone_id": "default",
+  "active_zone_id": "EGLL",
   "zones": {
     "default": {
       "center": {
-        "lat": 51.47,
-        "lon": -0.46
+        "lat": 51.470748,
+        "lon": -0.459909
       },
       "zoom": 8,
       "radius_nm": 220
@@ -133,6 +133,22 @@
       "center": {
         "lat": 53.428713,
         "lon": -6.262121
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "EDDM": {
+      "center": {
+        "lat": 48.353802,
+        "lon": 11.7861
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "EHAM": {
+      "center": {
+        "lat": 52.308601,
+        "lon": 4.76389
       },
       "zoom": 8,
       "radius_nm": 220

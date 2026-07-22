@@ -83,7 +83,7 @@ import json
 import math
 import os
 
-from .countries import country_by_iso
+from .countries import country_by_iso, region_for_country_iso
 
 _AIRPORTS_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "airports.json")
 _MAP_AIRPORTS_DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "ourairports.json")
@@ -297,3 +297,46 @@ def airports_in_bbox(lamin, lomin, lamax, lomax, include_closed=False, center=No
         center_lat, center_lon = center
         result = [a for a in result if _haversine_km(center_lat, center_lon, a["lat"], a["lon"]) <= radius_km]
     return result
+
+
+POPULAR_AIRPORTS_BY_REGION = {
+    "North America": ["ATL", "DFW", "ORD", "DEN", "LAX", "JFK", "MCO", "LAS", "CLT", "MIA"],
+    "Europe": ["LHR", "IST", "CDG", "AMS", "FRA", "MAD", "BCN", "FCO", "SAW", "MUC"],
+    "Asia & Middle East": ["DXB", "HND", "PVG", "CAN", "DEL", "ICN", "SZX", "PEK", "TFU", "SIN"],
+    "Latin America & Caribbean": ["GRU", "BOG", "MEX", "CUN", "LIM", "CGH", "SCL", "PTY", "BSB", "GDL"],
+    "Africa": ["CAI", "ADD", "JNB", "CPT", "LOS", "ALG", "NBO", "CMN", "DUR", "ABV"],
+    "Australia & Oceania": ["SYD", "MEL", "BNE", "AKL", "PER", "ADL", "OOL", "CNS", "CHC", "CBR"],
+}
+
+
+def popular_airports_for_region(region):
+    if not region or region not in POPULAR_AIRPORTS_BY_REGION or not _MAP_AIRPORTS:
+        return []
+    codes = POPULAR_AIRPORTS_BY_REGION[region]
+    iata_to_airport = {a.get("iata"): a for a in _MAP_AIRPORTS if a.get("iata")}
+    result = []
+    for code in codes:
+        airport = iata_to_airport.get(code)
+        if airport:
+            country_obj = country_by_iso(airport.get("country"))
+            result.append({**airport, "country_name": country_obj["name"] if country_obj else None})
+    return result
+
+
+def region_for_coordinates(lat, lon):
+    if lat is None or lon is None or not _MAP_AIRPORTS:
+        return None
+    try:
+        lat, lon = float(lat), float(lon)
+    except (TypeError, ValueError):
+        return None
+    best = None
+    best_distance = None
+    for airport in _MAP_AIRPORTS:
+        distance = _haversine_km(lat, lon, airport["lat"], airport["lon"])
+        if best_distance is None or distance < best_distance:
+            best, best_distance = airport, distance
+    if best is None:
+        return None
+    country_iso = best.get("country")
+    return region_for_country_iso(country_iso)

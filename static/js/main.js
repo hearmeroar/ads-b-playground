@@ -110,6 +110,11 @@ function handleHideJunkToggleChange() {
 }
 hideJunkToggle.addEventListener('change', handleHideJunkToggleChange);
 
+uniformColorToggle.addEventListener('change', () => {
+  syncUniformColorBodyClass();
+  poll();
+});
+
 // Shown from the moment a source is enabled until the poll it triggers lands.
 // No "pending" state is tracked: updateCounts() runs at the end of every poll
 // and rewrites the slot, which is what clears the spinner — including when the

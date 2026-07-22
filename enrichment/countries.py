@@ -447,3 +447,95 @@ def country_iso_for_name(name):
         return None
     key = name.strip().lower()
     return COUNTRIES_BY_NAME.get(key) or COUNTRY_NAME_ALIASES.get(key)
+
+
+# Region mapping for the zone-search quick-open preset feature.
+# Maps ISO 2-letter country codes to one of 6 curated regions.
+# Built from standard continent classification collapsed into these buckets,
+# with explicit overrides for "industry convention" cases (e.g., Turkey is
+# grouped under Europe since its curated airports — IST, SAW — are listed there).
+REGION_BY_COUNTRY_ISO = {
+    # North America
+    "US": "North America", "CA": "North America", "MX": "North America",
+    "BZ": "North America", "CR": "North America", "SV": "North America",
+    "GT": "North America", "HN": "North America", "NI": "North America",
+    "PA": "North America",
+    # Europe
+    "AT": "Europe", "BE": "Europe", "BG": "Europe", "HR": "Europe",
+    "CY": "Europe", "CZ": "Europe", "DK": "Europe", "EE": "Europe",
+    "FI": "Europe", "FR": "Europe", "DE": "Europe", "GR": "Europe",
+    "HU": "Europe", "IE": "Europe", "IT": "Europe", "LV": "Europe",
+    "LT": "Europe", "LU": "Europe", "MT": "Europe", "NL": "Europe",
+    "PL": "Europe", "PT": "Europe", "RO": "Europe", "SK": "Europe",
+    "SI": "Europe", "ES": "Europe", "SE": "Europe", "CH": "Europe",
+    "GB": "Europe", "NO": "Europe", "IS": "Europe", "AD": "Europe",
+    "BY": "Europe", "RS": "Europe", "UA": "Europe", "MD": "Europe",
+    "TR": "Europe", "AZ": "Europe", "GE": "Europe", "AM": "Europe",
+    "AL": "Europe", "BA": "Europe", "MK": "Europe", "XK": "Europe",
+    "RU": "Europe",
+    # Asia & Middle East
+    "AE": "Asia & Middle East", "SA": "Asia & Middle East", "QA": "Asia & Middle East",
+    "OM": "Asia & Middle East", "YE": "Asia & Middle East", "JO": "Asia & Middle East",
+    "LB": "Asia & Middle East", "SY": "Asia & Middle East", "IQ": "Asia & Middle East",
+    "IR": "Asia & Middle East", "KW": "Asia & Middle East", "BH": "Asia & Middle East",
+    "IL": "Asia & Middle East", "PS": "Asia & Middle East", "KZ": "Asia & Middle East",
+    "UZ": "Asia & Middle East", "TM": "Asia & Middle East", "KG": "Asia & Middle East",
+    "AF": "Asia & Middle East", "PK": "Asia & Middle East", "IN": "Asia & Middle East",
+    "BD": "Asia & Middle East", "BT": "Asia & Middle East", "NP": "Asia & Middle East",
+    "LK": "Asia & Middle East", "MM": "Asia & Middle East", "TH": "Asia & Middle East",
+    "LA": "Asia & Middle East", "KH": "Asia & Middle East", "VN": "Asia & Middle East",
+    "MY": "Asia & Middle East", "SG": "Asia & Middle East", "BN": "Asia & Middle East",
+    "ID": "Asia & Middle East", "PH": "Asia & Middle East", "TL": "Asia & Middle East",
+    "CN": "Asia & Middle East", "MN": "Asia & Middle East", "KP": "Asia & Middle East",
+    "KR": "Asia & Middle East", "JP": "Asia & Middle East", "TW": "Asia & Middle East",
+    "HK": "Asia & Middle East", "MO": "Asia & Middle East", "TH": "Asia & Middle East",
+    # Latin America & Caribbean
+    "AG": "Latin America & Caribbean", "BS": "Latin America & Caribbean",
+    "BB": "Latin America & Caribbean", "BM": "Latin America & Caribbean",
+    "CU": "Latin America & Caribbean", "DO": "Latin America & Caribbean",
+    "DM": "Latin America & Caribbean", "GD": "Latin America & Caribbean",
+    "HT": "Latin America & Caribbean", "JM": "Latin America & Caribbean",
+    "KN": "Latin America & Caribbean", "LC": "Latin America & Caribbean",
+    "VC": "Latin America & Caribbean", "TT": "Latin America & Caribbean",
+    "AR": "Latin America & Caribbean", "BO": "Latin America & Caribbean",
+    "BR": "Latin America & Caribbean", "CL": "Latin America & Caribbean",
+    "CO": "Latin America & Caribbean", "EC": "Latin America & Caribbean",
+    "GY": "Latin America & Caribbean", "PY": "Latin America & Caribbean",
+    "PE": "Latin America & Caribbean", "SR": "Latin America & Caribbean",
+    "UY": "Latin America & Caribbean", "VE": "Latin America & Caribbean",
+    # Africa
+    "DZ": "Africa", "AO": "Africa", "BJ": "Africa", "BW": "Africa",
+    "BF": "Africa", "BI": "Africa", "CM": "Africa", "CV": "Africa",
+    "CF": "Africa", "TD": "Africa", "KM": "Africa", "CG": "Africa",
+    "CD": "Africa", "DJ": "Africa", "EG": "Africa", "GQ": "Africa",
+    "ER": "Africa", "ET": "Africa", "GA": "Africa", "GM": "Africa",
+    "GH": "Africa", "GN": "Africa", "GW": "Africa", "CI": "Africa",
+    "KE": "Africa", "LS": "Africa", "LR": "Africa", "LY": "Africa",
+    "MG": "Africa", "MW": "Africa", "ML": "Africa", "MR": "Africa",
+    "MU": "Africa", "MA": "Africa", "MZ": "Africa", "NA": "Africa",
+    "NE": "Africa", "NG": "Africa", "RW": "Africa", "ST": "Africa",
+    "SN": "Africa", "SC": "Africa", "SL": "Africa", "SO": "Africa",
+    "ZA": "Africa", "SS": "Africa", "SD": "Africa", "SZ": "Africa",
+    "TZ": "Africa", "TG": "Africa", "TN": "Africa", "UG": "Africa",
+    "ZM": "Africa", "ZW": "Africa",
+    # Australia & Oceania
+    "AU": "Australia & Oceania", "NZ": "Australia & Oceania",
+    "FJ": "Australia & Oceania", "KI": "Australia & Oceania",
+    "MH": "Australia & Oceania", "FM": "Australia & Oceania",
+    "NR": "Australia & Oceania", "PW": "Australia & Oceania",
+    "PG": "Australia & Oceania", "WS": "Australia & Oceania",
+    "SB": "Australia & Oceania", "TO": "Australia & Oceania",
+    "TV": "Australia & Oceania", "VU": "Australia & Oceania",
+}
+
+
+def region_for_country_iso(iso_code):
+    """Returns the region name for a 2-letter ISO code, or None.
+
+    Maps a country to one of six curated regions used by the zone-search
+    quick-open preset feature: North America, Europe, Asia & Middle East,
+    Latin America & Caribbean, Africa, Australia & Oceania.
+    """
+    if not iso_code:
+        return None
+    return REGION_BY_COUNTRY_ISO.get(iso_code.upper())

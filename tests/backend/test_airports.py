@@ -255,3 +255,55 @@ def test_api_airports_search_limit_clamped_server_side(client):
     resp = client.get("/api/airports/search", query_string={"q": "airport", "limit": "500"})
     assert resp.status_code == 200
     assert len(resp.get_json()["airports"]) <= 50
+
+
+# --- Popular airports functions -----------------------------------------------
+
+def test_region_for_coordinates_london_returns_europe():
+    from enrichment.airports import region_for_coordinates
+    region = region_for_coordinates(51.47, -0.46)
+    assert region == "Europe"
+
+
+def test_region_for_coordinates_atlanta_returns_north_america():
+    from enrichment.airports import region_for_coordinates
+    region = region_for_coordinates(33.64, -84.43)
+    assert region == "North America"
+
+
+def test_region_for_coordinates_invalid_coords_returns_none():
+    from enrichment.airports import region_for_coordinates
+    assert region_for_coordinates(None, None) is None
+    assert region_for_coordinates("not-a-number", 0) is None
+
+
+def test_popular_airports_for_region_europe_returns_10():
+    from enrichment.airports import popular_airports_for_region
+    airports = popular_airports_for_region("Europe")
+    assert len(airports) == 10
+    assert airports[0]["iata"] == "LHR"
+
+
+def test_popular_airports_for_region_north_america_returns_10():
+    from enrichment.airports import popular_airports_for_region
+    airports = popular_airports_for_region("North America")
+    assert len(airports) == 10
+    assert airports[0]["iata"] == "ATL"
+
+
+def test_popular_airports_for_region_all_codes_resolve():
+    from enrichment.airports import POPULAR_AIRPORTS_BY_REGION, popular_airports_for_region
+    for region in POPULAR_AIRPORTS_BY_REGION.keys():
+        airports = popular_airports_for_region(region)
+        assert len(airports) == 10, f"Region {region} returned {len(airports)} airports"
+
+
+def test_api_airports_popular_returns_10_for_european_center(client, monkeypatch):
+    import app
+    monkeypatch.setattr(app, "AREA_CENTER", {"lat": 51.47, "lon": -0.46})
+    resp = client.get("/api/airports/popular")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["region"] == "Europe"
+    assert len(data["airports"]) == 10
+    assert data["airports"][0]["iata"] == "LHR"
