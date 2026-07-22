@@ -85,7 +85,6 @@ requires.
 | Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Data sources | | Blocked — no free/no-signup source identified yet |
 | Aircraft serial number (MSN) field | XL (blocked) | Low | Data sources | | Blocked — no verified data source yet, needs research first |
 | Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Frontend UX | | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
-| Use UAV aircraft silhouette icon on map (match category display) | XS | Low | Frontend UX | | Currently uses generic Material Design glyph on map marker; category dropdown uses proper aircraft silhouette (`b0.svg` from icon set). Swap marker icon to match dropdown for visual consistency. Quick win. |
 | *(Historical track interpolation, listed separately below)* | — | — | Duplicate of the two track-smoothing items above; fold into one of them rather than tracking a third time |
 
 ## Bugs
