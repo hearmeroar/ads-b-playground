@@ -1064,7 +1064,7 @@ field) — not wired to one yet.
   (`#ffd400`) + dark stroke (`#1a1a1a`); light theme uses a dark-ink fill
   (`#1c2128`, matching this app's own `--ink` token) + light stroke
   (`#ffffff`) instead, since yellow-on-light would have poor contrast.
-  `categoryIcon()`/`uavIcon()` (`icons.js`) read this instead of the old
+  `categoryIcon()` (`icons.js`) reads this instead of the old
   constants directly. **The stroke half needs a second fix beyond the JS
   constant**: a plain CSS rule always outranks an SVG's own inline
   `stroke=` presentation attribute, so `--marker-stroke-color` has to be a
@@ -1205,7 +1205,7 @@ because photographer name and photo URL come from an external API.
   bright yellow fill with a dark outline instead of per-source colors.
   **Implementation detail:** The toggle's state is read via `isUniformColorEnabled()`
   (a getter in `state-filters.js` that reads the checkbox directly, not a
-  mirrored global), and `categoryIcon()`/`uavIcon()` in `icons.js` replace
+  mirrored global), and `categoryIcon()` in `icons.js` replaces
   both `COLOR` and `STROKE` template placeholders in each glyph before rendering.
   The marker's `data-color` attribute continues to record the *true* per-source
   color regardless of uniform mode — this decoupling keeps existing `colorCounts()`
@@ -2542,7 +2542,7 @@ because photographer name and photo URL come from an external API.
   glyph from the ADS-B Radar free icon set
   (`static/ADS-B_Radar_Free_Aircraft_SVG_Icons/`, mapped 1:1 by DO-260B code:
   `a0.svg`–`a7.svg`, `b0.svg`–`b4.svg`), rendered inline at 200×200 viewBox
-  and scaled down to 28×28 marker pixels. Glyphs are colored per source (see
+  and scaled down to 20×20 marker pixels. Glyphs are colored per source (see
   `SOURCE_COLORS`) via a wrapping `<g fill="COLOR">` and outlined in white
   with `vector-effect="non-scaling-stroke"` to keep the outline a constant
   ~1px on-screen regardless of scale. `unknown` uses `a0.svg` (the icon
@@ -2553,10 +2553,13 @@ because photographer name and photo URL come from an external API.
   uses `categoryIcon('unknown', ...)` as the default whenever `ICON_BUILDERS`
   has no entry for a category group, including when category is
   absent/unrecognized entirely.
-  `uav` is kept as a generic Material Design glyph even though the icon set
-  has a UAV-shaped file (`b0.svg`) — that file is used for the category
-  dropdown only (see below), not the map marker, since no re-approval was
-  given to change the on-map UAV glyph. `rotatedDivIcon()` is the shared builder every rotating icon
+  `uav` renders the icon set's own `b0.svg` (quadcopter silhouette) on the
+  map marker too (2026-07-22, explicit re-approval) — it used to fall back
+  to a generic Material Design "flight" glyph on the map while the category
+  dropdown already used `b0.svg`, so the two disagreed visually for the
+  same category; `UAV_GLYPH` (`icons.js`) is the marker-icon-format copy of
+  the same artwork `CATEGORY_ICON_SVGS.uav` (`state-filters.js`) already
+  draws for the dropdown. `rotatedDivIcon()` is the shared builder every rotating icon
   goes through; it stamps a `data-color` attribute on the marker's wrapper
   `<div>` recording the source color regardless of how many colored `<path>`s
   the glyph itself uses — this is what lets tests count markers by source

@@ -22,17 +22,6 @@ function rotatedDivIcon(cssClass, size, anchor, headingDeg, color, svgInner, vie
   return L.divIcon({ className: '', html: html, iconSize: [size, size], iconAnchor: [anchor, anchor] });
 }
 
-// Default glyph (Material Design "flight" icon, 24×24 viewBox) — used for
-// the uav category, which has no dedicated per-category artwork in the
-// icon set.
-const GENERIC_AIRCRAFT_GLYPH =
-  '<path d="M21,16v-2l-8-5V3.5C13,2.67,12.33,2,11.5,2S10,2.67,10,3.5V9l-8,5v2l8-2.5V19l-2.5,1.5V22l4-1l4,1v-1.5' +
-        'L13,19v-5.5L21,16z" fill="COLOR" stroke="STROKE" stroke-width="0.8"/>';
-
-function genericGlyph(color, strokeColor) {
-  return GENERIC_AIRCRAFT_GLYPH.replace(/COLOR/g, color).replace(/STROKE/g, strokeColor);
-}
-
 // Per-category glyphs from ADS-B Radar icon set (200×200 viewBox). Each wrapped
 // in <g> with source color, stroke, and vector-effect for constant outline.
 // Transform applied to handle coordinate system from source SVG editor.
@@ -42,7 +31,15 @@ const LARGE_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352,
 const HIGH_VORTEX_LARGE_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.254 C 147.119 -41.846000000000004 138.086 -46.68 127.344 -46.68 L 103.125 -46.68 C 100.049 -46.68 98.877 -47.168 96.924 -49.268 L 90.503 -56.217 L 90.503 -66.571 L 81.002 -66.571 L 59.277 -90.478 C 58.057 -91.797 56.592 -92.529 55.029 -92.529 L 48.438 -92.529 C 46.973 -92.529 46.143 -91.211 46.875 -89.648 L 66.26 -46.68 L 34.912 -43.555 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 24.384 -34.95 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 34.912 -26.953 L 66.26 -23.877 L 46.875 19.141 C 46.143 20.654 46.973 21.973 48.438 21.973 L 55.029 21.973 C 56.592 21.973 58.057 21.24 59.277 19.922 L 80.805 -3.927 L 90.503 -3.927 L 90.503 -14.345 L 96.924 -21.24 C 98.877 -23.389 100.049 -23.877 103.125 -23.877 L 127.344 -23.877 C 138.086 -23.877 147.119 -28.662 147.119 -35.254 Z"/></g>';
 const HEAVY_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.254 C 147.119 -41.846000000000004 138.086 -46.68 127.344 -46.68 L 103.125 -46.68 C 100.049 -46.68 98.877 -47.168 96.924 -49.268 L 90.503 -56.217 L 90.503 -66.571 L 81.002 -66.571 L 81.031 -82.156 L 66.863 -82.156 L 59.277 -90.478 C 58.057 -91.797 56.592 -92.529 55.029 -92.529 L 48.438 -92.529 C 46.973 -92.529 46.143 -91.211 46.875 -89.648 L 66.26 -46.68 L 34.912 -43.555 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 34.912 -26.953 L 66.26 -23.877 L 46.875 19.141 C 46.143 20.654 46.973 21.973 48.438 21.973 L 55.029 21.973 C 56.592 21.973 58.057 21.24 59.277 19.922 L 66.848 12.193 L 81.031 12.256 L 81.002 -3.927 L 90.503 -3.927 L 90.503 -14.345 L 96.924 -21.24 C 98.877 -23.389 100.049 -23.877 103.125 -23.877 L 127.344 -23.877 C 138.086 -23.877 147.119 -28.662 147.119 -35.254 Z"/></g>';
 const HIGH_PERFORMANCE_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 17.718 -10.644 L 24.384 -34.95 L 17.718 -59.193 L 22.376 -63.188 L 42.042 -45.053 L 46.445 -45.053 L 42.042 -78.667 L 53.954 -79.462 L 99.913 -44.391 C 99.913 -44.391 119.05 -46.566 128.237 -44.391 C 135.089 -42.769 147.119 -34.918 147.119 -34.918 C 147.119 -34.918 135.081 -27.123 128.237 -25.509 C 119.056 -23.344 99.939 -25.485 99.939 -25.485 L 53.954 9.636 L 42.042 8.831 L 46.445 -24.784 L 42.042 -24.784 L 22.376 -6.638 L 17.718 -10.644 Z"/></g>';
-const ROTORCRAFT_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 142.944 -44.391 C 139.538 -52.615 135.405 -50.329 128.237 -53.832 C 116.927 -59.359 102.102 -58.649 90.472 -53.832 C 82.248 -50.426 71.59 -40.893 71.59 -40.893 L 33.825 -40.893 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 24.384 -44.391 L 24.384 -25.509 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 33.822 -30.006 L 71.59 -29.975 C 71.59 -29.975 82.248 -19.474 90.472 -16.068 C 102.102 -11.25 116.937 -10.521 128.237 -16.068 C 135.379 -19.574 139.429 -17.285 142.835 -25.509 C 145.244 -31.324 145.353 -38.576 142.86 -44.422 L 142.944 -44.391 Z"/></g>';
+// Body + two rotor-blade paths — the dropdown's rotorcraft entry
+// (CATEGORY_ICON_SVGS.rotorcraft, state-filters.js) has all three; this
+// glyph used to carry only the body, found while auditing every category
+// glyph for dropdown/marker parity alongside the UAV fix above (2026-07-22).
+const ROTORCRAFT_GLYPH = '<g fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke">' +
+  '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)"><path d="M 142.944 -44.391 C 139.538 -52.615 135.405 -50.329 128.237 -53.832 C 116.927 -59.359 102.102 -58.649 90.472 -53.832 C 82.248 -50.426 71.59 -40.893 71.59 -40.893 L 33.825 -40.893 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 24.384 -44.391 L 24.384 -25.509 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 33.822 -30.006 L 71.59 -29.975 C 71.59 -29.975 82.248 -19.474 90.472 -16.068 C 102.102 -11.25 116.937 -10.521 128.237 -16.068 C 135.379 -19.574 139.429 -17.285 142.835 -25.509 C 145.244 -31.324 145.353 -38.576 142.86 -44.422 L 142.944 -44.391 Z"/></g>' +
+  '<path d="M 96.385 -25.442 C 96.705 55.448 96.705 113.74 96.607 193.603 C 96.599 200.4 105.318 200.399 105.292 193.603 C 104.981 113.74 104.981 55.448 104.846 -25.442 C 104.835 -32.064 96.359 -32.064 96.385 -25.442 Z" transform="matrix(0.642788, -0.766044, 0.766044, 0.642788, -28.43878, 107.304662)"/>' +
+  '<path d="M 96.348 -25.479 C 96.668 55.411 96.668 113.703 96.57 193.566 C 96.562 200.363 105.281 200.362 105.255 193.566 C 104.944 113.703 104.944 55.411 104.809 -25.479 C 104.798 -32.101 96.322 -32.101 96.348 -25.479 Z" transform="matrix(0.642788, 0.766044, -0.766044, 0.642788, 100.438642, -47.173674)"/>' +
+'</g>';
 const GLIDER_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.509 C 147.119 -42.101 128.247 -40.196 128.247 -40.196 C 128.247 -40.196 121.869 -39.494 118.811 -40.229 C 115.479 -41.03 109.637 -44.871 109.637 -44.871 C 109.637 -44.871 109.637 -82.316 109.637 -97.762 C 109.637 -101.182 99.913 -101.038 99.913 -101.038 C 98.849 -102.188 99.913 -59.556 97.974 -44.881 C 96.725 -42.05 90.503 -40.229 90.503 -40.229 L 24.386 -38.787 L 24.658 -62.158 C 23.828 -63.477 22.9 -64.062 21.094 -64.062 L 18.359 -64.062 C 16.895 -64.062 16.064 -63.281 16.064 -61.768 L 14.943 -34.95 L 16.064 -8.789 C 16.064 -7.227 16.895 -6.494 18.359 -6.494 L 21.094 -6.494 C 22.9 -6.494 23.828 -7.08 24.658 -8.398 L 24.386 -32.234 L 90.503 -30.858 C 90.503 -30.858 96.893 -28.325 97.974 -26.14 C 100.715 -9.365 99.913 28.489 99.939 30.016 C 99.181 30.002 109.637 30.048 109.637 26.756 C 109.637 11.297 109.637 -26.148 109.637 -26.148 C 111.59 -28.297 115.471 -30.44 119.008 -30.858 C 122.368 -30.977 128.247 -30.826 128.247 -30.826 C 128.247 -30.826 147.119 -28.917 147.119 -35.509 Z"/></g>';
 const LIGHTER_THAN_AIR_GLYPH = '<g transform="translate(100, 100)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><ellipse cx="0" cy="0.1" rx="46.209" ry="85.8"/></g>';
 const PARACHUTIST_GLYPH = '<g fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 142.86 28.6 L 171.432 57.2 L 185.718 100.1 L 171.432 143 L 142.86 171.6 L 100.002 185.9 L 57.144 171.6 L 28.572 143 L 14.286 100.1 L 28.572 57.2 L 57.144 28.6 L 100.002 14.3 L 142.86 28.6 Z"/><circle cx="100" cy="100" r="12.48" style="fill: rgb(255, 255, 255);"/></g>';
@@ -51,11 +48,27 @@ const SURFACE_OBSTACLE_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 
 // Unknown / no-category aircraft (ADS-B Radar a0.svg — "no ADS-B info" variant).
 const UNKNOWN_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.2539 C 147.119 -41.8457 138.086 -46.6797 127.344 -46.6797 L 103.125 -46.6797 C 100.049 -46.6797 98.877 -47.168 96.9238 -49.2676 L 59.2773 -90.4785 C 58.0566 -91.7969 56.5918 -92.5293 55.0293 -92.5293 L 48.4375 -92.5293 C 46.9727 -92.5293 46.1426 -91.2109 46.875 -89.6484 L 66.2598 -46.6797 L 34.9121 -43.5547 L 24.6582 -62.1582 C 23.8281 -63.4766 22.9004 -64.0625 21.0938 -64.0625 L 18.3594 -64.0625 C 16.8945 -64.0625 16.0645 -63.2812 16.0645 -61.7676 L 16.0645 -8.78906 C 16.0645 -7.22656 16.8945 -6.49414 18.3594 -6.49414 L 21.0938 -6.49414 C 22.9004 -6.49414 23.8281 -7.08008 24.6582 -8.39844 L 34.9121 -26.9531 L 66.2598 -23.877 L 46.875 19.1406 C 46.1426 20.6543 46.9727 21.9727 48.4375 21.9727 L 55.0293 21.9727 C 56.5918 21.9727 58.0566 21.2402 59.2773 19.9219 L 96.9238 -21.2402 C 98.877 -23.3887 100.049 -23.877 103.125 -23.877 L 127.344 -23.877 C 138.086 -23.877 147.119 -28.6621 147.119 -35.2539 Z"/></g>';
 
+// UAV (OpenSky cat 14 / ADSBExchange B6) — the icon set's own b0.svg
+// (quadcopter silhouette: four rotor rings + a stylized body), the same
+// artwork the category dropdown already uses (CATEGORY_ICON_SVGS.uav in
+// state-filters.js). Each shape keeps its own per-path transform (there's
+// no single shared group transform in this glyph, unlike the others above),
+// with the dropdown copy's individual fill="currentColor" attributes
+// dropped in favor of one COLOR fill on the wrapping <g>, matching every
+// other glyph's pattern.
+const UAV_GLYPH = '<g fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke">' +
+  '<path d="M 565 355 m -35.428 0 a 35.428 35.428 0 1 0 70.856 0 a 35.428 35.428 0 1 0 -70.856 0 Z M 565 355 m -21.257 0 a 21.257 21.257 0 0 1 42.514 0 a 21.257 21.257 0 0 1 -42.514 0 Z" transform="matrix(-0.724416, 0.689363, -0.689363, -0.724416, 703.93356, -82.23506)"/>' +
+  '<path d="M 565 355 m -35.428 0 a 35.428 35.428 0 1 0 70.856 0 a 35.428 35.428 0 1 0 -70.856 0 Z M 565 355 m -21.257 0 a 21.257 21.257 0 0 1 42.514 0 a 21.257 21.257 0 0 1 -42.514 0 Z" transform="matrix(-0.724416, 0.689363, -0.689363, -0.724416, 804.108365, -82.23506)"/>' +
+  '<path d="M 565 355 m -35.428 0 a 35.428 35.428 0 1 0 70.856 0 a 35.428 35.428 0 1 0 -70.856 0 Z M 565 355 m -21.257 0 a 21.257 21.257 0 0 1 42.514 0 a 21.257 21.257 0 0 1 -42.514 0 Z" transform="matrix(-0.724416, 0.689363, -0.689363, -0.724416, 704.106351, 17.864939)"/>' +
+  '<path d="M 565 355 m -35.428 0 a 35.428 35.428 0 1 0 70.856 0 a 35.428 35.428 0 1 0 -70.856 0 Z M 565 355 m -21.257 0 a 21.257 21.257 0 0 1 42.514 0 a 21.257 21.257 0 0 1 -42.514 0 Z" transform="matrix(-0.724416, 0.689363, -0.689363, -0.724416, 804.108365, 17.7901)"/>' +
+  '<path d="M 57.144 42.9 C 74.235 41.207 79.789 71.5 100.002 71.5 C 120.215 71.5 125.769 41.207 142.86 42.9 C 149.565 43.564 156.482 50.495 157.146 57.2 C 158.839 74.298 128.574 79.887 128.574 100.1 C 128.574 120.313 158.839 125.902 157.146 143 C 156.482 149.705 149.565 156.636 142.86 157.3 C 125.769 158.993 120.215 128.7 100.002 128.7 C 79.789 128.7 74.235 158.993 57.144 157.3 C 50.439 156.636 43.522 149.705 42.858 143 C 41.165 125.902 71.43 120.313 71.43 100.1 C 71.43 79.887 41.165 74.298 42.858 57.2 C 43.522 50.495 50.439 43.564 57.144 42.9 Z"/>' +
+'</g>';
+
 // Every per-category marker icon differs only in its glyph and CSS class,
 // so one table + one factory replaces the old per-category function pairs.
-// Keys are category groups with a dedicated ADS-B Radar glyph; uav is the
-// one exception (generic Material Design glyph, different size/viewBox —
-// see uavIcon) and joins ICON_BUILDERS separately below.
+// Every category group has its own dedicated ADS-B Radar glyph here,
+// including uav — see UAV_GLYPH above for why it's not the same file
+// reference as the others.
 const CATEGORY_GLYPHS = {
   light: LIGHT_GLYPH,                     // OpenSky cat 2 / ADSBExchange A1
   small: SMALL_GLYPH,                     // cat 3 / A2
@@ -68,6 +81,7 @@ const CATEGORY_GLYPHS = {
   lighter_than_air: LIGHTER_THAN_AIR_GLYPH,   // cat 10 / B2
   parachutist: PARACHUTIST_GLYPH,         // cat 11 / B3
   ultralight: ULTRALIGHT_GLYPH,           // cat 12 / B4
+  uav: UAV_GLYPH,                         // cat 14 / B6 (b0.svg)
   unknown: UNKNOWN_GLYPH,                 // cat 0 / absent (a0.svg) — also iconFor()'s fallback
   // space: intentionally absent — falls through to the unknown icon in iconFor().
 };
@@ -81,16 +95,6 @@ function categoryIcon(group, headingDeg, color) {
   const strokeColor = isUniformColorEnabled() ? uniformMarkerColors().stroke : '#fff';
   const svg = CATEGORY_GLYPHS[group].replace(/COLOR/g, fillColor).replace(/STROKE/g, strokeColor);
   return rotatedDivIcon(cssClass, 20, 10, headingDeg, color, svg, '0 0 200 200');
-}
-
-// UAV (OpenSky cat 14 / ADSBExchange B6) — deliberately keeps the generic
-// Material Design glyph rather than the icon set's b0.svg, which is used
-// for the category dropdown only (no re-approval was given to change the
-// on-map UAV glyph).
-function uavIcon(headingDeg, color) {
-  const fillColor = isUniformColorEnabled() ? uniformMarkerColors().fill : color;
-  const strokeColor = isUniformColorEnabled() ? uniformMarkerColors().stroke : '#fff';
-  return rotatedDivIcon('uav-icon', 28, 14, headingDeg, color, genericGlyph(fillColor, strokeColor));
 }
 
 // Surface obstacle icon for ground stations/vehicles (`isGroundVehicle` or
@@ -133,7 +137,7 @@ function airportIcon(type) {
   return rotatedDivIcon(cssClass, size, size / 2, 0, AIRPORT_MARKER_COLOR, glyph, '0 0 24 24');
 }
 
-const ICON_BUILDERS = { uav: uavIcon };
+const ICON_BUILDERS = {};
 for (const group of Object.keys(CATEGORY_GLYPHS)) {
   ICON_BUILDERS[group] = (headingDeg, color) => categoryIcon(group, headingDeg, color);
 }
