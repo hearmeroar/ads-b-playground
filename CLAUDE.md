@@ -891,6 +891,138 @@ worldwide as map markers, off by default like every other optional overlay.
   is the house style for any toggleable map layer with source/caveat
   details worth explaining on demand, not weather-specific.
 
+**Theme toggle** (`#theme-mode-toggle` in the HUD, `static/js/
+state-filters.js`, `static/style.css`): a two-way Light/Dark mode
+selector — deliberately the `.segmented`/`.seg-btn` widget (same family as
+the Units toggle), not the `.switch` pill used for simple on/off feature
+toggles, since this reads as a genuine mode, not a checkbox. No third
+"Auto" segment: `resolveInitialThemeMode()` seeds the initial value once
+from `window.matchMedia('(prefers-color-scheme: dark)')`, then it's an
+explicit, session-only choice like every other display preference here
+(no `localStorage`/`sessionStorage` anywhere in this app). The resolution
+logic is deliberately isolated in its own function as an extension point
+for a possible future backend-configured default (e.g. a `/api/config`
+field) — not wired to one yet.
+- **CSS token system**: `style.css`'s `:root` block, previously just 4
+  custom properties (`--ink`/`--muted`/`--border`/`--card-bg`), grew to 16 —
+  `--surface`/`--surface-hover`/`--surface-strong` (dropdown/segmented/input
+  chrome), `--overlay-hover`/`--overlay-fill`/`--overlay-badge`/
+  `--overlay-strong` (four distinct "ink-tint" roles — hover states, static
+  card fills, badge pills, and the empty-state icon's stronger tint —
+  inverted by visual weight in dark mode, not by mirroring the same alpha
+  number, since the same alpha reads very differently against a light vs.
+  dark substrate), `--switch-track-off`/`--switch-knob`/`--spinner-track`
+  (small chrome bits), `--scrollbar-thumb` (new — no scrollbar styling
+  existed anywhere before this), `--map-bg` (the app's root background —
+  `#map`'s own `background`, the only visible root-background layer in the
+  app; `html`/`body` have none of their own), and `--marker-fill-color`/
+  `--marker-stroke-color` (see below). Every existing "glass card" — `#hud`,
+  `#sidebar`, `#dev-aircraft-panel`, `#collection-panel`, `#source-tooltip`,
+  `.user-menu-*`, the Leaflet `.airport-popup` override — already routed
+  through the original 4 variables via one shared `background:
+  var(--card-bg); backdrop-filter: blur(10px); border: 1px solid
+  var(--border);` idiom, so redefining just those re-themes most of the
+  chrome; the other 12 cover the literal hardcoded colors that didn't
+  already route through a variable (dropdown/segmented backgrounds, switch
+  track/knob, spinner rings, several `rgba(15,23,42,0.0X)` overlay tints).
+  Also fixes a pre-existing dead reference: `#hud .chip-checkbox:hover`
+  read `var(--surface-hover)` before this, a variable that was never
+  actually defined anywhere.
+- **Cascade mechanism** — two layers, no `!important` needed (an attribute
+  selector's specificity beats a bare `:root` block regardless of source
+  order):
+  ```css
+  :root { /* light values, the defaults */ }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { /* dark values */ }
+  }
+  :root[data-theme="dark"] { /* same dark values, forces dark regardless of OS */ }
+  ```
+  The `@media` layer is a pure-CSS fallback that works even before JS runs;
+  `[data-theme]` (written by `state-filters.js`) is what the toggle
+  actually sets at runtime, and `:not([data-theme="light"])` is what lets
+  an explicit Light choice override a dark OS preference.
+- **Auto-switches the basemap — but only from an explicit toggle click,
+  never on page load**: `THEME_BASEMAP = { dark: 'dark', light: 'voyager'
+  }` pairs each theme with a basemap key (see Basemap picker above).
+  `map-init.js`'s own `currentBaseLayerKey` default is an independently
+  tested, deliberate product choice (`test_basemap.spec.js` asserts it) —
+  seeding the toggle's *initial* segment from `prefers-color-scheme` must
+  never silently override that default basemap for a visitor who never
+  touches the toggle. `applyThemeChrome(mode)` (CSS tokens + marker stroke
+  only) runs once at load from the resolved initial mode; `applyThemeMode
+  (mode)` (chrome + basemap switch + immediate `poll()`) only ever runs
+  from the toggle's own `click` handler. `setBaseLayer()` itself
+  (map-init.js) only swaps the Leaflet tile layer and touches no DOM — the
+  basemap dropdown's own "which option is `.active`, what label is shown"
+  sync used to be inlined only inside its per-option click handler; it's
+  now `syncBasemapDropdownUi(key)`, a small helper called from both that
+  handler and the theme toggle, so opening the basemap dropdown after an
+  automatic theme-driven switch shows the correct option, not a stale one.
+- **Auto-switches the uniform marker color** to whichever fill/stroke pair
+  actually contrasts against the current theme, not the same fixed pair
+  regardless — `UNIFORM_MARKER_COLORS` (`constants.js`) replaces the old
+  flat `UNIFORM_MARKER_COLOR`/`UNIFORM_MARKER_STROKE_COLOR` constants with
+  a `{dark: {fill, stroke}, light: {fill, stroke}}` lookup, read via
+  `uniformMarkerColors()`: dark theme keeps the original bright yellow fill
+  (`#ffd400`) + dark stroke (`#1a1a1a`); light theme uses a dark-ink fill
+  (`#1c2128`, matching this app's own `--ink` token) + light stroke
+  (`#ffffff`) instead, since yellow-on-light would have poor contrast.
+  `categoryIcon()`/`uavIcon()` (`icons.js`) read this instead of the old
+  constants directly. **The stroke half needs a second fix beyond the JS
+  constant**: a plain CSS rule always outranks an SVG's own inline
+  `stroke=` presentation attribute, so `--marker-stroke-color` has to be a
+  real custom property some rule can consume, not just computed in JS —
+  `applyThemeChrome()`/`applyThemeMode()` set it via
+  `document.body.style.setProperty('--marker-stroke-color', ...)`, an
+  inline style that always outranks the old `body.uniform-color-mode`
+  class rule regardless of which one is hardcoded (that class rule no
+  longer hardcodes a value itself — the `:root`/`[data-theme]` token blocks
+  above already supply the right fallback before JS runs).
+  **Toggling uniform-color itself still doesn't force a redraw**
+  (`isUniformColorEnabled()` is only re-read on the next `syncMarkers()`
+  poll cycle) — this is why `applyThemeMode()` calls `poll()` once
+  immediately, so the marker recolor (and the basemap switch) both feel
+  instant instead of waiting up to `POLL_INTERVAL_MS` (12s).
+- **Root background**: `#map`'s `background` now reads `var(--map-bg,
+  #eef1f4)` instead of a hardcoded hex — confirmed the only visible root
+  background layer in the app (no separate `html`/`body` background
+  exists), so this one change is what makes "the whole app's background"
+  flip dark/light.
+- **Scrollbars**: no scrollbar styling existed anywhere before this.
+  `scrollbar-color`/`::-webkit-scrollbar-thumb` rules, keyed to
+  `--scrollbar-thumb`, are scoped to the four containers that actually
+  scroll — `#hud`, `#sidebar`, `#dev-aircraft-panel-scroll`,
+  `#collection-panel-grid` — not a page-wide rule (the page itself uses
+  `position:fixed` layout and never scrolls).
+- **Explicit, permanent exceptions** (left untouched on purpose, not an
+  oversight): `.google-signin-btn` stays light per Google's own sign-in
+  branding guidelines; status/brand colors (`#1a73e8` accent, `#dc2626`
+  error/emergency, `#22c55e` live-dot, `#b45309` unverified-route amber)
+  are saturated enough to read on both themes; per-source `--row-color`
+  inline swatches (~20 `.switch` labels in `index.html`) identify data
+  sources, not theme; `.plane-icon svg`'s non-uniform stroke,
+  `.radius-ring-label`, and Leaflet's own `.leaflet-control-attribution`
+  are all keyed to map tiles, not UI theme.
+- **Help popover**: `#theme-mode-help`/`#theme-mode-help-popover`,
+  `refreshDarkModeHelp()` in `main.js`, wired via the same shared
+  `wireHelpPopover()` every other HUD help button uses.
+- **Round icon buttons found still light during manual QA, fixed in a
+  follow-up pass**: `#sidebar-close`/`#sidebar-center-map`/
+  `#sidebar-save-collection` (the sidebar's three circular buttons) and
+  `.collection-card-icon-btn`/`.collection-card-removed-overlay`/
+  `.collection-card-removed-label`/`.collection-card-undo-hint` all used
+  to hardcode `rgba(255,255,255,...)` directly rather than a token — not
+  "glass cards" in the `--card-bg`/blur sense, so the initial token pass
+  missed them. Now use `--surface-strong`/`--surface-hover`/`--card-bg`.
+  `.user-avatar`'s pre-load placeholder background (`#cbd5e1`) is now
+  `var(--surface)` for the same reason. **`#aircraft-search`** (the "Search
+  by ICAO (hex)" input, `index.html`) is styled entirely via an inline
+  `style=` attribute with no CSS class — it never had a `background`
+  property at all, so it fell back to the browser's native white input
+  background regardless of theme; its inline style now also sets
+  `background:var(--surface); color:var(--ink);`.
+
 **Aircraft photos, two sources, Planespotters primary + airport-data.com
 top-up** (`app.py`):
 - `/api/photo/reg/<registration>`, `/api/photo/hex/<icao24>` →

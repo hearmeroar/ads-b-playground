@@ -129,6 +129,82 @@ function syncUniformColorBodyClass() {
 }
 syncUniformColorBodyClass();
 
+// Theme mode ('light' | 'dark') — a genuine two-way mode selector (segmented
+// control, like Units above), not a plain on/off .switch: it drives four
+// things together, not just CSS chrome — see CLAUDE.md's Theme toggle
+// section. No third "Auto" segment: the initial value is seeded once from
+// the browser's own preference, then it's an explicit, session-only choice
+// like every other display preference in this app (nothing here uses
+// localStorage/sessionStorage).
+function resolveInitialThemeMode() {
+  // Extension point for a future backend-configured default (e.g. a
+  // /api/config field) to override this before falling back to the
+  // browser's own preference. Not wired to a config source yet.
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+  return 'light';
+}
+
+// Paired basemap per theme: dark theme shows the CARTO Dark tiles, light
+// theme shows Voyager (this app's documented light default) — but this
+// pairing is only ever *applied* from an explicit toggle click (see
+// applyThemeMode() below), never at page load. map-init.js's own
+// currentBaseLayerKey default (currently 'dark') is a deliberate,
+// independently-tested product choice (test_basemap.spec.js asserts it) —
+// seeding the toggle from prefers-color-scheme must not silently override
+// that default basemap for a visitor who never touched the toggle at all.
+const THEME_BASEMAP = { dark: 'dark', light: 'voyager' };
+
+let currentThemeMode = resolveInitialThemeMode();
+
+// Chrome-only application: CSS tokens (via data-theme) + the uniform-marker
+// stroke color. Safe to call once, synchronously, at this file's own
+// top-level load time — everything it touches (uniformMarkerColors()) is
+// already defined earlier in the script load order. Deliberately does NOT
+// touch the basemap — see the THEME_BASEMAP comment above.
+function applyThemeChrome(mode) {
+  currentThemeMode = mode;
+  document.documentElement.dataset.theme = mode;
+  // Uniform marker color's stroke is fought over by a plain CSS rule (see
+  // the uniform-color-mode comment above) — an inline style always outranks
+  // it regardless of which one is hardcoded, so this is what actually makes
+  // the stroke color theme-aware.
+  document.body.style.setProperty('--marker-stroke-color', uniformMarkerColors().stroke);
+}
+
+// The toggle-click path: applies the chrome above, THEN forces the paired
+// basemap switch (only here — an explicit user action, not an
+// auto-applied-on-load side effect) and an immediate redraw. Toggling
+// uniform-color itself doesn't force a redraw today (isUniformColorEnabled()
+// is only re-read on the next poll cycle) — an immediate poll() here is
+// what makes the marker recolor (and everything else) feel instant instead
+// of waiting up to POLL_INTERVAL_MS. Only safe to call from a runtime event
+// handler (by the time a user can click anything, every script — including
+// main.js's poll() — has already loaded), never at this file's own
+// top-level load time.
+function applyThemeMode(mode) {
+  applyThemeChrome(mode);
+  setBaseLayer(THEME_BASEMAP[mode]);
+  syncBasemapDropdownUi(THEME_BASEMAP[mode]);
+  poll();
+}
+
+const themeModeButtons = document.querySelectorAll('#theme-mode-toggle .seg-btn');
+themeModeButtons.forEach((btn) => {
+  if (btn.dataset.value === currentThemeMode) btn.classList.add('active');
+  btn.addEventListener('click', () => {
+    if (btn.classList.contains('active')) return;
+    themeModeButtons.forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyThemeMode(btn.dataset.value);
+  });
+});
+// Seed the chrome (only) from the resolved initial mode immediately — the
+// basemap stays whatever map-init.js's own default already is until the
+// user actually interacts with this toggle.
+applyThemeChrome(currentThemeMode);
+
 // Purely presentational (no data to (re)fetch), so — like devModeToggle
 // above — this mutates the map directly instead of triggering poll().
 // scanRadiusLayer (map-init.js) is reassigned once /api/config resolves,
@@ -301,15 +377,22 @@ basemapTrigger.addEventListener('click', (e) => {
   e.stopPropagation();
   basemapDropdown.classList.toggle('open');
 });
+// Factored out of the per-option click handler so the theme toggle below can
+// also drive the basemap (dark theme -> Dark basemap, light theme ->
+// Voyager) while keeping the dropdown's own displayed label/active option in
+// sync — setBaseLayer() itself (map-init.js) only swaps the Leaflet tile
+// layer and touches no DOM.
+function syncBasemapDropdownUi(key) {
+  basemapOptions.forEach((o) => o.classList.toggle('active', o.dataset.value === key));
+  basemapValueWrap.innerHTML =
+    '<span class="swatch" style="background:' + BASE_LAYERS[key].swatch + '"></span>'
+    + '<span class="dropdown-value">' + BASE_LAYERS[key].label + '</span>';
+}
 basemapOptions.forEach((opt) => {
   opt.addEventListener('click', () => {
-    basemapOptions.forEach((o) => o.classList.remove('active'));
-    opt.classList.add('active');
     const key = opt.dataset.value;
     setBaseLayer(key);
-    basemapValueWrap.innerHTML =
-      '<span class="swatch" style="background:' + BASE_LAYERS[key].swatch + '"></span>'
-      + '<span class="dropdown-value">' + BASE_LAYERS[key].label + '</span>';
+    syncBasemapDropdownUi(key);
     basemapDropdown.classList.remove('open');
   });
 });

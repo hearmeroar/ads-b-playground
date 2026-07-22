@@ -86,6 +86,11 @@ in-memory dict.
   aircraft marker in a single bright yellow with a dark outline, instead of
   the default per-source color scheme. Useful for focusing on aircraft
   position and movement without the visual distraction of multiple colors.
+- **Theme toggle** — a Light/Dark mode selector (starts from your system's
+  own preference) that re-themes the HUD/sidebar/panels and, when you
+  actually switch it, also pairs a matching basemap (Dark ↔ CARTO Dark
+  tiles, Light ↔ Voyager) and flips the uniform marker color to whichever
+  contrasts best (bright yellow on dark, dark ink on light).
 - **Weather layers** — four independently toggleable, off-by-default HUD
   layers, any combination at once: live Precipitation radar and a
   short-range Forecast (nowcast) composite via

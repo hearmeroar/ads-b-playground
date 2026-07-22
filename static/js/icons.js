@@ -77,8 +77,8 @@ const CATEGORY_GLYPHS = {
 // key off these names, so the underscore→hyphen derivation must not change.
 function categoryIcon(group, headingDeg, color) {
   const cssClass = group.replace(/_/g, '-') + '-icon';
-  const fillColor = isUniformColorEnabled() ? UNIFORM_MARKER_COLOR : color;
-  const strokeColor = isUniformColorEnabled() ? UNIFORM_MARKER_STROKE_COLOR : '#fff';
+  const fillColor = isUniformColorEnabled() ? uniformMarkerColors().fill : color;
+  const strokeColor = isUniformColorEnabled() ? uniformMarkerColors().stroke : '#fff';
   const svg = CATEGORY_GLYPHS[group].replace(/COLOR/g, fillColor).replace(/STROKE/g, strokeColor);
   return rotatedDivIcon(cssClass, 20, 10, headingDeg, color, svg, '0 0 200 200');
 }
@@ -88,8 +88,8 @@ function categoryIcon(group, headingDeg, color) {
 // for the category dropdown only (no re-approval was given to change the
 // on-map UAV glyph).
 function uavIcon(headingDeg, color) {
-  const fillColor = isUniformColorEnabled() ? UNIFORM_MARKER_COLOR : color;
-  const strokeColor = isUniformColorEnabled() ? UNIFORM_MARKER_STROKE_COLOR : '#fff';
+  const fillColor = isUniformColorEnabled() ? uniformMarkerColors().fill : color;
+  const strokeColor = isUniformColorEnabled() ? uniformMarkerColors().stroke : '#fff';
   return rotatedDivIcon('uav-icon', 28, 14, headingDeg, color, genericGlyph(fillColor, strokeColor));
 }
 

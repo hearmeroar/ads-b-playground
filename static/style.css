@@ -1,16 +1,98 @@
-/* Root variables & base */
+/* Root variables & base — light theme (default) */
 :root {
   --ink: #1c2128;
   --muted: #6b7280;
   --border: rgba(15, 23, 42, 0.08);
   --card-bg: rgba(255, 255, 255, 0.86);
+  --surface: #eef0f3;
+  --surface-hover: #e5e8ec;
+  --surface-strong: #fff;
+  --overlay-hover: rgba(15, 23, 42, 0.06);
+  --overlay-fill: rgba(15, 23, 42, 0.02);
+  --overlay-badge: rgba(15, 23, 42, 0.06);
+  --overlay-strong: rgba(15, 23, 42, 0.16);
+  --map-bg: #eef1f4;
+  --switch-track-off: #d7dbe1;
+  --switch-knob: #fff;
+  --spinner-track: #e3e6ea;
+  --scrollbar-thumb: #cbd5e1;
+  --marker-fill-color: #ffd400;
+  --marker-stroke-color: #1a1a1a;
+}
+
+/* Dark theme */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #f0f1f3;
+    --muted: #a0a6b0;
+    --border: rgba(255, 255, 255, 0.12);
+    --card-bg: rgba(24, 27, 33, 0.94);
+    --surface: #2d3139;
+    --surface-hover: #3a414b;
+    --surface-strong: #1a1d24;
+    --overlay-hover: rgba(255, 255, 255, 0.08);
+    --overlay-fill: rgba(255, 255, 255, 0.04);
+    --overlay-badge: rgba(255, 255, 255, 0.08);
+    --overlay-strong: rgba(255, 255, 255, 0.22);
+    --map-bg: #1a1d24;
+    --switch-track-off: #3a414b;
+    --switch-knob: #1a1d24;
+    --spinner-track: #3a414b;
+    --scrollbar-thumb: #4a525c;
+    --marker-fill-color: #ffd400;
+    --marker-stroke-color: #1a1a1a;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #f0f1f3;
+  --muted: #a0a6b0;
+  --border: rgba(255, 255, 255, 0.12);
+  --card-bg: rgba(24, 27, 33, 0.94);
+  --surface: #2d3139;
+  --surface-hover: #3a414b;
+  --surface-strong: #1a1d24;
+  --overlay-hover: rgba(255, 255, 255, 0.08);
+  --overlay-fill: rgba(255, 255, 255, 0.04);
+  --overlay-badge: rgba(255, 255, 255, 0.08);
+  --overlay-strong: rgba(255, 255, 255, 0.22);
+  --map-bg: #1a1d24;
+  --switch-track-off: #3a414b;
+  --switch-knob: #1a1d24;
+  --spinner-track: #3a414b;
+  --scrollbar-thumb: #4a525c;
+  --marker-fill-color: #ffd400;
+  --marker-stroke-color: #1a1a1a;
+}
+:root[data-theme="light"] {
+  --marker-fill-color: #1c2128;
+  --marker-stroke-color: #ffffff;
+}
+
+/* Scrollbar theming for the app's four internally-scrolling panels. Firefox
+   (scrollbar-color/-width) and Chromium/Safari (::-webkit-scrollbar*) need
+   separate syntaxes; no scrollbar styling existed anywhere before this. */
+#hud, #sidebar, #dev-aircraft-panel-scroll, #collection-panel-grid {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+#hud::-webkit-scrollbar, #sidebar::-webkit-scrollbar,
+#dev-aircraft-panel-scroll::-webkit-scrollbar, #collection-panel-grid::-webkit-scrollbar {
+  width: 8px;
+}
+#hud::-webkit-scrollbar-thumb, #sidebar::-webkit-scrollbar-thumb,
+#dev-aircraft-panel-scroll::-webkit-scrollbar-thumb, #collection-panel-grid::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb); border-radius: 4px;
+}
+#hud::-webkit-scrollbar-track, #sidebar::-webkit-scrollbar-track,
+#dev-aircraft-panel-scroll::-webkit-scrollbar-track, #collection-panel-grid::-webkit-scrollbar-track {
+  background: transparent;
 }
 html, body { margin: 0; padding: 0; height: 100%; }
 /* position: fixed (not absolute) is what makes the map a true backdrop: its
    containing block becomes the viewport itself rather than the document, so
    it can never move even if the page scrolls (see #hud below — the one
    element still allowed to make the document taller than the viewport). */
-#map { position: fixed; inset: 0; background: #eef1f4; }
+#map { position: fixed; inset: 0; background: var(--map-bg, #eef1f4); }
 
 /* HUD panel with its own internal scrolling. Fixed position so the scrollbar
    scrolls within the panel bounds, not the viewport. */
@@ -53,7 +135,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .source-name { font-weight: 500; }
 #hud .source-count {
   padding: 1px 7px; border-radius: 999px;
-  background: rgba(15, 23, 42, 0.06); color: var(--muted);
+  background: var(--overlay-badge); color: var(--muted);
   font-size: 11px; font-variant-numeric: tabular-nums;
 }
 /* A disabled source renders an empty count — collapse the pill entirely
@@ -65,7 +147,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .source-count.loading { background: none; padding: 0; }
 #hud .count-spinner {
   display: block; width: 10px; height: 10px; border-radius: 50%;
-  border: 1.5px solid rgba(15, 23, 42, 0.14); border-top-color: var(--muted);
+  border: 1.5px solid var(--overlay-hover); border-top-color: var(--muted);
   animation: gallery-spin .7s linear infinite;
 }
 #hud .count-spinner[hidden] { display: none; }
@@ -101,18 +183,22 @@ html, body { margin: 0; padding: 0; height: 100%; }
   position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1;
 }
 #hud .switch-track {
-  position: absolute; inset: 0; background: #d7dbe1; border-radius: 999px;
+  position: absolute; inset: 0; background: var(--switch-track-off); border-radius: 999px;
   transition: background .15s ease;
 }
 #hud .switch-track::before {
   content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
-  background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  background: var(--switch-knob); border-radius: 50%; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: transform .15s ease;
 }
 #hud .switch input:checked + .switch-track { background: var(--row-color, #1a73e8); }
 #hud .switch input:checked + .switch-track::before { transform: translateX(13px); }
 
-#hud .filter-block { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+/* position:relative so a .source-help-popover placed directly inside a
+   .filter-block (not nested in a .source-row, which already has its own
+   position:relative) still anchors correctly — e.g. the Theme toggle's
+   help popover. */
+#hud .filter-block { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); position: relative; }
 #hud .filter-title { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
 #hud .filter-block .source-row { margin-bottom: 4px; }
 #hud .filter-block .source-row:last-child { margin-bottom: 0; }
@@ -150,14 +236,14 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .airport-type-list[hidden] { display: none; }
 #hud .airport-type-list .source-row { margin-bottom: 0; }
 #hud .segmented {
-  display: flex; background: #eef0f3; border-radius: 9px; padding: 2px; gap: 2px;
+  display: flex; background: var(--surface); border-radius: 9px; padding: 2px; gap: 2px;
 }
 #hud .seg-btn {
   flex: 1; border: none; background: transparent; color: var(--muted);
   font: inherit; font-size: 11px; font-weight: 500; padding: 5px 4px;
   border-radius: 7px; cursor: pointer; transition: background .15s ease, color .15s ease;
 }
-#hud .seg-btn.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15); }
+#hud .seg-btn.active { background: var(--surface-strong); color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15); }
 #hud .seg-btn:hover:not(.active) { color: var(--ink); }
 #hud .seg-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -165,10 +251,10 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .dropdown-trigger {
   width: 100%; display: flex; align-items: center; justify-content: space-between;
   font: inherit; font-size: 12px; color: var(--ink);
-  background: #eef0f3; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 7px;
   padding: 6px 9px; cursor: pointer; transition: background .15s ease;
 }
-#hud .dropdown-trigger:hover { background: #e5e8ec; }
+#hud .dropdown-trigger:hover { background: var(--surface-hover); }
 #hud .dropdown-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
 #hud .dropdown-value-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
 #hud .dropdown-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -176,7 +262,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 #hud .dropdown.open .dropdown-caret { transform: rotate(180deg); }
 #hud .dropdown-menu {
   position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 10;
-  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-strong); border: 1px solid var(--border); border-radius: 10px;
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.2);
   padding: 4px; max-height: 216px; overflow-y: auto;
   display: none;
@@ -187,7 +273,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
   padding: 6px 9px; font-size: 12px; border-radius: 6px; cursor: pointer;
   color: var(--ink); line-height: 1.4;
 }
-#hud .dropdown-option:hover { background: #f2f4f6; }
+#hud .dropdown-option:hover { background: var(--surface-hover); }
 #hud .dropdown-option.active { background: rgba(26, 115, 232, 0.1); color: #1a73e8; font-weight: 600; }
 #hud .dropdown-icon { flex: none; color: var(--muted); }
 #hud .dropdown-option.active .dropdown-icon { color: #1a73e8; }
@@ -200,7 +286,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
    results list/open-state toggling. */
 #hud .zone-search-input {
   width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; color: var(--ink);
-  background: #eef0f3; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 7px;
   padding: 6px 9px;
 }
 #hud .zone-search-input:focus { outline: none; border-color: #1a73e8; }
@@ -238,15 +324,18 @@ html, body { margin: 0; padding: 0; height: 100%; }
   vector-effect: non-scaling-stroke;
 }
 /* Uniform aircraft color mode (toggled via #toggle-uniform-color): swaps
-   the marker outline from white to dark, matching the bright yellow fill
-   swap already done in icons.js's categoryIcon()/uavIcon(). Without this,
-   the CSS rule above always won over the SVG's own inline stroke="STROKE"
-   attribute (author stylesheet rules take priority over presentation
-   attributes, regardless of specificity), so the dark outline never
-   actually rendered even though the JS was computing it correctly. */
-body.uniform-color-mode {
-  --marker-stroke-color: #1a1a1a;
-}
+   the marker outline color, matching the fill swap already done in
+   icons.js's categoryIcon()/uavIcon(). A plain CSS rule always wins over
+   the SVG's own inline stroke="STROKE" attribute (author stylesheet rules
+   take priority over presentation attributes, regardless of specificity),
+   so the dark/light outline never actually rendered even though the JS was
+   computing it correctly — hence --marker-stroke-color needing to be a real
+   custom property some rule can override, not just an SVG attribute.
+   state-filters.js's applyThemeVisuals() sets this property directly via
+   an inline style on <body> (which always outranks any class-based rule
+   here), so there's no per-mode value to hardcode in this file anymore —
+   the :root/[data-theme] token blocks above already supply the right
+   fallback value before JS runs. */
 
 .dropdown-icon-container {
   display: inline-block;
@@ -290,7 +379,7 @@ body.uniform-color-mode {
 #sidebar-close, #sidebar-center-map {
   position: absolute; top: 10px; z-index: 2;
   width: 28px; height: 28px; border-radius: 50%; border: none;
-  background: rgba(255, 255, 255, 0.92); color: var(--ink);
+  background: var(--surface-strong); color: var(--ink);
   font-size: 18px; line-height: 1; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
@@ -300,7 +389,7 @@ body.uniform-color-mode {
    rather than text, since "center on this aircraft" doesn't have an
    obvious single-character glyph the way "close" has "×". */
 #sidebar-center-map { left: 10px; }
-#sidebar-center-map:hover { background: rgba(255, 255, 255, 1); }
+#sidebar-center-map:hover { background: var(--surface-hover); }
 
 /* Header masthead: identity essentials (registration/ICAO, callsign,
    aircraft type) at a glance, above the gallery. #sidebar-close/
@@ -513,7 +602,7 @@ body.uniform-color-mode {
 #dev-aircraft-table col.type { width: 15%; }
 #dev-aircraft-table col.route { width: 40%; }
 #dev-aircraft-table tbody tr { cursor: pointer; }
-#dev-aircraft-table tbody tr:hover { background: rgba(15, 23, 42, 0.05); }
+#dev-aircraft-table tbody tr:hover { background: var(--overlay-hover); }
 #dev-aircraft-table tbody td[title] { cursor: help; }
 
 /* Photo gallery slider container — fixed 16:9 aspect ratio, set explicitly
@@ -577,11 +666,11 @@ body.uniform-color-mode {
 .gallery-placeholder {
   display: flex; align-items: center; justify-content: center;
   width: 100%; aspect-ratio: 16 / 9;
-  background: #f2f4f6; color: var(--muted); font-size: 12px;
+  background: var(--surface); color: var(--muted); font-size: 12px;
 }
 .gallery-spinner {
   width: 24px; height: 24px; border-radius: 50%;
-  border: 3px solid #e3e6ea; border-top-color: #1a73e8;
+  border: 3px solid var(--spinner-track); border-top-color: #1a73e8;
   animation: gallery-spin .8s linear infinite;
 }
 .gallery-placeholder.loading { background: none; }
@@ -610,7 +699,7 @@ body.uniform-color-mode {
 #map-loader.hidden { opacity: 0; pointer-events: none; }
 #map-loader .loader-spinner {
   width: 34px; height: 34px; border-radius: 50%;
-  border: 3px solid #e3e6ea; border-top-color: #1a73e8;
+  border: 3px solid var(--spinner-track); border-top-color: #1a73e8;
   animation: gallery-spin .8s linear infinite;
 }
 /* Overlaid on the image, vertically centered — but with no background
@@ -637,7 +726,7 @@ body.uniform-color-mode {
    and this row's dots suddenly appeared. */
 .gallery-dots { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 0; min-height: 6px; }
 .gallery-dot {
-  width: 6px; height: 6px; border-radius: 50%; background: #d7dbe1; cursor: pointer;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--switch-track-off); cursor: pointer;
 }
 .gallery-dot.active { background: #1a73e8; }
 /* Overlaid on .gallery-slider-container's top-right corner (bottom-right
@@ -713,7 +802,7 @@ body.uniform-color-mode {
 .user-menu-trigger:hover { box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2); }
 .user-avatar {
   width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
-  display: block; background: #cbd5e1; flex: none;
+  display: block; background: var(--surface); flex: none;
 }
 .user-menu-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-menu-caret { color: var(--muted); flex: none; transition: transform .15s ease; }
@@ -744,7 +833,7 @@ body.uniform-color-mode {
   color: var(--ink); background: none; border: none; border-radius: 8px;
   padding: 9px 10px; cursor: pointer; text-align: left;
 }
-.user-menu-item:hover { background: rgba(15, 23, 42, 0.06); }
+.user-menu-item:hover { background: var(--overlay-hover); }
 .user-menu-item svg { flex: none; color: var(--muted); }
 .user-menu-item-danger:hover { background: rgba(220, 38, 38, 0.08); color: #dc2626; }
 .user-menu-item-danger:hover svg { color: #dc2626; }
@@ -758,12 +847,12 @@ body.uniform-color-mode {
 #sidebar-save-collection {
   position: absolute; top: 10px; left: 46px; z-index: 2;
   width: 28px; height: 28px; border-radius: 50%; border: none;
-  background: rgba(255, 255, 255, 0.92); color: var(--ink);
+  background: var(--surface-strong); color: var(--ink);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
 }
-#sidebar-save-collection:hover { background: rgba(255, 255, 255, 1); }
+#sidebar-save-collection:hover { background: var(--surface-hover); }
 /* Filled vs outline is the save/unsave state — the SVG path already ships
    fill="none" (an outline), and this rule overrides that presentation
    attribute (any CSS rule targeting the element always wins over a
@@ -813,15 +902,15 @@ body.uniform-color-mode {
 #collection-panel-header-actions { display: flex; align-items: center; gap: 14px; }
 #collection-panel-close {
   width: 32px; height: 32px; border-radius: 50%; border: none;
-  background: rgba(15, 23, 42, 0.06); color: var(--ink);
+  background: var(--overlay-badge); color: var(--ink);
   font-size: 18px; line-height: 1; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
-#collection-panel-close:hover { background: rgba(15, 23, 42, 0.12); }
+#collection-panel-close:hover { background: var(--overlay-hover); }
 /* Cards / Compact display switcher — a segmented control, same visual
    family as #motion-filter's three-button group. */
 #collection-view-toggle {
-  display: flex; background: rgba(15, 23, 42, 0.06); border-radius: 999px; padding: 3px;
+  display: flex; background: var(--overlay-badge); border-radius: 999px; padding: 3px;
 }
 .collection-view-btn {
   font: inherit; font-size: 12px; font-weight: 600; color: var(--muted);
@@ -847,16 +936,16 @@ body.uniform-color-mode {
   align-items: center; justify-content: center; text-align: center;
   color: var(--muted); padding: 30px;
 }
-.collection-empty-icon { width: 96px; height: 96px; color: rgba(15, 23, 42, 0.16); }
+.collection-empty-icon { width: 96px; height: 96px; color: var(--overlay-strong); }
 .collection-empty-title { font-size: 15px; font-weight: 700; color: var(--ink); margin-top: 14px; }
 .collection-empty-hint { font-size: 13px; color: var(--muted); margin-top: 6px; max-width: 320px; }
 
 .collection-card {
   border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
-  background: rgba(15, 23, 42, 0.02); position: relative;
+  background: var(--overlay-fill); position: relative;
 }
 .collection-card-photo-wrap {
-  width: 100%; aspect-ratio: 16 / 9; background: rgba(15, 23, 42, 0.05);
+  width: 100%; aspect-ratio: 16 / 9; background: var(--overlay-hover);
   display: flex; align-items: center; justify-content: center; overflow: hidden;
 }
 .collection-card-photo-wrap img { width: 100%; height: 100%; object-fit: cover; }
@@ -874,7 +963,7 @@ body.uniform-color-mode {
 .collection-card-row-icon .airline-logo { width: 18px; height: 18px; object-fit: contain; }
 .collection-card-category {
   display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 700;
-  color: var(--ink); background: rgba(15, 23, 42, 0.06);
+  color: var(--ink); background: var(--overlay-badge);
   padding: 2px 8px; border-radius: 999px;
 }
 .collection-card-meta { font-size: 13px; color: var(--ink); margin-top: 5px; }
@@ -889,13 +978,13 @@ body.uniform-color-mode {
 .collection-card-icon-btn {
   position: absolute; top: 10px; right: 10px; z-index: 2;
   width: 34px; height: 34px; border-radius: 50%; border: none;
-  background: rgba(255, 255, 255, 0.92); color: #1a73e8;
+  background: var(--surface-strong); color: #1a73e8;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
 }
 .collection-card-icon-btn svg { width: 20px; height: 20px; }
-.collection-card-icon-btn:hover { background: #fff; }
+.collection-card-icon-btn:hover { background: var(--surface-hover); }
 .collection-card-icon-btn.saved svg path { fill: currentColor; }
 
 /* "Elegant" removal: the card stays in place, dimmed, with an Undo action —
@@ -910,11 +999,11 @@ body.uniform-color-mode {
 .collection-card-removed-overlay {
   position: absolute; inset: 0; z-index: 2;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; background: rgba(255, 255, 255, 0.55);
+  gap: 6px; background: var(--card-bg);
 }
 .collection-card-removed-label {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--ink); background: rgba(255, 255, 255, 0.9);
+  color: var(--ink); background: var(--surface-strong);
   padding: 2px 8px; border-radius: 999px;
 }
 /* Primary-style, high-contrast — deliberately not the muted white pill this
@@ -927,7 +1016,7 @@ body.uniform-color-mode {
 }
 .collection-card-undo-btn:hover { background: #1558b0; }
 .collection-card-undo-hint {
-  font-size: 10px; color: var(--muted); background: rgba(255, 255, 255, 0.85);
+  font-size: 10px; color: var(--muted); background: var(--surface-strong);
   padding: 1px 8px; border-radius: 999px;
 }
 
@@ -998,7 +1087,7 @@ body.uniform-color-mode {
 .airport-popup-codes { display: flex; gap: 6px; margin-top: 9px; }
 .airport-popup-code-chip {
   font-family: monospace; font-size: 11px; font-weight: 700; letter-spacing: .02em;
-  background: rgba(15, 23, 42, 0.06); color: var(--ink);
+  background: var(--overlay-badge); color: var(--ink);
   padding: 2px 7px; border-radius: 6px;
 }
 .airport-popup-row {

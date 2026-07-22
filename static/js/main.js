@@ -268,6 +268,13 @@ function refreshSignalTypeHelp() {
     + 'Aircraft without a signal type are always shown unless this filter is used.';
 }
 
+function refreshDarkModeHelp() {
+  document.getElementById('theme-mode-help-popover').textContent =
+    'Starts from your system\'s light/dark preference. Switching it also matches the basemap '
+    + '(Dark ↔ CARTO Dark tiles, Light ↔ Voyager) and the uniform marker color to whichever '
+    + 'contrasts best. Like every other display setting here, your choice only lasts this session.';
+}
+
 // A "(?)" icon is click-to-toggle (works on touch, unlike a hover title): it
 // opens a small popover explaining a source/track quota state, and a click
 // anywhere else closes it — same pattern as the category dropdown. Both the
@@ -300,6 +307,7 @@ wireHelpPopover('weather-sigmet-help', 'weather-sigmet-help-popover', refreshWea
 wireHelpPopover('weather-metar-help', 'weather-metar-help-popover', refreshWeatherMetarHelp);
 wireHelpPopover('airports-help', 'airports-help-popover', refreshAirportsHelp);
 wireHelpPopover('signal-type-help', 'signal-type-help-popover', refreshSignalTypeHelp);
+wireHelpPopover('theme-mode-help', 'theme-mode-help-popover', refreshDarkModeHelp);
 document.addEventListener('click', closeHelpPopovers);
 
 // Dev-mode source badges (.source-badge) are freshly regenerated HTML every

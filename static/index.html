@@ -139,7 +139,7 @@
 
   <div class="filter-block" id="search-block">
     <input type="text" id="aircraft-search" placeholder="Search by ICAO (hex)"
-           autocomplete="off" maxlength="6" style="width:100%; padding:6px 9px; font-size:12px; border:1px solid var(--border); border-radius:7px; box-sizing:border-box; font-family:monospace;">
+           autocomplete="off" maxlength="6" style="width:100%; padding:6px 9px; font-size:12px; border:1px solid var(--border); border-radius:7px; box-sizing:border-box; font-family:monospace; background:var(--surface); color:var(--ink);">
   </div>
 
   <div class="sources">
@@ -544,6 +544,24 @@
         <span class="switch-track"></span>
       </label>
     </div>
+  </div>
+
+  <div class="filter-block">
+    <div class="filter-title">
+      Theme
+      <button type="button" class="source-help" id="theme-mode-help" aria-label="How does the theme selector work?">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
+    </div>
+    <div class="segmented" id="theme-mode-toggle">
+      <button type="button" class="seg-btn" data-value="light">Light</button>
+      <button type="button" class="seg-btn" data-value="dark">Dark</button>
+    </div>
+    <div class="source-help-popover up" id="theme-mode-help-popover" hidden></div>
   </div>
 
   <div class="hud-footer">

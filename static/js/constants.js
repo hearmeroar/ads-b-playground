@@ -78,12 +78,24 @@ const SOURCE_COLORS = {
   // Black, distinct from every live source above.
   flywme: '#000000',
 };
-// Uniform marker color mode (bright yellow fill, dark outline), toggled via
-// "Uniform aircraft color" HUD switch. Only affects the visual paint of
-// markers; data-color attribute still records the true per-source color for
-// provenance/testing purposes.
-const UNIFORM_MARKER_COLOR = '#ffd400';
-const UNIFORM_MARKER_STROKE_COLOR = '#1a1a1a';
+// Uniform marker color mode, toggled via "Uniform aircraft color" HUD
+// switch. Only affects the visual paint of markers; data-color attribute
+// still records the true per-source color for provenance/testing purposes.
+// The actual fill/stroke pair is theme-dependent (see uniformMarkerColors()
+// below) — bright yellow on dark reads as high-contrast, but the same
+// yellow on a light basemap/UI would not, so light mode uses a dark-ink
+// fill with a light stroke instead. currentThemeMode is declared later in
+// state-filters.js — safe to reference here since this function's body
+// only runs when actually called (after every script has loaded), not at
+// definition time.
+const UNIFORM_MARKER_COLORS = {
+  dark: { fill: '#ffd400', stroke: '#1a1a1a' },
+  light: { fill: '#1c2128', stroke: '#ffffff' },
+};
+function uniformMarkerColors() {
+  return UNIFORM_MARKER_COLORS[typeof currentThemeMode !== 'undefined' ? currentThemeMode : 'dark']
+    || UNIFORM_MARKER_COLORS.dark;
+}
 const SOURCE_DISPLAY_NAMES = {
   opensky: 'OpenSky', adsbfi: 'adsb.fi', adsblol: 'adsb.lol',
   adsbone: 'adsb.one', airplaneslive: 'airplanes.live', flightaware: 'FlightAware',
