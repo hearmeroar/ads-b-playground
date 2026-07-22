@@ -52,9 +52,9 @@ requires.
 | Item | Effort | Value | Category | Status | Read |
 |---|---|---|---|---|---|
 | **[CRITICAL BUG]** Track stops updating after aircraft select | S | High | Frontend UX / Bug | 🚨 | **BLOCKER:** Track renders & updates *before* selection (live polling). Clicking marker → track stops updating, becomes stale. Historical track fetch may interfere with live trail. See Bugs section. |
-| Rework UI for data quality filter (Status flags + Signal type) | S | Medium | Frontend UX | | Polish visual hierarchy, spacing, responsive behavior of recently-shipped filter. Improve label clarity, add inline help text, test mobile layouts. See UI/UX section. |
+| ✅ **Rework UI for data quality filter** (Status flags + Signal type) | S | Medium | Frontend UX | | Polish visual hierarchy, spacing, responsive behavior of recently-shipped filter. Improve label clarity, add inline help text, test mobile layouts. See UI/UX section. |
 | **[BUG]** `capture-test-run.sh` hook not updating test markers in session | XS–S | High | Testing | 🐛 | Verification hook (`PostToolUse`) that captures real test run exit codes to `.claude/test-runs/` not being triggered/updating during session. Blocks `require-verification.sh` gate from verifying current test state. See Bugs section. |
-| Airport search quick-open with pre-loaded results | XS–S | Medium | Frontend UX | | When input focus enters #zone-search-input, immediately show list of popular/nearby airports (no typing needed). Options: (1) hardcoded popular list (London/Paris/Berlin), (2) 10 nearest airports to current AREA_CENTER. Improves speed for frequent zone-switching. |
+| ✅ **Airport search quick-open** with pre-loaded results | XS–S | Medium | Frontend UX | | When input focus enters #zone-search-input, immediately show list of popular/nearby airports (no typing needed). Options: (1) hardcoded popular list (London/Paris/Berlin), (2) 10 nearest airports to current AREA_CENTER. Improves speed for frequent zone-switching. |
 | Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
 | **Research & adopt mature UI framework** | M | High | Frontend UX | | Mature UI framework (Bootstrap/Bulma/MDC/Tailwind) with 100+ pre-built components, tokens, dark mode support. v1 scope: research phase + POC + decision. Full proposal: `.ai/proposals/ui-framework-research-2026-07-22.md`. |
 | Selected aircraft styling & visual highlight | XS–S | Medium | Frontend UX | | Visual distinction when an aircraft is selected: highlight marker, glow, or change icon/color to signal active selection state. |
@@ -66,7 +66,7 @@ requires.
 | Planespotters as third data source (metadata enrichment) | L | High | Data sources | | Helicopter + rare aircraft coverage gap; requires API research, integration into enrichment chain, dedup/priority |
 | Free tier API and user registration system | M–L | High | Backend | | Enable multi-user deployments with API keys, rate limiting, quota management. Requires registration endpoint, token generation, SQLite user role/quota schema, middleware. |
 | Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Frontend UX | | Highest standalone value in the backlog; worth scheduling deliberately |
-| **Data source flags filter** | S–M | Med–High | Frontend UX | | **HIGH PRIORITY** — Research data quality flags (dbFlags, NIC/NACp/NACv, messageType) across all sources; implement HUD filter to show/hide aircraft by flag state. Improves visibility of data quality. See UI/UX section. |
+| ✅ **Data source flags filter** | S–M | Med–High | Frontend UX | | **HIGH PRIORITY** — Research data quality flags (dbFlags, NIC/NACp/NACv, messageType) across all sources; implement HUD filter to show/hide aircraft by flag state. Improves visibility of data quality. See UI/UX section. |
 | Seamless login without page reload | M | Medium | Frontend UX | | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
 | Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Frontend UX | | Shareable/deep-linkable view; reusable layout could also serve collection cards |
 | Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Backend | | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
@@ -87,6 +87,7 @@ requires.
 | Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Data sources | | Blocked — no free/no-signup source identified yet |
 | Aircraft serial number (MSN) field | XL (blocked) | Low | Data sources | | Blocked — no verified data source yet, needs research first |
 | Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Frontend UX | | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
+| Use UAV aircraft silhouette icon on map (match category display) | XS | Low | Frontend UX | | Currently uses generic Material Design glyph on map marker; category dropdown uses proper aircraft silhouette (`b0.svg` from icon set). Swap marker icon to match dropdown for visual consistency. Quick win. |
 | *(Historical track interpolation, listed separately below)* | — | — | Duplicate of the two track-smoothing items above; fold into one of them rather than tracking a third time |
 
 ## Bugs
