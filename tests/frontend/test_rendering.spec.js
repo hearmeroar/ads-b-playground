@@ -11,41 +11,31 @@ test.beforeEach(async ({ page }) => {
 test('renders exact marker counts per source with the dedup chain applied', async ({ page }) => {
   // ICAO24_DEDUP_PRIORITY (constants.js): airplanes.live > adsb.fi > adsb.lol
   // > adsb.one > Aircraft Scatter > OpenSky > FlightRadar24.
-  // airplaneslive.json: "dddddd", "eeeeee", "ffffff" — none excluded (highest
-  //   priority) — all 3 shown (green).
-  // adsbfi.json: "dddddd"/"eeeeee" already claimed by airplanes.live (hidden);
-  //   "474806"/"999999" (TWR + callsign-pattern entries, still shown since
-  //   "Hide non-aircraft" ships off by default), "aaaaaa", "bbbbbb" are its
-  //   own unique contribution — 4 shown (red).
-  // states.json: 5 OpenSky entries, but "aaaaaa"/"bbbbbb" (claimed by adsb.fi)
-  //   and "dddddd" (claimed by airplanes.live) are now excluded — only
-  //   "cccccc"/"gggggg" remain (blue).
+  // airplaneslive.json: "dddddd", "ffffff" — both shown (green).
+  // adsbfi.json: "dddddd" is claimed by airplanes.live; its remaining five
+  // visible entries render red. OpenSky retains two visible entries.
   const counts = await colorCounts(page);
-  expect(counts).toEqual({ blue: 2, red: 4, green: 3 });
+  expect(counts).toEqual({ blue: 2, red: 5, green: 2 });
 
-  // Total unique aircraft across all sources is unchanged by reordering
-  // which source "owns" each collision — same 9 distinct ICAO24s as before.
+  // Nine distinct aircraft remain after deduplication.
   const total = await page.evaluate(() => document.getElementById('count').textContent);
   expect(total).toBe('9');
 });
 
 test('overlapping aircraft is deduped (not drawn twice), owned by the highest-priority source', async ({ page }) => {
-  // "dddddd" is reported by OpenSky, adsb.fi, and airplanes.live —
-  // airplanes.live now outranks both, so it owns the marker (see
-  // ICAO24_DEDUP_PRIORITY, constants.js) instead of OpenSky.
+  // dddddd is owned by airplanes.live under the configured priority.
   await page.evaluate(() => {
     const marker = airplanesliveMarkers.get('dddddd');
     if (marker && marker._icon) marker._icon.click();
   });
   await page.waitForTimeout(300);
 
-  // Registration/Aircraft type are airplanes.live's own native fields here
-  // (it's the rendering source now, not enrichment on top of another one).
+  // Registration/Aircraft type come from its airplanes.live record.
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar').textContent);
   expect(sidebarText).toContain('OO-DUP');
   expect(sidebarText).toContain('AIRBUS A-320');
 
-  // it must not also exist as a separate OpenSky/adsb.fi marker
+  // It must not also exist as a separate OpenSky/adsb.fi marker.
   const dedupedAway = await page.evaluate(
     () => !openskyMarkers.has('dddddd') && !adsbfiMarkers.has('dddddd')
   );
@@ -71,7 +61,7 @@ test('disabling then re-enabling a source restores its markers immediately (no 1
 
   await page.click('#toggle-adsbfi');
   await page.waitForTimeout(600); // well under the 12s poll interval
-  expect((await colorCounts(page)).red).toBe(4);
+  expect((await colorCounts(page)).red).toBe(5);
 });
 
 test('Aircraft Scatter renders only aircraft not covered by airplanes.live', async ({ page }) => {

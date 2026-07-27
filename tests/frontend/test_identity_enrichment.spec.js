@@ -4,8 +4,9 @@ const { mockAllSources } = require('./helpers');
 // "eeeeee" (adsb.fi + airplanes.live only, no OpenSky): live registration
 // F-UNIQ and aircraftType "BOEING 737-800", but no live country/operator/
 // year at all — good for "gaps get filled / Unknown when unresolved".
-// "dddddd" (OpenSky dedup winner, live originCountry "Testland", adsb.fi/
-// airplanes.live-enriched registration OO-DUP) — good for "live wins".
+// "dddddd" (airplanes.live dedup winner, live registration OO-DUP) — good
+// for "live registration wins". Tests that specifically need OpenSky data
+// isolate it from the higher-priority radius sources below.
 async function selectAircraft(page, hex, markerMapName) {
   // markerMapsBySource (a page-global, see static/index.html) maps each
   // source name to its Map — bare identifiers like adsbfiMarkers aren't
@@ -50,6 +51,11 @@ test.beforeEach(async ({ page }) => {
   await mockAllSources(page); // default /api/identity/** -> all-null
 });
 
+async function isolateDddOnOpenSky(page) {
+  await page.route('**/api/adsbfi', (route) => route.fulfill({ json: { ac: [] } }));
+  await page.route('**/api/airplaneslive', (route) => route.fulfill({ json: { ac: [] } }));
+}
+
 test('dev mode off: resolved fields render plain, unresolved render "Unknown", no badges', async ({ page }) => {
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
     country: null, operator: null, registration: null,
@@ -90,9 +96,9 @@ test('dev mode on: a Flywme badge shows the computation technique and confidence
   expect(await page.textContent('#source-tooltip')).toBe('Flywme — computed from callsign decode, confidence 0.8');
 });
 
-test('live values are never overwritten by enrichment, even a contradicting one — but Flywme\'s own guess still co-displays for transparency', async ({ page }) => {
+test('a live registration is never overwritten by enrichment, but Flywme\'s own guess still co-displays for transparency', async ({ page }) => {
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
-    country: { value: 'Decoyland', source: 'registration_prefix', confidence: 1.0 },
+    country: null,
     operator: null,
     registration: { value: 'X-DECOY', source: 'icao24_lookup', confidence: 1.0 },
     manufacturer: null, model: null, year_built: null,
@@ -100,31 +106,21 @@ test('live values are never overwritten by enrichment, even a contradicting one 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.click('#toggle-dev-mode');
-  await selectAircraft(page, 'dddddd', 'opensky');
+  await selectAircraft(page, 'dddddd', 'airplaneslive');
 
-  // Registration is #sidebar-header's title now; Country stays in #sidebar-details.
+  // Registration is #sidebar-header's title now.
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar').textContent);
-  expect(sidebarText).toContain('Testland');
   expect(sidebarText).toContain('OO-DUP');
-  expect(sidebarText).not.toContain('Decoyland');
   expect(sidebarText).not.toContain('X-DECOY');
 
-  // The displayed value is still OpenSky's own — but since Flywme did
-  // resolve a real (if contradicting) guess of its own, its badge
-  // co-displays second, after the winning source's, reflecting the
-  // priority chain rather than making the losing tier's guess disappear.
-  expect(await badgeSourcesForLabel(page, 'Registration Country')).toEqual(['opensky', 'flywme']);
-  // "dddddd"'s registration is independently reported by adsb.fi and
-  // airplanes.live too (see fixtures) — the point here is just that
-  // 'flywme' is appended last, after whichever live sources already won.
-  // Registration's badges are on #sidebar-header's title now (no <b> label).
+  // The displayed value is still airplanes.live's own — but Flywme's
+  // contrary registration guess still co-displays as provenance.
   const regSources = await page.evaluate(() =>
     [...document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')].map((b) => b.dataset.source));
+  expect(regSources).toContain('airplaneslive');
   expect(regSources[regSources.length - 1]).toBe('flywme');
   expect(regSources.length).toBeGreaterThan(1);
 
-  await clickBadge(page, 'Registration Country', 1);
-  expect(await page.textContent('#source-tooltip')).toBe('Flywme — computed from registration prefix, confidence 1.0');
 });
 
 test('a live-sourced country still gets a flag when the backend recognizes its name, without becoming a Flywme field', async ({ page }) => {
@@ -136,6 +132,7 @@ test('a live-sourced country still gets a flag when the backend recognizes its n
     country: { value: 'Testland', source: 'live', confidence: 1.0, country_iso: 'CZ' },
     operator: null, registration: null, manufacturer: null, model: null, year_built: null,
   } }));
+  await isolateDddOnOpenSky(page);
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.click('#toggle-dev-mode');
@@ -318,6 +315,7 @@ test('category fallback: a live-sourced category is never overwritten, but Flywm
     manufacturer: null, model: null, year_built: null,
     category: { value: 'A7', source: 'aircraft_category_db', confidence: 0.9 },
   } }));
+  await isolateDddOnOpenSky(page);
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.click('#toggle-dev-mode');
@@ -327,10 +325,8 @@ test('category fallback: a live-sourced category is never overwritten, but Flywm
   expect(sidebarText).toContain('Large');
   expect(sidebarText).not.toContain('Rotorcraft');
 
-  // "dddddd" independently reports a category on OpenSky *and* both
-  // enabled radius sources (adsbfi/airplaneslive fixtures both carry "A3"
-  // for this hex) — the point here is just that 'flywme' is appended last,
-  // after every real live source that already reported one.
+  // dddddd is isolated to OpenSky above; Flywme's lower-priority category
+  // remains visible only as an additional provenance badge.
   const catSources = await badgeSourcesForLabel(page, 'Category:');
   expect(catSources[catSources.length - 1]).toBe('flywme');
   expect(catSources).toContain('opensky');

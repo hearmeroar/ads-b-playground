@@ -12,6 +12,13 @@ async function trackSegmentCount(page) {
   ));
 }
 
+async function waitForTrackSegments(page, count) {
+  await page.waitForFunction((expected) => (
+    trackLayerGroup && map.hasLayer(trackLayerGroup)
+      && trackLayerGroup.getLayers().length === expected
+  ), count);
+}
+
 async function clickMarker(page, source, icao24) {
   await page.evaluate(({ source, icao24 }) => {
     const marker = ({ adsbfiMarkers, airplanesliveMarkers, openskyMarkers })[source].get(icao24);
@@ -34,7 +41,7 @@ test('clicking a marker draws its flight-history track and it stays visible', as
   // element (not mouse-coordinate hit-testing), which exercises the bound
   // click handler that loads an OpenSky flight history for any source.
   await clickMarker(page, 'adsbfiMarkers', 'eeeeee');
-  await page.waitForTimeout(500);
+  await waitForTrackSegments(page, 2);
   expect(await trackSegmentCount(page)).toBe(2);
 
   // Stays visible on its own — nothing clears it a moment later.
@@ -44,7 +51,7 @@ test('clicking a marker draws its flight-history track and it stays visible', as
 
 test('clicking empty map area clears the track', async ({ page }) => {
   await clickMarker(page, 'adsbfiMarkers', 'eeeeee');
-  await page.waitForTimeout(500);
+  await waitForTrackSegments(page, 2);
   expect(await trackSegmentCount(page)).toBe(2);
 
   await page.mouse.click(640, 450); // empty map area, away from zoom controls/markers
@@ -137,8 +144,8 @@ test('track status shows cached data when rate limited but cache exists', async 
     status: 429,
     json: { path: [[1000, 44.0, 21.0, 10000, 90, false], [1300, 44.05, 21.05, 10000, 90, false]], stale: true, error: 'rate_limited' }
   }));
-
-  await clickMarker(page, 'openskyMarkers', 'dddddd');
+  // dddddd is owned by airplanes.live under the configured priority order.
+  await clickMarker(page, 'airplanesliveMarkers', 'dddddd');
   await page.waitForTimeout(500);
 
   // Track should show with cached data indicator
@@ -171,7 +178,7 @@ test('track status clears when deselecting aircraft', async ({ page }) => {
 
 test('sidebar stays open across cross-source marker handoff (dedup priority change)', async ({ page }) => {
   // Regression: when an aircraft moves from a lower-priority source (adsb.fi)
-  // to a higher-priority one (OpenSky) between polls, the sidebar used to
+  // to a higher-priority one (airplanes.live) between polls, the sidebar used to
   // close spuriously even though the aircraft is still alive. This test
   // simulates that handoff in three poll cycles.
 
@@ -216,19 +223,15 @@ test('sidebar stays open across cross-source marker handoff (dedup priority chan
   let trackSegments = await trackSegmentCount(page);
   expect(trackSegments).toBeGreaterThan(0);
 
-  // Poll 3: OpenSky NOW ALSO reports 'hhhhhh' (higher priority) — dedup handoff.
+  // Poll 3: airplanes.live NOW ALSO reports 'hhhhhh' (higher priority) — dedup handoff.
   // adsb.fi still reports it but will be excluded from render (already in
-  // openskyMarkers). The bug would cause clearStaleMarkers(adsbfiMarkers)
+  // airplanesliveMarkers). The bug would cause clearStaleMarkers(adsbfiMarkers)
   // to spuriously call deselectAircraft() since 'hhhhhh' won't be in adsb.fi's
   // render list. The fix keeps sidebar open.
-  await page.route('**/api/states', (route) => route.fulfill({
-    json: {
-      time: 2000,
-      rate_limit_remaining: 3999,
-      states: [
-        ['hhhhhh', 'TST100  ', 'Testland', 1500, 1500, 21.05, 44.05, 8200, false, 460, 45, 0, null, 8200, '2000', false, 0, 1]
-      ]
-    }
+  await page.route('**/api/airplaneslive', (route) => route.fulfill({
+    json: { ac: [
+      { hex: 'hhhhhh', flight: 'TST100  ', r: 'N123AA', t: 'B737', alt_baro: 8200, gs: 460, track: 45, lat: 44.05, lon: 21.05 }
+    ] }
   }));
   await page.route('**/api/adsbfi', (route) => route.fulfill({
     json: {
@@ -246,10 +249,10 @@ test('sidebar stays open across cross-source marker handoff (dedup priority chan
   selectedId = await page.evaluate(() => selectedIcao24);
   expect(selectedId).toBe('hhhhhh');
 
-  // Marker handoff happened as expected: now in opensky, removed from adsb.fi
-  let hasInOpenSky = await page.evaluate(() => openskyMarkers.has('hhhhhh'));
+  // Marker handoff happened as expected: now in airplanes.live, removed from adsb.fi
+  let hasInAirplanesLive = await page.evaluate(() => airplanesliveMarkers.has('hhhhhh'));
   let hasInAdsbfi = await page.evaluate(() => adsbfiMarkers.has('hhhhhh'));
-  expect(hasInOpenSky).toBe(true);
+  expect(hasInAirplanesLive).toBe(true);
   expect(hasInAdsbfi).toBe(false);
 
   // Track is still visible (live fallback kept fresh)
@@ -258,7 +261,7 @@ test('sidebar stays open across cross-source marker handoff (dedup priority chan
 
   // Finally: confirm the "genuinely gone" case still closes the sidebar.
   // Stop reporting 'hhhhhh' from everywhere.
-  await page.route('**/api/states', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/airplaneslive', (route) => route.fulfill({ json: { ac: [] } }));
   await page.route('**/api/adsbfi', (route) => route.fulfill({ json: { ac: [] } }));
   await page.evaluate(() => poll());
   await page.waitForTimeout(500);

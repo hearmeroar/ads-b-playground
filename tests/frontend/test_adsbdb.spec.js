@@ -185,13 +185,12 @@ test('a live registration is never overwritten by adsbdb, even a contradicting o
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.click('#toggle-dev-mode');
-  await selectAircraft(page, 'dddddd', 'opensky');
+  await selectAircraft(page, 'dddddd', 'airplaneslive');
 
   // Registration is the header's title now (dddddd has one), no <b> label.
   expect(await headerText(page)).toContain('OO-DUP');
-  // "dddddd" is independently reported by adsb.fi and airplanes.live too
-  // (see fixtures) — the point of this test is just that 'adsbdb' isn't
-  // among them, since the live value must win over adsbdb's contradicting one.
+  // airplanes.live owns dddddd under the current priority; adsbdb must never
+  // overwrite that live value.
   const sources = await page.evaluate(() => [...document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')].map((b) => b.dataset.source));
   expect(sources).not.toContain('adsbdb');
   expect(sources.length).toBeGreaterThan(0);
