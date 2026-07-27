@@ -37,8 +37,11 @@ back the rules above — staging `.ai/CURRENT.md`, auto-pruning `✅`-marked
 changes, and — since 2026-07-21 — blocking a commit unless pytest/Playwright/
 a real curl against a running server actually ran and passed for whatever
 area the commit touches, closing the "tests passed but the real endpoint
-404s" gap): see `.agents/architect.md` for the full hook behavior and
-bypass flags.
+404s" gap). `capture-test-run.sh` records green markers from successful
+`PostToolUse` events and replaces them with red markers from
+`PostToolUseFailure`; successful Bash responses do not contain a process
+`exitCode`, so the event type itself is the authoritative success signal.
+See `.agents/architect.md` for the full hook behavior and bypass flags.
 
 ## Workflow & Branching Convention
 

@@ -21,8 +21,8 @@
 
 ## 🐛 Open: commit-hook `if` matcher fires unreliably
 
-`capture-test-run.sh`/`require-verification.sh`/`backlog-cleanup.sh` (and
-the other hooks sharing the same `if: Bash(git commit *)` condition in
+`require-verification.sh`/`backlog-cleanup.sh` (and the other PreToolUse
+hooks sharing the same `if: Bash(git commit *)` condition in
 `.claude/settings.json`) don't reliably fire only on real `git commit`
 invocations. Confirmed 2026-07-22: a bare `count_file="$(mktemp)"` with no
 "git" or "commit" text anywhere triggered `check-current-md.sh`'s deny,
@@ -31,11 +31,6 @@ and stranger than "matches the word commit," and not yet root-caused. This
 makes live, in-session testing of these hooks unreliable; verify hook
 changes via direct piped invocation of the script instead (bypass the
 `if` chain entirely), as done for the 2026-07-22 `backlog-cleanup.sh` fix.
-
-Practical effect: `capture-test-run.sh` can't be trusted to have populated
-fresh `.claude/test-runs/*.json` markers just because tests were run this
-session — check the marker's own timestamp/exit code before relying on
-`require-verification.sh` passing.
 
 ---
 
