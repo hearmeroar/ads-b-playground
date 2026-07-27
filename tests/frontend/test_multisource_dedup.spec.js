@@ -31,23 +31,24 @@ test('same ICAO24 from 4 radius sources renders one marker, from the highest-pri
   await page.evaluate(() => document.getElementById('toggle-adsbone').click());
   await page.waitForTimeout(600);
 
-  // Priority OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live: adsb.fi
-  // (the highest-priority source that has it) owns the single marker; the three
-  // lower-priority sources are deduped away.
+  // Priority airplanes.live > adsb.fi > adsb.lol > adsb.one > Aircraft
+  // Scatter > OpenSky > FlightRadar24 (ICAO24_DEDUP_PRIORITY, constants.js):
+  // airplanes.live (the highest-priority source that has it) owns the
+  // single marker; the three lower-priority sources are deduped away.
   const membership = await page.evaluate(() => ({
     adsbfi: adsbfiMarkers.has('multi1'),
     adsblol: adsblolMarkers.has('multi1'),
     adsbone: adsboneMarkers.has('multi1'),
     airplaneslive: airplanesliveMarkers.has('multi1'),
   }));
-  expect(membership).toEqual({ adsbfi: true, adsblol: false, adsbone: false, airplaneslive: false });
+  expect(membership).toEqual({ adsbfi: false, adsblol: false, adsbone: false, airplaneslive: true });
 
   // Exactly one aircraft on the map in total.
   const total = await page.evaluate(() => document.getElementById('count').textContent);
   expect(total).toBe('1');
 });
 
-test('enrichment from a lower-priority source disappears when that source is toggled off', async ({ page }) => {
+test('toggling off the source that owns the selected aircraft\'s marker deselects it', async ({ page }) => {
   await mockAllSources(page);
   // One OpenSky aircraft "aaaaaa" — OpenSky state vectors carry no registration.
   await page.route('**/api/states', (r) => r.fulfill({
@@ -62,20 +63,32 @@ test('enrichment from a lower-priority source disappears when that source is tog
 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  // adsb.lol ships on by default, so it's already enriching the OpenSky aircraft.
+  // adsb.lol ships on by default and now outranks OpenSky in
+  // ICAO24_DEDUP_PRIORITY (constants.js), so it — not OpenSky — owns this
+  // aircraft's marker, showing LOL-ONLY as its own native registration
+  // field (not enrichment on top of another source's marker).
 
   await page.evaluate(() => {
-    const m = openskyMarkers.get('aaaaaa');
+    const m = adsblolMarkers.get('aaaaaa');
     if (m && m._icon) m._icon.click();
   });
   await page.waitForTimeout(300);
   // Registration (LOL-ONLY) is #sidebar-header's title now, not #sidebar-details.
-  let header = await page.evaluate(() => document.querySelector('#sidebar-header').textContent);
-  expect(header).toContain('LOL-ONLY'); // enriched from adsb.lol
+  const header = await page.evaluate(() => document.querySelector('#sidebar-header').textContent);
+  expect(header).toContain('LOL-ONLY');
+  expect(await page.evaluate(() => document.getElementById('sidebar').classList.contains('open'))).toBe(true);
 
-  // Turn adsb.lol off: it triggers an immediate poll, the open sidebar re-renders.
+  // Turn adsb.lol off: clearAllMarkers(adsblolMarkers) removes its marker
+  // for the currently-selected aircraft and — since the selected aircraft
+  // was one of the markers just removed — deselects it (existing
+  // clearAllMarkers()/deselectAircraft() behavior in icons.js/sidebar-track.js,
+  // unrelated to this reorder; it already applied identically to every
+  // other non-OpenSky source before this change). Unlike a genuine
+  // cross-source handoff (a different source claiming the same aircraft
+  // between two poll cycles — see test_track.spec.js), this is an explicit
+  // user action removing the very source that owned the open sidebar's
+  // aircraft, so closing it is the correct, existing behavior.
   await page.click('#toggle-adsblol');
   await page.waitForTimeout(600);
-  header = await page.evaluate(() => document.querySelector('#sidebar-header').textContent);
-  expect(header).not.toContain('LOL-ONLY'); // the only enricher is gone
+  expect(await page.evaluate(() => document.getElementById('sidebar').classList.contains('open'))).toBe(false);
 });

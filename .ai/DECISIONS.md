@@ -199,3 +199,41 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 - This was implemented across an earlier, uncommitted work-in-progress in the working tree before being reviewed/completed and committed in this session (commit `be44da4`) — documentation (this entry, the CLAUDE.md section, an `.ai/ARCHITECTURE.md` numbering fix) was added retroactively to bring it in line with every other source's documentation depth, and a stray raw draft note containing a live RapidAPI key in `.ai/BACKLOG.md` was removed (confirmed via full git history search that the key itself was never actually committed/pushed).
 
 **References:** CLAUDE.md § "Aircraft Scatter", `.ai/ARCHITECTURE.md`, `tests/backend/test_radius_sources.py`, `tests/frontend/test_rendering.spec.js`.
+
+---
+
+## 2026-07-27 — Fast first paint and revised ICAO24 source priority
+
+**Problem:** A complete poll waited for its slowest enabled upstream before
+showing any aircraft, so an intermittent adsb.lol delay made the initial map
+look empty despite faster sources already having responded. The former marker
+priority also gave OpenSky first claim even where established ADS-B feeds
+already supplied the same aircraft, spending a quota-limited source without
+adding coverage.
+
+**Decision:** `poll()` renders the same pipeline twice: an opportunistic pass
+when the first real enabled fetch settles, followed by a final authoritative
+pass once all fetches settle. The single canonical ICAO24 order is now
+`airplanes.live > adsb.fi > adsb.lol > adsb.one > Aircraft Scatter > OpenSky
+> FlightRadar24`; FlightAware remains callsign-keyed and follows this chain.
+Aircraft Scatter ships enabled when configured, is included in the one-shot
+per-process cache warm-up, and remains safely empty without `RAPIDAPI_KEY`.
+
+**Reason:** The early pass makes the map useful at the latency of the fastest
+source while the final pass remains the sole complete view. Prioritizing the
+free/cheap radius feeds preserves OpenSky for aircraft they do not cover and
+keeps the priority definition in one place (`ICAO24_DEDUP_PRIORITY`) for both
+marker ownership and enrichment precedence.
+
+**Tradeoffs:**
+- A marker may briefly belong to a lower-priority source before a slower,
+  higher-priority response arrives; the final pass corrects it.
+- Every gunicorn worker warms five default-enabled routes on startup, which
+  can add upstream traffic, but runs in a daemon thread and uses each route's
+  existing cache/error behavior.
+- Aircraft Scatter can consume paid quota when a key is configured; its 60s
+  cache bounds that rate and its toggle remains available.
+
+**References:** `static/js/main.js`, `static/js/constants.js`, `app.py`,
+`gunicorn.conf.py`, `tests/frontend/test_rendering.spec.js`,
+`tests/backend/test_warmup.py`.

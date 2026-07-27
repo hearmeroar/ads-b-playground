@@ -443,26 +443,80 @@ async function fetchFlightRadar24Flights() {
   }
 }
 
-async function poll() {
-  const [openskyStates, adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft, aircraftscatterAircraft, flightawareFlights, flightradar24Flights] =
-    await Promise.all([
-      isSourceEnabled('opensky') ? fetchOpenSkyStates() : Promise.resolve(null),
-      isSourceEnabled('adsbfi') ? fetchRadiusSourceAircraft('/api/adsbfi') : Promise.resolve(null),
-      isSourceEnabled('adsblol') ? fetchRadiusSourceAircraft('/api/adsblol') : Promise.resolve(null),
-      isSourceEnabled('adsbone') ? fetchRadiusSourceAircraft('/api/adsbone') : Promise.resolve(null),
-      isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
-      isSourceEnabled('aircraftscatter') ? fetchRadiusSourceAircraft('/api/aircraftscatter') : Promise.resolve(null),
-      isSourceEnabled('flightaware') ? fetchFlightAwareFlights() : Promise.resolve(null),
-      isSourceEnabled('flightradar24') ? fetchFlightRadar24Flights() : Promise.resolve(null),
-    ]);
+async function poll(opts = {}) {
+  const { onFirstPaint } = opts;
+  let firstPaintDone = false;
+  const markFirstPaint = () => {
+    if (firstPaintDone) return;
+    firstPaintDone = true;
+    if (onFirstPaint) onFirstPaint();
+  };
+
+  const fetches = {
+    opensky: isSourceEnabled('opensky') ? fetchOpenSkyStates() : Promise.resolve(null),
+    adsbfi: isSourceEnabled('adsbfi') ? fetchRadiusSourceAircraft('/api/adsbfi') : Promise.resolve(null),
+    adsblol: isSourceEnabled('adsblol') ? fetchRadiusSourceAircraft('/api/adsblol') : Promise.resolve(null),
+    adsbone: isSourceEnabled('adsbone') ? fetchRadiusSourceAircraft('/api/adsbone') : Promise.resolve(null),
+    airplaneslive: isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
+    aircraftscatter: isSourceEnabled('aircraftscatter') ? fetchRadiusSourceAircraft('/api/aircraftscatter') : Promise.resolve(null),
+    flightaware: isSourceEnabled('flightaware') ? fetchFlightAwareFlights() : Promise.resolve(null),
+    flightradar24: isSourceEnabled('flightradar24') ? fetchFlightRadar24Flights() : Promise.resolve(null),
+  };
+
+  // Opportunistic early paint: fires once, the instant the FASTEST *real,
+  // enabled* fetch resolves — using whatever's arrived by then. A source
+  // that's still pending at that moment is simply absent from `partial`,
+  // which renderPoll() already treats exactly like a disabled/failed
+  // source (see its existing `isSourceEnabled(name) && aircraft` checks
+  // below) — no new "pending" concept needed. The trivial
+  // Promise.resolve(null) placeholders above settle on the next microtask
+  // regardless of network speed, so only real, enabled fetches count
+  // toward this race.
+  const partial = {};
+  let earlyFired = false;
+  const tryEarlyRender = () => {
+    if (earlyFired) return;
+    earlyFired = true;
+    renderPoll(partial, { isFinal: false });
+    markFirstPaint();
+  };
+  for (const name of Object.keys(fetches)) {
+    if (!isSourceEnabled(name)) continue;
+    // fetch* helpers already swallow their own errors into a resolved
+    // null (fetchOpenSkyStates/fetchRadiusSourceAircraft/etc. above), so
+    // no .catch() is needed here.
+    fetches[name].then((data) => { partial[name] = data; tryEarlyRender(); });
+  }
+
+  const settled = await Promise.all(Object.values(fetches));
+  const final = Object.fromEntries(Object.keys(fetches).map((name, i) => [name, settled[i]]));
+  renderPoll(final, { isFinal: true });
+  markFirstPaint();
+}
+
+// The actual fetch→render pipeline, called twice per poll() cycle (see
+// above): once opportunistically as soon as the fastest source resolves
+// (isFinal: false, using whatever's in `raw` so far), once authoritatively
+// once every enabled source has settled (isFinal: true). Both passes run
+// the exact same dedup/enrichment logic below — the early pass is a
+// self-correcting preview, not a separate code path, so there is nothing
+// to keep in sync between them.
+function renderPoll(raw, { isFinal }) {
+  const {
+    opensky: openskyStates, adsbfi: adsbfiAircraft, adsblol: adsblolAircraft,
+    adsbone: adsboneAircraft, airplaneslive: airplanesliveAircraft,
+    aircraftscatter: aircraftscatterAircraft, flightaware: flightawareFlights,
+    flightradar24: flightradar24Flights,
+  } = raw;
 
   // Each source fetches independently: fetchRadiusSourceAircraft swallows its
   // own failure into null, so one source erroring out (e.g. adsb.one's
   // Cloudflare block) never blocks the others from rendering this cycle.
   // Parse every source exactly once here; everything below (live trails,
   // radiusRecordsByHex, the update*Markers renderers) works on these parsed
-  // lists. null (source disabled or failed) stays null — distinct from an
-  // empty list, which means "polled fine, zero aircraft".
+  // lists. null (source disabled, failed, or not yet arrived this pass)
+  // stays null — distinct from an empty list, which means "polled fine,
+  // zero aircraft".
   const parsedStates = openskyStates && openskyStates.map(parseOpenSkyState);
   const parsedAdsbfi = adsbfiAircraft && adsbfiAircraft.map(parseAdsbExchangeAircraft);
   const parsedAdsblol = adsblolAircraft && adsblolAircraft.map(parseAdsbExchangeAircraft);
@@ -503,15 +557,17 @@ async function poll() {
   // winner, consistent with the marker dedup order below), but EVERY
   // source that reported the aircraft is kept, not just the winner, so dev
   // mode can show a badge per source that independently supplied a field.
-  // Both this loop's order and the exclude-chain's order below are derived
-  // from the single RADIUS_SOURCE_PRIORITY array (constants.js) rather than
-  // two separately hand-written, mirrored lists.
+  // OpenSky is never a member of this map (it has no radius-shaped record
+  // of its own to contribute — it's this map's *consumer*, via `extra` in
+  // normalizeOpenSky, not a contributor) — parsedByRadiusSource simply has
+  // no `opensky` key, so the `if (!list) continue;` below skips it for
+  // free when iterating ICAO24_DEDUP_PRIORITY, no special-casing needed.
   const parsedByRadiusSource = {
     adsbfi: parsedAdsbfi, adsblol: parsedAdsblol, adsbone: parsedAdsbone,
     airplaneslive: parsedAirplaneslive, aircraftscatter: parsedAircraftscatter, flightradar24: parsedFlightradar24,
   };
   const radiusRecordsByHex = new Map(); // icao24 -> Array<{ source, data }>
-  for (const name of [...RADIUS_SOURCE_PRIORITY].reverse()) {
+  for (const name of [...ICAO24_DEDUP_PRIORITY].reverse()) {
     const list = parsedByRadiusSource[name];
     if (!list) continue;
     for (const a of list) {
@@ -522,53 +578,48 @@ async function poll() {
     }
   }
 
-  // Render priority: OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live > Aircraft Scatter.
-  // Each later source only contributes aircraft no earlier source covers — its
-  // exclude set is the union of every higher-priority source's rendered keys.
-  let openskyCount = openskyMarkers.size;
-  if (isSourceEnabled('opensky') && parsedStates) {
-    openskyCount = updateOpenSkyMarkers(parsedStates, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns);
-  }
-
-  const counts = { opensky: openskyCount };
-  // Order derived from RADIUS_SOURCE_PRIORITY (minus flightradar24, which
-  // uses its own update function below rather than this generic loop) —
-  // see the radiusRecordsByHex comment above for why both share one list.
-  const radiusMarkerMaps = {
-    adsbfi: adsbfiMarkers, adsblol: adsblolMarkers,
-    adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers, aircraftscatter: aircraftscatterMarkers,
+  // Render priority (highest to lowest, ICAO24_DEDUP_PRIORITY in
+  // constants.js): airplanes.live > adsb.fi > adsb.lol > adsb.one >
+  // Aircraft Scatter > OpenSky > FlightRadar24. Each later source only
+  // contributes aircraft no earlier source covers — its exclude set is the
+  // union of every higher-priority source's rendered keys. One unified loop
+  // dispatches to whichever update function a given source needs (most go
+  // through the generic updateRadiusSourceMarkers; OpenSky and FlightRadar24
+  // each have their own update function and are special-cased inline, same
+  // as FlightRadar24 already was before this source list included OpenSky).
+  const markerMapsByDedupName = {
+    airplaneslive: airplanesliveMarkers, adsbfi: adsbfiMarkers, adsblol: adsblolMarkers,
+    adsbone: adsboneMarkers, aircraftscatter: aircraftscatterMarkers,
+    opensky: openskyMarkers, flightradar24: flightradar24Markers,
   };
-  const radiusSources = RADIUS_SOURCE_PRIORITY
-    .filter((name) => name !== 'flightradar24')
-    .map((name) => [name, radiusMarkerMaps[name], parsedByRadiusSource[name]]);
-  const excludeIds = new Set(openskyMarkers.keys());
-  for (const [name, markerMap, aircraft] of radiusSources) {
+  const parsedForDedup = {
+    airplaneslive: parsedAirplaneslive, adsbfi: parsedAdsbfi, adsblol: parsedAdsblol,
+    adsbone: parsedAdsbone, aircraftscatter: parsedAircraftscatter,
+    opensky: parsedStates, flightradar24: parsedFlightradar24,
+  };
+  const counts = {};
+  const excludeIds = new Set();
+  for (const name of ICAO24_DEDUP_PRIORITY) {
+    const markerMap = markerMapsByDedupName[name];
+    const aircraft = parsedForDedup[name];
     if (isSourceEnabled(name) && aircraft) {
-      counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name], name, flightawareByCallsign, matchedFlightawareCallsigns, radiusRecordsByHex);
+      if (name === 'opensky') {
+        counts[name] = updateOpenSkyMarkers(aircraft, excludeIds, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns);
+      } else if (name === 'flightradar24') {
+        counts[name] = updateFlightRadar24Markers(aircraft, excludeIds, radiusRecordsByHex);
+      } else {
+        counts[name] = updateRadiusSourceMarkers(markerMap, aircraft, excludeIds, SOURCE_COLORS[name], name, flightawareByCallsign, matchedFlightawareCallsigns, radiusRecordsByHex);
+      }
     } else {
       counts[name] = markerMap.size;
     }
-    // Later sources must not re-render what this one just claimed.
+    // Later (lower-priority) sources must not re-render what this one just claimed.
     for (const key of markerMap.keys()) excludeIds.add(key);
   }
 
-  // FlightRadar24 renders last among the ICAO24-keyed sources — only what
-  // OpenSky/adsb.fi/adsb.lol/adsb.one/airplanes.live don't already cover.
-  // This is its own code block rather than folded into the radiusSources
-  // loop above (it uses a different update function), but its position here
-  // must stay last, matching RADIUS_SOURCE_PRIORITY's own last entry.
-  // See CLAUDE.md for why this unofficial, best-effort source never outranks
-  // any of the established free ones.
-  if (isSourceEnabled('flightradar24') && parsedFlightradar24) {
-    counts.flightradar24 = updateFlightRadar24Markers(parsedFlightradar24, excludeIds, radiusRecordsByHex);
-  } else {
-    counts.flightradar24 = flightradar24Markers.size;
-  }
-  for (const key of flightradar24Markers.keys()) excludeIds.add(key);
-
-  // FlightAware: after OpenSky/radius sources, render only those flights that
-  // weren't matched to another source's callsign (matched ones had their data
-  // merged into the other source's sidebar).
+  // FlightAware: after every ICAO24-keyed source above, render only those
+  // flights that weren't matched to another source's callsign (matched ones
+  // had their data merged into the other source's sidebar).
   if (isSourceEnabled('flightaware') && parsedFlights) {
     counts.flightaware = updateFlightAwareMarkers(parsedFlights, matchedFlightawareCallsigns);
   } else {
@@ -578,11 +629,19 @@ async function poll() {
   updateCounts(counts);
   if (currentDevMode) { renderDevAircraftTable(); refreshIdentityStats(); }
 
+  // Deselect check is final-pass-only: during an early pass, a still-pending
+  // source's marker map is simply untouched (not cleared), so a real
+  // disappearance is still correctly detectable once the final pass runs
+  // moments later. Running this against an early, incomplete marker-map
+  // snapshot risks a false-positive deselectAircraft() the final pass could
+  // never undo — strictly worse than a few hundred ms of extra delay here.
+  if (!isFinal) return;
+
   // Deselect only if the aircraft genuinely disappeared from every source this
   // poll. Don't deselect if a single source's own stale-marker sweep removed it
-  // — that's a cross-source handoff (e.g. OpenSky now claims it instead of
-  // adsb.fi), not a real disappearance. Must happen after all seven sources
-  // have rendered so we can check the union of all marker maps.
+  // — that's a cross-source handoff (e.g. airplanes.live now claims it instead
+  // of adsb.fi), not a real disappearance. Must happen after every source has
+  // rendered so we can check the union of all marker maps.
   if (selectedIcao24 && !Object.values(markerMapsBySource).some((m) => m.has(selectedIcao24))) {
     deselectAircraft();
   } else if (selectedIcao24 && trackUsesLiveFallback) {
@@ -615,7 +674,11 @@ for (const name of Object.keys(sourceToggles)) {
   if (isSourceEnabled(name)) showSourceCountSpinner(name);
 }
 
-// Hide the initial-load overlay once the first poll resolves (data in, or all
-// sources failed — either way there's nothing more to wait for).
-poll().finally(() => document.getElementById('map-loader').classList.add('hidden'));
+// Hide the initial-load overlay on the first PAINT, not the first fully-
+// settled poll — onFirstPaint fires as soon as the fastest enabled source's
+// data has rendered something, rather than waiting for the slowest one (see
+// poll()'s early/final two-phase render above). Still guaranteed to fire
+// even if every source fails, since renderPoll()'s final pass always runs
+// and poll() always calls markFirstPaint() after it regardless.
+poll({ onFirstPaint: () => document.getElementById('map-loader').classList.add('hidden') });
 setInterval(poll, POLL_INTERVAL_MS);

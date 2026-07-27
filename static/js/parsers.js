@@ -116,10 +116,14 @@ function parseOpenSkyState(arr) {
 // priority entry is the winner, same choice as the old single-entry map)
 // and to feed dev mode's per-field provenance badges, where EVERY entry
 // that reports a given field contributes a badge, not just the winner.
-// excludeIds: aircraft already shown by the higher-priority sources
-// (adsb.fi/airplanes.live) — OpenSky renders last and only contributes what
-// they don't cover, since it's the only source that spends a daily quota.
-function updateOpenSkyMarkers(states, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns) {
+// This enrichment relationship is independent of OpenSky's own marker-level
+// dedup rank (excludeIds below) — normalizeOpenSky always prefers OpenSky's
+// own native fields regardless of anything else, so it's unaffected by
+// wherever OpenSky sits in ICAO24_DEDUP_PRIORITY.
+// excludeIds: aircraft already claimed by a higher-priority source per
+// ICAO24_DEDUP_PRIORITY (constants.js) — OpenSky only contributes what
+// they don't cover, same exclusion mechanism updateRadiusSourceMarkers uses.
+function updateOpenSkyMarkers(states, excludeIds, radiusRecordsByHex, flightawareByCallsign, matchedFlightawareCallsigns) {
   const items = [];
   for (const s of states) { // already parsed by poll() (parseOpenSkyState)
     if (!isValidCoordinate(s.lat, s.lon)) continue; // missing/malformed position — skip this aircraft
@@ -139,6 +143,7 @@ function updateOpenSkyMarkers(states, radiusRecordsByHex, flightawareByCallsign,
       adsbExchangeCategory: extra && extra.category,
     });
     if (!passesCategoryFilter(categoryGroup)) continue;
+    if (excludeIds && excludeIds.has(s.icao24)) continue;
     const info = normalizeOpenSky(s, extra);
     if (!passesDataQualityFilter(info)) continue;
     // pickFields() only copies OPENSKY_NATIVE_FIELDS, which deliberately

@@ -26,7 +26,7 @@ in-memory dict.
     unaffected by request headers, so no toggle would ever work. Still
     fully wired up server- and client-side; only its HUD row is hidden)*
   - [airplanes.live](https://airplanes.live/api-guide/) — green
-  - [Aircraft Scatter API](https://rapidapi.com/adsbx/api/aircraftscatter/) — dark teal, via ADSBexchange/RapidAPI. It returns a fixed 1,000 km snapshot and is off by default; the app caches it for 60 seconds to stay within its metered quota.
+  - [Aircraft Scatter API](https://rapidapi.com/adsbx/api/aircraftscatter/) — dark teal, via ADSBexchange/RapidAPI. It returns a fixed 1,000 km snapshot, is enabled by default when configured, and is cached for 60 seconds to limit metered requests.
   - FlightRadar24 (via the unofficial [FlightRadarAPI](https://github.com/JeanExtreme002/FlightRadarAPI)
     SDK) — brown *(free, no key, but talks to FlightRadar24's private web API,
     not their official paid one — may stop working without warning if
@@ -237,7 +237,7 @@ Copy `.env.example` to `.env` to enable:
   AeroAPI](https://www.flightaware.com/commercial/aeroapi/). Enables the
   FlightAware source on the map; without it, the source shows empty. Optional.
   Note: this is a paid, metered API; each poll costs quota.
-- `RAPIDAPI_KEY` — RapidAPI key for the optional ADSBexchange Aircraft Scatter source. The frontend sends requests only when its toggle is enabled; the backend caches its fixed-radius result for 60 seconds.
+- `RAPIDAPI_KEY` — RapidAPI key for Aircraft Scatter (ADSBexchange). The toggle ships enabled, but without this key the route safely returns no aircraft; the backend caches its fixed-radius result for 60 seconds.
 - `SECRET_KEY` — signs the login session cookie. Without it, a random key is
   generated on every process start, which logs everyone out on every
   restart (including Flask debug's auto-reload on each file save) — set a

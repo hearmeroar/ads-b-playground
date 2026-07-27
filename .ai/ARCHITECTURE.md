@@ -4,7 +4,7 @@ This is a **map**, not a narrative. Read CLAUDE.md for full detail and rationale
 
 ## Data sources (eight live feeds plus lazy adsbdb enrichment)
 
-1. **OpenSky Network** (`/api/states`, `/api/track`) — 10s cache, own quota system (daily limit + per-track limit). Shares most fields with radius sources; highest priority. Falls back to anonymous if auth token unavailable. Circuit-breaker on outage (30s cooldown). (CLAUDE.md § "OpenSky endpoints")
+1. **OpenSky Network** (`/api/states`, `/api/track`) — 10s cache, own quota system (daily limit + per-track limit). Shares most fields with radius sources; ICAO24 priority below the free/cheap radius feeds. Falls back to anonymous if auth token unavailable. Circuit-breaker on outage (30s cooldown). (CLAUDE.md § "OpenSky endpoints")
 
 2. **adsb.fi** (`/api/adsbfi`) — Radius source (220nm, center-based), 10s cache. Extra fields: `dbFlags`, `messageType`, `adsbVersion`, DO-260B accuracy codes, `operator`, `calc_track`. (CLAUDE.md § "The four radius sources")
 
@@ -14,7 +14,7 @@ This is a **map**, not a narrative. Read CLAUDE.md for full detail and rationale
 
 5. **airplanes.live** (`/api/airplaneslive`) — Radius source, 10s cache, on by default. Highest priority among radius sources (enrichment order). (CLAUDE.md § "The four radius sources")
 
-6. **Aircraft Scatter** (`/api/aircraftscatter`) — ADSBexchange via RapidAPI, **off by default, metered**. Fixed 1,000km point query; 60s cache. ADSBExchange-compatible records, ICAO24-deduped after airplanes.live. Requires `RAPIDAPI_KEY`.
+6. **Aircraft Scatter** (`/api/aircraftscatter`) — ADSBexchange via RapidAPI, **enabled by default when configured; metered**. Fixed 1,000km point query; 60s cache. ADSBExchange-compatible records, ICAO24-deduped after adsb.one and before OpenSky. Requires `RAPIDAPI_KEY` (otherwise safely empty).
 
 7. **FlightAware AeroAPI** (`/api/flightaware`) — **Auth-required, off by default, metered/paid**. Flight-centric (no ICAO24), deduped by callsign. Contributes `originAirport`/`destinationAirport`. (CLAUDE.md § "FlightAware AeroAPI")
 
@@ -80,7 +80,7 @@ Storage (SQLite with WAL mode)
 Caches (in-memory, per gunicorn process, lost on restart; not critical)
 ├─ _cache (states) + stale-fallback on error/429
 ├─ _track_cache (per-ICAO24, persisted to disk .track_cache.json)
-├─ radius_source.cache (four entries, one per adsb.fi/lol/one/airplanes.live)
+├─ radius_source.cache (five entries, one per adsb.fi/lol/one/airplanes.live/Aircraft Scatter)
 ├─ _flightaware_cache
 ├─ _flightradar24_cache
 ├─ _photo_cache (Planespotters + airport-data.com, keyed by "source:reg:value")
@@ -98,28 +98,29 @@ Enrichment modules (enrichment/*, pure lookups, no I/O)
 └─ aircraft_enrichment.py — enrich_identity() orchestrator (live → registration → icao24 → callsign → aircraft_type → category)
 
 Background tasks (Flask app, daemon thread)
-└─ Identity backfill (every 5s: grab visible ICAO24s from cache, resolve any unknown ones to adsbdb, log to identity_cache)
+├─ Identity backfill (every 5s: grab visible ICAO24s from cache, resolve any unknown ones to adsbdb, log to identity_cache)
+└─ One-shot cache warm-up (per process: the five default-enabled feeds; launched after gunicorn `post_fork` or on Flask dev startup; never blocks serving)
 ```
 
 ## Frontend data flow
 
 ```
-Poll loop (12s cycle, all enabled sources in parallel, then dedup+render)
+Poll loop (12s cycle, all enabled sources in parallel, early paint then final dedup+render)
 │
 ├─ Fetch /api/states (OpenSky)
 ├─ Fetch /api/adsbfi, /api/adsblol, /api/adsbone, /api/airplaneslive, /api/aircraftscatter (in parallel)
 ├─ Fetch /api/flightaware (if enabled)
 ├─ Fetch /api/flightradar24 (if enabled)
 │
-└─ renderMarkers() in fixed priority order
+└─ renderPoll() twice: once when the fastest real fetch resolves, then once after all settle
    │
-   ├─ updateOpenSkyMarkers()
-   │  └─ Enriched with radiusRecordsByHex (all four radius sources' records for this ICAO24)
-   │     → deduplicated by category
-   │
-├─ updateRadiusSourceMarkers() × 5 (adsb.fi → adsb.lol → adsb.one → airplanes.live → Aircraft Scatter)
+   ├─ updateRadiusSourceMarkers() × 5 (airplanes.live → adsb.fi → adsb.lol → adsb.one → Aircraft Scatter)
    │  └─ Each source renders only aircraft no higher-priority source claimed
    │     → contributes to shared excludeIds set before next source runs
+   │
+   ├─ updateOpenSkyMarkers()
+   │  └─ Enriched with radiusRecordsByHex (all radius-source records for this ICAO24)
+   │     → only aircraft no higher-priority source claimed
    │
    ├─ updateFlightRadar24Markers()
    │  └─ Same ICAO24-based dedup chain as radius sources (sits below them)

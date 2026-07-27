@@ -152,6 +152,38 @@
       },
       "zoom": 8,
       "radius_nm": 220
+    },
+    "LFKB": {
+      "center": {
+        "lat": 42.5527,
+        "lon": 9.48373
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "EDDF": {
+      "center": {
+        "lat": 50.026706,
+        "lon": 8.55835
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "OIAA": {
+      "center": {
+        "lat": 30.367887,
+        "lon": 48.230075
+      },
+      "zoom": 8,
+      "radius_nm": 220
+    },
+    "OMEF": {
+      "center": {
+        "lat": 24.46611,
+        "lon": 55.625
+      },
+      "zoom": 8,
+      "radius_nm": 220
     }
   }
 }

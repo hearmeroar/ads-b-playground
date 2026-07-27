@@ -441,14 +441,13 @@ endpoint takes only a lat/lon point and always returns a fixed ~1,000km
 snapshot around it, so — unlike every other `RADIUS_SOURCES` entry — it has
 no `dist_param` key at all; `_apply_zone()`'s per-source center rebuild
 (and the entry's own initial setup) both special-case `dist_param` being
-absent rather than assuming every entry has one. **Ships off by default**
-and cached for 60s (`min_interval`), six times longer than the free
-sources' 10s, specifically to stay comfortably inside its metered monthly
-quota given a fixed radius can't be narrowed to cut cost. **Priority: sits
-below airplanes.live**, both in `RADIUS_SOURCE_PRIORITY` (`constants.js`)
-and the marker `excludeIds` render chain — a newer, paid source never
-outranks the four established free ones, the same reasoning FlightAware/
-FlightRadar24 ship off-by-default and low-priority for. Color: dark teal
+absent rather than assuming every entry has one. **Ships enabled by default**
+(and safely yields no aircraft when `RAPIDAPI_KEY` is absent), cached for 60s
+(`min_interval`), six times longer than the free sources' 10s, to limit its
+metered request rate. **Priority: sits after adsb.one and before OpenSky** in
+`ICAO24_DEDUP_PRIORITY` (`constants.js`): it never outranks the established
+free radius sources, while OpenSky is reserved for aircraft they do not
+cover. Color: dark teal
 (`#00838f`), distinct from every other source's swatch. Tests:
 `tests/backend/test_radius_sources.py` covers the `not_configured` guard
 and the RapidAPI header attachment; `tests/frontend/test_rendering.spec.js`
@@ -1244,8 +1243,8 @@ because photographer name and photo URL come from an external API.
   which clears its markers immediately and triggers an immediate `poll()` (rather
   than waiting up to `POLL_INTERVAL_MS` for the next tick) — both on and off
   toggles re-run `poll()` so counts/markers never sit stale after a toggle.
-  **OpenSky, adsb.fi, adsb.lol and airplanes.live ship checked**; FlightAware
-  ships off (see above); adsb.one's row is hidden from the HUD entirely (see
+  **airplanes.live, adsb.fi, adsb.lol, Aircraft Scatter and OpenSky ship
+  checked**; FlightAware ships off (see above); adsb.one's row is hidden from the HUD entirely (see
   above) rather than shipping an always-off checkbox. Turning OpenSky off
   clears the quota line and any pending OpenSky warning message.
 - **HUD counts** (`updateCounts()`) render as a pill per source, collapsed via
@@ -1258,37 +1257,38 @@ because photographer name and photo URL come from an external API.
   spinner — including for a source that failed and whose real count is 0, so
   there's no path where a spinner outlives its fetch.
 - **A `#map-loader` overlay** covers the first paint — without it the map
-  opens visibly empty for a second or two and reads as broken rather than
-  loading. It's hidden from the initial `poll().finally(...)`, deliberately
-  `finally` and not `then`: if that first poll fails, the overlay must still
-  go away and let the (empty) map and its error line show, rather than
-  spinning forever over them.
+opens visibly empty for a second or two and reads as broken rather than
+loading. `poll()` now paints opportunistically as soon as the fastest real
+enabled fetch resolves, then repeats the same render path after all fetches
+settle; the overlay hides on that first paint. If every fetch fails, the
+final pass still hides it, so the empty map and error line remain reachable.
 - **Dedup + enrichment rule:** `poll()` fetches all enabled sources in
-  parallel, builds a `flightawareByCallsign` lookup (callsign-normalized for matching),
-  then defers rendering until all arrive. Rendering happens in one fixed priority order
-  — **OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live > FlightRadar24 > FlightAware**
+  parallel, paints once as soon as the first real response arrives, then
+  performs an authoritative final pass after all arrive. Both passes use one
+  fixed priority order — **airplanes.live > adsb.fi > adsb.lol > adsb.one >
+  Aircraft Scatter > OpenSky > FlightRadar24 > FlightAware**
   — since each step depends on data or state from the others. FlightRadar24 is
   ICAO24-keyed like the radius sources (not callsign-keyed like FlightAware), so it
   sits inside the same `excludeIds`/`radiusRecordsByHex` chain as them, just last —
   see the FlightRadar24 section above for why. **Single source of truth for
   this order (2026-07-20):** the ICAO24-keyed portion of this priority
-  (adsb.fi/adsb.lol/adsb.one/airplanes.live/FlightRadar24 — OpenSky and
-  FlightAware aren't in it, see below) used to be written twice in
+  (airplanes.live/adsb.fi/adsb.lol/adsb.one/Aircraft Scatter/OpenSky/
+  FlightRadar24 — FlightAware isn't in it, see below) used to be written twice in
   `poll()` — once low→high to build `radiusRecordsByHex` (so the
   highest-priority entry is pushed last and wins), once high→low for the
   `excludeIds` chain — as two independently hand-written, mirrored array
   literals with no link between them, a real risk of drifting out of sync
-  on a future reorder. Both are now derived from one `RADIUS_SOURCE_PRIORITY`
+  on a future reorder. Both are now derived from one `ICAO24_DEDUP_PRIORITY`
   array (`constants.js`), reversed for the former. **FlightAware uses callsign-based dedup:**
   after the ICAO24-keyed chain above, FlightAware flights matching any other source's
   callsign (trimmed, case-insensitive) are suppressed, and their route data is merged
   into that source's sidebar. A failing source degrades to `null` and is skipped for
   that cycle (see the radius-sources note above) — its existing markers/count are kept:
-  - OpenSky renders first (when enabled). Its sidebar data is enriched with
+  - OpenSky renders after the higher-priority sources (when enabled). Its sidebar data is enriched with
     everything it doesn't have itself (registration, aircraft type,
     `emergency`, IAS/TAS/Mach, mag/true heading, turn rate, roll, autopilot
     targets, wind, OAT/TAT, operator, year, the DO-260B accuracy fields) via
-    `radiusRecordsByHex`, a lookup merged from all four radius responses — see
+    `radiusRecordsByHex`, a lookup merged from every radius response — see
     `normalizeOpenSky(s, extra)` (`extra` is that lookup's highest-priority
     entry for this aircraft). It's built by iterating the lists
     *lowest→highest* priority so the highest-priority source is pushed last
@@ -1296,7 +1296,7 @@ because photographer name and photo URL come from an external API.
     provides (altitude, speed, position, squawk, position source,
     last-contact time) are never taken from `extra` — OpenSky's own values
     always win for those.
-  - Each radius source then renders in turn against a single growing
+  - Each ICAO24-keyed source renders in turn against a single growing
     `excludeIds` set: it contributes only aircraft no higher-priority source
     already claimed, and its own keys are added before the next one runs.
   - What's uniquely visible as a lower-priority *marker* is therefore exactly

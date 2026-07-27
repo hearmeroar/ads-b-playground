@@ -36,28 +36,27 @@ function looksLikePlausibleRegistration(reg) {
   return typeof reg === 'string' && /[A-Za-z]/.test(reg);
 }
 
-// Three independent data sources, each rendered as its own color-coded set of
-// markers, all keyed by the aircraft's ICAO24/hex address (the same aircraft
-// can in principle show up in more than one feed at once — see the dedup
-// rule in poll() below). OpenSky is the "primary" source; adsb.fi and
-// airplanes.live are ranked below it in that order.
-// Key order is the canonical source priority: OpenSky > adsb.fi >
-// airplanes.live. OpenSky remains quota-limited, but starts enabled.
-// Key order is the canonical source priority (highest first): it drives the
-// HUD count/toggle loops and the dedup chain in poll(). adsb.lol and adsb.one
-// are independent instances of the same aggregator family as adsb.fi, ordered
-// between it and airplanes.live as a coverage/uptime fallback chain (not a
-// data-quality ranking).
-// Canonical ICAO24-keyed enrichment/render priority, highest first. Both
-// main.js's radiusRecordsByHex construction (reversed, so the
+// Every ICAO24-keyed data source, each rendered as its own color-coded set
+// of markers (the same aircraft can in principle show up in more than one
+// feed at once — see the dedup rule in poll() below). FlightAware is the
+// only live source excluded from this list — it dedupes by callsign, not
+// ICAO24 (see matchedFlightawareCallsigns instead).
+// Canonical ICAO24-keyed enrichment/render priority, highest first (product
+// decision, 2026-07-27 — see .ai/DECISIONS.md): airplanes.live > adsb.fi >
+// adsb.lol > adsb.one > Aircraft Scatter > OpenSky > FlightRadar24. adsb.lol
+// and adsb.one are independent instances of the same aggregator family as
+// adsb.fi, kept adjacent to it as a coverage/uptime fallback chain (not a
+// data-quality ranking). OpenSky — despite being the only source with a
+// real daily quota to protect — is deliberately ranked *below* the free/
+// cheap sources rather than above them: every aircraft the cheaper sources
+// already cover is one OpenSky doesn't need to be consulted for, so this
+// ordering also reduces its quota spend, not just an arbitrary reshuffle.
+// Both main.js's radiusRecordsByHex construction (reversed, so the
 // highest-priority entry is pushed last and wins — array[length-1]) and its
 // marker exclude-chain derive their order from this one array, instead of
 // two independently hand-written mirror lists that could silently drift out
-// of sync with each other. OpenSky and FlightAware aren't in this list:
-// OpenSky always renders first and unconditionally seeds excludeIds, and
-// FlightAware dedupes by callsign, not ICAO24 (see
-// matchedFlightawareCallsigns instead).
-const RADIUS_SOURCE_PRIORITY = ['adsbfi', 'adsblol', 'adsbone', 'airplaneslive', 'aircraftscatter', 'flightradar24'];
+// of sync with each other.
+const ICAO24_DEDUP_PRIORITY = ['airplaneslive', 'adsbfi', 'adsblol', 'adsbone', 'aircraftscatter', 'opensky', 'flightradar24'];
 
 const SOURCE_COLORS = {
   opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32', aircraftscatter: '#00838f', flightaware: '#00acc1',

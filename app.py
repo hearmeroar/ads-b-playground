@@ -997,6 +997,37 @@ def api_adsblol():
     return radius_source_response("adsblol")
 
 
+def _warm_default_source_caches():
+    """One-time, best-effort warm-up of the caches for the 4 sources the
+    frontend ships enabled by default (static/index.html's checked
+    checkboxes: airplaneslive, adsbfi, adsblol, aircraftscatter, opensky) —
+    NOT a repeating
+    poller. Called exactly once per process from two places: gunicorn's
+    post_fork hook (gunicorn.conf.py, production) and this module's own
+    `if __name__ == "__main__":` block (local `python app.py` dev). Both
+    call sites run this in a background thread so a slow/unreachable
+    upstream can never delay the worker/dev-server actually starting to
+    accept traffic — every route already has its own complete stale/error-
+    fallback contract (_cached_fetch, /api/states' 429/error branches) for
+    whenever this hasn't finished yet, has been caught by
+    TOKEN_RETRY_COOLDOWN/OPENSKY_OUTAGE_COOLDOWN, or simply hasn't run at
+    all — a warm-up is a pure optimization for whichever request happens to
+    arrive first per source per process, never a correctness requirement.
+
+    Reuses the real Flask routes via test_client() rather than calling
+    fetch_opensky()/cached_radius_source() directly: every one of those
+    returns via jsonify(), which needs an app/request context that
+    test_client() sets up for free — zero warm-up-specific duplication of
+    the fetch/cache/error logic each route already owns.
+    """
+    client = app.test_client()
+    for path in ("/api/states", "/api/adsbfi", "/api/adsblol", "/api/airplaneslive", "/api/aircraftscatter"):
+        try:
+            client.get(path)
+        except Exception:
+            pass  # a failed warm-up is retried for real the moment a user needs it
+
+
 @app.route("/api/adsbone")
 def api_adsbone():
     return radius_source_response("adsbone")
@@ -1556,6 +1587,12 @@ if __name__ == "__main__":
     # same value).
     app.debug = True
     _start_identity_backfill_thread()
+    # Same reloader-double-start guard as the identity-backfill thread above
+    # — without it a fresh reloader watcher process would also kick off a
+    # useless warm-up of its own. Under gunicorn (production) the equivalent
+    # trigger is gunicorn.conf.py's post_fork hook, not this block at all.
+    if _should_start_background_thread():
+        threading.Thread(target=_warm_default_source_caches, daemon=True, name="cache-warmup").start()
 
     # Port is configurable (PORT env var) so the test suite can run on a
     # different one. The default is 5051, not 5000 — 5000 (and often 5001)

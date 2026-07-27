@@ -143,25 +143,16 @@
   </div>
 
   <div class="sources">
-    <div class="source-row" id="source-opensky">
-      <span class="swatch" style="background:#1a73e8"></span>
-      <span class="source-name">OpenSky</span>
-      <span class="source-count" id="count-opensky"></span>
-      <button type="button" class="source-help" id="opensky-help" style="display:none"
-              aria-label="Why is OpenSky disabled?">
-        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
-          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
-                fill="currentColor">?</text>
-        </svg>
-      </button>
-      <label class="switch" style="--row-color:#1a73e8">
-        <input type="checkbox" id="toggle-opensky" checked>
+    <div class="source-row" title="Highest-priority source in the dedup chain — never excluded by any other">
+      <span class="swatch" style="background:#2e7d32"></span>
+      <span class="source-name">airplanes.live</span>
+      <span class="source-count" id="count-airplaneslive"></span>
+      <label class="switch" style="--row-color:#2e7d32">
+        <input type="checkbox" id="toggle-airplaneslive" checked>
         <span class="switch-track"></span>
       </label>
-      <div class="source-help-popover" id="opensky-help-popover" hidden></div>
     </div>
-    <div class="source-row" title="Only shown where not already covered by OpenSky">
+    <div class="source-row" title="Only shown where not already covered by airplanes.live">
       <span class="swatch" style="background:#e53935"></span>
       <span class="source-name">adsb.fi</span>
       <span class="source-count" id="count-adsbfi"></span>
@@ -170,7 +161,7 @@
         <span class="switch-track"></span>
       </label>
     </div>
-    <div class="source-row" title="Its api.adsb.lol upstream occasionally has multi-second hangs — degrades to the last-good cycle rather than blocking the poll. Only shown where not already covered by OpenSky or adsb.fi">
+    <div class="source-row" title="Its api.adsb.lol upstream occasionally has multi-second hangs — degrades to the last-good cycle rather than blocking the poll. Only shown where not already covered by airplanes.live or adsb.fi">
       <span class="swatch" style="background:#8e24aa"></span>
       <span class="source-name">adsb.lol</span>
       <span class="source-count" id="count-adsblol"></span>
@@ -201,23 +192,32 @@
         <span class="switch-track"></span>
       </label>
     </div>
-    <div class="source-row" title="Only shown where not already covered by OpenSky, adsb.fi, adsb.lol or adsb.one">
-      <span class="swatch" style="background:#2e7d32"></span>
-      <span class="source-name">airplanes.live</span>
-      <span class="source-count" id="count-airplaneslive"></span>
-      <label class="switch" style="--row-color:#2e7d32">
-        <input type="checkbox" id="toggle-airplaneslive" checked>
-        <span class="switch-track"></span>
-      </label>
-    </div>
-    <div class="source-row" title="ADSBexchange via RapidAPI. Covers a fixed 1,000 km radius and is off by default because it is metered; only shown where no higher-priority source already covers the aircraft.">
+    <div class="source-row" title="ADSBexchange via RapidAPI. Covers a fixed 1,000 km radius (metered — enabled by default). Only shown where not already covered by airplanes.live, adsb.fi, or adsb.lol.">
       <span class="swatch" style="background:#00838f"></span>
       <span class="source-name">Aircraft Scatter</span>
       <span class="source-count" id="count-aircraftscatter"></span>
       <label class="switch" style="--row-color:#00838f">
-        <input type="checkbox" id="toggle-aircraftscatter">
+        <input type="checkbox" id="toggle-aircraftscatter" checked>
         <span class="switch-track"></span>
       </label>
+    </div>
+    <div class="source-row" id="source-opensky" title="Only shown where not already covered by airplanes.live, adsb.fi, adsb.lol, or Aircraft Scatter">
+      <span class="swatch" style="background:#1a73e8"></span>
+      <span class="source-name">OpenSky</span>
+      <span class="source-count" id="count-opensky"></span>
+      <button type="button" class="source-help" id="opensky-help" style="display:none"
+              aria-label="Why is OpenSky disabled?">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
+      <label class="switch" style="--row-color:#1a73e8">
+        <input type="checkbox" id="toggle-opensky" checked>
+        <span class="switch-track"></span>
+      </label>
+      <div class="source-help-popover" id="opensky-help-popover" hidden></div>
     </div>
     <div class="source-row" title="Shown independently, not deduplicated against other sources (FlightAware is flight-centric with no ICAO24 field)">
       <span class="swatch" style="background:#00acc1"></span>
@@ -590,17 +590,17 @@
   </div>
  </div>
 
-<script src="leaflet/leaflet.js"></script>
-<script src="leaflet-markercluster/leaflet.markercluster.js"></script>
-<script src="js/map-init.js"></script>
-<script src="js/constants.js"></script>
-<script src="js/route-validation.js"></script>
-<script src="js/state-filters.js"></script>
-<script src="js/sidebar-track.js"></script>
-<script src="js/auth-collection.js"></script>
-<script src="js/icons.js"></script>
-<script src="js/render-details.js"></script>
-<script src="js/parsers.js"></script>
-<script src="js/main.js"></script>
+<script src="leaflet/leaflet.js" defer></script>
+<script src="leaflet-markercluster/leaflet.markercluster.js" defer></script>
+<script src="js/map-init.js" defer></script>
+<script src="js/constants.js" defer></script>
+<script src="js/route-validation.js" defer></script>
+<script src="js/state-filters.js" defer></script>
+<script src="js/sidebar-track.js" defer></script>
+<script src="js/auth-collection.js" defer></script>
+<script src="js/icons.js" defer></script>
+<script src="js/render-details.js" defer></script>
+<script src="js/parsers.js" defer></script>
+<script src="js/main.js" defer></script>
 </body>
 </html>
