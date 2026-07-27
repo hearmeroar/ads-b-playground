@@ -28,6 +28,7 @@ test('enabling a source shows a spinner until its first count lands, then the pi
 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
+  await page.waitForFunction(() => document.getElementById('count-airplaneslive').textContent !== '');
 
   // Off: no pill, no spinner.
   expect(await slotState(page, 'adsbone')).toEqual({ text: '', spinning: false, loading: false });
@@ -36,11 +37,17 @@ test('enabling a source shows a spinner until its first count lands, then the pi
   // see CLAUDE.md). page.click() can't target a display:none element at all
   // (no layout box, even with force: true), so invoke the native DOM click
   // directly; the toggle/wiring underneath are otherwise untouched.
-  await page.evaluate(() => document.getElementById('toggle-adsbone').click());
+  const pending = await page.evaluate(() => {
+    document.getElementById('toggle-adsbone').click();
+    const el = document.getElementById('count-adsbone');
+    return {
+      text: el.textContent,
+      spinning: !!el.querySelector('.count-spinner'),
+      loading: el.classList.contains('loading'),
+    };
+  });
 
   // On, data still in flight: spinner stands in for the pill.
-  await page.waitForFunction(() => !!document.querySelector('#count-adsbone .count-spinner'));
-  const pending = await slotState(page, 'adsbone');
   expect(pending.spinning).toBe(true);
   expect(pending.loading).toBe(true);
   expect(pending.text).toBe(''); // no stale number behind the spinner

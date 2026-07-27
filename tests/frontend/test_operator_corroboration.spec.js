@@ -20,6 +20,15 @@ async function selectOpenSky(page, hex) {
   await page.waitForTimeout(100);
 }
 
+async function isolateOnOpenSky(page, hex) {
+  const adsbfi = fixture('adsbfi.json');
+  adsbfi.ac = adsbfi.ac.filter((aircraft) => aircraft.hex !== hex);
+  await page.route('**/api/adsbfi', (route) => route.fulfill({ json: adsbfi }));
+  const airplaneslive = fixture('airplaneslive.json');
+  airplaneslive.ac = airplaneslive.ac.filter((aircraft) => aircraft.hex !== hex);
+  await page.route('**/api/airplaneslive', (route) => route.fulfill({ json: airplaneslive }));
+}
+
 function needsCorroborationIdentityResponse() {
   return {
     country: null,
@@ -35,6 +44,7 @@ test.beforeEach(async ({ page }) => {
 
 test('rotorcraft: an unconfirmed operator/operator_country renders as "Unknown" in normal mode', async ({ page }) => {
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: needsCorroborationIdentityResponse() }));
+  await isolateOnOpenSky(page, 'bbbbbb');
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await selectOpenSky(page, 'bbbbbb');
@@ -50,6 +60,7 @@ test('rotorcraft: an unconfirmed operator/operator_country renders as "Unknown" 
 
 test('rotorcraft: dev mode reveals the unconfirmed value with a warning tag', async ({ page }) => {
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: needsCorroborationIdentityResponse() }));
+  await isolateOnOpenSky(page, 'bbbbbb');
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.click('#toggle-dev-mode');
@@ -69,7 +80,11 @@ test('non-rotorcraft: an unconfirmed operator/operator_country still renders nor
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: needsCorroborationIdentityResponse() }));
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
-  await selectOpenSky(page, 'dddddd');
+  await page.evaluate(() => {
+    const marker = airplanesliveMarkers.get('dddddd');
+    if (marker && marker._icon) marker._icon.click();
+  });
+  await page.waitForFunction(() => enrichmentById.has('dddddd'));
 
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
   expect(sidebarText).toContain('Mauritania Airlines International');
@@ -110,6 +125,9 @@ test('a bare numeric registration skips the reg-based photo lookup and uses the 
   const row = adsbfi.ac.find((a) => a.hex === 'dddddd');
   row.r = '333';
   await page.route('**/api/adsbfi', (route) => route.fulfill({ json: adsbfi }));
+  const airplaneslive = fixture('airplaneslive.json');
+  airplaneslive.ac.find((a) => a.hex === 'dddddd').r = '333';
+  await page.route('**/api/airplaneslive', (route) => route.fulfill({ json: airplaneslive }));
 
   const requestedPaths = [];
   await page.route('**/api/photo/**', (route) => {
@@ -121,7 +139,7 @@ test('a bare numeric registration skips the reg-based photo lookup and uses the 
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('dddddd');
+    const marker = airplanesliveMarkers.get('dddddd');
     if (marker && marker._icon) marker._icon.click();
   });
   await page.waitForTimeout(300);

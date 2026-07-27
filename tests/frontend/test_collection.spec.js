@@ -29,7 +29,7 @@ test('saving the selected aircraft posts a snapshot and shows it as saved', asyn
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await expect(page.locator('#sidebar')).toHaveClass(/open/);
@@ -40,10 +40,10 @@ test('saving the selected aircraft posts a snapshot and shows it as saved', asyn
   expect(postedBody).not.toBeNull();
   expect(postedBody.icao24).toBe('aaaaaa');
   expect(postedBody.snapshot).toBeTruthy();
-  // aaaaaa's own lat/lon from states.json — proves the position captured at
+  // aaaaaa's winning adsb.fi position proves the position captured at
   // save time is actually sent, not just present on detailsById.
-  expect(postedBody.lat).toBeCloseTo(44.0, 1);
-  expect(postedBody.lon).toBeCloseTo(21.0, 1);
+  expect(postedBody.lat).toBeCloseTo(44.25, 1);
+  expect(postedBody.lon).toBeCloseTo(21.25, 1);
   await expect(page.locator('#sidebar-save-collection')).toHaveClass(/saved/);
 });
 
@@ -65,7 +65,7 @@ test('the saved snapshot carries categoryGroup, not just Unknown (regression for
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('dddddd');
+    const marker = airplanesliveMarkers.get('dddddd');
     if (marker && marker._icon) marker._icon.click();
   });
   await expect(page.locator('#sidebar')).toHaveClass(/open/);
@@ -96,7 +96,7 @@ test('re-selecting an already-saved aircraft shows the save button already fille
   await page.waitForTimeout(200);
 
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await expect(page.locator('#sidebar-save-collection')).toHaveClass(/saved/);

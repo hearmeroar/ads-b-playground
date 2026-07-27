@@ -14,7 +14,7 @@ test('centers the map on the selected aircraft\'s current position, keeping the 
   const zoomBefore = await page.evaluate(() => map.getZoom());
 
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await expect(page.locator('#sidebar')).toHaveClass(/open/);
@@ -26,10 +26,10 @@ test('centers the map on the selected aircraft\'s current position, keeping the 
   // far from the aircraft) — give the animation time to finish.
   await page.waitForTimeout(1000);
 
-  // "aaaaaa" is at lat 44.0, lon 21.0 in states.json.
+  // adsb.fi owns aaaaaa and reports it at 44.25, 21.25.
   const center = await page.evaluate(() => map.getCenter());
-  expect(center.lat).toBeCloseTo(44.0, 1);
-  expect(center.lng).toBeCloseTo(21.0, 1);
+  expect(center.lat).toBeCloseTo(44.25, 1);
+  expect(center.lng).toBeCloseTo(21.25, 1);
   // Zoom level is preserved, not reset to some default.
   expect(await page.evaluate(() => map.getZoom())).toBe(zoomBefore);
 });

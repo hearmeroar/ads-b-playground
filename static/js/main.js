@@ -128,12 +128,16 @@ function showSourceCountSpinner(name) {
   el.appendChild(spinner);
 }
 
-function updateCounts(counts) {
+function updateCounts(counts, pendingSources = new Set()) {
   let total = 0;
   for (const name of Object.keys(sourceToggles)) {
     const enabled = isSourceEnabled(name);
     const n = enabled ? (counts[name] || 0) : 0;
     total += n;
+    // An opportunistic early render only knows about the sources that have
+    // already answered. Preserve the spinner/disabled state for every other
+    // enabled source until the final pass receives (or times out) its fetch.
+    if (pendingSources.has(name)) continue;
     const el = document.getElementById('count-' + name);
     el.classList.remove('loading');
     el.textContent = enabled ? String(n) : ''; // also removes the spinner child
@@ -626,7 +630,15 @@ function renderPoll(raw, { isFinal }) {
     counts.flightaware = flightawareMarkers.size;
   }
 
-  updateCounts(counts);
+  const pendingSources = new Set();
+  if (!isFinal) {
+    for (const name of Object.keys(sourceToggles)) {
+      if (isSourceEnabled(name) && !Object.prototype.hasOwnProperty.call(raw, name)) {
+        pendingSources.add(name);
+      }
+    }
+  }
+  updateCounts(counts, pendingSources);
   if (currentDevMode) { renderDevAircraftTable(); refreshIdentityStats(); }
 
   // Deselect check is final-pass-only: during an early pass, a still-pending

@@ -29,7 +29,7 @@ test('clicking a marker shows the photo and required attribution', async ({ page
   await page.waitForTimeout(500);
 
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await page.waitForTimeout(600);
@@ -58,7 +58,7 @@ test('shows a neutral placeholder when no photo is found, with no console error'
   await page.waitForTimeout(500);
 
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await page.waitForTimeout(600);
@@ -78,7 +78,7 @@ test('reopening the same sidebar does not refetch (client-side cache)', async ({
   await page.waitForTimeout(500);
 
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await page.waitForTimeout(600);
@@ -89,7 +89,7 @@ test('reopening the same sidebar does not refetch (client-side cache)', async ({
   await page.waitForTimeout(200);
   // Reopen same aircraft
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await page.waitForTimeout(400);
@@ -107,7 +107,7 @@ test('photo survives a poll cycle while the sidebar stays open (regression guard
   await page.waitForTimeout(500);
 
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await page.waitForTimeout(600);

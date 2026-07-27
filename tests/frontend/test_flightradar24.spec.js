@@ -55,8 +55,8 @@ test('toggle controls marker visibility', async ({ page }) => {
   expect(await page.evaluate(() => flightradar24Markers.size)).toBe(0);
 });
 
-test('an aircraft already shown by OpenSky is not double-marked', async ({ page }) => {
-  // states.json's "aaaaaa" is already rendered by OpenSky (on by default) —
+test('an aircraft already shown by a higher-priority source is not double-marked', async ({ page }) => {
+  // "aaaaaa" is already rendered by adsb.fi (on by default) —
   // FlightRadar24 sits lowest priority, so it must not claim the same hex.
   await page.route('**/api/flightradar24', (route) => route.fulfill({ json: {
     flights: [{
@@ -73,10 +73,10 @@ test('an aircraft already shown by OpenSky is not double-marked', async ({ page 
   await page.waitForTimeout(500);
 
   const state = await page.evaluate(() => ({
-    opensky: openskyMarkers.has('aaaaaa'),
+    adsbfi: adsbfiMarkers.has('aaaaaa'),
     fr24: flightradar24Markers.has('aaaaaa'),
   }));
-  expect(state.opensky).toBe(true);
+  expect(state.adsbfi).toBe(true);
   expect(state.fr24).toBe(false);
 });
 

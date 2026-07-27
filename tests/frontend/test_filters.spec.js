@@ -8,11 +8,12 @@ test.beforeEach(async ({ page }) => {
   await page.waitForTimeout(500);
 });
 
-test('motion filter partitions OpenSky markers into air/ground correctly', async ({ page }) => {
-  // states.json: 5 total, 4 airborne, 1 on the ground ("gggggg").
+test('motion filter partitions visible OpenSky markers into air/ground correctly', async ({ page }) => {
+  // Higher-priority sources own three overlapping OpenSky aircraft, leaving
+  // one visible airborne marker and one visible ground marker.
   await page.click('#motion-filter .seg-btn[data-value="airborne"]');
   await page.waitForTimeout(500);
-  expect((await colorCounts(page)).blue).toBe(4);
+  expect((await colorCounts(page)).blue).toBe(1);
 
   await page.click('#motion-filter .seg-btn[data-value="ground"]');
   await page.waitForTimeout(500);
@@ -20,7 +21,7 @@ test('motion filter partitions OpenSky markers into air/ground correctly', async
 
   await page.click('#motion-filter .seg-btn[data-value="all"]');
   await page.waitForTimeout(500);
-  expect((await colorCounts(page)).blue).toBe(5);
+  expect((await colorCounts(page)).blue).toBe(2);
 });
 
 test('category dropdown filters to an exact count', async ({ page }) => {
@@ -41,12 +42,12 @@ test('category dropdown filters to an exact count', async ({ page }) => {
 
 test('non-aircraft entries are shown with a tower icon by default and hidden when the filter is enabled', async ({ page }) => {
   let counts = await colorCounts(page);
-  expect(counts.red).toBe(3); // both junk entries shown by default alongside the real one
+  expect(counts.red).toBe(5); // both junk entries shown by default
   expect(await iconClassCounts(page, 'surface-obstacle-icon')).toBe(2); // the TWR and callsign-pattern entries specifically
 
   await page.click('#toggle-hide-junk');
   await page.waitForTimeout(600);
   counts = await colorCounts(page);
-  expect(counts.red).toBe(1); // TWR + callsign-pattern entries now hidden
+  expect(counts.red).toBe(3); // TWR + callsign-pattern entries now hidden
   expect(await iconClassCounts(page, 'surface-obstacle-icon')).toBe(0);
 });

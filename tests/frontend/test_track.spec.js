@@ -80,7 +80,7 @@ test('uses the collected live trail when OpenSky track history is rate limited',
   });
 
   await clickMarker(page, 'airplanesliveMarkers', 'ffffff');
-  await page.waitForTimeout(500);
+  await waitForTrackSegments(page, 1);
 
   expect(await trackSegmentCount(page)).toBe(1);
   expect(await page.evaluate(() => trackUsesLiveFallback)).toBe(true);
@@ -93,7 +93,7 @@ test('track status is shown in HUD when track is unavailable, with the reason be
   }));
 
   await clickMarker(page, 'adsbfiMarkers', 'eeeeee');
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => document.getElementById('track-status').textContent === 'Historical track unavailable');
 
   // The line itself stays short; the explanation lives in the popover.
   expect(await page.textContent('#track-status')).toBe('Historical track unavailable');
@@ -132,7 +132,7 @@ test('track status shows live fallback when using live trail', async ({ page }) 
 
   // Should fall back to live trail
   await clickMarker(page, 'airplanesliveMarkers', 'ffffff');
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => document.getElementById('track-status').textContent === 'Track: live fallback');
 
   const trackStatus = await page.textContent('#track-status');
   expect(trackStatus).toBe('Track: live fallback');
@@ -146,7 +146,7 @@ test('track status shows cached data when rate limited but cache exists', async 
   }));
   // dddddd is owned by airplanes.live under the configured priority order.
   await clickMarker(page, 'airplanesliveMarkers', 'dddddd');
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => document.getElementById('track-status').textContent === 'Track: cached data');
 
   // Track should show with cached data indicator
   const trackStatus = await page.textContent('#track-status');
@@ -161,7 +161,7 @@ test('track status clears when deselecting aircraft', async ({ page }) => {
   }));
 
   await clickMarker(page, 'adsbfiMarkers', 'eeeeee');
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => document.getElementById('track-status').textContent.includes('Historical track unavailable'));
 
   // Track status should show error
   let trackStatus = await page.textContent('#track-status');

@@ -110,13 +110,13 @@ test('non-matching callsigns render as separate markers', async ({ page }) => {
 test('matching callsigns are deduplicated and enriched', async ({ page }) => {
   // When a FlightAware callsign matches an OpenSky/adsb.fi aircraft's callsign,
   // the FlightAware marker is suppressed and its route data enriches the main marker.
-  // OpenSky fixture has callsign "TES100  " (from states.json, aaaaaa icao24),
-  // which normalizes to "TES100", so FlightAware uses the same.
+  // adsb.fi owns aaaaaa and reports callsign "MLAT1", so FlightAware uses
+  // the same normalized callsign.
   await page.route('**/api/flightaware', (route) => {
     route.fulfill({ json: {
       flights: [{
         fa_flight_id: 'FA-MATCH',
-        ident: 'TES100',  // matches OpenSky fixture's callsign (normalized)
+        ident: 'MLAT1',
         aircraft_type: 'A320',
         origin: {
           code: 'LICC',
@@ -149,12 +149,12 @@ test('matching callsigns are deduplicated and enriched', async ({ page }) => {
   );
   expect(hasFlightAware).toBe(false);
 
-  // But the OpenSky marker should have the route card enriched from
+  // But the winning adsb.fi marker should have the route card enriched from
   // FlightAware — its own dedicated #sidebar-route block now, not a text
   // row inside #sidebar-details. The card splits "Name (CODE)" back into
   // a big code + a small city name, rather than showing the combined string.
   const routeText = await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) {
       marker._icon.click();
       return document.querySelector('#sidebar-route')?.textContent || '';

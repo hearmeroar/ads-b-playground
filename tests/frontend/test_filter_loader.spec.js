@@ -4,10 +4,10 @@ const { mockAllSources, fixture } = require('./helpers');
 // Holds a route open behind a manually-resolved promise so the pending
 // window is observable instead of racing a fast mock — same trick
 // test_source_count_spinner.spec.js already uses.
-function holdRoute(page, pattern, json) {
+async function holdRoute(page, pattern, json) {
   let release;
   const held = new Promise((resolve) => { release = resolve; });
-  page.route(pattern, async (route) => {
+  await page.route(pattern, async (route) => {
     await held;
     route.fulfill({ json });
   });
@@ -18,8 +18,9 @@ test('motion filter shows a spinner and disables its buttons while the poll is i
   await mockAllSources(page);
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
+  await page.waitForFunction(() => document.getElementById('count-airplaneslive').textContent !== '');
 
-  const release = holdRoute(page, '**/api/states', fixture('states.json'));
+  const release = await holdRoute(page, '**/api/states', fixture('states.json'));
   await page.click('#motion-filter .seg-btn[data-value="airborne"]');
 
   await page.waitForFunction(() => !document.getElementById('motion-filter-spinner').hidden);
@@ -46,7 +47,7 @@ test('category filter shows a spinner and disables its dropdown trigger while th
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
 
-  const release = holdRoute(page, '**/api/states', fixture('states.json'));
+  const release = await holdRoute(page, '**/api/states', fixture('states.json'));
   await page.click('#category-filter .dropdown-trigger');
   await page.click('#category-filter .dropdown-option[data-value="light"]');
 
@@ -74,7 +75,7 @@ test('hide-non-aircraft toggle shows a spinner and disables itself while the pol
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
 
-  const release = holdRoute(page, '**/api/states', fixture('states.json'));
+  const release = await holdRoute(page, '**/api/states', fixture('states.json'));
   await page.click('#toggle-hide-junk');
 
   await page.waitForFunction(() => !document.getElementById('hide-junk-spinner').hidden);
@@ -100,16 +101,19 @@ test('a source toggle disables itself while its own poll is in flight, then re-e
   await mockAllSources(page);
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
+  await page.waitForFunction(() => document.getElementById('count-airplaneslive').textContent !== '');
 
   // FlightAware ships off by default (CLAUDE.md), so clicking it turns it
   // *on* — the branch whose poll actually awaits this source's own route,
   // unlike turning an already-on source off (which skips fetching it
   // entirely and so never observably holds it disabled for long).
-  const release = holdRoute(page, '**/api/flightaware', { flights: [] });
-  await page.click('#toggle-flightaware');
-
-  await page.waitForFunction(() => document.getElementById('toggle-flightaware').disabled);
-  expect(await page.evaluate(() => document.getElementById('toggle-flightaware').disabled)).toBe(true);
+  const release = await holdRoute(page, '**/api/flightaware', { flights: [] });
+  const pendingDisabled = await page.evaluate(() => {
+    const toggle = document.getElementById('toggle-flightaware');
+    toggle.click();
+    return toggle.disabled;
+  });
+  expect(pendingDisabled).toBe(true);
 
   release();
 

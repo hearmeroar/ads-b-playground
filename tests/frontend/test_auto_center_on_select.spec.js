@@ -20,7 +20,7 @@ test('auto-centers the map when selecting an aircraft (toggle on by default)', a
 
   // Click the aircraft marker
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await expect(page.locator('#sidebar')).toHaveClass(/open/);
@@ -28,10 +28,10 @@ test('auto-centers the map when selecting an aircraft (toggle on by default)', a
   // Wait for animation to complete (1500ms duration + buffer)
   await page.waitForTimeout(800);
 
-  // Verify map flew to the aircraft position (lat 44.0, lon 21.0 from states.json)
+  // Verify map flew to the winning adsb.fi position.
   const center = await page.evaluate(() => map.getCenter());
-  expect(center.lat).toBeCloseTo(44.0, 1);
-  expect(center.lng).toBeCloseTo(21.0, 1);
+  expect(center.lat).toBeCloseTo(44.25, 1);
+  expect(center.lng).toBeCloseTo(21.25, 1);
 
   // Zoom level should be preserved
   expect(await page.evaluate(() => map.getZoom())).toBe(zoomBefore);
@@ -51,7 +51,7 @@ test('does not auto-center when toggle is unchecked', async ({ page }) => {
 
   // Click the aircraft marker
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await expect(page.locator('#sidebar')).toHaveClass(/open/);
@@ -78,7 +78,7 @@ test('respects the toggle state when toggled on after being off', async ({ page 
 
   // Click marker — should not move
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await expect(page.locator('#sidebar')).toHaveClass(/open/);
@@ -92,7 +92,7 @@ test('respects the toggle state when toggled on after being off', async ({ page 
   // Now turn toggle back on and select again
   await page.locator('#toggle-auto-center').check();
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('aaaaaa');
+    const marker = adsbfiMarkers.get('aaaaaa');
     if (marker && marker._icon) marker._icon.click();
   });
   await expect(page.locator('#sidebar')).toHaveClass(/open/);
@@ -100,6 +100,6 @@ test('respects the toggle state when toggled on after being off', async ({ page 
 
   // Should now be centered on aircraft
   const centerWithToggleOn = await page.evaluate(() => map.getCenter());
-  expect(centerWithToggleOn.lat).toBeCloseTo(44.0, 1);
-  expect(centerWithToggleOn.lng).toBeCloseTo(21.0, 1);
+  expect(centerWithToggleOn.lat).toBeCloseTo(44.25, 1);
+  expect(centerWithToggleOn.lng).toBeCloseTo(21.25, 1);
 });

@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { mockAllSources } = require('./helpers');
+const { mockAllSources, fixture } = require('./helpers');
 
 // "aaaaaa" (OpenSky, states.json): lat 44.0, lon 21.0, track 90°
 // (due east), altitude 10000m, ground speed 230 m/s (828 km/h) — a
@@ -121,6 +121,9 @@ test.describe('pure geometry functions (route-validation.js)', () => {
 test.describe('Route row end-to-end', () => {
   test.beforeEach(async ({ page }) => {
     await mockAllSources(page);
+    const adsbfi = fixture('adsbfi.json');
+    adsbfi.ac = adsbfi.ac.filter((aircraft) => aircraft.hex !== 'aaaaaa');
+    await page.route('**/api/adsbfi', (route) => route.fulfill({ json: adsbfi }));
   });
 
   test('a geometrically consistent adsbdb route renders with no warning', async ({ page }) => {

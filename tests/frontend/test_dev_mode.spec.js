@@ -8,13 +8,10 @@ test.beforeEach(async ({ page }) => {
   await page.waitForTimeout(500);
 });
 
-// "dddddd" is OpenSky's own marker (dedup winner) enriched with adsb.fi's
-// registration/aircraft type (OO-DUP / AIRBUS A-320) — a good aircraft to
-// exercise both an OpenSky-sourced field (e.g. Altitude) and an
-// adsb.fi-sourced enrichment field (Registration) in the same sidebar.
+// "dddddd" is owned by airplanes.live under the configured dedup priority.
 async function selectDddddd(page) {
   await page.evaluate(() => {
-    const marker = openskyMarkers.get('dddddd');
+    const marker = airplanesliveMarkers.get('dddddd');
     if (marker && marker._icon) marker._icon.click();
   });
   await page.waitForTimeout(300);
@@ -66,7 +63,11 @@ function badgeSourcesForLabel(page, label) {
 
 test('a field reported by only one source shows exactly one badge, with a click-to-toggle tooltip', async ({ page }) => {
   await page.click('#toggle-dev-mode');
-  await selectDddddd(page);
+  await page.evaluate(() => {
+    const marker = openskyMarkers.get('cccccc');
+    if (marker && marker._icon) marker._icon.click();
+  });
+  await page.waitForTimeout(300);
 
   // Country (originCountry) has no equivalent field on adsb.fi/airplanes.live's
   // own parsed record at all (normalizeAdsbExchange always sets it null) —
@@ -108,20 +109,20 @@ test('a field independently reported by several enabled sources shows one badge 
   // (no <b>Registration:</b> label wrapper).
   const sources = await page.evaluate(() =>
     [...document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')].map((b) => b.dataset.source));
-  expect(sources).toEqual(['airplaneslive', 'adsbfi']);
+  expect(sources).toEqual(['adsbfi', 'airplaneslive']);
 
   // Each badge opens its own tooltip independently.
   await page.evaluate(() => {
-    document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')[0].click(); // airplanes.live
-  });
-  await page.waitForTimeout(100);
-  expect(await page.textContent('#source-tooltip')).toBe('airplanes.live');
-
-  await page.evaluate(() => {
-    document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')[1].click(); // adsb.fi
+    document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')[0].click(); // adsb.fi
   });
   await page.waitForTimeout(100);
   expect(await page.textContent('#source-tooltip')).toBe('adsb.fi');
+
+  await page.evaluate(() => {
+    document.querySelectorAll('#sidebar-header .sidebar-header-title .source-badge')[1].click(); // airplanes.live
+  });
+  await page.waitForTimeout(100);
+  expect(await page.textContent('#source-tooltip')).toBe('airplanes.live');
 });
 
 test('toggling dev mode off restores the exact non-dev-mode markup', async ({ page }) => {
