@@ -11,6 +11,17 @@ const markerMapsBySource = {
   flightradar24: flightradar24Markers,
 };
 
+// Looks up the L.Marker for a given id across every source's marker map —
+// no single map is guaranteed to hold it (an aircraft can hand off between
+// sources between polls). Returns undefined if not currently tracked.
+function findMarkerByIcao24(icao24) {
+  for (const markerMap of Object.values(markerMapsBySource)) {
+    const marker = markerMap.get(icao24);
+    if (marker) return marker;
+  }
+  return undefined;
+}
+
 const sourceToggles = {
   opensky: document.getElementById('toggle-opensky'),
   adsbfi: document.getElementById('toggle-adsbfi'),

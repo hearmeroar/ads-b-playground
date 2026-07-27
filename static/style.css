@@ -18,6 +18,7 @@
   --scrollbar-thumb: #cbd5e1;
   --marker-fill-color: #ffd400;
   --marker-stroke-color: #1a1a1a;
+  --marker-selected-color: #f472b6;
 }
 
 /* Dark theme */
@@ -41,6 +42,7 @@
     --scrollbar-thumb: #4a525c;
     --marker-fill-color: #ffd400;
     --marker-stroke-color: #1a1a1a;
+    --marker-selected-color: #f472b6;
   }
 }
 :root[data-theme="dark"] {
@@ -62,10 +64,12 @@
   --scrollbar-thumb: #4a525c;
   --marker-fill-color: #ffd400;
   --marker-stroke-color: #1a1a1a;
+  --marker-selected-color: #f472b6;
 }
 :root[data-theme="light"] {
   --marker-fill-color: #1c2128;
   --marker-stroke-color: #ffffff;
+  --marker-selected-color: #be185d;
 }
 
 /* Scrollbar theming for the app's four internally-scrolling panels. Firefox
@@ -322,6 +326,18 @@ html, body { margin: 0; padding: 0; height: 100%; }
   stroke: var(--marker-stroke-color, #fff);
   stroke-width: 0.5px;
   vector-effect: non-scaling-stroke;
+}
+/* Selected-aircraft highlight: a plain theme-aware fill color swap (no
+   glow/pulse, per explicit product decision) — overrides the glyph's own
+   fill="COLOR" presentation attribute the same way --marker-stroke-color
+   already overrides stroke="STROKE" above. Baked into the icon HTML by
+   iconFor() every poll (durable) and toggled instantly on click via
+   setMarkerSelectedClass() (icons.js) — see selectAircraft()/
+   deselectAircraft() in sidebar-track.js. */
+.plane-icon.selected svg path,
+.plane-icon.selected svg ellipse,
+.plane-icon.selected svg circle {
+  fill: var(--marker-selected-color, #f472b6);
 }
 /* Uniform aircraft color mode (toggled via #toggle-uniform-color): swaps
    the marker outline color, matching the fill swap already done in

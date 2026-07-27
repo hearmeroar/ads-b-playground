@@ -10,11 +10,12 @@
 // shadow filter on the same node makes the shadow spin with the aircraft —
 // wrong, since a real cast shadow's direction is fixed relative to the
 // ground/light source, not the object's heading.
-function rotatedDivIcon(cssClass, size, anchor, headingDeg, color, svgInner, viewBox) {
+function rotatedDivIcon(cssClass, size, anchor, headingDeg, color, svgInner, viewBox, isSelected) {
   const heading = Number.isFinite(headingDeg) ? headingDeg : 0;
   const vb = viewBox || '0 0 24 24';
+  const cls = cssClass + (isSelected ? ' selected' : '');
   const html =
-    '<div class="plane-icon ' + cssClass + '" data-color="' + color + '">' +
+    '<div class="plane-icon ' + cls + '" data-color="' + color + '">' +
       '<div class="plane-icon-rotate" style="transform: rotate(' + heading + 'deg)">' +
         '<svg width="' + size + '" height="' + size + '" viewBox="' + vb + '">' + svgInner + '</svg>' +
       '</div>' +
@@ -89,12 +90,12 @@ const CATEGORY_GLYPHS = {
 // The CSS class is exactly what the old per-category builders used
 // ("light-icon", "high-vortex-large-icon", ...) — style.css and the tests
 // key off these names, so the underscore→hyphen derivation must not change.
-function categoryIcon(group, headingDeg, color) {
+function categoryIcon(group, headingDeg, color, isSelected) {
   const cssClass = group.replace(/_/g, '-') + '-icon';
   const fillColor = isUniformColorEnabled() ? uniformMarkerColors().fill : color;
   const strokeColor = isUniformColorEnabled() ? uniformMarkerColors().stroke : '#fff';
   const svg = CATEGORY_GLYPHS[group].replace(/COLOR/g, fillColor).replace(/STROKE/g, strokeColor);
-  return rotatedDivIcon(cssClass, 20, 10, headingDeg, color, svg, '0 0 200 200');
+  return rotatedDivIcon(cssClass, 20, 10, headingDeg, color, svg, '0 0 200 200', isSelected);
 }
 
 // Surface obstacle icon for ground stations/vehicles (`isGroundVehicle` or
@@ -102,8 +103,8 @@ function categoryIcon(group, headingDeg, color) {
 // neutral grey rather than source-colored, since these aren't really "sources"
 // of aircraft data. Never rotated — ground stations have no heading. `color`
 // is still accepted and recorded via `data-color` for colorCounts() compatibility.
-function towerIcon(color) {
-  return rotatedDivIcon('surface-obstacle-icon', 20, 10, 0, color, SURFACE_OBSTACLE_GLYPH, '0 0 200 200');
+function towerIcon(color, isSelected) {
+  return rotatedDivIcon('surface-obstacle-icon', 20, 10, 0, color, SURFACE_OBSTACLE_GLYPH, '0 0 200 200', isSelected);
 }
 
 // Airport/heliport markers (map-init.js's Airports layer) — Material Design
@@ -139,7 +140,7 @@ function airportIcon(type) {
 
 const ICON_BUILDERS = {};
 for (const group of Object.keys(CATEGORY_GLYPHS)) {
-  ICON_BUILDERS[group] = (headingDeg, color) => categoryIcon(group, headingDeg, color);
+  ICON_BUILDERS[group] = (headingDeg, color, isSelected) => categoryIcon(group, headingDeg, color, isSelected);
 }
 
 // Ground vehicles (either flagged by looksLikeGroundVehicle()'s heuristics,
@@ -149,11 +150,27 @@ for (const group of Object.keys(CATEGORY_GLYPHS)) {
 // ICON_BUILDERS, falling back to the unknown-category icon (a0.svg) for
 // groups with no dedicated icon (space category, or no category at all).
 function iconFor(item, color) {
+  const isSelected = item.id === selectedIcao24;
   if (item.isGroundVehicle || item.categoryGroup === 'surface_obstacle') {
-    return towerIcon(color);
+    return towerIcon(color, isSelected);
   }
   const builder = ICON_BUILDERS[item.categoryGroup];
-  return builder ? builder(item.heading, color) : categoryIcon('unknown', item.heading, color);
+  return builder ? builder(item.heading, color, isSelected) : categoryIcon('unknown', item.heading, color, isSelected);
+}
+
+// One-time DOM patch for instant selection feedback only. syncMarkers()
+// calls marker.setIcon() unconditionally every poll, which tears down and
+// rebuilds marker._icon's entire subtree — this mutation WILL be wiped by
+// the next poll. What makes the highlight durable is iconFor()'s
+// isSelected computation baking the 'selected' class into the regenerated
+// HTML itself (see above); this helper only closes the visual gap until
+// that next poll happens. marker._icon is Leaflet's own wrapper div
+// ("leaflet-marker-icon ..."), NOT the `.plane-icon` div — that's a child,
+// set via innerHTML.
+function setMarkerSelectedClass(marker, isSelected) {
+  if (!marker || !marker._icon) return;
+  const el = marker._icon.querySelector('.plane-icon');
+  if (el) el.classList.toggle('selected', isSelected);
 }
 
 // Creates/moves/removes markers in `markerMap` to match `items`

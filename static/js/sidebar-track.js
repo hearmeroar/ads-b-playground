@@ -593,7 +593,15 @@ async function loadAdsbdb(icao24, info) {
 }
 
 function selectAircraft(icao24) {
+  const previousIcao24 = selectedIcao24;
   selectedIcao24 = icao24;
+  if (previousIcao24 && previousIcao24 !== icao24) {
+    const prevMarker = findMarkerByIcao24(previousIcao24);
+    if (prevMarker) setMarkerSelectedClass(prevMarker, false);
+  }
+  const marker = findMarkerByIcao24(icao24);
+  if (marker) setMarkerSelectedClass(marker, true);
+
   updateSaveButtonState(); // auth-collection.js — reflects saved/C0-disabled state for this aircraft
   trackUsesLiveFallback = false;
   drawTrack(null); // never leave the previously selected aircraft's path visible
@@ -640,6 +648,8 @@ function selectAircraft(icao24) {
 }
 
 function deselectAircraft() {
+  const marker = findMarkerByIcao24(selectedIcao24);
+  if (marker) setMarkerSelectedClass(marker, false);
   selectedIcao24 = null;
   trackUsesLiveFallback = false;
   stopTrackRetryTimer();
