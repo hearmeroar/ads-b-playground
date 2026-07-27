@@ -59,7 +59,8 @@ Flask app.py (gunicorn 2 workers × 8 threads)
 ├─ /api/zones/active (POST)
 │  └─ _apply_zone() + _persist_zone_config() — moves AREA_CENTER/BBOX and every
 │     derived value (RADIUS_SOURCES centers, FLIGHTAWARE_QUERY, FLIGHTRADAR24_BOUNDS),
-│     clears location-scoped caches, persists to config/zones.json
+│     clears location-scoped caches, persists only the latest active zone to
+│     config/zones.json
 ├─ /api/collection
 │  ├─ GET (list saved aircraft for logged-in user)
 │  ├─ POST (save/update one aircraft snapshot)
@@ -170,4 +171,4 @@ Test verifies this order is enforced via `#app > script[src*="..."].src`.
 - **Route validation (Layer 2) on adsbdb only** (2026-07-20) — Geometric checks suppress "Reject" routes in normal mode.
 - **Basemap picker default = Voyager** (2026-07-18) — CARTO colorful (not monochrome Light).
 - **ICAO24 block corroboration for callsign-decoded operator** (2026-07-20) — Suppresses mismatches for rotorcraft only; dev mode shows them flagged.
-- **Runtime zone switching: file persistence + mtime-poll sync** (2026-07-21) — Zone changes (via airport search) persist to `config/zones.json` rather than staying session-only; cross-worker propagation via a cheap `getmtime()` poll rather than a new SQLite table. `_apply_zone()` recomputes all seven values derived from `AREA_CENTER`/`BBOX` together (three of which were previously frozen at import time and never revisited).
+- **Runtime zone switching: file persistence + mtime-poll sync** (2026-07-21; compacted 2026-07-27) — Zone changes (via airport search) persist only the latest `active_zone` to `config/zones.json` rather than staying session-only or accumulating unused presets; cross-worker propagation uses a cheap `getmtime()` poll rather than a new SQLite table. `_apply_zone()` recomputes all seven values derived from `AREA_CENTER`/`BBOX` together (three of which were previously frozen at import time and never revisited).

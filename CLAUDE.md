@@ -612,15 +612,19 @@ restarting.
   blocking this process, same known risk as its regular polling — see
   that section above) is caught and leaves the old bounds in place rather
   than aborting the rest of the zone change.
-- **Persists to `config/zones.json`** (`_persist_zone_config()`, keyed by
-  the picked airport's ICAO, or `"custom"` if absent) rather than staying
-  session-only — a zone change survives a restart, the explicitly chosen
-  design (over an in-memory-only change) since this is a single-tenant
-  app where the zone is backend-authoritative shared state, unlike a
-  per-user preference like basemap/units. Best-effort: an unwritable file
-  doesn't fail the request, matching this app's general "disk persistence
-  is an optimization, not a hard requirement" posture elsewhere (e.g. the
-  track cache).
+- **Persists to `config/zones.json`** (`_persist_zone_config()`) rather than
+  staying session-only — a zone change survives a restart, the explicitly
+  chosen design (over an in-memory-only change) since this is a single-tenant
+  app where the zone is backend-authoritative shared state, unlike a per-user
+  preference like basemap/units. The file stores only `active_zone_id` (the
+  picked airport's ICAO, or `"custom"` if absent) and one `active_zone`
+  object; each selection replaces the previous one rather than accumulating
+  an unused preset catalog. `_load_zone_config()` still accepts the legacy
+  `zones` dictionary so an existing deployment can upgrade safely; its next
+  selection rewrites the file into the compact format. Best-effort: an
+  unwritable file doesn't fail the request, matching this app's general
+  "disk persistence is an optimization, not a hard requirement" posture
+  elsewhere (e.g. the track cache).
 - **Cross-worker sync**: this app runs under gunicorn with multiple worker
   processes (see storage.py's own docstring for the identical problem that
   motivated moving collections/identity to SQLite), each with its own copy

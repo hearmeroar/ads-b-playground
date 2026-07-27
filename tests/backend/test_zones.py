@@ -140,8 +140,35 @@ def test_api_zones_set_active_persists_to_disk(client):
     assert resp.status_code == 200
     with open(app.ZONES_FILE) as f:
         cfg = json.load(f)
-    assert cfg["active_zone_id"] == "EGLL"
-    assert cfg["zones"]["EGLL"]["center"] == {"lat": LONDON_HEATHROW["lat"], "lon": LONDON_HEATHROW["lon"]}
+    assert cfg == {
+        "active_zone_id": "EGLL",
+        "active_zone": {
+            "center": {"lat": LONDON_HEATHROW["lat"], "lon": LONDON_HEATHROW["lon"]},
+            "zoom": app.AREA_ZOOM,
+            "radius_nm": app.AREA_RADIUS_NM,
+        },
+    }
+
+
+def test_load_zone_config_accepts_legacy_preset_catalog(monkeypatch, tmp_path):
+    legacy_file = tmp_path / "legacy-zones.json"
+    legacy_file.write_text(json.dumps({
+        "active_zone_id": "EGLL",
+        "zones": {
+            "unused": {"center": PARIS_CDG, "zoom": 7, "radius_nm": 100},
+            "EGLL": {"center": LONDON_HEATHROW, "zoom": 9, "radius_nm": 150},
+        },
+    }))
+    monkeypatch.setattr(app, "ZONES_FILE", str(legacy_file))
+
+    assert app._load_zone_config() == {
+        "active_zone_id": "EGLL",
+        "active_zone": {
+            "center": LONDON_HEATHROW,
+            "zoom": 9,
+            "radius_nm": 150,
+        },
+    }
 
 
 # --- Cross-worker sync (_maybe_reload_zone_from_disk()) ---------------------
@@ -158,7 +185,7 @@ def test_maybe_reload_zone_from_disk_picks_up_external_change():
     with open(app.ZONES_FILE, "w") as f:
         json.dump({
             "active_zone_id": "EGLL",
-            "zones": {"EGLL": {"center": LONDON_HEATHROW, "zoom": 9, "radius_nm": 150}},
+            "active_zone": {"center": LONDON_HEATHROW, "zoom": 9, "radius_nm": 150},
         }, f)
     # Force the mtime forward in case the write above landed within the same
     # filesystem-timestamp granularity as the fixture's own initial write.
@@ -190,7 +217,7 @@ def test_api_config_picks_up_external_zone_change(client):
     with open(app.ZONES_FILE, "w") as f:
         json.dump({
             "active_zone_id": "EGLL",
-            "zones": {"EGLL": {"center": LONDON_HEATHROW, "zoom": 9, "radius_nm": 150}},
+            "active_zone": {"center": LONDON_HEATHROW, "zoom": 9, "radius_nm": 150},
         }, f)
     new_mtime = os.path.getmtime(app.ZONES_FILE) + 1
     os.utime(app.ZONES_FILE, (new_mtime, new_mtime))

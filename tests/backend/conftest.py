@@ -72,7 +72,11 @@ def reset_caches(monkeypatch, tmp_path):
     zones_file = tmp_path / "zones.json"
     zones_file.write_text(json.dumps({
         "active_zone_id": "default",
-        "zones": {"default": {"center": dict(app.AREA_CENTER), "zoom": app.AREA_ZOOM, "radius_nm": app.AREA_RADIUS_NM}},
+        "active_zone": {
+            "center": dict(app.AREA_CENTER),
+            "zoom": app.AREA_ZOOM,
+            "radius_nm": app.AREA_RADIUS_NM,
+        },
     }))
     monkeypatch.setattr(app, "ZONES_FILE", str(zones_file))
     monkeypatch.setattr(app, "_zones_file_mtime", os.path.getmtime(str(zones_file)))

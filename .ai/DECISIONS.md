@@ -121,6 +121,37 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 
 ---
 
+## 2026-07-27 — Zone config stores only the latest active zone
+
+**Problem:** Runtime airport selections were appended to the `zones` dictionary
+in `config/zones.json`, but the UI never lists or selects those stored presets.
+Only the entry named by `active_zone_id` is loaded, so the file accumulated
+historical coordinates that looked configurable but had no product behavior.
+
+**Decision:** Keep the existing server-side persistence semantics, but replace
+the preset dictionary with one `active_zone` object plus `active_zone_id`.
+Every airport selection overwrites those values, so the last selection still
+survives reopening/restarting the app. `_load_zone_config()` accepts the old
+dictionary format for upgrade compatibility; the next selection writes the
+compact format.
+
+**Reason:** The application is single-tenant and the selected coverage area is
+shared backend state, so persisting the last choice is useful. Retaining every
+past selection is not: airport search and popular-airport suggestions come from
+the separate OurAirports dataset, not from this config file.
+
+**Tradeoffs:**
+- Previously stored zone presets are discarded from the tracked config because
+  they were not reachable through the UI.
+- Switching back to an earlier airport goes through the existing airport search
+  rather than editing `active_zone_id` by hand.
+- Persistence remains global to the deployment, not per user.
+
+**References:** CLAUDE.md § "Zone search", `config/zones.json`,
+`tests/backend/test_zones.py`
+
+---
+
 ## 2026-07-21 — `/api/health` endpoint: public with minimal response (not admin-only)
 
 **Problem:** Deployment monitoring requires a health check endpoint (Northflank health checks, external uptime monitoring, CI/CD orchestration). Should it require authentication (admin-only) or be public?

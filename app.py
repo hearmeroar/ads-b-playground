@@ -71,19 +71,25 @@ ZONES_FILE = os.environ.get("ZONES_FILE", "config/zones.json")
 def _load_zone_config():
     default = {
         "active_zone_id": "default",
-        "zones": {
-            "default": {
-                "center": {"lat": 51.47, "lon": -0.46},
-                "zoom": 8,
-                "radius_nm": 220,
-            }
+        "active_zone": {
+            "center": {"lat": 51.47, "lon": -0.46},
+            "zoom": 8,
+            "radius_nm": 220,
         },
     }
     try:
         with open(ZONES_FILE, "r") as f:
             cfg = json.load(f)
-        if "zones" in cfg and cfg.get("active_zone_id") in cfg["zones"]:
+        zone_id = cfg.get("active_zone_id")
+        if zone_id and isinstance(cfg.get("active_zone"), dict):
             return cfg
+
+        # Backwards-compatible read for the old preset-catalog format. The
+        # next zone selection rewrites it into the compact active-zone-only
+        # format in _persist_zone_config().
+        zones = cfg.get("zones")
+        if zone_id and isinstance(zones, dict) and zone_id in zones:
+            return {"active_zone_id": zone_id, "active_zone": zones[zone_id]}
     except (OSError, ValueError):
         pass
     return default
@@ -91,7 +97,7 @@ def _load_zone_config():
 
 _zone_config = _load_zone_config()
 _active_zone_id = _zone_config["active_zone_id"]
-_zone = _zone_config["zones"][_active_zone_id]
+_zone = _zone_config["active_zone"]
 
 AREA_CENTER = _zone["center"]
 AREA_ZOOM = _zone["zoom"]
@@ -196,22 +202,25 @@ def _apply_zone(center, zoom, radius_nm, zone_id):
 
 
 def _persist_zone_config(center, zoom, radius_nm, zone_id):
-    """Write the new zone into ZONES_FILE's `zones` dict (keyed by
-    `zone_id`) and make it the active one, so the change survives a
-    restart — the explicitly chosen persistence model for this feature
-    (over a session-only in-memory change). Best-effort: an unwritable
-    ZONES_FILE (permissions, read-only filesystem) leaves the in-memory
-    zone change from _apply_zone() in effect for this process but doesn't
-    fail the request over it, matching this app's general pattern of
-    treating disk persistence as an optimization, not a hard requirement
-    (see e.g. the track cache's own best-effort save/load).
+    """Replace ZONES_FILE with the one currently active zone, so the latest
+    airport selection survives a restart without accumulating an unused
+    catalog of previously selected airports. Best-effort: an unwritable
+    ZONES_FILE (permissions, read-only filesystem) leaves the in-memory zone
+    change from _apply_zone() in effect for this process but doesn't fail the
+    request over it, matching this app's general pattern of treating disk
+    persistence as an optimization, not a hard requirement (see e.g. the
+    track cache's own best-effort save/load).
     """
     global _zones_file_mtime
     try:
-        cfg = _load_zone_config()
-        cfg.setdefault("zones", {})
-        cfg["zones"][zone_id] = {"center": center, "zoom": zoom, "radius_nm": radius_nm}
-        cfg["active_zone_id"] = zone_id
+        cfg = {
+            "active_zone_id": zone_id,
+            "active_zone": {
+                "center": center,
+                "zoom": zoom,
+                "radius_nm": radius_nm,
+            },
+        }
         with open(ZONES_FILE, "w") as f:
             json.dump(cfg, f, indent=2)
         _zones_file_mtime = os.path.getmtime(ZONES_FILE)
@@ -247,7 +256,7 @@ def _maybe_reload_zone_from_disk():
     _zones_file_mtime = mtime
     cfg = _load_zone_config()
     zone_id = cfg["active_zone_id"]
-    zone = cfg["zones"][zone_id]
+    zone = cfg["active_zone"]
     if (
         zone_id == _active_zone_id
         and zone["center"] == AREA_CENTER
@@ -770,8 +779,7 @@ def api_zones_set_active():
     # together, or three of six live sources would keep querying the old
     # location. Zoom/radius are deliberately left untouched (only `center`
     # moves) — a v1 scope decision, not an oversight; `zone_id` defaults to
-    # "custom" so an ad-hoc airport pick doesn't need to match one of
-    # config/zones.json's named presets.
+    # "custom" so an ad-hoc airport pick doesn't need an ICAO identifier.
     body = request.get_json(silent=True) or {}
     lat, lon = body.get("lat"), body.get("lon")
     if (
