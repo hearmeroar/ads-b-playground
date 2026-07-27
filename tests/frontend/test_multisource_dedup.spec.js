@@ -88,6 +88,9 @@ test('toggling off the source that owns the selected aircraft\'s marker deselect
   // between two poll cycles — see test_track.spec.js), this is an explicit
   // user action removing the very source that owned the open sidebar's
   // aircraft, so closing it is the correct, existing behavior.
+  // The per-source toggle list is dev-mode-only (2026-07-27) — open it so
+  // #toggle-adsblol is reachable.
+  await page.click('#toggle-dev-mode');
   await page.click('#toggle-adsblol');
   await page.waitForTimeout(600);
   expect(await page.evaluate(() => document.getElementById('sidebar').classList.contains('open'))).toBe(false);

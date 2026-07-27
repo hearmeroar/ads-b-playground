@@ -130,7 +130,30 @@ html, body { margin: 0; padding: 0; height: 100%; }
    .sources away from it below, so the search input reads as glued to the
    first source row without this. */
 #hud #search-block { margin-bottom: 12px; }
-#hud .sources { display: flex; flex-direction: column; gap: 8px; }
+/* The whole per-source toggle list is a Dev Mode-only feature (2026-07-27):
+   hidden by default regardless of any individual source's own
+   config/sources.json "visible" value, and revealed only while dev mode
+   is on — mirroring #source-adsbdb's own dev-mode-only row, just applied
+   to the whole list at once instead of one row. Within the revealed list,
+   config's per-source "visible" flag (already applied by main.js's config
+   bootstrap as each row's own inline style.display) still governs which
+   individual rows actually show — a source configured visible:false stays
+   hidden even with dev mode on; making it appear requires editing
+   config/sources.json (restart-only, no hot-reload), not just toggling
+   dev mode. No gap here (unlike this rule pre-2026-07-27, when .sources
+   was its own standalone section) — now that it's nested inside the same
+   .filter-block as the Dev mode/adsbdb.com rows, its own rows already get
+   consistent spacing from #hud .filter-block .source-row's margin-bottom
+   below; a flex gap on top of that made the gap between source rows
+   visibly larger than the gap above them (Dev mode → adsbdb.com). */
+#hud .sources { display: none; flex-direction: column; }
+/* :not(.sources-pending) also guards the page-load race: main.js's config
+   bootstrap applies each row's own visible/enabled_by_default asynchronously
+   (after a network round trip) and only removes .sources-pending once that
+   settles — success or failure alike — so if a user somehow flips dev mode
+   on in that split-second window before it resolves, the list stays hidden
+   rather than briefly showing index.html's own hardcoded per-row defaults. */
+body.dev-mode-on #hud .sources:not(.sources-pending) { display: flex; }
 #hud .source-row { display: flex; align-items: center; gap: 8px; position: relative; }
 #hud .swatch {
   width: 9px; height: 9px; border-radius: 50%; flex: none;

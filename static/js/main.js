@@ -679,18 +679,62 @@ document.getElementById('aircraft-search').addEventListener('keydown', (e) => {
   }
 });
 
-// The first poll is the same "enabled, no numbers yet" state as a toggle-on,
-// so the sources that ship enabled get the same spinner rather than an empty
-// slot (the #map-loader overlay covers the map, not the HUD).
-for (const name of Object.keys(sourceToggles)) {
-  if (isSourceEnabled(name)) showSourceCountSpinner(name);
-}
+// Operator-configurable source visibility (config/sources.json, via
+// /api/config's "sources" key): applies each source's configured
+// visible/enabled_by_default state to its HUD row/checkbox before the
+// startup sequence below reads isSourceEnabled() for the first time. The
+// whole per-source toggle list this touches is itself a Dev Mode-only
+// feature (style.css's "body.dev-mode-on #hud .sources" rule,
+// state-filters.js's devModeToggle handler) — a row's own "visible" flag
+// only matters once dev mode is already on; with dev mode off, the entire
+// list stays hidden regardless of any row's individual state. checked
+// still applies unconditionally either way, since isSourceEnabled() (and
+// therefore poll()) never looks at visibility, only at the checkbox — a
+// hidden-and-enabled source still fetches/renders markers normally, it
+// just has no visible HUD control. A second, independent fetch('/api/config')
+// from the one in map-init.js — that one is deliberately fire-and-forget
+// for the map view/scan-radius rings and gives no ordering guarantee
+// relative to this file's own synchronous startup code, so only gating
+// this promise chain on the fetch guarantees checkbox state reflects the
+// config before anything below reads it. Acceptable per the endpoint's own
+// deliberately-uncached, zero-I/O nature (same reasoning as /api/identity).
+// No new markup/ids — reuses sourceToggles[name] (already a live DOM
+// reference) and .closest('.source-row'). A failed/malformed fetch falls
+// back to the HTML's own hardcoded defaults untouched, via the empty-object
+// fallback and the .catch() below.
+fetch('/api/config')
+  .then((resp) => resp.json())
+  .then((cfg) => {
+    for (const [name, s] of Object.entries((cfg && cfg.sources) || {})) {
+      const checkbox = sourceToggles[name];
+      if (!checkbox) continue; // config lists a source this build doesn't have
+      checkbox.checked = s.enabled_by_default;
+      const row = checkbox.closest('.source-row');
+      if (row) row.style.display = s.visible ? '' : 'none';
+    }
+  })
+  .catch(() => {})
+  .finally(() => {
+    // Reveal the sources list only now that its final visible/checked state
+    // is settled — success or failure alike — so nothing ever flashes the
+    // HTML's hardcoded defaults and then jumps to the configured state a
+    // moment later (see .sources-pending in style.css).
+    document.querySelector('#hud .sources').classList.remove('sources-pending');
 
-// Hide the initial-load overlay on the first PAINT, not the first fully-
-// settled poll — onFirstPaint fires as soon as the fastest enabled source's
-// data has rendered something, rather than waiting for the slowest one (see
-// poll()'s early/final two-phase render above). Still guaranteed to fire
-// even if every source fails, since renderPoll()'s final pass always runs
-// and poll() always calls markFirstPaint() after it regardless.
-poll({ onFirstPaint: () => document.getElementById('map-loader').classList.add('hidden') });
-setInterval(poll, POLL_INTERVAL_MS);
+    // The first poll is the same "enabled, no numbers yet" state as a
+    // toggle-on, so the sources that ship enabled get the same spinner
+    // rather than an empty slot (the #map-loader overlay covers the map,
+    // not the HUD).
+    for (const name of Object.keys(sourceToggles)) {
+      if (isSourceEnabled(name)) showSourceCountSpinner(name);
+    }
+
+    // Hide the initial-load overlay on the first PAINT, not the first fully-
+    // settled poll — onFirstPaint fires as soon as the fastest enabled source's
+    // data has rendered something, rather than waiting for the slowest one (see
+    // poll()'s early/final two-phase render above). Still guaranteed to fire
+    // even if every source fails, since renderPoll()'s final pass always runs
+    // and poll() always calls markFirstPaint() after it regardless.
+    poll({ onFirstPaint: () => document.getElementById('map-loader').classList.add('hidden') });
+    setInterval(poll, POLL_INTERVAL_MS);
+  });

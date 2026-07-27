@@ -91,6 +91,9 @@ test('turning a source back off clears the slot entirely', async ({ page }) => {
 
   expect((await slotState(page, 'adsbfi')).text).toMatch(/^\d+$/);
 
+  // The per-source toggle list is dev-mode-only (2026-07-27) — open it so
+  // #toggle-adsbfi is reachable.
+  await page.click('#toggle-dev-mode');
   await page.click('#toggle-adsbfi');
   await page.waitForFunction(() => document.getElementById('count-adsbfi').textContent === '');
   expect(await slotState(page, 'adsbfi')).toEqual({ text: '', spinning: false, loading: false });

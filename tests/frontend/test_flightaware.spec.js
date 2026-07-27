@@ -4,6 +4,9 @@ const { mockAllSources } = require('./helpers');
 test.beforeEach(async ({ page }) => {
   await mockAllSources(page);
   await page.goto('/');
+  // The per-source toggle list is dev-mode-only (2026-07-27) — open it
+  // before the FlightAware checkbox is reachable at all.
+  await page.click('#toggle-dev-mode');
   // FlightAware ships off by default (paid/metered) — enable it for these tests.
   await page.click('#toggle-flightaware');
   await page.waitForTimeout(300);

@@ -96,6 +96,13 @@ devModeToggle.addEventListener('change', () => {
   currentDevMode = devModeToggle.checked;
   adsbdbSourceRow.style.display = currentDevMode ? '' : 'none';
   devAircraftPanel.style.display = currentDevMode ? '' : 'none';
+  // Reveals the whole per-source toggle list (style.css's #hud .sources
+  // rule) — a Dev Mode-only feature, same idiom as adsbdbSourceRow above,
+  // just a body-level class since it gates a whole container rather than
+  // one row. Each source's own visible/enabled_by_default (config/sources.json,
+  // applied once at load by main.js's config bootstrap) still governs
+  // whether that specific row shows within the now-revealed list.
+  document.body.classList.toggle('dev-mode-on', currentDevMode);
   // The sidebar (higher z-index) would otherwise sit directly on top of
   // the dev-mode aircraft table whenever both are open — dock it to the
   // table's right instead so both stay visible/usable together.

@@ -55,6 +55,9 @@ test('emergency squawk is highlighted in the sidebar', async ({ page }) => {
 });
 
 test('disabling then re-enabling a source restores its markers immediately (no 12s wait)', async ({ page }) => {
+  // The per-source toggle list is dev-mode-only (2026-07-27) — open it so
+  // #toggle-adsbfi is reachable.
+  await page.click('#toggle-dev-mode');
   await page.click('#toggle-adsbfi');
   await page.waitForTimeout(600);
   expect((await colorCounts(page)).red).toBe(0);

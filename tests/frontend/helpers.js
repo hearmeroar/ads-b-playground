@@ -74,6 +74,19 @@ async function mockAllSources(page, { skipHealth = false } = {}) {
     radius_nm: 220,
     bbox: [49.47, -2.46, 53.47, 1.54],
     active_zone_id: 'default',
+    // Byte-identical to config/sources.json's real shipped defaults, so the
+    // config-driven bootstrap in main.js is a no-op against every existing
+    // spec here (the byte-identical-default guarantee this feature relies on).
+    sources: {
+      opensky: { visible: true, enabled_by_default: true },
+      adsbfi: { visible: true, enabled_by_default: true },
+      adsblol: { visible: true, enabled_by_default: true },
+      adsbone: { visible: false, enabled_by_default: false },
+      airplaneslive: { visible: true, enabled_by_default: true },
+      aircraftscatter: { visible: true, enabled_by_default: true },
+      flightaware: { visible: true, enabled_by_default: false },
+      flightradar24: { visible: true, enabled_by_default: false },
+    },
   } }));
   // Mock /api/me (auth check)
   await page.route('**/api/me', (route) => route.fulfill({ json: { user: null } }));

@@ -33,6 +33,10 @@ test('exhausted OpenSky quota auto-disables and locks the source with a countdow
   expect(state.count).toBe('');        // no OpenSky markers/count while locked
   expect(state.quota).toBe('');
 
+  // The per-source toggle list (including the "(?)" icon inside OpenSky's
+  // own row) is dev-mode-only (2026-07-27) — open it before clicking.
+  await page.click('#toggle-dev-mode');
+
   // Clicking the icon reveals the reason + countdown.
   await page.click('#opensky-help');
   const popover = await page.evaluate(() => ({

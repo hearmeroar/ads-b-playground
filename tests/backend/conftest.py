@@ -80,6 +80,29 @@ def reset_caches(monkeypatch, tmp_path):
     }))
     monkeypatch.setattr(app, "ZONES_FILE", str(zones_file))
     monkeypatch.setattr(app, "_zones_file_mtime", os.path.getmtime(str(zones_file)))
+    # Sources config (config/sources.json, _load_sources_config()): unlike
+    # zones.json, nothing ever writes this file at runtime (it's hand-edited
+    # by an operator, no hot-reload/API mutation path), so there's no
+    # write-corruption risk to guard against — but a test asserting
+    # /api/config's "sources" key should still be insulated from whatever an
+    # operator happens to have in the real, tracked config/sources.json.
+    # SOURCES_CONFIG is computed once at import time, so monkeypatching
+    # SOURCES_FILE alone wouldn't retroactively change it — both are reset
+    # here to the same known defaults the real file ships with.
+    default_sources = {
+        "opensky": {"visible": True, "enabled_by_default": True},
+        "adsbfi": {"visible": True, "enabled_by_default": True},
+        "adsblol": {"visible": True, "enabled_by_default": True},
+        "adsbone": {"visible": False, "enabled_by_default": False},
+        "airplaneslive": {"visible": True, "enabled_by_default": True},
+        "aircraftscatter": {"visible": True, "enabled_by_default": True},
+        "flightaware": {"visible": True, "enabled_by_default": False},
+        "flightradar24": {"visible": True, "enabled_by_default": False},
+    }
+    sources_file = tmp_path / "sources.json"
+    sources_file.write_text(json.dumps(default_sources))
+    monkeypatch.setattr(app, "SOURCES_FILE", str(sources_file))
+    monkeypatch.setattr(app, "SOURCES_CONFIG", default_sources)
     _orig_zone = (dict(app.AREA_CENTER), app.AREA_ZOOM, app.AREA_RADIUS_NM, app._active_zone_id)
     yield
     app._apply_zone(_orig_zone[0], _orig_zone[1], _orig_zone[2], _orig_zone[3])

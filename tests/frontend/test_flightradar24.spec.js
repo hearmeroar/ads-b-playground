@@ -4,6 +4,9 @@ const { mockAllSources } = require('./helpers');
 test.beforeEach(async ({ page }) => {
   await mockAllSources(page);
   await page.goto('/');
+  // The per-source toggle list is dev-mode-only (2026-07-27) — open it so
+  // #toggle-flightradar24 is reachable for the tests below that click it.
+  await page.click('#toggle-dev-mode');
 });
 
 test('ships off by default', async ({ page }) => {

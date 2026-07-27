@@ -1,7 +1,12 @@
 # Proposal: Operator-configurable source visibility (`config/sources.json`)
 
 **Date:** 2026-07-22  
-**Status:** Design approved, implementation pending  
+**Status:** ✅ Implemented 2026-07-27 — see `.ai/DECISIONS.md`'s
+2026-07-27 "Operator-configurable source visibility" entry for the final
+as-built details (an 8th source, Aircraft Scatter, was added to the
+codebase after this proposal was written and folded in; a couple of line
+references below were superseded by other unrelated refactors in the
+interim — the ADR entry and CLAUDE.md are the current source of truth).  
 **Effort:** S (small)  
 **Value:** Medium (enables future operator-only customization without code changes)
 

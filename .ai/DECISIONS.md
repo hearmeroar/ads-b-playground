@@ -268,3 +268,73 @@ marker ownership and enrichment precedence.
 **References:** `static/js/main.js`, `static/js/constants.js`, `app.py`,
 `gunicorn.conf.py`, `tests/frontend/test_rendering.spec.js`,
 `tests/backend/test_warmup.py`.
+
+---
+
+## 2026-07-27 — Operator-configurable source visibility (`config/sources.json`)
+
+**Problem:** Which of the app's eight data sources show a HUD row, and
+whether their checkbox starts checked, was hardcoded purely in
+`static/index.html`'s markup — adsb.one's hidden-row pattern
+(`style="display:none"`, unchecked by default) was a one-off written
+directly into the HTML for that specific source, with no general
+mechanism. Changing a source's default meant editing markup.
+
+**Decision:** Generalize the pattern into an operator-editable, committed
+`config/sources.json` file — `{name: {visible, enabled_by_default}}` for
+all eight sources — following `config/zones.json`'s established
+"env-var-overridable path, loaded once at import" convention
+(`SOURCES_FILE`/`_load_sources_config()`/`SOURCES_CONFIG` in `app.py`,
+mirroring `ZONES_FILE`/`_load_zone_config()`). Surfaced via a new
+`sources` key on `/api/config`; `static/js/main.js` fetches it a second,
+independent time (the existing `map-init.js` fetch stays fire-and-forget
+for the map view) and gates its own startup sequence on the result, so
+`isSourceEnabled()` reflects the config before the first poll. v1 scope is
+strictly these two flags — no ordering, no per-filter/per-weather-layer
+visibility.
+
+**Revised mid-implementation, same day:** the whole per-source toggle list
+was moved behind **Dev Mode** — with Dev Mode off, none of the eight rows
+show at all, regardless of any individual source's own `visible` value.
+`visible` only takes effect once Dev Mode is already on, where it then
+decides which specific rows actually appear (a `visible: false` source,
+adsb.one by default, stays hidden even in Dev Mode — editing the config
+file is still the only way to expose it). This moved the list's markup
+out of its original standalone spot near the top of the HUD into the same
+group as the Dev Mode toggle and the existing `#source-adsbdb` row, since
+both are the same kind of thing. `enabled_by_default` stays completely
+independent of both `visible` and Dev Mode — it only ever gates the
+checkbox's own `.checked` state, which `isSourceEnabled()`/`poll()` read
+directly regardless of visibility.
+
+**Reason:** Values are byte-identical to the prior hardcoded HTML
+defaults, so an absent or malformed file changes nothing — zero risk to
+existing behavior/tests. An operator can now hide/show a source or flip
+its default without touching code. Kept as a **separate** file from
+`zones.json` (different nature of change — source/UI policy, not
+geography) and deliberately **without** hot-reload or cross-worker
+mtime-poll sync: unlike a zone change (a live, API-driven runtime action),
+this file is hand-edited only, so a plain import-time load is sufficient
+and avoids adding sync machinery nothing needs yet.
+
+**Tradeoffs:**
+- Changing a source's visibility/default requires an app restart, not a
+  live toggle — accepted, since this is meant for occasional operator
+  configuration, not a runtime feature.
+- The two flags remain a purely frontend concern — a source's backend
+  route still serves data to any caller regardless of `visible`/
+  `enabled_by_default`; this feature doesn't add server-side gating.
+- `visible: false` + `enabled_by_default: true` is a valid, intentional
+  combination (hidden from the HUD but still polled/contributing data in
+  the background), not disallowed or treated as a conflict.
+- Gating the whole list behind Dev Mode broke 13 previously-passing
+  Playwright tests across 6 files that clicked a source checkbox directly
+  without opening Dev Mode first — fixed by adding one
+  `page.click('#toggle-dev-mode')` before the checkbox interaction in
+  each, not a wider test rewrite.
+
+**References:** CLAUDE.md § "Operator-configurable source visibility",
+`config/sources.json`, `app.py`, `static/js/main.js`,
+`tests/backend/test_sources_config.py`,
+`tests/frontend/test_sources_config.spec.js`,
+`.ai/proposals/source-visibility-config-2026-07-22.md`.

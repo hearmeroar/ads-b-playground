@@ -142,103 +142,6 @@
            autocomplete="off" maxlength="6" style="width:100%; padding:6px 9px; font-size:12px; border:1px solid var(--border); border-radius:7px; box-sizing:border-box; font-family:monospace; background:var(--surface); color:var(--ink);">
   </div>
 
-  <div class="sources">
-    <div class="source-row" title="Highest-priority source in the dedup chain — never excluded by any other">
-      <span class="swatch" style="background:#2e7d32"></span>
-      <span class="source-name">airplanes.live</span>
-      <span class="source-count" id="count-airplaneslive"></span>
-      <label class="switch" style="--row-color:#2e7d32">
-        <input type="checkbox" id="toggle-airplaneslive" checked>
-        <span class="switch-track"></span>
-      </label>
-    </div>
-    <div class="source-row" title="Only shown where not already covered by airplanes.live">
-      <span class="swatch" style="background:#e53935"></span>
-      <span class="source-name">adsb.fi</span>
-      <span class="source-count" id="count-adsbfi"></span>
-      <label class="switch" style="--row-color:#e53935">
-        <input type="checkbox" id="toggle-adsbfi" checked>
-        <span class="switch-track"></span>
-      </label>
-    </div>
-    <div class="source-row" title="Its api.adsb.lol upstream occasionally has multi-second hangs — degrades to the last-good cycle rather than blocking the poll. Only shown where not already covered by airplanes.live or adsb.fi">
-      <span class="swatch" style="background:#8e24aa"></span>
-      <span class="source-name">adsb.lol</span>
-      <span class="source-count" id="count-adsblol"></span>
-      <label class="switch" style="--row-color:#8e24aa">
-        <input type="checkbox" id="toggle-adsblol" checked>
-        <span class="switch-track"></span>
-      </label>
-    </div>
-    <!-- Hidden from the HUD (2026-07-19), not just off by default: api.adsb.one
-         is behind a blanket Cloudflare anti-bot block on the whole subdomain,
-         confirmed live from both a local IP and this app's own Northflank/GCP
-         pod — every path 403s regardless of User-Agent/Origin, so there's no
-         header fix, and no toggle would ever do anything if shown. See
-         CLAUDE.md's adsb.one section for the full investigation. display:none
-         (not an HTML comment) is deliberate: state-filters.js's sourceToggles/
-         markerMapsBySource and several Object.keys(sourceToggles) loops in
-         main.js (wiring, isSourceEnabled(), the count spinner) all dereference
-         document.getElementById('toggle-adsbone') directly — removing the
-         element from the DOM entirely would null-crash those on page load.
-         Backend route and JS wiring are otherwise untouched (still defaults to
-         unchecked/off), so this is a one-line revert if the block ever lifts. -->
-    <div class="source-row" style="display:none" title="Hidden — its api.adsb.one is behind a Cloudflare block affecting the whole subdomain, not just this app">
-      <span class="swatch" style="background:#f9a825"></span>
-      <span class="source-name">adsb.one</span>
-      <span class="source-count" id="count-adsbone"></span>
-      <label class="switch" style="--row-color:#f9a825">
-        <input type="checkbox" id="toggle-adsbone">
-        <span class="switch-track"></span>
-      </label>
-    </div>
-    <div class="source-row" title="ADSBexchange via RapidAPI. Covers a fixed 1,000 km radius (metered — enabled by default). Only shown where not already covered by airplanes.live, adsb.fi, or adsb.lol.">
-      <span class="swatch" style="background:#00838f"></span>
-      <span class="source-name">Aircraft Scatter</span>
-      <span class="source-count" id="count-aircraftscatter"></span>
-      <label class="switch" style="--row-color:#00838f">
-        <input type="checkbox" id="toggle-aircraftscatter" checked>
-        <span class="switch-track"></span>
-      </label>
-    </div>
-    <div class="source-row" id="source-opensky" title="Only shown where not already covered by airplanes.live, adsb.fi, adsb.lol, or Aircraft Scatter">
-      <span class="swatch" style="background:#1a73e8"></span>
-      <span class="source-name">OpenSky</span>
-      <span class="source-count" id="count-opensky"></span>
-      <button type="button" class="source-help" id="opensky-help" style="display:none"
-              aria-label="Why is OpenSky disabled?">
-        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
-          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
-                fill="currentColor">?</text>
-        </svg>
-      </button>
-      <label class="switch" style="--row-color:#1a73e8">
-        <input type="checkbox" id="toggle-opensky" checked>
-        <span class="switch-track"></span>
-      </label>
-      <div class="source-help-popover" id="opensky-help-popover" hidden></div>
-    </div>
-    <div class="source-row" title="Shown independently, not deduplicated against other sources (FlightAware is flight-centric with no ICAO24 field)">
-      <span class="swatch" style="background:#00acc1"></span>
-      <span class="source-name">FlightAware</span>
-      <span class="source-count" id="count-flightaware"></span>
-      <label class="switch" style="--row-color:#00acc1">
-        <input type="checkbox" id="toggle-flightaware">
-        <span class="switch-track"></span>
-      </label>
-    </div>
-    <div class="source-row" title="Unofficial community wrapper around FlightRadar24's own private API (github.com/JeanExtreme002/FlightRadarAPI), not FlightRadar24's official service — may stop working without warning if FlightRadar24 tightens its anti-bot protections. Shown only where not already covered by any other source">
-      <span class="swatch" style="background:#6d4c41"></span>
-      <span class="source-name">FlightRadar24</span>
-      <span class="source-count" id="count-flightradar24"></span>
-      <label class="switch" style="--row-color:#6d4c41">
-        <input type="checkbox" id="toggle-flightradar24">
-        <span class="switch-track"></span>
-      </label>
-    </div>
-  </div>
-
   <div class="filter-block">
     <div class="filter-title"><span>Show</span><span class="count-spinner" id="motion-filter-spinner" hidden></span></div>
     <div class="segmented" id="motion-filter">
@@ -552,6 +455,110 @@
         <input type="checkbox" id="toggle-adsbdb" checked>
         <span class="switch-track"></span>
       </label>
+    </div>
+
+    <!-- Per-source toggle list — grouped here alongside adsbdb.com rather
+         than living up near the search box, since both are dev-mode-only
+         reveals (2026-07-27): this whole list stays hidden regardless of
+         any individual source's own config/sources.json "visible" flag
+         until Dev Mode above is switched on (style.css's
+         "body.dev-mode-on #hud .sources" rule) — visible only decides,
+         once dev mode is already on, which specific rows within this list
+         actually show. -->
+    <div class="sources sources-pending">
+    <div class="source-row" title="Highest-priority source in the dedup chain — never excluded by any other">
+      <span class="swatch" style="background:#2e7d32"></span>
+      <span class="source-name">airplanes.live</span>
+      <span class="source-count" id="count-airplaneslive"></span>
+      <label class="switch" style="--row-color:#2e7d32">
+        <input type="checkbox" id="toggle-airplaneslive" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Only shown where not already covered by airplanes.live">
+      <span class="swatch" style="background:#e53935"></span>
+      <span class="source-name">adsb.fi</span>
+      <span class="source-count" id="count-adsbfi"></span>
+      <label class="switch" style="--row-color:#e53935">
+        <input type="checkbox" id="toggle-adsbfi" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Its api.adsb.lol upstream occasionally has multi-second hangs — degrades to the last-good cycle rather than blocking the poll. Only shown where not already covered by airplanes.live or adsb.fi">
+      <span class="swatch" style="background:#8e24aa"></span>
+      <span class="source-name">adsb.lol</span>
+      <span class="source-count" id="count-adsblol"></span>
+      <label class="switch" style="--row-color:#8e24aa">
+        <input type="checkbox" id="toggle-adsblol" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <!-- Hidden by default (2026-07-19), not just off by default: api.adsb.one
+         is behind a blanket Cloudflare anti-bot block on the whole subdomain,
+         confirmed live from both a local IP and this app's own Northflank/GCP
+         pod — every path 403s regardless of User-Agent/Origin, so there's no
+         header fix. See CLAUDE.md's adsb.one section for the full
+         investigation. Its config/sources.json entry ships visible:false;
+         style="display:none" here is just the safe pre-config-fetch fallback
+         (see main.js's config bootstrap) — state-filters.js's sourceToggles/
+         markerMapsBySource and several Object.keys(sourceToggles) loops in
+         main.js (wiring, isSourceEnabled(), the count spinner) all dereference
+         document.getElementById('toggle-adsbone') directly — removing the
+         element from the DOM entirely would null-crash those on page load. -->
+    <div class="source-row" style="display:none" title="Hidden — its api.adsb.one is behind a Cloudflare block affecting the whole subdomain, not just this app">
+      <span class="swatch" style="background:#f9a825"></span>
+      <span class="source-name">adsb.one</span>
+      <span class="source-count" id="count-adsbone"></span>
+      <label class="switch" style="--row-color:#f9a825">
+        <input type="checkbox" id="toggle-adsbone">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="ADSBexchange via RapidAPI. Covers a fixed 1,000 km radius (metered — enabled by default). Only shown where not already covered by airplanes.live, adsb.fi, or adsb.lol.">
+      <span class="swatch" style="background:#00838f"></span>
+      <span class="source-name">Aircraft Scatter</span>
+      <span class="source-count" id="count-aircraftscatter"></span>
+      <label class="switch" style="--row-color:#00838f">
+        <input type="checkbox" id="toggle-aircraftscatter" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" id="source-opensky" title="Only shown where not already covered by airplanes.live, adsb.fi, adsb.lol, or Aircraft Scatter">
+      <span class="swatch" style="background:#1a73e8"></span>
+      <span class="source-name">OpenSky</span>
+      <span class="source-count" id="count-opensky"></span>
+      <button type="button" class="source-help" id="opensky-help" style="display:none"
+              aria-label="Why is OpenSky disabled?">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
+          <text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700"
+                fill="currentColor">?</text>
+        </svg>
+      </button>
+      <label class="switch" style="--row-color:#1a73e8">
+        <input type="checkbox" id="toggle-opensky" checked>
+        <span class="switch-track"></span>
+      </label>
+      <div class="source-help-popover" id="opensky-help-popover" hidden></div>
+    </div>
+    <div class="source-row" title="Shown independently, not deduplicated against other sources (FlightAware is flight-centric with no ICAO24 field)">
+      <span class="swatch" style="background:#00acc1"></span>
+      <span class="source-name">FlightAware</span>
+      <span class="source-count" id="count-flightaware"></span>
+      <label class="switch" style="--row-color:#00acc1">
+        <input type="checkbox" id="toggle-flightaware">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+    <div class="source-row" title="Unofficial community wrapper around FlightRadar24's own private API (github.com/JeanExtreme002/FlightRadarAPI), not FlightRadar24's official service — may stop working without warning if FlightRadar24 tightens its anti-bot protections. Shown only where not already covered by any other source">
+      <span class="swatch" style="background:#6d4c41"></span>
+      <span class="source-name">FlightRadar24</span>
+      <span class="source-count" id="count-flightradar24"></span>
+      <label class="switch" style="--row-color:#6d4c41">
+        <input type="checkbox" id="toggle-flightradar24">
+        <span class="switch-track"></span>
+      </label>
+    </div>
     </div>
   </div>
 

@@ -55,7 +55,10 @@ Flask app.py (gunicorn 2 workers × 8 threads)
 ├─ /api/airports/search
 │  └─ search_airports() — ranked name/IATA/ICAO/city/country search, uncached
 ├─ /api/config
-│  └─ AREA_CENTER, initial zoom, radius_nm, active_zone_id (calls _maybe_reload_zone_from_disk() first)
+│  └─ AREA_CENTER, initial zoom, radius_nm, active_zone_id, sources
+│     (calls _maybe_reload_zone_from_disk() first; sources comes from
+│     SOURCES_CONFIG, loaded once at import from config/sources.json,
+│     restart-only — no hot-reload counterpart)
 ├─ /api/zones/active (POST)
 │  └─ _apply_zone() + _persist_zone_config() — moves AREA_CENTER/BBOX and every
 │     derived value (RADIUS_SOURCES centers, FLIGHTAWARE_QUERY, FLIGHTRADAR24_BOUNDS),
@@ -172,3 +175,4 @@ Test verifies this order is enforced via `#app > script[src*="..."].src`.
 - **Basemap picker default = Voyager** (2026-07-18) — CARTO colorful (not monochrome Light).
 - **ICAO24 block corroboration for callsign-decoded operator** (2026-07-20) — Suppresses mismatches for rotorcraft only; dev mode shows them flagged.
 - **Runtime zone switching: file persistence + mtime-poll sync** (2026-07-21; compacted 2026-07-27) — Zone changes (via airport search) persist only the latest `active_zone` to `config/zones.json` rather than staying session-only or accumulating unused presets; cross-worker propagation uses a cheap `getmtime()` poll rather than a new SQLite table. `_apply_zone()` recomputes all seven values derived from `AREA_CENTER`/`BBOX` together (three of which were previously frozen at import time and never revisited).
+- **Operator-configurable source visibility, gated behind Dev Mode; restart-only config file, no hot-reload** (2026-07-27) — `config/sources.json` moves per-source `visible`/`enabled_by_default` out of hardcoded `index.html` markup, following `config/zones.json`'s convention, but deliberately skips the mtime-poll/cross-worker-sync machinery zones.json needed — this file is hand-edited by an operator, never mutated via an API, so a plain import-time load is sufficient. The whole per-source toggle list only shows at all once Dev Mode is on (moved next to `#source-adsbdb`); `visible` then curates which specific rows Dev Mode actually reveals.

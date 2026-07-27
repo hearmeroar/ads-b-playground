@@ -1,0 +1,10 @@
+{
+  "opensky":         { "visible": true,  "enabled_by_default": true },
+  "adsbfi":          { "visible": true,  "enabled_by_default": true },
+  "adsblol":         { "visible": true,  "enabled_by_default": true },
+  "adsbone":         { "visible": false, "enabled_by_default": false },
+  "airplaneslive":   { "visible": true,  "enabled_by_default": true },
+  "aircraftscatter": { "visible": true,  "enabled_by_default": true },
+  "flightaware":     { "visible": true,  "enabled_by_default": false },
+  "flightradar24":   { "visible": true,  "enabled_by_default": false }
+}

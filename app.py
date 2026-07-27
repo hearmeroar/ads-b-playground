@@ -511,6 +511,42 @@ _aircraftscatter_cache = RADIUS_SOURCES["aircraftscatter"]["cache"]
 _adsblol_cache = RADIUS_SOURCES["adsblol"]["cache"]
 _adsbone_cache = RADIUS_SOURCES["adsbone"]["cache"]
 
+# Operator-configurable source visibility (config/sources.json): which of
+# the eight data sources show a HUD row at all, and whether their checkbox
+# starts checked, used to be hardcoded in static/index.html's markup with
+# no way to change it short of editing that file. This generalizes the
+# pattern adsb.one's hidden row already used one-off. Mirrors ZONES_FILE/
+# _load_zone_config() above, but deliberately has no mtime-poll/hot-reload
+# counterpart — this file is hand-edited by an operator, not mutated at
+# runtime via an API the way a zone change is, so restart-only is fine.
+# Values below are byte-identical to today's hardcoded HTML defaults, so an
+# absent/malformed file changes nothing.
+SOURCES_FILE = os.environ.get("SOURCES_FILE", "config/sources.json")
+
+
+def _load_sources_config():
+    default = {
+        "opensky": {"visible": True, "enabled_by_default": True},
+        "adsbfi": {"visible": True, "enabled_by_default": True},
+        "adsblol": {"visible": True, "enabled_by_default": True},
+        "adsbone": {"visible": False, "enabled_by_default": False},
+        "airplaneslive": {"visible": True, "enabled_by_default": True},
+        "aircraftscatter": {"visible": True, "enabled_by_default": True},
+        "flightaware": {"visible": True, "enabled_by_default": False},
+        "flightradar24": {"visible": True, "enabled_by_default": False},
+    }
+    try:
+        with open(SOURCES_FILE, "r") as f:
+            cfg = json.load(f)
+        if isinstance(cfg, dict) and all(k in cfg for k in default):
+            return cfg
+    except (OSError, ValueError):
+        pass
+    return default
+
+
+SOURCES_CONFIG = _load_sources_config()
+
 # FlightAware AeroAPI (https://www.flightaware.com/commercial/aeroapi/):
 # unlike the four radius sources above, this is a paid/metered, API-key-
 # authenticated API with a flight-centric shape (one object per flight leg,
@@ -765,6 +801,7 @@ def api_config():
         "radius_nm": AREA_RADIUS_NM,
         "bbox": BBOX,
         "active_zone_id": _active_zone_id,
+        "sources": SOURCES_CONFIG,
     })
 
 

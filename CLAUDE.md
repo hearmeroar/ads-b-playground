@@ -691,6 +691,100 @@ restarting.
   preserving all existing search behavior. Re-focusing shows the cached
   preset without a second network request.
 
+**Operator-configurable source visibility, gated behind Dev Mode**
+(`config/sources.json`, `app.py`'s `SOURCES_FILE`/`_load_sources_config()`/
+`SOURCES_CONFIG`, `static/js/main.js`'s startup-sequence config bootstrap,
+`static/js/state-filters.js`'s `devModeToggle` handler): which of the
+app's eight data sources show a HUD row at all, and whether their checkbox
+starts checked, used to be hardcoded purely in `static/index.html`'s
+markup (`checked` attribute, `style="display:none"` for adsb.one's
+Cloudflare-blocked row — see above) with no way for an operator to change
+it short of editing that file. Generalizes that one-off pattern into an
+editable, committed JSON file, following the same "operator-editable
+config file, loaded once at import" convention `config/zones.json`
+established — but **restart-only, deliberately no hot-reload**: unlike a
+zone change (a live, cross-worker runtime action via `POST
+/api/zones/active`), this file is hand-edited by an operator, not mutated
+via any API, so there's no `_maybe_reload_zone_from_disk()`-style
+mtime-poll counterpart. `SOURCES_FILE` defaults to `config/sources.json`
+(env-var overridable, same idiom as `ZONES_FILE`), loaded once at import
+into `SOURCES_CONFIG`; an absent or malformed file falls back to a
+hardcoded default that's byte-identical to today's shipped HTML defaults,
+so a deployment with no `config/sources.json` at all behaves exactly as
+before this feature existed. `/api/config`'s response gained one `sources`
+key (`{name: {visible, enabled_by_default}}` for all eight) — no other
+route reads it; a source's own route still serves data to any caller
+regardless of these two flags, which stay a purely **frontend** concern
+(same as "enabled by default" already was before this feature, just no
+longer hardcoded).
+
+**The whole per-source toggle list is itself a Dev Mode-only feature**
+(explicit product decision, 2026-07-27 — revised mid-implementation from an
+earlier version where each row was independently visible/hidden with no
+Dev Mode involvement at all): moved out of its original standalone spot
+near the top of the HUD into the same `.filter-block` as the Dev Mode
+toggle and `#source-adsbdb`, right after adsbdb's own row — grouped there
+because both are the same kind of thing, a dev-mode-only reveal. **Two
+independent layers decide what a user actually sees**: `body.dev-mode-on`
+(added/removed by `devModeToggle`'s own `change` handler, alongside its
+existing `adsbdbSourceRow.style.display` toggle) gates the *entire* list —
+with Dev Mode off, none of the eight rows show, regardless of any
+individual source's own `visible` value; a CSS rule
+(`body.dev-mode-on #hud .sources:not(.sources-pending) { display: flex;
+}`) is what reveals the container. Once Dev Mode is on, each row's own
+`config/sources.json`-driven `visible` flag (still applied exactly as
+before, via `row.style.display` set by `main.js`'s config bootstrap) then
+decides which *specific* rows actually appear — a source configured
+`visible: false` (adsb.one, by default) stays hidden even with Dev Mode
+on; making it appear requires editing `config/sources.json` and
+restarting, not just flipping Dev Mode. In other words: Dev Mode exposes
+the *mechanism*, `visible` still curates *which* sources are exposed
+through it — an operator can hand-pick a subset of sources a power user is
+even allowed to discover via Dev Mode. `static/js/main.js` fetches
+`/api/config` a **second**, independent time (the existing fetch in
+`map-init.js` stays untouched — it's deliberately fire-and-forget for the
+map view/scan-radius rings, with no ordering guarantee relative to
+`main.js`'s own synchronous startup code) and gates the whole startup
+sequence (the count-spinner loop, the first `poll()`, `setInterval`) on it
+resolving or failing either way, so `isSourceEnabled()` always reflects
+the config by the time anything reads it. For each entry, sets
+`sourceToggles[name].checked = enabled_by_default` and toggles that
+checkbox's `.closest('.source-row')` between `display:''`/`display:'none'`
+per `visible` — no new markup/ids, reuses the existing live DOM
+references. A config entry naming a source this build doesn't have is
+silently skipped; a fetch failure/malformed response leaves the HTML's own
+hardcoded defaults untouched (the `.catch(() => {})` no-op). **`enabled_by_default`
+is completely independent of both `visible` and Dev Mode** — a source can
+be `visible: false` with `enabled_by_default: true` (never shown to
+anyone, Dev Mode or not, yet still polled/contributing data/counts in the
+background) — a valid, intentional combination, not a bug, since
+`isSourceEnabled()`/`poll()` only ever read the checkbox's `.checked`
+state, never its visibility.
+
+**A page-load race, and the CSS that closes it**: the config only settles
+after an async fetch, so `.sources` starts tagged `sources-pending`
+(`display:none` regardless of Dev Mode, via `:not(.sources-pending)` in
+the CSS rule above) until `main.js`'s config bootstrap removes that class
+in its `.finally()` — success or failure alike. Without this, a user who
+somehow flipped Dev Mode on in that split-second window would briefly see
+`index.html`'s own hardcoded per-row defaults before the real config
+applied a moment later, a visible flash/jump. `#hud .sources` itself
+carries **no flex `gap`** (unlike before this row was grouped under Dev
+Mode) — it relies purely on the shared `#hud .filter-block .source-row {
+margin-bottom: 4px; }` rule the Dev Mode/adsbdb.com rows above it already
+use, so the spacing between every row in this section — Dev Mode →
+adsbdb.com → airplanes.live → ... — reads as one uniform list rather than
+adsbdb.com/airplanes.live having a visibly larger gap between them than
+Dev Mode/adsbdb.com do (a real bug hit while building this: a flex `gap`
+on `.sources` stacked on top of that shared margin for every row nested
+inside it, but not for the two rows outside it).
+
+v1 scope is deliberately narrow (just these two flags per source) —
+per-filter visibility, per-weather-layer visibility, and element ordering
+are noted as straightforward future extensions of the same pattern, not
+built now. Full design history:
+`.ai/proposals/source-visibility-config-2026-07-22.md`.
+
 **Scan-radius range rings** (`static/js/map-init.js`, toggled via
 `#toggle-scan-radius` in the HUD, wired in `static/js/state-filters.js`):
 a visual indicator of where the four radius sources' shared query area
@@ -3371,6 +3465,45 @@ final pass still hides it, so the empty map and error line remain reachable.
   `reuseExistingServer`), so a real POST would mutate the actual
   `config/zones.json` on disk and leak zone state into every other
   concurrently-running spec.
+- `tests/backend/test_sources_config.py` covers operator-configurable
+  source visibility: `_load_sources_config()` returns the exact hardcoded
+  default for a missing or malformed `SOURCES_FILE`; a custom file (via
+  `monkeypatch.setattr(app, "SOURCES_FILE", ...)`, same idiom
+  `test_zones.py` uses for `ZONES_FILE`) overrides `visible`/
+  `enabled_by_default` correctly; `/api/config` includes the `sources` key
+  with all 8 entries. 4 tests total, not one per source/field combination
+  (per this repo's own test-suite-audit finding about avoiding
+  combinatorial C0-C5-style over-testing). `conftest.py`'s `reset_caches`
+  redirects `SOURCES_FILE` to a throwaway file **and** resets
+  `SOURCES_CONFIG` directly to the same known defaults (since it's
+  computed once at import time, monkeypatching `SOURCES_FILE` alone
+  wouldn't retroactively change an already-computed global) — no mtime
+  tracking needed, unlike `ZONES_FILE`, since this file has no
+  hot-reload/write path to guard against.
+  `test_sources_config.spec.js` covers the frontend's Dev Mode-gated
+  reveal: the whole `#hud .sources` list stays hidden with Dev Mode off
+  regardless of any source's configured `visible` value (even one
+  configured `visible: true`); turning Dev Mode on reveals only the
+  sources configured `visible: true` in a mocked `/api/config`, while one
+  configured `visible: false` (mirroring adsb.one's real default) stays
+  hidden even then — and, once actually visible, its checkbox is
+  interactive (a power user can click it); turning Dev Mode back off hides
+  the whole list again; a source configured `enabled_by_default: false`
+  starts unchecked and is never polled on load (`/api/states` request
+  count stays 0) independent of visibility — `isSourceEnabled()`/`poll()`
+  read the checkbox directly, regardless of whether Dev Mode is on.
+  `mockAllSources()`'s own `/api/config` mock (`helpers.js`) includes a
+  `sources` key byte-identical to `config/sources.json`'s real shipped
+  defaults, so every other existing spec passing unchanged (with Dev Mode
+  off, as every spec defaults to) is itself the test for the
+  byte-identical-default guarantee. Moving the list behind Dev Mode broke
+  13 previously-passing tests across 6 other spec files that clicked a
+  source checkbox directly without opening Dev Mode first
+  (`test_flightaware.spec.js`, `test_flightradar24.spec.js`,
+  `test_multisource_dedup.spec.js`, `test_opensky_quota.spec.js`,
+  `test_rendering.spec.js`, `test_source_count_spinner.spec.js`) — each
+  fixed with one `await page.click('#toggle-dev-mode')` added right before
+  the checkbox interaction that needed it, not a wider rewrite.
 - `tests/backend/test_flightradar24.py` mocks the `FlightRadarAPI` SDK
   directly (`monkeypatch.setattr(app._fr24_client, "get_flights", ...)`) —
   the first backend test file that isn't mocking `app.requests.get`/`.post`,
