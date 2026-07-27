@@ -3,11 +3,12 @@ const adsbfiMarkers = new Map(); // hex -> L.Marker
 const adsblolMarkers = new Map(); // hex -> L.Marker
 const adsboneMarkers = new Map(); // hex -> L.Marker
 const airplanesliveMarkers = new Map(); // hex -> L.Marker
+const aircraftscatterMarkers = new Map(); // hex -> L.Marker
 const flightawareMarkers = new Map(); // fa_flight_id -> L.Marker
 const flightradar24Markers = new Map(); // icao24 -> L.Marker
 const markerMapsBySource = {
   opensky: openskyMarkers, adsbfi: adsbfiMarkers, adsblol: adsblolMarkers,
-  adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers, flightaware: flightawareMarkers,
+  adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers, aircraftscatter: aircraftscatterMarkers, flightaware: flightawareMarkers,
   flightradar24: flightradar24Markers,
 };
 
@@ -28,6 +29,7 @@ const sourceToggles = {
   adsblol: document.getElementById('toggle-adsblol'),
   adsbone: document.getElementById('toggle-adsbone'),
   airplaneslive: document.getElementById('toggle-airplaneslive'),
+  aircraftscatter: document.getElementById('toggle-aircraftscatter'),
   flightaware: document.getElementById('toggle-flightaware'),
   flightradar24: document.getElementById('toggle-flightradar24'),
 };

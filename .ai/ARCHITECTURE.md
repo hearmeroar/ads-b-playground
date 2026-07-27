@@ -2,7 +2,7 @@
 
 This is a **map**, not a narrative. Read CLAUDE.md for full detail and rationale.
 
-## Data sources (seven total)
+## Data sources (eight live feeds plus lazy adsbdb enrichment)
 
 1. **OpenSky Network** (`/api/states`, `/api/track`) — 10s cache, own quota system (daily limit + per-track limit). Shares most fields with radius sources; highest priority. Falls back to anonymous if auth token unavailable. Circuit-breaker on outage (30s cooldown). (CLAUDE.md § "OpenSky endpoints")
 
@@ -14,11 +14,13 @@ This is a **map**, not a narrative. Read CLAUDE.md for full detail and rationale
 
 5. **airplanes.live** (`/api/airplaneslive`) — Radius source, 10s cache, on by default. Highest priority among radius sources (enrichment order). (CLAUDE.md § "The four radius sources")
 
-6. **FlightAware AeroAPI** (`/api/flightaware`) — **Auth-required, off by default, metered/paid**. Flight-centric (no ICAO24), deduped by callsign. Contributes `originAirport`/`destinationAirport`. (CLAUDE.md § "FlightAware AeroAPI")
+6. **Aircraft Scatter** (`/api/aircraftscatter`) — ADSBexchange via RapidAPI, **off by default, metered**. Fixed 1,000km point query; 60s cache. ADSBExchange-compatible records, ICAO24-deduped after airplanes.live. Requires `RAPIDAPI_KEY`.
 
-7. **FlightRadar24** (`/api/flightradar24`) — **Off by default**, uses unofficial SDK (`FlightRadarAPI`, `curl_cffi`, Cloudflare TLS fingerprinting). ICAO24-keyed, sits below airplanes.live in enrichment order. High failure risk; caught generically. (CLAUDE.md § "FlightRadar24, via the unofficial `JeanExtreme002/FlightRadarAPI` SDK")
+7. **FlightAware AeroAPI** (`/api/flightaware`) — **Auth-required, off by default, metered/paid**. Flight-centric (no ICAO24), deduped by callsign. Contributes `originAirport`/`destinationAirport`. (CLAUDE.md § "FlightAware AeroAPI")
 
-8. **adsbdb.com** (`/api/adsbdb`) — **Lazy fetch only, not in poll loop**. Enriches identity + route + operator on click. Cached indefinitely. (CLAUDE.md § "adsbdb.com")
+8. **FlightRadar24** (`/api/flightradar24`) — **Off by default**, uses unofficial SDK (`FlightRadarAPI`, `curl_cffi`, Cloudflare TLS fingerprinting). ICAO24-keyed, sits below Aircraft Scatter in enrichment order. High failure risk; caught generically. (CLAUDE.md § "FlightRadar24, via the unofficial `JeanExtreme002/FlightRadarAPI` SDK")
+
+9. **adsbdb.com** (`/api/adsbdb`) — **Lazy fetch only, not in poll loop**. Enriches identity + route + operator on click. Cached indefinitely. (CLAUDE.md § "adsbdb.com")
 
 ## Backend flow
 
@@ -30,6 +32,8 @@ Flask app.py (gunicorn 2 workers × 8 threads)
 │  └─ OpenSky per-ICAO24 (300s TTL) → persistent disk cache
 ├─ /api/adsbfi, /api/adsblol, /api/adsbone, /api/airplaneslive
 │  └─ Radius sources via shared cached_radius_source() (10s TTL)
+├─ /api/aircraftscatter
+│  └─ ADSBexchange/RapidAPI point query via shared cache (60s TTL)
 ├─ /api/flightaware
 │  └─ FlightAware via cached_flightradar24() with broader Exception catch
 ├─ /api/flightradar24
@@ -103,7 +107,7 @@ Background tasks (Flask app, daemon thread)
 Poll loop (12s cycle, all enabled sources in parallel, then dedup+render)
 │
 ├─ Fetch /api/states (OpenSky)
-├─ Fetch /api/adsbfi, /api/adsblol, /api/adsbone, /api/airplaneslive (in parallel)
+├─ Fetch /api/adsbfi, /api/adsblol, /api/adsbone, /api/airplaneslive, /api/aircraftscatter (in parallel)
 ├─ Fetch /api/flightaware (if enabled)
 ├─ Fetch /api/flightradar24 (if enabled)
 │
@@ -113,7 +117,7 @@ Poll loop (12s cycle, all enabled sources in parallel, then dedup+render)
    │  └─ Enriched with radiusRecordsByHex (all four radius sources' records for this ICAO24)
    │     → deduplicated by category
    │
-   ├─ updateRadiusSourceMarkers() × 4 (adsb.fi → adsb.lol → adsb.one → airplanes.live)
+├─ updateRadiusSourceMarkers() × 5 (adsb.fi → adsb.lol → adsb.one → airplanes.live → Aircraft Scatter)
    │  └─ Each source renders only aircraft no higher-priority source claimed
    │     → contributes to shared excludeIds set before next source runs
    │

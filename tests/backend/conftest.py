@@ -34,6 +34,8 @@ def reset_caches(monkeypatch, tmp_path):
     app._adsbfi_cache.update({"data": None, "ts": 0.0})
     app._airplaneslive_cache.clear()
     app._airplaneslive_cache.update({"data": None, "ts": 0.0})
+    app._aircraftscatter_cache.clear()
+    app._aircraftscatter_cache.update({"data": None, "ts": 0.0})
     app._adsblol_cache.clear()
     app._adsblol_cache.update({"data": None, "ts": 0.0})
     app._adsbone_cache.clear()
@@ -102,6 +104,11 @@ def no_flightaware_key_by_default(monkeypatch):
     """Most tests exercise the not_configured path; test_flightaware.py opts
     into a configured key explicitly by overriding it within its own tests."""
     monkeypatch.setattr(app, "FLIGHTAWARE_API_KEY", None)
+
+
+@pytest.fixture(autouse=True)
+def no_rapidapi_key_by_default(monkeypatch):
+    monkeypatch.setattr(app, "RAPIDAPI_KEY", None)
 
 
 @pytest.fixture

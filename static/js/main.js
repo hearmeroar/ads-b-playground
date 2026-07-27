@@ -444,13 +444,14 @@ async function fetchFlightRadar24Flights() {
 }
 
 async function poll() {
-  const [openskyStates, adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft, flightawareFlights, flightradar24Flights] =
+  const [openskyStates, adsbfiAircraft, adsblolAircraft, adsboneAircraft, airplanesliveAircraft, aircraftscatterAircraft, flightawareFlights, flightradar24Flights] =
     await Promise.all([
       isSourceEnabled('opensky') ? fetchOpenSkyStates() : Promise.resolve(null),
       isSourceEnabled('adsbfi') ? fetchRadiusSourceAircraft('/api/adsbfi') : Promise.resolve(null),
       isSourceEnabled('adsblol') ? fetchRadiusSourceAircraft('/api/adsblol') : Promise.resolve(null),
       isSourceEnabled('adsbone') ? fetchRadiusSourceAircraft('/api/adsbone') : Promise.resolve(null),
       isSourceEnabled('airplaneslive') ? fetchRadiusSourceAircraft('/api/airplaneslive') : Promise.resolve(null),
+      isSourceEnabled('aircraftscatter') ? fetchRadiusSourceAircraft('/api/aircraftscatter') : Promise.resolve(null),
       isSourceEnabled('flightaware') ? fetchFlightAwareFlights() : Promise.resolve(null),
       isSourceEnabled('flightradar24') ? fetchFlightRadar24Flights() : Promise.resolve(null),
     ]);
@@ -467,9 +468,10 @@ async function poll() {
   const parsedAdsblol = adsblolAircraft && adsblolAircraft.map(parseAdsbExchangeAircraft);
   const parsedAdsbone = adsboneAircraft && adsboneAircraft.map(parseAdsbExchangeAircraft);
   const parsedAirplaneslive = airplanesliveAircraft && airplanesliveAircraft.map(parseAdsbExchangeAircraft);
+  const parsedAircraftscatter = aircraftscatterAircraft && aircraftscatterAircraft.map(parseAdsbExchangeAircraft);
   const parsedFlights = flightawareFlights && flightawareFlights.map(parseFlightAware);
   const parsedFlightradar24 = flightradar24Flights && flightradar24Flights.map(parseFlightRadar24Aircraft);
-  const radiusLists = [parsedAdsbfi, parsedAdsblol, parsedAdsbone, parsedAirplaneslive, parsedFlightradar24];
+  const radiusLists = [parsedAdsbfi, parsedAdsblol, parsedAdsbone, parsedAirplaneslive, parsedAircraftscatter, parsedFlightradar24];
   recordLiveTrails(parsedStates, radiusLists);
 
   // The generic "updated" timestamp lives here, not in fetchOpenSkyStates()
@@ -506,7 +508,7 @@ async function poll() {
   // two separately hand-written, mirrored lists.
   const parsedByRadiusSource = {
     adsbfi: parsedAdsbfi, adsblol: parsedAdsblol, adsbone: parsedAdsbone,
-    airplaneslive: parsedAirplaneslive, flightradar24: parsedFlightradar24,
+    airplaneslive: parsedAirplaneslive, aircraftscatter: parsedAircraftscatter, flightradar24: parsedFlightradar24,
   };
   const radiusRecordsByHex = new Map(); // icao24 -> Array<{ source, data }>
   for (const name of [...RADIUS_SOURCE_PRIORITY].reverse()) {
@@ -520,7 +522,7 @@ async function poll() {
     }
   }
 
-  // Render priority: OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live.
+  // Render priority: OpenSky > adsb.fi > adsb.lol > adsb.one > airplanes.live > Aircraft Scatter.
   // Each later source only contributes aircraft no earlier source covers — its
   // exclude set is the union of every higher-priority source's rendered keys.
   let openskyCount = openskyMarkers.size;
@@ -534,7 +536,7 @@ async function poll() {
   // see the radiusRecordsByHex comment above for why both share one list.
   const radiusMarkerMaps = {
     adsbfi: adsbfiMarkers, adsblol: adsblolMarkers,
-    adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers,
+    adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers, aircraftscatter: aircraftscatterMarkers,
   };
   const radiusSources = RADIUS_SOURCE_PRIORITY
     .filter((name) => name !== 'flightradar24')

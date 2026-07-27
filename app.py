@@ -162,7 +162,9 @@ def _apply_zone(center, zoom, radius_nm, zone_id):
     _active_zone_id = zone_id
 
     for _cfg in RADIUS_SOURCES.values():
-        _cfg["center"] = {"lat": AREA_CENTER["lat"], "lon": AREA_CENTER["lon"], _cfg["dist_param"]: AREA_RADIUS_NM}
+        _cfg["center"] = {"lat": AREA_CENTER["lat"], "lon": AREA_CENTER["lon"]}
+        if _cfg.get("dist_param"):
+            _cfg["center"][_cfg["dist_param"]] = AREA_RADIUS_NM
 
     FLIGHTAWARE_QUERY = '-latlong "{lamin} {lomin} {lamax} {lomax}"'.format(**BBOX)
 
@@ -439,7 +441,7 @@ def _save_track_cache():
 
 _load_track_cache()
 
-# The four simple radius sources — adsb.fi (https://github.com/adsbfi/opendata),
+# The simple ADSBExchange-compatible sources — adsb.fi (https://github.com/adsbfi/opendata),
 # airplanes.live (https://airplanes.live/api-guide/), adsb.lol
 # (https://api.adsb.lol/docs) and adsb.one (https://api.adsb.one) — are all
 # open, anonymous, no-daily-quota aggregators (rate-limited to 1 req/s, but
@@ -451,7 +453,9 @@ _load_track_cache()
 # BBOX above. NOTE: as of 2026-07-17 api.adsb.one sits behind a Cloudflare
 # WAF that 403s server-side requests, so its proxy will return an empty list
 # until that's lifted; the pipeline tolerates a dataless source by design.
-# Adding a fifth is one dict entry plus a one-line alias route below.
+# aircraftscatter is the exception: its paid RapidAPI endpoint has a fixed
+# 1,000km search radius and only takes a center point, so it is opt-in and
+# cached longer to remain comfortably below its 60,000-request monthly plan.
 RADIUS_SOURCES = {
     # "dist_param" is the query field name each API uses for the radius —
     # adsb.fi/adsb.lol call it "dist", adsb.one/airplanes.live call it
@@ -466,6 +470,10 @@ RADIUS_SOURCES = {
         "dist_param": "radius",
         "min_interval": 10,
     },
+    "aircraftscatter": {
+        "url": "https://aircraftscatter.p.rapidapi.com/lat/{lat}/lon/{lon}/",
+        "min_interval": 60,
+    },
     "adsblol": {
         "url": "https://api.adsb.lol/v2/lat/{lat}/lon/{lon}/dist/{dist}",
         "dist_param": "dist",
@@ -478,7 +486,9 @@ RADIUS_SOURCES = {
     },
 }
 for _cfg in RADIUS_SOURCES.values():
-    _cfg["center"] = {"lat": AREA_CENTER["lat"], "lon": AREA_CENTER["lon"], _cfg["dist_param"]: AREA_RADIUS_NM}
+    _cfg["center"] = {"lat": AREA_CENTER["lat"], "lon": AREA_CENTER["lon"]}
+    if _cfg.get("dist_param"):
+        _cfg["center"][_cfg["dist_param"]] = AREA_RADIUS_NM
     _cfg["cache"] = {"data": None, "ts": 0.0}
 del _cfg
 
@@ -488,6 +498,7 @@ del _cfg
 # through .clear()/.update() is visible through the other.
 _adsbfi_cache = RADIUS_SOURCES["adsbfi"]["cache"]
 _airplaneslive_cache = RADIUS_SOURCES["airplaneslive"]["cache"]
+_aircraftscatter_cache = RADIUS_SOURCES["aircraftscatter"]["cache"]
 _adsblol_cache = RADIUS_SOURCES["adsblol"]["cache"]
 _adsbone_cache = RADIUS_SOURCES["adsbone"]["cache"]
 
@@ -502,6 +513,7 @@ _adsbone_cache = RADIUS_SOURCES["adsbone"]["cache"]
 FLIGHTAWARE_URL = "https://aeroapi.flightaware.com/aeroapi/flights/search"
 FLIGHTAWARE_QUERY = '-latlong "{lamin} {lomin} {lamax} {lomax}"'.format(**BBOX)
 FLIGHTAWARE_API_KEY = os.environ.get("FLIGHTAWARE_API_KEY")
+RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY")
 FLIGHTAWARE_MIN_INTERVAL = 10
 _flightaware_cache = {"data": None, "ts": 0.0}
 
@@ -942,7 +954,18 @@ def cached_radius_source(url, cache, min_interval, headers=None, params=None, em
 def radius_source_response(name):
     _maybe_reload_zone_from_disk()
     cfg = RADIUS_SOURCES[name]
-    return cached_radius_source(cfg["url"].format(**cfg["center"]), cfg["cache"], cfg["min_interval"])
+    if name == "aircraftscatter":
+        if not RAPIDAPI_KEY:
+            return jsonify({"ac": [], "error": "not_configured"})
+        headers = {
+            "X-RapidAPI-Host": "aircraftscatter.p.rapidapi.com",
+            "X-RapidAPI-Key": RAPIDAPI_KEY,
+        }
+    else:
+        headers = None
+    return cached_radius_source(
+        cfg["url"].format(**cfg["center"]), cfg["cache"], cfg["min_interval"], headers=headers,
+    )
 
 
 @app.route("/api/source/<name>")
@@ -962,6 +985,11 @@ def api_adsbfi():
 @app.route("/api/airplaneslive")
 def api_airplaneslive():
     return radius_source_response("airplaneslive")
+
+
+@app.route("/api/aircraftscatter")
+def api_aircraftscatter():
+    return radius_source_response("aircraftscatter")
 
 
 @app.route("/api/adsblol")

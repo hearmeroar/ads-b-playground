@@ -65,6 +65,37 @@ requires.
 | Planespotters as third data source (metadata enrichment) | L | High | Data sources | | Helicopter + rare aircraft coverage gap; requires API research, integration into enrichment chain, dedup/priority |
 | Free tier API and user registration system | M–L | High | Backend | | Enable multi-user deployments with API keys, rate limiting, quota management. Requires registration endpoint, token generation, SQLite user role/quota schema, middleware. |
 | Multi-entity search (icao24/reg/callsign/adsbdb) | M | High | Frontend UX | | Highest standalone value in the backlog; worth scheduling deliberately |
+
+
+ADDED MANUALLY, NOT RATED
+| **keep native avia units – NM etc, make them enabled by default**
+| **Put units in a config**
+
+| **EPIC – Ability to save fleet and track them** | by their tail number, reg or icao
+  | **Fleet needed an aircraft page** | for detailled expection of every craft
+  | **fleet needed to save track of aircraft**
+  | **To be able mnotor them app have to have continious monitoring feature**
+  | **Monitoring will be limited by zone. Et first**
+  | **TRack exact aeroclub** | Club looks suitable for checking hypotesis https://www.safeskyalliance.com/fleet/
+
+**bug – light plane displayd as ground object. wrog icon and connot save** 
+84-00488
+DUKE60 · Beech C-12U Huron · ADFECE
+Aircraft photo
+© Varani Ennio - VRN Spotter Group
+IDENTITY
+Manufacturer Beechcraft
+Model King Air 200
+Operator
+ Ducair
+Operator Country
+  Luxembourg
+Registration Country
+  United States
+Category: A1 · Light
+
+
+| **Data source flags filter** | S–M | Med–High | Frontend UX | | **HIGH PRIORITY** — Research data quality flags (dbFlags, NIC/NACp/NACv, messageType) across all sources; implement HUD filter to show/hide aircraft by flag state. Improves visibility of data quality. See UI/UX section. |
 | Seamless login without page reload | M | Medium | Frontend UX | | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
 | Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Frontend UX | | Shareable/deep-linkable view; reusable layout could also serve collection cards |
 | Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Backend | | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |

@@ -210,6 +210,15 @@
         <span class="switch-track"></span>
       </label>
     </div>
+    <div class="source-row" title="ADSBexchange via RapidAPI. Covers a fixed 1,000 km radius and is off by default because it is metered; only shown where no higher-priority source already covers the aircraft.">
+      <span class="swatch" style="background:#00838f"></span>
+      <span class="source-name">Aircraft Scatter</span>
+      <span class="source-count" id="count-aircraftscatter"></span>
+      <label class="switch" style="--row-color:#00838f">
+        <input type="checkbox" id="toggle-aircraftscatter">
+        <span class="switch-track"></span>
+      </label>
+    </div>
     <div class="source-row" title="Shown independently, not deduplicated against other sources (FlightAware is flight-centric with no ICAO24 field)">
       <span class="swatch" style="background:#00acc1"></span>
       <span class="source-name">FlightAware</span>

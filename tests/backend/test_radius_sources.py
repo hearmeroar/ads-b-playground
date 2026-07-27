@@ -48,3 +48,22 @@ def test_cold_start_error_returns_502(client, mock_get, endpoint, cache_attr):
     resp = client.get(endpoint)
     assert resp.status_code == 502
     assert resp.get_json()["ac"] == []
+
+
+def test_aircraftscatter_uses_rapidapi_headers(client, mock_get, monkeypatch):
+    monkeypatch.setattr(app, "RAPIDAPI_KEY", "test-key")
+    mock_get.return_value = make_response(json_data={"ac": []})
+
+    client.get("/api/aircraftscatter")
+
+    assert mock_get.call_args.kwargs["headers"] == {
+        "X-RapidAPI-Host": "aircraftscatter.p.rapidapi.com",
+        "X-RapidAPI-Key": "test-key",
+    }
+
+
+def test_aircraftscatter_is_not_configured_without_key(client, mock_get):
+    resp = client.get("/api/aircraftscatter")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"ac": [], "error": "not_configured"}
+    mock_get.assert_not_called()

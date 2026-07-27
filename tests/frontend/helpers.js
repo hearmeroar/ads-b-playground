@@ -41,6 +41,7 @@ async function mockAllSources(page, { skipHealth = false } = {}) {
   await page.route('**/api/states', (route) => route.fulfill({ json: fixture('states.json') }));
   await page.route('**/api/adsbfi', (route) => route.fulfill({ json: fixture('adsbfi.json') }));
   await page.route('**/api/airplaneslive', (route) => route.fulfill({ json: fixture('airplaneslive.json') }));
+  await page.route('**/api/aircraftscatter', (route) => route.fulfill({ json: { ac: [] } }));
   // adsb.lol / adsb.one / flightaware default to empty so existing tests' marker/color counts
   // are unaffected; a test that wants to exercise them overrides with its own aircraft.
   await page.route('**/api/adsblol', (route) => route.fulfill({ json: { ac: [] } }));

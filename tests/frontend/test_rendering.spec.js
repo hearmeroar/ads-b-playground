@@ -63,3 +63,18 @@ test('disabling then re-enabling a source restores its markers immediately (no 1
   await page.waitForTimeout(600); // well under the 12s poll interval
   expect((await colorCounts(page)).red).toBe(3);
 });
+
+test('Aircraft Scatter renders only aircraft not covered by airplanes.live', async ({ page }) => {
+  await page.route('**/api/aircraftscatter', (route) => route.fulfill({ json: { ac: [
+    // Already rendered by airplanes.live: must stay deduplicated.
+    { hex: 'ffffff', flight: 'DUP999', alt_baro: 3000, gs: 100, track: 90, lat: 44.4, lon: 21.4 },
+    { hex: '777777', flight: 'SCAT1', alt_baro: 9000, gs: 180, track: 120, lat: 44.5, lon: 21.5 },
+  ] } }));
+
+  await page.goto('/');
+  await page.click('#toggle-aircraftscatter');
+  await page.waitForFunction(() => aircraftscatterMarkers.has('777777'));
+
+  expect(await page.evaluate(() => aircraftscatterMarkers.has('ffffff'))).toBe(false);
+  expect(await page.locator('.plane-icon[data-color="#00838f"]').count()).toBe(1);
+});

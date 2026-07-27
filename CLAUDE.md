@@ -424,6 +424,36 @@ adsb.one).
 > now hidden from the HUD entirely — behaves identically at the backend/JS
 > level wherever the phrase appears; only its visibility in the UI differs.
 
+**Aircraft Scatter (`/api/aircraftscatter` → `aircraftscatter.p.rapidapi.com/lat/.../lon/...`,
+via [RapidAPI](https://rapidapi.com/adsbx/api/aircraftscatter/)):** a sixth
+radius-shaped source, structurally like the four free ones above (same
+ADSBExchange-compatible JSON shape, so it reuses `parseAdsbExchangeAircraft()`
+with zero changes) but with two differences that made it a `RADIUS_SOURCES`
+entry with its own handling rather than a plain fifth alias. First, it's
+**metered and auth-required**: it's a paid RapidAPI product, so
+`radius_source_response()` special-cases it to attach `X-RapidAPI-Host`/
+`X-RapidAPI-Key` headers (from the `RAPIDAPI_KEY` env var) instead of the
+plain unauthenticated GET every free radius source uses; without a key it
+short-circuits to `{"ac": [], "error": "not_configured"}` (the same
+graceful-degradation shape FlightAware uses when unconfigured), never
+raising. Second, its **query shape is fixed, not radius-configurable**: the
+endpoint takes only a lat/lon point and always returns a fixed ~1,000km
+snapshot around it, so — unlike every other `RADIUS_SOURCES` entry — it has
+no `dist_param` key at all; `_apply_zone()`'s per-source center rebuild
+(and the entry's own initial setup) both special-case `dist_param` being
+absent rather than assuming every entry has one. **Ships off by default**
+and cached for 60s (`min_interval`), six times longer than the free
+sources' 10s, specifically to stay comfortably inside its metered monthly
+quota given a fixed radius can't be narrowed to cut cost. **Priority: sits
+below airplanes.live**, both in `RADIUS_SOURCE_PRIORITY` (`constants.js`)
+and the marker `excludeIds` render chain — a newer, paid source never
+outranks the four established free ones, the same reasoning FlightAware/
+FlightRadar24 ship off-by-default and low-priority for. Color: dark teal
+(`#00838f`), distinct from every other source's swatch. Tests:
+`tests/backend/test_radius_sources.py` covers the `not_configured` guard
+and the RapidAPI header attachment; `tests/frontend/test_rendering.spec.js`
+covers ICAO24 dedup against a higher-priority source (airplanes.live).
+
 **FlightAware AeroAPI (`/api/flightaware` → `aeroapi.flightaware.com/aeroapi/flights/search`):**
 This sixth source is structurally unlike the four radius sources in three critical ways.
 First, it's **authentication-required**: requests must carry an `x-apikey` header with a

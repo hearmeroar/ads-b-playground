@@ -57,10 +57,10 @@ function looksLikePlausibleRegistration(reg) {
 // OpenSky always renders first and unconditionally seeds excludeIds, and
 // FlightAware dedupes by callsign, not ICAO24 (see
 // matchedFlightawareCallsigns instead).
-const RADIUS_SOURCE_PRIORITY = ['adsbfi', 'adsblol', 'adsbone', 'airplaneslive', 'flightradar24'];
+const RADIUS_SOURCE_PRIORITY = ['adsbfi', 'adsblol', 'adsbone', 'airplaneslive', 'aircraftscatter', 'flightradar24'];
 
 const SOURCE_COLORS = {
-  opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32', flightaware: '#00acc1',
+  opensky: '#1a73e8', adsbfi: '#e53935', adsblol: '#8e24aa', adsbone: '#f9a825', airplaneslive: '#2e7d32', aircraftscatter: '#00838f', flightaware: '#00acc1',
   // FlightRadar24, via the unofficial JeanExtreme002/FlightRadarAPI SDK — see
   // CLAUDE.md for why it ships off by default and lowest-priority. Brown,
   // distinct from every color above (avoids adsbone's yellow-orange, which
@@ -98,7 +98,7 @@ function uniformMarkerColors() {
 }
 const SOURCE_DISPLAY_NAMES = {
   opensky: 'OpenSky', adsbfi: 'adsb.fi', adsblol: 'adsb.lol',
-  adsbone: 'adsb.one', airplaneslive: 'airplanes.live', flightaware: 'FlightAware',
+  adsbone: 'adsb.one', airplaneslive: 'airplanes.live', aircraftscatter: 'Aircraft Scatter', flightaware: 'FlightAware',
   flightradar24: 'FlightRadar24',
   adsbdb: 'adsbdb.com',
   flywme: 'Flywme',
