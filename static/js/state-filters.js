@@ -160,13 +160,14 @@ function resolveInitialThemeMode() {
 }
 
 // Paired basemap per theme: dark theme shows the CARTO Dark tiles, light
-// theme shows Voyager (this app's documented light default) — but this
-// pairing is only ever *applied* from an explicit toggle click (see
-// applyThemeMode() below), never at page load. map-init.js's own
-// currentBaseLayerKey default (currently 'dark') is a deliberate,
-// independently-tested product choice (test_basemap.spec.js asserts it) —
-// seeding the toggle from prefers-color-scheme must not silently override
-// that default basemap for a visitor who never touched the toggle at all.
+// theme shows Voyager (this app's documented light default). map-init.js's
+// own currentBaseLayerKey seeds itself from the same prefers-color-scheme
+// check this file's resolveInitialThemeMode() uses (duplicated there since
+// that script loads first and can't call this file's functions), so the
+// initial basemap is already paired with the initial chrome by the time
+// this file runs — applyThemeMode() below only needs to handle *later*,
+// explicit toggle clicks, re-pairing the two on demand rather than seeding
+// them from scratch.
 const THEME_BASEMAP = { dark: 'dark', light: 'voyager' };
 
 let currentThemeMode = resolveInitialThemeMode();
@@ -410,6 +411,13 @@ basemapOptions.forEach((opt) => {
   });
 });
 document.addEventListener('click', () => basemapDropdown.classList.remove('open'));
+// Sync the dropdown's displayed label/active option to whichever basemap
+// map-init.js actually seeded on load (currentBaseLayerKey, paired with the
+// initial theme — see THEME_BASEMAP above) — the markup's own hardcoded
+// "Dark" label (index.html) is only correct when that happens to be the
+// seeded key, otherwise the dropdown would show a stale label for a
+// basemap that isn't actually showing.
+syncBasemapDropdownUi(currentBaseLayerKey);
 
 // Zone search — a text input + live-filtered results list (backed by
 // /api/airports/search, enrichment/airports.py) that moves the app's whole

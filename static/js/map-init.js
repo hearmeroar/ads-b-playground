@@ -203,7 +203,16 @@ for (const key of Object.keys(BASE_LAYERS)) {
     maxNativeZoom: cfg.maxNativeZoom,
   });
 }
-let currentBaseLayerKey = 'dark';
+// Paired with the theme toggle's own THEME_BASEMAP (state-filters.js) so the
+// initial basemap matches the initial chrome instead of always defaulting to
+// Dark regardless of OS preference (a real bug: an OS-light visitor used to
+// get light chrome + dark basemap on every load, since nothing re-synced
+// them until the toggle was clicked). Can't call state-filters.js's own
+// resolveInitialThemeMode() here — this script loads first (map-init.js ->
+// constants.js -> route-validation.js -> state-filters.js -> ...) — so the
+// one-line matchMedia check is duplicated rather than reordering scripts.
+const prefersDarkOnLoad = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+let currentBaseLayerKey = prefersDarkOnLoad ? 'dark' : 'voyager';
 baseLayers[currentBaseLayerKey].addTo(map);
 
 function setBaseLayer(key) {

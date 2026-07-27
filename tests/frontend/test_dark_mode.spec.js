@@ -17,14 +17,14 @@ test.describe('theme mode — chrome only (no toggle interaction)', () => {
     expect(await page.evaluate(() => document.querySelector('#theme-mode-toggle .seg-btn[data-value="dark"]').classList.contains('active'))).toBe(true);
     expect(await page.evaluate(() => document.querySelector('#theme-mode-toggle .seg-btn[data-value="light"]').classList.contains('active'))).toBe(false);
 
-    // Basemap stays whatever map-init.js's own default is (currently 'dark')
-    // regardless of OS preference — auto-switching is only ever triggered by
-    // an explicit toggle click, never applied silently on load.
+    // map-init.js seeds its initial basemap from the same prefers-color-scheme
+    // check used above, paired via THEME_BASEMAP — dark OS preference pairs
+    // with the Dark basemap at load, not just from a later toggle click.
     const label = await page.textContent('#basemap-filter .dropdown-value');
     expect(label).toBe('Dark');
   });
 
-  test('OS light preference seeds light chrome tokens and the Light segment', async ({ page }) => {
+  test('OS light preference seeds light chrome tokens and the Light segment, paired with the Voyager basemap', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light' });
     await mockAllSources(page);
     await page.goto('/');
@@ -33,6 +33,11 @@ test.describe('theme mode — chrome only (no toggle interaction)', () => {
     expect(await page.getAttribute('html', 'data-theme')).toBe('light');
     expect(await cssVar(page, '--marker-fill-color')).toBe('#1c2128');
     expect(await page.evaluate(() => document.querySelector('#theme-mode-toggle .seg-btn[data-value="light"]').classList.contains('active'))).toBe(true);
+
+    // Regression guard for the basemap/chrome mismatch bug: an OS-light
+    // visitor used to get light chrome but a hardcoded dark basemap.
+    const label = await page.textContent('#basemap-filter .dropdown-value');
+    expect(label).toBe('Voyager');
   });
 });
 
@@ -101,5 +106,59 @@ test.describe('theme mode — toggle interaction', () => {
 
     await page.click('#map');
     expect(await page.isVisible('#theme-mode-help-popover')).toBe(false);
+  });
+
+  // Regression guard for the "marker shows the other theme's color after
+  // toggling" bug: fill used to be baked into the SVG markup as a literal,
+  // with no CSS rule referencing --marker-fill-color at all, so it only
+  // repainted whenever that marker's source next resynced via syncMarkers()
+  // (icons.js) — which could lag well behind the toggle. Fill is now driven
+  // by a body.uniform-color-mode CSS rule, so it must update the instant
+  // data-theme changes, with no dependency on poll()'s own /api/states
+  // request ever resolving. Holding that request open (same trick
+  // test_source_count_spinner.spec.js uses) proves the repaint isn't
+  // waiting on it.
+  test('marker fill and stroke repaint instantly on toggle, even while the follow-up poll is still in flight', async ({ page }) => {
+    let releaseStates;
+    const held = new Promise((resolve) => { releaseStates = resolve; });
+    await page.route('**/api/states', async (route) => {
+      await held;
+      route.fulfill({ json: require('./fixtures/states.json') });
+    });
+
+    await page.click('#theme-mode-toggle .seg-btn[data-value="dark"]');
+
+    const marker = '.plane-icon[data-color="#1a73e8"] svg path';
+    await page.waitForFunction(
+      (sel) => getComputedStyle(document.querySelector(sel)).fill === 'rgb(255, 212, 0)',
+      marker,
+      { timeout: 2000 },
+    );
+    const fill = await page.evaluate((sel) => getComputedStyle(document.querySelector(sel)).fill, marker);
+    const stroke = await page.evaluate((sel) => getComputedStyle(document.querySelector(sel)).stroke, marker);
+    expect(fill).toBe('rgb(255, 212, 0)'); // #ffd400, dark theme's uniform fill
+    expect(stroke).toBe('rgb(26, 26, 26)'); // #1a1a1a, dark theme's uniform stroke
+
+    releaseStates();
+  });
+});
+
+test.describe('Google sign-in button theming', () => {
+  test('button background switches to the dark variant with the theme', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await mockAllSources(page);
+    await page.goto('/');
+    await page.waitForSelector('.leaflet-marker-icon');
+
+    const lightBg = await page.evaluate(() =>
+      getComputedStyle(document.getElementById('google-signin-btn')).backgroundColor);
+    expect(lightBg).toBe('rgb(255, 255, 255)');
+
+    await page.click('#theme-mode-toggle .seg-btn[data-value="dark"]');
+    await page.waitForTimeout(300);
+
+    const darkBg = await page.evaluate(() =>
+      getComputedStyle(document.getElementById('google-signin-btn')).backgroundColor);
+    expect(darkBg).toBe('rgb(19, 19, 20)');
   });
 });

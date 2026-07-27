@@ -8,21 +8,27 @@ const LABELS = {
 };
 
 test.beforeEach(async ({ page }) => {
+  // Explicit: the initial basemap is now paired with the initial theme
+  // (map-init.js seeds currentBaseLayerKey from prefers-color-scheme, same
+  // as state-filters.js's resolveInitialThemeMode()) — light OS preference
+  // pairs with Voyager. Made explicit here rather than relying on
+  // Playwright's own light-by-default colorScheme.
+  await page.emulateMedia({ colorScheme: 'light' });
   await mockAllSources(page);
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
 });
 
-test('Dark is the active basemap on load, all others are not', async ({ page }) => {
+test('Voyager is the active basemap on load (light theme default pairing), all others are not', async ({ page }) => {
   const active = await page.evaluate((keys) =>
     Object.fromEntries(keys.map((k) => [k, map.hasLayer(baseLayers[k])])), KEYS);
-  expect(active).toEqual(Object.fromEntries(KEYS.map((k) => [k, k === 'dark'])));
+  expect(active).toEqual(Object.fromEntries(KEYS.map((k) => [k, k === 'voyager'])));
 
   const label = await page.textContent('#basemap-filter .dropdown-value');
-  expect(label).toBe('Dark');
+  expect(label).toBe('Voyager');
 });
 
-for (const key of KEYS.filter((k) => k !== 'dark')) {
+for (const key of KEYS.filter((k) => k !== 'voyager')) {
   test(`switching to ${key} swaps the active tile layer and label`, async ({ page }) => {
     await page.click('#basemap-filter .dropdown-trigger');
     await page.click(`#basemap-filter .dropdown-option[data-value="${key}"]`);

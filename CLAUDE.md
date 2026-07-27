@@ -728,8 +728,10 @@ between — the same "no signup, no token" constraint that picked CARTO
 over Mapbox in the first place, applied to the rest of the set too.
 Light (CARTO Positron, the original hardcoded layer before this feature)
 and two siblings from the same CDN — Dark (`dark_all`) and **Voyager**
-(`rastertiles/voyager`, colorful labeled streets — **the default**,
-re-approved 2026-07-18 over Light) — plus Streets (standard
+(`rastertiles/voyager`, colorful labeled streets — the light-theme default,
+re-approved 2026-07-18 over Light; Dark is the dark-theme default instead —
+see the Theme toggle section's basemap-pairing bugfix below for why the
+default is theme-dependent, not a single fixed layer) — plus Streets (standard
 `tile.openstreetmap.org` — the single most recognizable web map look; its
 tile usage policy discourages embedding in a high-traffic production app
 without self-hosting, accepted here since this is a low-traffic personal
@@ -1067,16 +1069,22 @@ field) — not wired to one yet.
   `[data-theme]` (written by `state-filters.js`) is what the toggle
   actually sets at runtime, and `:not([data-theme="light"])` is what lets
   an explicit Light choice override a dark OS preference.
-- **Auto-switches the basemap — but only from an explicit toggle click,
-  never on page load**: `THEME_BASEMAP = { dark: 'dark', light: 'voyager'
-  }` pairs each theme with a basemap key (see Basemap picker above).
-  `map-init.js`'s own `currentBaseLayerKey` default is an independently
-  tested, deliberate product choice (`test_basemap.spec.js` asserts it) —
-  seeding the toggle's *initial* segment from `prefers-color-scheme` must
-  never silently override that default basemap for a visitor who never
-  touches the toggle. `applyThemeChrome(mode)` (CSS tokens + marker stroke
-  only) runs once at load from the resolved initial mode; `applyThemeMode
-  (mode)` (chrome + basemap switch + immediate `poll()`) only ever runs
+- **The initial basemap is paired with the initial theme at load, not just
+  on a later toggle click** (fixed 2026-07-27 — previously `map-init.js`
+  hardcoded `currentBaseLayerKey = 'dark'` unconditionally, so an OS-light
+  visitor got light chrome + a dark basemap on every load, permanently,
+  until they touched the toggle): `THEME_BASEMAP = { dark: 'dark', light:
+  'voyager' }` pairs each theme with a basemap key (see Basemap picker
+  above). `map-init.js` seeds its own `currentBaseLayerKey` from the same
+  `prefers-color-scheme` check `state-filters.js`'s
+  `resolveInitialThemeMode()` uses (duplicated there since `map-init.js`
+  loads first in script order and can't call that function), so the two
+  are already paired by the time either script's default takes effect —
+  `test_basemap.spec.js` now asserts Voyager (the light-theme pairing) as
+  the default under Playwright's own light-by-default `colorScheme`.
+  `applyThemeChrome(mode)` (CSS tokens + marker stroke only) runs once at
+  load from the resolved initial mode; `applyThemeMode(mode)` (chrome +
+  basemap switch + immediate `poll()`) only ever runs
   from the toggle's own `click` handler. `setBaseLayer()` itself
   (map-init.js) only swaps the Leaflet tile layer and touches no DOM — the
   basemap dropdown's own "which option is `.active`, what label is shown"
@@ -1094,21 +1102,44 @@ field) — not wired to one yet.
   (`#1c2128`, matching this app's own `--ink` token) + light stroke
   (`#ffffff`) instead, since yellow-on-light would have poor contrast.
   `categoryIcon()` (`icons.js`) reads this instead of the old
-  constants directly. **The stroke half needs a second fix beyond the JS
-  constant**: a plain CSS rule always outranks an SVG's own inline
-  `stroke=` presentation attribute, so `--marker-stroke-color` has to be a
-  real custom property some rule can consume, not just computed in JS —
-  `applyThemeChrome()`/`applyThemeMode()` set it via
-  `document.body.style.setProperty('--marker-stroke-color', ...)`, an
-  inline style that always outranks the old `body.uniform-color-mode`
-  class rule regardless of which one is hardcoded (that class rule no
-  longer hardcodes a value itself — the `:root`/`[data-theme]` token blocks
-  above already supply the right fallback before JS runs).
+  constants directly. **Both halves need a CSS rule beyond the JS
+  constant, not just stroke** (bug fixed 2026-07-27 — see below): a plain
+  CSS rule always outranks an SVG's own inline `fill=`/`stroke=`
+  presentation attribute, so `--marker-fill-color`/`--marker-stroke-color`
+  have to be real custom properties some rule actually consumes, not just
+  computed in JS. `--marker-stroke-color` is additionally set directly via
+  `document.body.style.setProperty('--marker-stroke-color', ...)` in
+  `applyThemeChrome()`/`applyThemeMode()` (an inline style, which always
+  outranks the `body.uniform-color-mode` class rule below regardless of
+  which one is hardcoded) — `--marker-fill-color` has no such inline-style
+  path and relies purely on the `:root`/`[data-theme]` token cascade.
+  **Original bug**: only the stroke rule existed, and it was unconditional
+  (applied to every marker, not just uniform-color ones) — so a
+  per-source-colored marker (uniform color off) had its intentional white
+  outline silently forced to the *current theme's* uniform-mode stroke
+  color (near-black in dark theme) regardless, and marker **fill** had no
+  CSS rule referencing `--marker-fill-color` at all (the variable was
+  defined in every theme block but never consumed), so it only ever
+  repainted whenever that aircraft's source next happened to resync via
+  `syncMarkers()` (`icons.js`) — which can lag a theme toggle by a full
+  poll cycle or more if that source's fetch is slow/failing at the exact
+  moment of the switch, reading as "the marker briefly shows the other
+  theme's color." Fixed by scoping the stroke rule to
+  `body.uniform-color-mode` (with a plain unconditional white default for
+  the non-uniform case) and adding an equivalent `body.uniform-color-mode`
+  fill rule (`:not(.selected)`, so the selected-marker highlight fill keeps
+  winning) — both `style.css` rules right after the `.selected` fill rule.
+  This also meant the base `:root` block's own `--marker-fill-color`/
+  `--marker-stroke-color` fallback values were fixed: they held the *dark*
+  theme's pair (`#ffd400`/`#1a1a1a`) under a "light theme (default)"
+  comment, dead until the fill rule above made them live.
   **Toggling uniform-color itself still doesn't force a redraw**
   (`isUniformColorEnabled()` is only re-read on the next `syncMarkers()`
   poll cycle) — this is why `applyThemeMode()` calls `poll()` once
   immediately, so the marker recolor (and the basemap switch) both feel
-  instant instead of waiting up to `POLL_INTERVAL_MS` (12s).
+  instant instead of waiting up to `POLL_INTERVAL_MS` (12s); the CSS fix
+  above additionally means the fill/stroke repaint itself no longer
+  depends on that `poll()` call succeeding at all.
 - **Root background**: `#map`'s `background` now reads `var(--map-bg,
   #eef1f4)` instead of a hardcoded hex — confirmed the only visible root
   background layer in the app (no separate `html`/`body` background
@@ -1120,15 +1151,29 @@ field) — not wired to one yet.
   scroll — `#hud`, `#sidebar`, `#dev-aircraft-panel-scroll`,
   `#collection-panel-grid` — not a page-wide rule (the page itself uses
   `position:fixed` layout and never scrolls).
+- **`.google-signin-btn` now has a dark variant, not a permanent light-only
+  exception** (fixed 2026-07-27 — was previously documented here as staying
+  light always): it used to be hardcoded light-only while
+  `.user-menu-trigger` — the widget that replaces it in the exact same
+  `#account-bar` slot once signed in — was already fully theme-aware,
+  which read as a real inconsistency, not a coherent branding choice.
+  Google's own Sign-In guidelines publish an official dark-surface variant
+  too, so `[data-theme="dark"] .google-signin-btn` (plus the matching
+  `@media (prefers-color-scheme: dark)` fallback) now applies it — dark
+  pill (`#131314`), light text/border. Only the pill's background/text/
+  border swap; the embedded four-color "G" mark keeps its real art
+  regardless of theme.
 - **Explicit, permanent exceptions** (left untouched on purpose, not an
-  oversight): `.google-signin-btn` stays light per Google's own sign-in
-  branding guidelines; status/brand colors (`#1a73e8` accent, `#dc2626`
+  oversight): status/brand colors (`#1a73e8` accent, `#dc2626`
   error/emergency, `#22c55e` live-dot, `#b45309` unverified-route amber)
   are saturated enough to read on both themes; per-source `--row-color`
   inline swatches (~20 `.switch` labels in `index.html`) identify data
-  sources, not theme; `.plane-icon svg`'s non-uniform stroke,
-  `.radius-ring-label`, and Leaflet's own `.leaflet-control-attribution`
-  are all keyed to map tiles, not UI theme.
+  sources, not theme; `.plane-icon svg`'s non-uniform stroke (a fixed white
+  outline for per-source-colored markers, deliberately not theme-linked —
+  see the Uniform aircraft color bugfix above for why this needs its own
+  scoped CSS rule rather than being unconditional), `.radius-ring-label`,
+  and Leaflet's own `.leaflet-control-attribution` are all keyed to map
+  tiles, not UI theme.
 - **Help popover**: `#theme-mode-help`/`#theme-mode-help-popover`,
   `refreshDarkModeHelp()` in `main.js`, wired via the same shared
   `wireHelpPopover()` every other HUD help button uses.

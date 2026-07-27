@@ -43,7 +43,7 @@ line left its body orphaned with no heading. Completed multi-paragraph
 items are now deleted in full rather than title-only-marked, to avoid
 recreating that problem.)*
 
-## At a glance — Effort × Value (as of 2026-07-21)
+## At a glance — Effort × Value (as of 2026-07-27)
 
 Sorted best-first (cheap + valuable at the top). Full item detail is in the
 sections below; this table is the quick-scan summary the convention above
@@ -54,9 +54,9 @@ requires.
 | **[CRITICAL BUG]** Track stops updating after aircraft select | S | High | Frontend UX / Bug | 🚨 | **BLOCKER:** Track renders & updates *before* selection (live polling). Clicking marker → track stops updating, becomes stale. Historical track fetch may interfere with live trail. See Bugs section. |
 | **[BUG]** `capture-test-run.sh` hook not updating test markers in session | XS–S | High | Testing | 🐛 | Verification hook (`PostToolUse`) that captures real test run exit codes to `.claude/test-runs/` not being triggered/updating during session. Blocks `require-verification.sh` gate from verifying current test state. See Bugs section. |
 | Zone-search: auto-select text + re-show popular list on refocus | XS | Medium | Frontend UX | | Follow-up to the quick-open item above — its focus handler only shows the popular-airports list when the input is empty, so after picking one airport it stops helping on every later refocus. See UI/UX section. |
-| Local track persistence & smoothing (frontend) | S | Med–High | Frontend UX | | Quick win — real UX gap: local live-trail isn't kept across reselect, and renders jagged |
+| Track continuity and smoothing | M | Med–High | Frontend UX / Backend | | Merge the local live-trail, reselect persistence, polling cadence and interpolation follow-ups into one scoped task; the critical post-selection freeze remains a separate blocker above. |
 | **Research & adopt mature UI framework** | M | High | Frontend UX | | Mature UI framework (Bootstrap/Bulma/MDC/Tailwind) with 100+ pre-built components, tokens, dark mode support. v1 scope: research phase + POC + decision. Full proposal: `.ai/proposals/ui-framework-research-2026-07-22.md`. |
-| Marker coloring modes (remaining: category/altitude) | S | Medium | Frontend UX | | ✅ Uniform mode shipped (2026-07-22). Remaining: color-by-category and color-by-altitude modes to complete the coloring-modes feature set. |
+| Marker coloring modes (category/altitude) | S | Medium | Frontend UX | | Uniform mode is shipped; remaining scope is color-by-category and color-by-altitude. |
 | Altitude profile graph (time-series plot) | M | Med–High | Frontend UX | | Graph showing selected aircraft's altitude over time, visualizes climb/cruise/descent phases and helps understand flight profile. |
 | airframes.io as aircraft enrichment source | L | Med–High | Data sources | | Aircraft history/lifecycle data (accidents, incidents, operator changes); lazy-fetch tier below adsbdb. Research API access, coverage, and integration into sidebar's new History section. |
 | RapidAPI flight data APIs — research | S | Medium | Data sources | | Audit RapidAPI collection for gaps vs. current seven sources; identify if any free/no-key APIs offer better coverage for real-time or metadata. |
@@ -97,10 +97,8 @@ Category: A1 · Light
 | **Data source flags filter** | S–M | Med–High | Frontend UX | | **HIGH PRIORITY** — Research data quality flags (dbFlags, NIC/NACp/NACv, messageType) across all sources; implement HUD filter to show/hide aircraft by flag state. Improves visibility of data quality. See UI/UX section. |
 | Seamless login without page reload | M | Medium | Frontend UX | | Real UX papercut (full navigation + reload loses map/sidebar state) but touches the OAuth callback flow, so not trivial |
 | Aircraft detail page (`/aircraft/<icao24>`) | M | Medium | Frontend UX | | Shareable/deep-linkable view; reusable layout could also serve collection cards |
-| Map update frequency & track smoothing (backend polling config + interpolation) | L | Medium | Backend | | Broader superset of the frontend-only item above — consider merging scope with it rather than doing both |
 | Airline metadata enrichment (alliance/country/website) | L | Medium | Data sources | | Needs a source-validation phase before implementation, not just coding time |
 | External links: UTM params / `rel` / variableized host | S | Low | Frontend UX | | Mostly hygiene (`noreferrer`) + analytics tagging this app doesn't otherwise use |
-| UI/CSS framework evaluation (POC only) | S | Low | Frontend UX | | Cheap experiment; no user-facing payoff until a real migration follows (unscoped, separate cost) |
 | Register an AirLabs API key | XS | Low | Data sources | | Trivial, but a pure prerequisite — does nothing standalone |
 | Exercise `.agents/ui.md` on a real task | XS–S | Low | Documentation | | Process/meta value only, not user-facing |
 | Sidebar search/filter within collection | S | Low | Frontend UX | | Only matters once a user's collection is large; defer until it is |
@@ -115,7 +113,6 @@ Category: A1 · Light
 | Additional weather layers (wind/clouds/temp) | XL (blocked) | Low–Med | Data sources | | Blocked — no free/no-signup source identified yet |
 | Aircraft serial number (MSN) field | XL (blocked) | Low | Data sources | | Blocked — no verified data source yet, needs research first |
 | Per-category icons for ground vehicles/obstacles (C0-C5) | S | Low | Frontend UX | | Purely cosmetic — every C-code already renders correctly (tower glyph, no crash); just one shared icon regardless of which C-code |
-| *(Historical track interpolation, listed separately below)* | — | — | Duplicate of the two track-smoothing items above; fold into one of them rather than tracking a third time |
 
 ## Bugs
 
