@@ -182,3 +182,20 @@ Append-only log of architecturally-significant decisions. Newest entries at bott
 - The initial-default resolution (`resolveInitialThemeMode()`) is deliberately isolated in its own function as an extension point for a possible future backend-configured default (e.g. a `/api/config` field) — explicitly requested but not built in this pass.
 
 **References:** CLAUDE.md § "Theme toggle", `tests/frontend/test_dark_mode.spec.js`, `.ai/BACKLOG.md` "Dark mode" (marked done).
+
+---
+
+## 2026-07-27 — Aircraft Scatter: a sixth radius source, paid/metered, off by default
+
+**Problem:** The four free ADSBExchange-compatible radius sources (adsb.fi/adsb.lol/adsb.one/airplanes.live) plus OpenSky cover the configured area, but a paid ADSBexchange feed (via RapidAPI's Aircraft Scatter product) was proposed as an additional, higher-coverage option — same JSON shape as the free sources, but with two structural differences from every existing `RADIUS_SOURCES` entry: it requires an `X-RapidAPI-Key` auth header, and its endpoint has a **fixed ~1,000km query radius** (lat/lon only, no distance parameter), unlike every free source which takes an explicit radius.
+
+**Decision:** Added it as a sixth `RADIUS_SOURCES` entry (`aircraftscatter`) rather than a bespoke standalone route. `radius_source_response()` special-cases it to attach RapidAPI auth headers (from `RAPIDAPI_KEY`, optional env var) and short-circuit to `{"ac": [], "error": "not_configured"}` when the key is absent — the same graceful-degradation shape FlightAware already uses for its own optional key. Since it has no `dist_param`, every place that builds a `RADIUS_SOURCES` entry's `center` dict (initial setup and `_apply_zone()`'s per-zone rebuild) now guards with `if _cfg.get("dist_param")` instead of assuming every entry has one. Ships **off by default**, cached for 60s (6× the free sources' 10s) since a fixed-radius query can't be narrowed to cut cost, and sits in enrichment/render priority **below airplanes.live** — a newer, paid, unproven-at-scale source never outranks the established free ones, the same reasoning FlightAware/FlightRadar24 already ship off-by-default and low-priority for.
+
+**Reason:** Reuses the entire existing `RADIUS_SOURCES`/`cached_radius_source()`/`parseAdsbExchangeAircraft()` pipeline with two small, well-contained exceptions, rather than duplicating the whole radius-source machinery for one more feed — consistent with how FlightAware/FlightRadar24 were each folded in as the smallest diff that captured their one or two genuine structural differences from the free sources.
+
+**Tradeoffs:**
+- The fixed 1,000km radius means it draws from a much larger area than the app's own `AREA_RADIUS_NM` (220nm) scan zone — most of what it returns is likely well outside the area every other source/layer (Airports, scan-radius rings) is scoped to. Accepted: those aircraft still get correctly deduped/rendered, they just aren't specially clipped to the smaller zone the way `airports_in_bbox()` clips the Airports layer.
+- Metered/paid, so a real API key is a prerequisite — without one, the source is silently inert (`not_configured`), same UX as FlightAware without a key.
+- This was implemented across an earlier, uncommitted work-in-progress in the working tree before being reviewed/completed and committed in this session (commit `be44da4`) — documentation (this entry, the CLAUDE.md section, an `.ai/ARCHITECTURE.md` numbering fix) was added retroactively to bring it in line with every other source's documentation depth, and a stray raw draft note containing a live RapidAPI key in `.ai/BACKLOG.md` was removed (confirmed via full git history search that the key itself was never actually committed/pushed).
+
+**References:** CLAUDE.md § "Aircraft Scatter", `.ai/ARCHITECTURE.md`, `tests/backend/test_radius_sources.py`, `tests/frontend/test_rendering.spec.js`.
