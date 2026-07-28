@@ -106,6 +106,7 @@ body {
     radial-gradient(circle at top right, rgba(59, 130, 246, 0.05), transparent 26%),
     var(--app-shell);
   overflow: hidden;
+  font-family: var(--app-font-sans);
 }
 
 #sidebar-gallery {
@@ -415,8 +416,6 @@ body {
 #collection-panel-grid,
 .user-menu-item,
 .user-menu-email,
-.collection-card-meta,
-.collection-card-footer-row,
 .route-card-city,
 .route-confidence,
 #hud .zone-search-status,
@@ -430,14 +429,28 @@ body {
 .route-card-city,
 .route-confidence,
 .collection-card-subtitle,
-.collection-card-meta,
-.collection-card-footer-row,
 .collection-empty-hint,
 #hud .zone-search-status,
 #hud .status,
 #hud .source-count,
 #dev-identity-stats,
 .user-menu-email {
+  color: var(--app-muted);
+  font-weight: 500;
+}
+
+/* Meta rows read as field *values* (operator, country, manufacturer),
+   matching #sidebar-details .detail-value's own var(--app-title) treatment
+   — not muted like a label. The footer (saved-at, location) is deliberately
+   the opposite: secondary/metadata about the card itself rather than a
+   fact about the aircraft, so it stays muted — like a sidebar .detail-label
+   — not promoted to value color the way the meta rows above are. */
+.collection-card-meta {
+  color: var(--app-title);
+  font-weight: 500;
+}
+
+.collection-card-footer-row {
   color: var(--app-muted);
   font-weight: 500;
 }
@@ -467,7 +480,16 @@ body {
   color: var(--app-muted);
 }
 
+/* Grid rows stretch items to equal height by default (align-items: stretch,
+   grid's own default) — this flex column is what lets the footer (saved
+   date/location) actually use that extra height rather than leaving a gap
+   below it: .collection-card-body grows to fill it (flex: 1 below) and its
+   own footer is pushed to the bottom via margin-top: auto, so the
+   saved-at/location block lines up across a row even when cards above it
+   have different amounts of operator/country/manufacturer content. */
 .collection-card {
+  display: flex;
+  flex-direction: column;
   background: var(--app-surface);
   overflow: hidden;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
@@ -481,6 +503,22 @@ body {
 
 .collection-card-photo-wrap {
   background: var(--app-surface);
+  flex: none;
+}
+
+.collection-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* Only two direct flex children now (.collection-card-content, the
+     footer) — this gap is the guaranteed minimum space above the footer's
+     divider, even when margin-top: auto below collapses to 0 because the
+     card isn't stretched taller than its own content. */
+  gap: 10px;
+}
+
+.collection-card-footer {
+  margin-top: auto;
 }
 
 .collection-card-body {
@@ -552,7 +590,6 @@ body {
 }
 
 #sidebar-details b,
-#sidebar-details b.identity-label,
 .route-card-tag,
 .field-unconfirmed-tag,
 .collection-card-category {
@@ -566,6 +603,14 @@ body {
   color: var(--app-title);
 }
 
+/* Deliberately no font-size override here — b.identity-label used to be
+   bundled into the --app-text-xs (11px) rule above alongside plain
+   #sidebar-details b, shrinking it below every other .detail-label (12px,
+   var(--app-text-sm), inherited from its parent .identity-label-wrap span)
+   and making identity-row labels (Operator, Operator Country, Registered
+   Owner, Registration Country) read as a visibly different, smaller size
+   than every other sidebar field label. Only color/weight are meant to
+   differ here, per the original "lighter, not smaller" design intent. */
 #sidebar-details b.identity-label {
   color: var(--app-muted);
   font-weight: 400;
@@ -715,6 +760,7 @@ body {
 
 .collection-view-btn {
   color: var(--app-muted);
+  font-size: var(--app-text-sm);
 }
 
 .collection-view-btn.active {
@@ -854,8 +900,6 @@ body {
 .route-card-empty-text,
 .route-confidence,
 .collection-card-subtitle,
-.collection-card-meta,
-.collection-card-footer-row,
 .collection-empty-hint,
 #collection-panel-grid {
   color: var(--app-muted);
@@ -914,6 +958,11 @@ body {
 }
 
 .collection-card-category {
+  /* .collection-card-body is a flex column (see the sticky-footer rule
+     above) whose default align-items: stretch would otherwise expand this
+     badge to the body's full width — it must opt out to keep hugging its
+     own text like the inline-block pill it's meant to read as. */
+  align-self: flex-start;
   background: color-mix(in srgb, var(--app-primary) 10%, var(--app-surface));
   color: var(--app-primary);
   border: 1px solid color-mix(in srgb, var(--app-primary) 18%, var(--app-divider));
@@ -1081,6 +1130,18 @@ body {
   color: var(--app-muted);
 }
 
+/* #collection-panel-grid itself is now the full-width scroll container
+   (see style.css) so its scrollbar sits at the panel's own edge; the
+   1100px reading-width cap moves here, onto its direct children, so
+   content still reads as a centered column without dragging the
+   scrollbar in from the viewport edge with it. */
+.collection-group-header,
+.collection-group-grid {
+  max-width: 1100px;
+  width: 100%;
+  margin-inline: auto;
+}
+
 .collection-group-grid {
   gap: 18px;
 }
@@ -1090,7 +1151,7 @@ body {
 }
 
 .collection-empty-icon {
-  color: rgba(37, 99, 235, 0.20);
+  color: color-mix(in srgb, var(--app-primary) 20%, transparent);
 }
 
 #collection-panel-empty {
@@ -1177,10 +1238,17 @@ body {
 
 .collection-card-meta,
 .collection-card-footer-row {
-  color: var(--app-muted);
   font-size: var(--app-text-sm);
   line-height: 1.35;
   font-weight: 500;
+}
+
+.collection-card-meta {
+  color: var(--app-title);
+}
+
+.collection-card-footer-row {
+  color: var(--app-muted);
 }
 
 .collection-card-category {
@@ -1188,13 +1256,26 @@ body {
   box-shadow: none;
 }
 
+/* Glass, like #hud/#sidebar/#collection-panel's own chrome — but those are
+   ~92-96% opaque (right for a panel sitting over the map), which reads as
+   a near-solid dot at this button's small size, with barely any blur
+   showing through. Cut well below that here so the photo underneath is
+   actually visible, blurred, through the button. */
 .collection-card-icon-btn {
+  color: var(--app-primary);
+  background: color-mix(in srgb, var(--app-shell-strong) 45%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   box-shadow: var(--app-control-shadow);
 }
 
 .collection-card-icon-btn:hover {
-  background: var(--app-surface);
+  background: color-mix(in srgb, var(--app-shell-strong) 65%, transparent);
   transform: translateY(-1px);
+}
+
+.collection-card-photo-placeholder {
+  color: var(--app-muted);
 }
 
 .collection-card-removed-overlay {
@@ -1206,12 +1287,51 @@ body {
   color: var(--app-text);
 }
 
+/* Primary-filled pill — the one clearly actionable control on an
+   otherwise dimmed "removed" card, so it deliberately breaks from the
+   neutral --app-surface chrome every other button here uses. */
 .collection-card-undo-btn {
-  box-shadow: var(--app-control-shadow);
+  background: var(--app-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--app-primary) 45%, transparent);
+}
+
+.collection-card-undo-btn:hover {
+  background: color-mix(in srgb, var(--app-primary) 85%, black);
 }
 
 .collection-card-undo-hint {
   background: var(--app-surface);
+}
+
+/* Compact view (#collection-view-toggle) reuses every .collection-card-*
+   class as-is (see auth-collection.js) — these overrides mirror the
+   full-card treatment above so the row layout isn't left on the old
+   flat legacy colors while the grid view is fully tokenized. */
+.collection-group-grid.compact .collection-card {
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+  border-color: var(--app-divider);
+  box-shadow: var(--app-control-shadow);
+}
+
+.collection-group-grid.compact .collection-card-title {
+  color: var(--app-title);
+  font-weight: 800;
+}
+
+.collection-group-grid.compact .collection-card-subtitle {
+  color: var(--app-muted);
+}
+
+.collection-group-grid.compact .collection-card-category {
+  background: color-mix(in srgb, var(--app-primary) 10%, var(--app-surface));
+  color: var(--app-primary);
+  border-color: color-mix(in srgb, var(--app-primary) 18%, var(--app-divider));
+}
+
+.collection-group-grid.compact .collection-card-icon-btn:hover {
+  background: color-mix(in srgb, var(--app-primary) 8%, transparent);
 }
 
 .gallery-placeholder {

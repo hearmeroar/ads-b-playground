@@ -84,6 +84,14 @@ const BOOKMARK_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" aria-
 const EMPTY_STATE_ICON_SVG = '<svg viewBox="' + CATEGORY_ICON_SVGS.unknown.viewBox + '">' +
   CATEGORY_ICON_SVGS.unknown.inner + '</svg>';
 
+// Card footer row icons (saved-at / location) — Material Design Icons
+// (pictogrammers.com/MaterialDesign, Apache-2.0), same vendoring convention
+// as GROUP_ICONS in render-details.js: inline path data, no network request.
+const CALENDAR_ICON_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">' +
+  '<path d="M19,19H5V8H19M16,1V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3H18V1"/></svg>';
+const MAP_MARKER_ICON_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">' +
+  '<path d="M12,11.5A2.5,2.5 0 0,1 9.5,9A2.5,2.5 0 0,1 12,6.5A2.5,2.5 0 0,1 14.5,9A2.5,2.5 0 0,1 12,11.5M12,2A7,7 0 0,0 5,9C5,14.25 12,22 12,22C12,22 19,14.25 19,9A7,7 0 0,0 12,2Z"/></svg>';
+
 // A plain gray-silhouette placeholder for a signed-in user with no Google
 // profile photo (picture: null is a real, expected value, not an error) or
 // whose photo URL fails to load — an inline data: SVG, not a network
@@ -392,15 +400,26 @@ function renderCollectionCard(card) {
   const body = document.createElement('div');
   body.className = 'collection-card-body';
 
+  // Everything above the footer lives in its own wrapper so
+  // .collection-card-body's flex gap (see app.css) only ever applies
+  // between *this* block and the footer — a single guaranteed minimum gap
+  // above the footer's divider, regardless of how tall the content above
+  // happens to be — without also inserting extra space between the
+  // title/subtitle/category/meta rows themselves, which already have their
+  // own tighter, individually-tuned margins.
+  const content = document.createElement('div');
+  content.className = 'collection-card-content';
+  body.appendChild(content);
+
   const title = document.createElement('div');
   title.className = 'collection-card-title';
   title.textContent = snapshot.registration || card.icao24 || 'Unknown';
-  body.appendChild(title);
+  content.appendChild(title);
 
   const subtitle = document.createElement('div');
   subtitle.className = 'collection-card-subtitle';
   subtitle.textContent = snapshot.aircraftType || 'Unknown type';
-  body.appendChild(subtitle);
+  content.appendChild(subtitle);
 
   // Category — same "code · label" split the sidebar's own Category row
   // uses, plus its one-sentence description as a small caption. Both
@@ -415,19 +434,19 @@ function renderCollectionCard(card) {
   // one click away in the sidebar's own Category row for whoever wants it.
   const categoryParts = splitCategoryDisplay(snapshot.categoryDisplay);
   if (categoryParts) {
-    appendCardRow(body, 'collection-card-category', null,
+    appendCardRow(content, 'collection-card-category', null,
       categoryParts.code ? `${categoryParts.code} · ${categoryParts.label}` : categoryParts.label);
   }
 
-  appendCardRow(body, 'collection-card-meta', airlineLogoHtml(snapshot.callsign), snapshot.operator);
-  appendCardRow(body, 'collection-card-meta', flagHtml(snapshot.operatorCountryIso), snapshot.operatorCountry);
+  appendCardRow(content, 'collection-card-meta', airlineLogoHtml(snapshot.callsign), snapshot.operator);
+  appendCardRow(content, 'collection-card-meta', flagHtml(snapshot.operatorCountryIso), snapshot.operatorCountry);
   const manufacturerModel = [snapshot.manufacturer, snapshot.model].filter(Boolean).join(' ');
-  appendCardRow(body, 'collection-card-meta', null, manufacturerModel);
+  appendCardRow(content, 'collection-card-meta', null, manufacturerModel);
 
   const footer = document.createElement('div');
   footer.className = 'collection-card-footer';
-  appendCardRow(footer, 'collection-card-footer-row', null, formatCardSavedAt(card.saved_at));
-  appendCardRow(footer, 'collection-card-footer-row', null, formatCardLocation(card.location));
+  appendCardRow(footer, 'collection-card-footer-row', CALENDAR_ICON_SVG, formatCardSavedAt(card.saved_at));
+  appendCardRow(footer, 'collection-card-footer-row', MAP_MARKER_ICON_SVG, formatCardLocation(card.location));
   if (footer.childElementCount) body.appendChild(footer);
 
   el.appendChild(body);

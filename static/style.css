@@ -939,7 +939,7 @@ body.uniform-color-mode .plane-icon:not(.selected) svg circle {
    attribute (any CSS rule targeting the element always wins over a
    presentation attribute, so no duplicate markup is needed for the two
    states). */
-#sidebar-save-collection.saved { color: #1a73e8; }
+/* color comes from app.css (var(--app-primary)) — see #sidebar-save-collection.saved there */
 #sidebar-save-collection.saved svg path { fill: currentColor; }
 /* Not-collectible aircraft (a "C0" ADS-B code, or a ground vehicle/tower
    flagged by looksLikeGroundVehicle()) get no save button at all, rather
@@ -999,9 +999,14 @@ body.uniform-color-mode .plane-icon:not(.selected) svg circle {
   padding: 5px 12px;
 }
 .collection-view-btn.active { background: var(--card-bg); color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18); }
+/* overflow/scrolling lives on this full-width element so the scrollbar
+   tracks the panel's own right edge; the 1100px reading-width cap is
+   applied to its children instead (see app.css) — putting max-width here
+   directly used to shrink the scroll container itself, stranding the
+   scrollbar in the middle of the panel instead of at the viewport edge. */
 #collection-panel-grid {
   overflow: auto; padding: 20px 24px 32px; flex: 1;
-  max-width: 1100px; width: 100%; margin: 0 auto;
+  width: 100%; box-sizing: border-box;
 }
 .collection-group-header {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
@@ -1009,7 +1014,10 @@ body.uniform-color-mode .plane-icon:not(.selected) svg circle {
 }
 .collection-group-header:first-child { margin-top: 0; }
 .collection-group-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  /* min(320px, 100%), not a bare 320px floor — on a narrow viewport a plain
+     320px minimum would force this track wider than its own container,
+     overflowing the panel instead of shrinking to one column. */
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 20px;
 }
 #collection-panel-empty {
@@ -1056,16 +1064,15 @@ body.uniform-color-mode .plane-icon:not(.selected) svg circle {
 /* The panel's own save/unsave toggle — same bookmark glyph + fill rule as
    #sidebar-save-collection above, always rendered filled here (a live card
    in this list is, by definition, currently saved). */
+/* color/box-shadow come from app.css (var(--app-primary)/var(--app-control-shadow)) */
 .collection-card-icon-btn {
   position: absolute; top: 10px; right: 10px; z-index: 2;
   width: 34px; height: 34px; border-radius: 50%; border: none;
-  background: var(--surface-strong); color: #1a73e8;
+  background: var(--surface-strong);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
 }
 .collection-card-icon-btn svg { width: 20px; height: 20px; }
-.collection-card-icon-btn:hover { background: var(--surface-hover); }
 .collection-card-icon-btn.saved svg path { fill: currentColor; }
 
 /* "Elegant" removal: the card stays in place, dimmed, with an Undo action —
@@ -1089,13 +1096,13 @@ body.uniform-color-mode .plane-icon:not(.selected) svg circle {
 }
 /* Primary-style, high-contrast — deliberately not the muted white pill this
    used to share with the "Removed" label, so Undo reads as the one clearly
-   actionable control on an otherwise dimmed card. */
+   actionable control on an otherwise dimmed card. color/background/
+   box-shadow/:hover come from app.css (var(--app-primary)). */
 .collection-card-undo-btn {
-  font: inherit; font-size: 13px; font-weight: 700; color: #fff;
-  background: #1a73e8; border: none; border-radius: 999px;
-  padding: 6px 16px; cursor: pointer; box-shadow: 0 2px 8px rgba(26, 115, 232, 0.45);
+  font: inherit; font-size: 13px; font-weight: 700;
+  border: none; border-radius: 999px;
+  padding: 6px 16px; cursor: pointer;
 }
-.collection-card-undo-btn:hover { background: #1558b0; }
 .collection-card-undo-hint {
   font-size: 10px; color: var(--muted); background: var(--surface-strong);
   padding: 1px 8px; border-radius: 999px;
@@ -1135,7 +1142,7 @@ body.uniform-color-mode .plane-icon:not(.selected) svg circle {
   position: static; margin: 0 10px; flex: none;
   width: 30px; height: 30px; box-shadow: none; background: transparent;
 }
-.collection-group-grid.compact .collection-card-icon-btn:hover { background: rgba(15, 23, 42, 0.08); }
+/* :hover background comes from app.css (var(--app-primary) tint) */
 .collection-group-grid.compact .collection-card-removed-overlay { flex-direction: row; gap: 10px; padding: 0 12px; }
 
 /* Airport marker popup (airportPopupHtml() in map-init.js) — reworked from

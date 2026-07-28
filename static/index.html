@@ -3,7 +3,23 @@
 <head>
 <meta charset="utf-8">
 <title>Live Aircraft — Serbia & Neighboring Region</title>
-<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="icon" type="image/png" href="/favicon.png" id="app-favicon">
+<script>
+  // Safari-only quirk: after the full-page Google OAuth redirect
+  // (/api/login/google -> accounts.google.com -> back here), Safari can get
+  // stuck showing Google's own tab icon instead of refetching ours — Chrome
+  // doesn't have this problem. Re-pointing the <link> at a cache-busted URL
+  // forces a refetch; `pageshow` (not just the initial load) is what fires
+  // on the bfcache restore a "back from Google" navigation triggers.
+  (function () {
+    function refreshFavicon() {
+      var link = document.getElementById('app-favicon');
+      if (link) link.href = '/favicon.png?v=' + Date.now();
+    }
+    refreshFavicon();
+    window.addEventListener('pageshow', refreshFavicon);
+  })();
+</script>
 <link rel="stylesheet" href="leaflet/leaflet.css" />
 <link rel="stylesheet" href="leaflet-markercluster/MarkerCluster.css">
 <link rel="stylesheet" href="leaflet-markercluster/MarkerCluster.Default.css">
