@@ -52,7 +52,7 @@ requires.
 | Item | Effort | Value | Category | Status | Read |
 |---|---|---|---|---|---|
 | **[CRITICAL BUG]** Track stops updating after aircraft select | S | High | Frontend UX / Bug | 🚨 | **BLOCKER:** Track renders & updates *before* selection (live polling). Clicking marker → track stops updating, becomes stale. Historical track fetch may interfere with live trail. See Bugs section. |
-| Zone-search: auto-select text + re-show popular list on refocus | XS | Medium | Frontend UX | | Follow-up to the quick-open item above — its focus handler only shows the popular-airports list when the input is empty, so after picking one airport it stops helping on every later refocus. See UI/UX section. |
+| Zone-search: preserve selection after refocus | XS | Medium | Frontend UX | | Follow-up to `5d7ec95`: pointer-click default handling immediately collapses the refocus selection; defer selection until the click finishes. |
 | Track continuity and smoothing | M | Med–High | Frontend UX / Backend | | Merge the local live-trail, reselect persistence, polling cadence and interpolation follow-ups into one scoped task; the critical post-selection freeze remains a separate blocker above. |
 | **Research & adopt mature UI framework** | M | High | Frontend UX | | Mature UI framework (Bootstrap/Bulma/MDC/Tailwind) with 100+ pre-built components, tokens, dark mode support. v1 scope: research phase + POC + decision. Full proposal: `.ai/proposals/ui-framework-research-2026-07-22.md`. |
 | Marker coloring modes (category/altitude) | S | Medium | Frontend UX | | Uniform mode is shipped; remaining scope is color-by-category and color-by-altitude. |
@@ -556,7 +556,12 @@ Estimate: S (1–2h of polish + testing, no new functionality)
 
 - **Airport search quick-open with pre-loaded results** — Speed up zone-switching for frequent users. When input focus enters `#zone-search-input` (user clicks or tabs into it), **immediately** show a pre-populated list of popular/frequently-visited airports without requiring any typing. Two design options to evaluate: (1) **Hardcoded popular list** — top 10 busiest airports globally (LHR/CDG/AMS/FRA/DEL/HND/LAX/ORD/DXB/HKG) or regionally curated list, quick to implement but less personalized; (2) **Nearest airports** — compute 10 closest airports to current `AREA_CENTER` using the same `nearest_airport()` haversine logic already in `enrichment/airports.py`, more contextual. Acceptance criteria: (1) clicking/focusing input shows results immediately (no character input needed), (2) typing any query filters/replaces the list as usual (existing behavior preserved), (3) can clear and re-populate by re-focusing the input, (4) visually distinguish "quick results" from user-typed query results (optional: muted styling or a "Popular" section header). Implementation: backend can pre-compute the list on load or on `/api/config` response (cheap: no per-request work); frontend `selectZoneSearchInput` focus handler calls `getZoneSearchResults([...preset list])` to populate dropdown immediately, then user's `input` event handler continues normal search flow if they type. Estimate: XS–S (depends on option: hardcoded ~XS, nearest-airports ~S if it needs a new `/api` endpoint or local computation).
 
-- **Zone-search: auto-select text + re-show popular list on refocus** — Follow-up
+- **Zone-search: preserve selection after refocus** — Follow-up to `5d7ec95`.
+  A pointer click continues after the synchronous `focus` handler and moves
+  the caret to its click position, immediately clearing the intended text
+  selection. Defer `select()` until the next animation frame so the existing
+  value stays selected until the user acts. The popular-airports follow-up
+  is otherwise complete. Follow-up
   to the already-shipped "Airport search quick-open" feature
   (`static/js/state-filters.js:555-563`). Today the `focus` handler on
   `#zone-search-input` only calls `ensurePopularAirportsLoaded()` /
