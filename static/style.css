@@ -19,6 +19,7 @@
   --marker-fill-color: #1c2128;
   --marker-stroke-color: #ffffff;
   --marker-selected-color: #be185d;
+  --surface-obstacle-color: #64748b;
 }
 
 /* Dark theme */
@@ -43,6 +44,7 @@
     --marker-fill-color: #ffd400;
     --marker-stroke-color: #1a1a1a;
     --marker-selected-color: #f472b6;
+    --surface-obstacle-color: #9ca3af;
   }
 }
 :root[data-theme="dark"] {
@@ -65,11 +67,13 @@
   --marker-fill-color: #ffd400;
   --marker-stroke-color: #1a1a1a;
   --marker-selected-color: #f472b6;
+  --surface-obstacle-color: #9ca3af;
 }
 :root[data-theme="light"] {
   --marker-fill-color: #1c2128;
   --marker-stroke-color: #ffffff;
   --marker-selected-color: #be185d;
+  --surface-obstacle-color: #64748b;
 }
 
 /* Scrollbar theming for the app's four internally-scrolling panels. Firefox
@@ -273,6 +277,7 @@ body.dev-mode-on #hud .sources:not(.sources-pending) { display: flex; }
 #hud .seg-btn.active { background: var(--surface-strong); color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15); }
 #hud .seg-btn:hover:not(.active) { color: var(--ink); }
 #hud .seg-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+#hud .show-filter-option { margin-top: 6px; }
 
 #hud .dropdown { position: relative; }
 #hud .dropdown-trigger {
@@ -368,6 +373,12 @@ body.dev-mode-on #hud .sources:not(.sources-pending) { display: flex; }
 .plane-icon.selected svg circle {
   fill: var(--marker-selected-color, #f472b6);
 }
+/* Surface obstacles are neutral ground objects rather than aircraft. Their
+   theme-aware color lives here instead of in icons.js; selected objects
+   still use the shared selection highlight above. */
+.plane-icon.surface-obstacle-icon:not(.selected) svg path {
+  fill: var(--surface-obstacle-color, #64748b);
+}
 /* Uniform aircraft color mode (toggled via #toggle-uniform-color): swaps
    both fill and outline to a theme-aware pair, matching the pair
    icons.js's categoryIcon() computes via uniformMarkerColors() — but as
@@ -387,17 +398,29 @@ body.dev-mode-on #hud .sources:not(.sources-pending) { display: flex; }
    always outranks these class-based rules), so there's no per-mode value
    to hardcode in this file — the :root/[data-theme] token blocks above
    already supply the right fallback value before JS runs.
-   :not(.selected) so the selected-marker highlight fill above keeps
-   winning — the two rules would otherwise have equal specificity. */
-body.uniform-color-mode .plane-icon svg path,
-body.uniform-color-mode .plane-icon svg ellipse,
-body.uniform-color-mode .plane-icon svg circle {
+   Surface obstacles and airport markers are neutral ground objects, not
+   aircraft, so both are excluded and keep the fixed colors baked into
+   their SVGs. :not(.selected) lets the selected-marker highlight above
+   keep winning — the two fill rules would otherwise have equal
+   specificity. */
+body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon) svg path,
+body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon) svg ellipse,
+body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon) svg circle {
   stroke: var(--marker-stroke-color, #1a1a1a);
 }
-body.uniform-color-mode .plane-icon:not(.selected) svg path,
-body.uniform-color-mode .plane-icon:not(.selected) svg ellipse,
-body.uniform-color-mode .plane-icon:not(.selected) svg circle {
+body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg path,
+body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg ellipse,
+body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg circle {
   fill: var(--marker-fill-color, #ffd400);
+}
+/* A real aircraft keeps its category glyph and remains collectible while
+   on the ground, but its paint becomes the same theme-aware neutral grey
+   as other ground objects. syncMarkers() rebuilds the icon on every poll,
+   so the on-ground class appears on landing and disappears on takeoff. */
+body .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg path,
+body .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg ellipse,
+body .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg circle {
+  fill: var(--surface-obstacle-color, #64748b);
 }
 
 .dropdown-icon-container {

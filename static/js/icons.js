@@ -45,7 +45,7 @@ const GLIDER_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352
 const LIGHTER_THAN_AIR_GLYPH = '<g transform="translate(100, 100)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><ellipse cx="0" cy="0.1" rx="46.209" ry="85.8"/></g>';
 const PARACHUTIST_GLYPH = '<g fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 142.86 28.6 L 171.432 57.2 L 185.718 100.1 L 171.432 143 L 142.86 171.6 L 100.002 185.9 L 57.144 171.6 L 28.572 143 L 14.286 100.1 L 28.572 57.2 L 57.144 28.6 L 100.002 14.3 L 142.86 28.6 Z"/><circle cx="100" cy="100" r="12.48" style="fill: rgb(255, 255, 255);"/></g>';
 const ULTRALIGHT_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 147.64 -35.505 C 147.64 -42.097 91.064 -101.03 91.064 -101.03 C 90.511 -101.627 91.418 -78.099 91.418 -78.099 L 82.048 -63.585 C 82.048 -63.585 98.395 -44.866 91.418 -44.866 C 72.677 -44.866 72.677 -44.866 63.306 -44.866 C 60.254 -44.866 72.744 -40.081 72.677 -35.505 C 72.606 -30.724 60.117 -26.143 63.306 -26.143 C 72.677 -26.143 78.924 -26.143 91.418 -26.143 C 100.788 -26.143 82.048 -7.418 82.048 -7.418 L 91.418 7.087 L 91.09 30.024 C 91.09 30.024 147.64 -28.913 147.64 -35.505 Z"/></g>';
-const SURFACE_OBSTACLE_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.197083, 247.503403)" fill="#9ca3af" stroke="none"><path d="M 143.535 -82.319 C 143.535 -82.819 134.164 -82.319 134.164 -82.319 C 134.164 -82.319 136.37 -89.474 134.164 -91.68 C 130.987 -94.857 109.502 -95.129 106.053 -91.68 C 103.847 -89.474 106.053 -82.319 106.053 -82.319 L 87.312 -82.319 C 87.312 -82.319 89.518 -89.474 87.312 -91.68 C 83.747 -95.245 62.262 -94.741 59.201 -91.68 C 56.995 -89.474 59.201 -82.319 59.201 -82.319 L 40.46 -82.319 C 40.367 -82.419 40.46 -54.235 40.46 -54.235 L 96.683 -44.874 L 96.683 -26.151 L 40.46 -16.79 L 40.46 11.294 L 59.201 11.294 C 59.201 11.294 56.995 18.449 59.201 20.655 C 62.344 23.798 83.829 24.138 87.312 20.655 C 89.518 18.449 87.312 11.294 87.312 11.294 C 107.852 11.294 106.053 11.294 106.053 11.294 C 106.053 11.294 103.847 18.449 106.053 20.655 C 109.208 23.81 130.693 24.126 134.164 20.655 C 136.37 18.449 134.164 11.294 134.164 11.294 L 143.535 11.294 L 143.535 -7.429 L 152.905 -7.429 L 152.905 -63.596 L 143.535 -63.596 C 143.535 -63.596 143.535 -81.196 143.535 -82.319 Z"/></g>';
+const SURFACE_OBSTACLE_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.197083, 247.503403)" fill="currentColor" stroke="none"><path d="M 143.535 -82.319 C 143.535 -82.819 134.164 -82.319 134.164 -82.319 C 134.164 -82.319 136.37 -89.474 134.164 -91.68 C 130.987 -94.857 109.502 -95.129 106.053 -91.68 C 103.847 -89.474 106.053 -82.319 106.053 -82.319 L 87.312 -82.319 C 87.312 -82.319 89.518 -89.474 87.312 -91.68 C 83.747 -95.245 62.262 -94.741 59.201 -91.68 C 56.995 -89.474 59.201 -82.319 59.201 -82.319 L 40.46 -82.319 C 40.367 -82.419 40.46 -54.235 40.46 -54.235 L 96.683 -44.874 L 96.683 -26.151 L 40.46 -16.79 L 40.46 11.294 L 59.201 11.294 C 59.201 11.294 56.995 18.449 59.201 20.655 C 62.344 23.798 83.829 24.138 87.312 20.655 C 89.518 18.449 87.312 11.294 87.312 11.294 C 107.852 11.294 106.053 11.294 106.053 11.294 C 106.053 11.294 103.847 18.449 106.053 20.655 C 109.208 23.81 130.693 24.126 134.164 20.655 C 136.37 18.449 134.164 11.294 134.164 11.294 L 143.535 11.294 L 143.535 -7.429 L 152.905 -7.429 L 152.905 -63.596 L 143.535 -63.596 C 143.535 -63.596 143.535 -81.196 143.535 -82.319 Z"/></g>';
 // Unknown / no-category aircraft (ADS-B Radar a0.svg — "no ADS-B info" variant).
 const UNKNOWN_GLYPH = '<g transform="matrix(0, -1.526083, 1.526083, 0, 154.192352, 224.515808)" fill="COLOR" stroke="STROKE" stroke-width="1" vector-effect="non-scaling-stroke"><path d="M 147.119 -35.2539 C 147.119 -41.8457 138.086 -46.6797 127.344 -46.6797 L 103.125 -46.6797 C 100.049 -46.6797 98.877 -47.168 96.9238 -49.2676 L 59.2773 -90.4785 C 58.0566 -91.7969 56.5918 -92.5293 55.0293 -92.5293 L 48.4375 -92.5293 C 46.9727 -92.5293 46.1426 -91.2109 46.875 -89.6484 L 66.2598 -46.6797 L 34.9121 -43.5547 L 24.6582 -62.1582 C 23.8281 -63.4766 22.9004 -64.0625 21.0938 -64.0625 L 18.3594 -64.0625 C 16.8945 -64.0625 16.0645 -63.2812 16.0645 -61.7676 L 16.0645 -8.78906 C 16.0645 -7.22656 16.8945 -6.49414 18.3594 -6.49414 L 21.0938 -6.49414 C 22.9004 -6.49414 23.8281 -7.08008 24.6582 -8.39844 L 34.9121 -26.9531 L 66.2598 -23.877 L 46.875 19.1406 C 46.1426 20.6543 46.9727 21.9727 48.4375 21.9727 L 55.0293 21.9727 C 56.5918 21.9727 58.0566 21.2402 59.2773 19.9219 L 96.9238 -21.2402 C 98.877 -23.3887 100.049 -23.877 103.125 -23.877 L 127.344 -23.877 C 138.086 -23.877 147.119 -28.6621 147.119 -35.2539 Z"/></g>';
 
@@ -90,8 +90,8 @@ const CATEGORY_GLYPHS = {
 // The CSS class is exactly what the old per-category builders used
 // ("light-icon", "high-vortex-large-icon", ...) — style.css and the tests
 // key off these names, so the underscore→hyphen derivation must not change.
-function categoryIcon(group, headingDeg, color, isSelected) {
-  const cssClass = group.replace(/_/g, '-') + '-icon';
+function categoryIcon(group, headingDeg, color, isSelected, isOnGround) {
+  const cssClass = group.replace(/_/g, '-') + '-icon' + (isOnGround ? ' on-ground' : '');
   const fillColor = isUniformColorEnabled() ? uniformMarkerColors().fill : color;
   const strokeColor = isUniformColorEnabled() ? uniformMarkerColors().stroke : '#fff';
   const svg = CATEGORY_GLYPHS[group].replace(/COLOR/g, fillColor).replace(/STROKE/g, strokeColor);
@@ -100,9 +100,11 @@ function categoryIcon(group, headingDeg, color, isSelected) {
 
 // Surface obstacle icon for ground stations/vehicles (`isGroundVehicle` or
 // categoryGroup "surface_obstacle") — uses ADS-B Radar icon set (c0.svg) in
-// neutral grey rather than source-colored, since these aren't really "sources"
-// of aircraft data. Never rotated — ground stations have no heading. `color`
-// is still accepted and recorded via `data-color` for colorCounts() compatibility.
+// theme-aware neutral grey rather than source-colored, since these aren't
+// really "sources" of aircraft data. The actual color comes from
+// --surface-obstacle-color in style.css. Never rotated — ground stations
+// have no heading. `color` is still accepted and recorded via `data-color`
+// for colorCounts() compatibility.
 function towerIcon(color, isSelected) {
   return rotatedDivIcon('surface-obstacle-icon', 20, 10, 0, color, SURFACE_OBSTACLE_GLYPH, '0 0 200 200', isSelected);
 }
@@ -140,7 +142,8 @@ function airportIcon(type) {
 
 const ICON_BUILDERS = {};
 for (const group of Object.keys(CATEGORY_GLYPHS)) {
-  ICON_BUILDERS[group] = (headingDeg, color, isSelected) => categoryIcon(group, headingDeg, color, isSelected);
+  ICON_BUILDERS[group] = (headingDeg, color, isSelected, isOnGround) =>
+    categoryIcon(group, headingDeg, color, isSelected, isOnGround);
 }
 
 // Ground vehicles (either flagged by looksLikeGroundVehicle()'s heuristics,
@@ -155,7 +158,9 @@ function iconFor(item, color) {
     return towerIcon(color, isSelected);
   }
   const builder = ICON_BUILDERS[item.categoryGroup];
-  return builder ? builder(item.heading, color, isSelected) : categoryIcon('unknown', item.heading, color, isSelected);
+  return builder
+    ? builder(item.heading, color, isSelected, item.onGround)
+    : categoryIcon('unknown', item.heading, color, isSelected, item.onGround);
 }
 
 // One-time DOM patch for instant selection feedback only. syncMarkers()
@@ -174,7 +179,7 @@ function setMarkerSelectedClass(marker, isSelected) {
 }
 
 // Creates/moves/removes markers in `markerMap` to match `items`
-// ({id, lat, lon, heading, info, registration, isGroundVehicle,
+// ({id, lat, lon, heading, info, registration, onGround, isGroundVehicle,
 // categoryGroup}[]), reusing existing markers instead of recreating them
 // each poll. Returns the number of markers now shown.
 function syncMarkers(markerMap, items, color) {

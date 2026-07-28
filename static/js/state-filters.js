@@ -282,13 +282,41 @@ document.querySelectorAll('.airport-type-checkbox').forEach((checkbox) => {
 
 const GROUND_VEHICLE_MARKERS = new Set(['TWR']);
 const GROUND_VEHICLE_CALLSIGN_RE = /^[A-Z]{4}\d{2}$/;
+const AIRCRAFT_EMITTER_CATEGORY_RE = /^(?:A[1-7]|B[1-6])$/;
+const ICAO_AIRCRAFT_TYPE_RE = /^[A-Z0-9]{2,4}$/;
+function categoryIdentifiesAircraft(category) {
+  if (typeof category === 'number') {
+    return category >= 2 && category <= 14 && category !== 13;
+  }
+  return typeof category === 'string' && AIRCRAFT_EMITTER_CATEGORY_RE.test(category);
+}
+function identityFieldsIdentifyAircraft(registration, aircraftType) {
+  const trimmedRegistration = (registration || '').trim();
+  const trimmedAircraftType = (aircraftType || '').trim().toUpperCase();
+  return !!(trimmedRegistration && ICAO_AIRCRAFT_TYPE_RE.test(trimmedAircraftType));
+}
 function looksLikeGroundVehicle({ category, registration, aircraftType, callsign }) {
-  if (registration && GROUND_VEHICLE_MARKERS.has(registration)) return true;
-  if (aircraftType && GROUND_VEHICLE_MARKERS.has(aircraftType)) return true;
-  const trimmedCallsign = (callsign || '').trim();
-  if (trimmedCallsign && GROUND_VEHICLE_CALLSIGN_RE.test(trimmedCallsign)) return true;
+  const markerFields = [registration, aircraftType, callsign]
+    .map((value) => (value || '').trim().toUpperCase());
+  // Tower/reference beacons do not consistently expose a registration or
+  // type: some feeds provide only their callsign as "TWR". Treat that
+  // explicit marker as ground evidence in any of the three fields.
+  if (markerFields.some((value) => GROUND_VEHICLE_MARKERS.has(value))) return true;
   if (typeof category === 'number' && category >= 16 && category <= 20) return true;
   if (typeof category === 'string' && /^C[0-5]$/.test(category)) return true;
+  // The four-letters-plus-two-digits callsign shape is only a fallback for
+  // records with no trustworthy category. Real aircraft and military
+  // callsigns can share that shape (e.g. DRAG76), so a definite aircraft
+  // emitter category must take priority over this heuristic.
+  if (categoryIdentifiesAircraft(category)) return false;
+  // Some MLAT records omit emitter category even though they carry both a
+  // real registration and a valid 2–4-character ICAO aircraft type. That pair is stronger
+  // evidence than the callsign shape alone (e.g. G-CGNE / R44 / PIPE65),
+  // while explicit surface categories and TWR markers still win, and a
+  // descriptive non-ICAO type such as "TRUCK" still reaches the fallback.
+  if (identityFieldsIdentifyAircraft(registration, aircraftType)) return false;
+  const trimmedCallsign = markerFields[2];
+  if (trimmedCallsign && GROUND_VEHICLE_CALLSIGN_RE.test(trimmedCallsign)) return true;
   return false;
 }
 

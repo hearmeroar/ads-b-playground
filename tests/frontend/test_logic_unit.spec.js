@@ -18,11 +18,38 @@ test('looksLikeGroundVehicle flags TWR registration/aircraft-type', async ({ pag
   expect(result).toBe(true);
 });
 
+test('looksLikeGroundVehicle flags a TWR callsign when registration and type are absent', async ({ page }) => {
+  const result = await page.evaluate(() =>
+    looksLikeGroundVehicle({ category: null, registration: null, aircraftType: null, callsign: 'TWR' })
+  );
+  expect(result).toBe(true);
+});
+
 test('looksLikeGroundVehicle flags the airport-ground-vehicle callsign pattern', async ({ page }) => {
   const result = await page.evaluate(() =>
     looksLikeGroundVehicle({ category: null, registration: 'XYZ99', aircraftType: null, callsign: 'TXLU01' })
   );
   expect(result).toBe(true);
+});
+
+test('a definite rotorcraft category wins over the ground-vehicle callsign heuristic', async ({ page }) => {
+  const result = await page.evaluate(() =>
+    looksLikeGroundVehicle({
+      category: 'A7', registration: 'F-ZAJB',
+      aircraftType: 'AIRBUS HELICOPTERS EC-145', callsign: 'DRAG76',
+    })
+  );
+  expect(result).toBe(false);
+});
+
+test('registration plus aircraft type wins over the callsign heuristic when MLAT omits category', async ({ page }) => {
+  const result = await page.evaluate(() =>
+    looksLikeGroundVehicle({
+      category: null, registration: 'G-CGNE',
+      aircraftType: 'R44', callsign: 'PIPE65',
+    })
+  );
+  expect(result).toBe(false);
 });
 
 test('looksLikeGroundVehicle flags OpenSky surface-vehicle/obstacle categories', async ({ page }) => {

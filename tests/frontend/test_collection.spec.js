@@ -128,6 +128,44 @@ test('an aircraft with ADS-B category "C0" (or flagged as a ground vehicle) show
   expect(postCount).toBe(0);
 });
 
+test('an A7 rotorcraft with a ground-like callsign keeps its rotorcraft icon and can be saved', async ({ page }) => {
+  await page.route('**/api/adsbfi', (route) => route.fulfill({ json: { ac: [{
+    hex: '3b7ba7', flight: 'DRAG76', r: 'F-ZAJB', t: 'EC45',
+    desc: 'AIRBUS HELICOPTERS EC-145', alt_baro: 2500, gs: 105,
+    track: 120, category: 'A7', squawk: null,
+    lat: 51.47, lon: -0.46, dbFlags: 0, type: 'adsb_icao',
+  }] } }));
+
+  let postedBody = null;
+  await page.route('**/api/collection', (route) => {
+    if (route.request().method() === 'POST') {
+      postedBody = route.request().postDataJSON();
+      route.fulfill({ status: 201, json: { id: 'rotorcraft-card', ...postedBody, saved_at: 1752835200 } });
+    } else {
+      route.fulfill({ json: { cards: [] } });
+    }
+  });
+
+  await page.goto('/');
+  await page.waitForFunction(() => adsbfiMarkers.has('3b7ba7'));
+
+  const marker = page.locator('.plane-icon.rotorcraft-icon[data-color="#e53935"]');
+  await expect(marker).toHaveCount(1);
+  await expect(page.locator('.plane-icon.surface-obstacle-icon[data-color="#e53935"]')).toHaveCount(0);
+
+  await page.evaluate(() => {
+    const rotorcraftMarker = adsbfiMarkers.get('3b7ba7');
+    if (rotorcraftMarker && rotorcraftMarker._icon) rotorcraftMarker._icon.click();
+  });
+  await expect(page.locator('#sidebar-save-collection')).toBeVisible();
+  await page.click('#sidebar-save-collection');
+
+  expect(postedBody).not.toBeNull();
+  expect(postedBody.icao24).toBe('3b7ba7');
+  expect(postedBody.category_code).toBe('A7');
+  expect(postedBody.is_ground_vehicle).toBe(false);
+});
+
 test('opens the collection panel and renders cards grouped by category', async ({ page }) => {
   await page.route('**/api/collection', (route) => {
     if (route.request().method() === 'GET') {

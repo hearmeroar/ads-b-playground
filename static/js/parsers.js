@@ -132,9 +132,9 @@ function updateOpenSkyMarkers(states, excludeIds, radiusRecordsByHex, flightawar
     const winner = radiusEntries.length ? radiusEntries[radiusEntries.length - 1] : null;
     const extra = winner ? winner.data : null;
     const isGroundVehicle = looksLikeGroundVehicle({
-      category: s.category,
+      category: openskyCategoryIsMeaningful(s.category) ? s.category : (extra && extra.category),
       registration: extra && extra.registration,
-      aircraftType: extra && extra.aircraftType,
+      aircraftType: extra && (extra.icaoTypeCode || extra.aircraftType),
       callsign: s.callsign,
     });
     if (hideNonAircraft() && isGroundVehicle) continue;
@@ -171,6 +171,7 @@ function updateOpenSkyMarkers(states, excludeIds, radiusRecordsByHex, flightawar
     items.push({
       id: s.icao24, lat: s.lat, lon: s.lon, heading: s.true_track,
       info: info, fieldSources: fieldSources, registration: extra && extra.registration,
+      onGround: s.on_ground === true,
       isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
       // The ADS-B letter+digit code (e.g. "C0") only ever comes from a radius
       // source's enrichment — OpenSky's own numeric category isn't that code
@@ -405,7 +406,8 @@ function updateFlightRadar24Markers(aircraftList, excludeIds, radiusRecordsByHex
     if (!a.icao24) continue;
     if (!passesMotionFilter(a.onGround)) continue;
     const isGroundVehicle = looksLikeGroundVehicle({
-      category: a.category, registration: a.registration, aircraftType: a.aircraftType, callsign: a.callsign,
+      category: a.category, registration: a.registration,
+      aircraftType: a.icaoTypeCode || a.aircraftType, callsign: a.callsign,
     });
     if (hideNonAircraft() && isGroundVehicle) continue;
     const categoryGroup = categoryGroupFor({ adsbExchangeCategory: a.category });
@@ -420,6 +422,7 @@ function updateFlightRadar24Markers(aircraftList, excludeIds, radiusRecordsByHex
     items.push({
       id: a.icao24, lat: a.lat, lon: a.lon, heading: a.track,
       info: info, fieldSources: fieldSources, registration: a.registration,
+      onGround: a.onGround === true,
       isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
       categoryCode: a.category,
     });
@@ -510,7 +513,8 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, s
     if (!isValidCoordinate(a.lat, a.lon)) continue;
     if (!passesMotionFilter(a.onGround)) continue;
     const isGroundVehicle = looksLikeGroundVehicle({
-      category: a.category, registration: a.registration, aircraftType: a.aircraftType, callsign: a.callsign,
+      category: a.category, registration: a.registration,
+      aircraftType: a.icaoTypeCode || a.aircraftType, callsign: a.callsign,
     });
     if (hideNonAircraft() && isGroundVehicle) continue;
     const categoryGroup = categoryGroupFor({ adsbExchangeCategory: a.category });
@@ -533,6 +537,7 @@ function updateRadiusSourceMarkers(markerMap, aircraftList, excludeIds, color, s
     items.push({
       id: a.icao24, lat: a.lat, lon: a.lon, heading: a.track,
       info: info, fieldSources: fieldSources, registration: a.registration,
+      onGround: a.onGround === true,
       isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
       categoryCode: a.category,
     });
@@ -559,6 +564,7 @@ function updateFlightAwareMarkers(flights, excludedCallsigns) {
     items.push({
       id: f.fa_flight_id, lat: f.lat, lon: f.lon, heading: f.track,
       info: info, fieldSources: fieldSources, registration: null,
+      onGround: f.onGround === true,
       isGroundVehicle: false, categoryGroup: 'unknown',
     });
   }

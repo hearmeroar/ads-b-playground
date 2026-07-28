@@ -2751,14 +2751,18 @@ final pass still hides it, so the empty map and error line remain reachable.
   vehicles/obstacles/reference beacons reported alongside real aircraft —
   category in the surface-vehicle/obstacle range (OpenSky 16-20, ADSBExchange
   C1-C5), a known non-aircraft registration/type marker (`GROUND_VEHICLE_MARKERS`,
-  currently just `"TWR"`), or a callsign matching the airport-ground-vehicle
-  pattern `^[A-Z]{4}\d{2}$` (e.g. "TXLU01"). **Off by default** — ground
+  currently just `"TWR"`), or — only when no definite aircraft emitter
+  category is present — a callsign matching the airport-ground-vehicle
+  pattern `^[A-Z]{4}\d{2}$` (e.g. "TXLU01"). A known aircraft category
+  takes priority over that last, deliberately weak heuristic because real
+  aircraft/military callsigns can share the shape (e.g. rotorcraft
+  `"DRAG76"` with category `"A7"`). **Off by default** — ground
   stations render as their own recognizable tower icon (see below) rather
   than being filtered away, so there's no need to hide them by default the
   way the old warning-triangle rendering arguably warranted; toggling it on
   re-runs `poll()` immediately like the other filters. Items it flags (whether shown
   or hidden) carry `isGroundVehicle: true` on their render item; `iconFor()`
-  draws `towerIcon()` (a cell-tower glyph, fixed neutral grey — not
+  draws `towerIcon()` (a cell-tower glyph, theme-aware neutral grey — not
   source-colored, since these aren't really an aircraft "source" reading in
   the same sense) for any item with `isGroundVehicle: true` OR
   `categoryGroup === 'surface_obstacle'` (the `isGroundVehicle` check on its
@@ -2766,6 +2770,15 @@ final pass still hides it, so the empty map and error line remain reachable.
   matches whose category is absent/unknown) instead of the plane glyph — so
   if the filter is turned off to inspect them, they don't visually read as
   aircraft.
+- **Real aircraft on the ground are grey, without becoming ground
+  vehicles:** each source's definite `onGround`/`on_ground` flag is carried
+  onto the render item. `categoryIcon()` adds `.on-ground` while that flag
+  is true, and CSS paints the existing aircraft/rotorcraft/etc. category
+  glyph with the same theme-aware `--surface-obstacle-color`. The next
+  `syncMarkers()` poll removes that class as soon as the source reports the
+  aircraft airborne again, restoring uniform or per-source paint. This is
+  visual state only: the category glyph, collection eligibility, and normal
+  aircraft `markerPane` all remain unchanged.
 - **Category dropdown** (`#category-filter`) is a hand-built component (plain
   `<div>`s, not a native `<select>`) so it can be fully styled and carry a
   small inline-SVG icon per option (`CATEGORY_ICON_SVGS`/`categoryIconHtml()`).
@@ -2984,7 +2997,8 @@ final pass still hides it, so the empty map and error line remain reachable.
     for "surface vehicle, no category info whatsoever". Separately, an
     aircraft flagged by `looksLikeGroundVehicle()` (`state-filters.js` —
     a known ground-vehicle registration/type marker like `"TWR"`, or a
-    callsign matching the airport-ground-vehicle pattern) can be a
+    callsign matching the airport-ground-vehicle pattern when no definite
+    aircraft category contradicts that weak heuristic) can be a
     non-aircraft even with *no* `"C0"` category code at all (e.g. an
     OpenSky-only ground beacon with an empty/absent category, still caught
     by the registration heuristic) — so the two checks are independent,

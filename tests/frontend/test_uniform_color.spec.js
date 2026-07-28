@@ -26,6 +26,21 @@ test('uniform mode renders markers in bright yellow with dark outline', async ({
   expect(dataColor).toBe('#1a73e8');
 });
 
+test('uniform mode keeps surface objects theme-aware neutral grey', async ({ page }) => {
+  const surfacePaths = page.locator('.plane-icon.surface-obstacle-icon svg path');
+
+  await expect(surfacePaths).toHaveCount(2);
+  expect(await surfacePaths.evaluateAll(
+    (paths) => paths.map((path) => getComputedStyle(path).fill)
+  )).toEqual(['rgb(100, 116, 139)', 'rgb(100, 116, 139)']);
+
+  await page.click('#theme-mode-toggle .seg-btn[data-value="dark"]');
+  await expect(surfacePaths.first()).toHaveCSS('fill', 'rgb(156, 163, 175)');
+  expect(await surfacePaths.evaluateAll(
+    (paths) => paths.map((path) => getComputedStyle(path).fill)
+  )).toEqual(['rgb(156, 163, 175)', 'rgb(156, 163, 175)']);
+});
+
 test('toggling off restores per-source colors', async ({ page }) => {
   // Start with uniform mode ON (default)
   const toggle = await page.$('#toggle-uniform-color');
