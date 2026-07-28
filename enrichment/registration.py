@@ -88,7 +88,17 @@ def lookup_country_by_registration(registration):
             candidates.append(before + after[0])
         candidates.append(before)
     else:
-        candidates.extend([reg[:3], reg[:2], reg[:1]])
+        # Short military/government serials often look like "ZM304",
+        # "ZM337", or "XZ1234": a 2-letter chunk followed by digits, but
+        # that leading chunk is not a civil nationality mark. Treat those
+        # as non-registrations so we don't mislabel British training
+        # aircraft (or similar government serials) as a country just
+        # because the serial happens to start with two letters from the
+        # prefix table.
+        if len(reg) >= 5 and reg[:2].isalpha() and reg[2:].isdigit() and len(reg[2:]) >= 3:
+            candidates.append(reg[:3])
+        else:
+            candidates.extend([reg[:3], reg[:2], reg[:1]])
 
     for prefix in candidates:
         iso = PREFIX_TO_ISO.get(prefix)

@@ -105,6 +105,14 @@ def test_registration_prefix_israel():
     assert result["country"] == "Israel"
 
 
+def test_registration_prefix_skips_short_military_serials():
+    # Short military/government serials can look like a 2-letter country
+    # prefix followed by digits ("ZM304", "ZM337"), but that is not a civil
+    # nationality mark and must not be forced into a country.
+    assert lookup_country_by_registration("ZM304") is None
+    assert lookup_country_by_registration("ZM337") is None
+
+
 def test_registration_prefix_composite_marks_hong_kong_macau():
     # Hong Kong ("B-H...") and Macau ("B-M...") both fall under China's bare
     # "B" mark but get their own sub-block after the dash — the more specific
@@ -578,6 +586,15 @@ def test_route_query_params_feed_the_fallback_tiers(client):
     assert data["country"]["source"] == "registration_prefix"  # outranks callsign_decode
     assert data["operator"]["value"] == "Smartwings"  # from callsign_decode, no icao24 record here
     assert data["manufacturer"]["value"] == "Boeing"  # from aircraft_type_db, no icao24 record here
+
+
+def test_route_short_military_serial_registration_does_not_claim_a_country(client):
+    # Real-world style military serial: the registration-like tail number
+    # should not be treated as a civil nationality mark just because it
+    # starts with two letters from the prefix table.
+    resp = client.get("/api/identity/ffffff?registration=ZM337&callsign=CWL132")
+    data = resp.get_json()
+    assert data["country"] is None
 
 
 def test_route_operator_needs_corroboration_round_trips(client):
