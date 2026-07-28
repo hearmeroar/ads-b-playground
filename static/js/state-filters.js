@@ -581,7 +581,12 @@ zoneSearchInput.addEventListener('input', () => {
 });
 zoneSearchInput.addEventListener('click', (e) => e.stopPropagation());
 zoneSearchInput.addEventListener('focus', () => {
-  zoneSearchInput.select();
+  // A pointer click continues after the focus event and otherwise moves the
+  // caret back to the click position, undoing select(). Run after that click
+  // has completed so the selected text remains ready to overwrite.
+  requestAnimationFrame(() => {
+    if (document.activeElement === zoneSearchInput) zoneSearchInput.select();
+  });
   ensurePopularAirportsLoaded().then((airports) => {
     if (airports) {
       renderZoneSearchResults(airports);

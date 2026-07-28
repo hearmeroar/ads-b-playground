@@ -108,6 +108,13 @@ test('refocusing the zone search re-selects text and re-shows popular airports',
   await page.locator('body').click({ position: { x: 4, y: 4 } });
   await page.click('#zone-search-input');
 
+  // Wait for both the popular-airports render and the next frame. A normal
+  // mouse click places the caret after `focus`; selection must be restored
+  // after that browser default action, not merely during the focus handler.
+  await expect(page.locator('#zone-search')).toHaveClass(/open/);
+  await expect(page.locator('#zone-search-results .dropdown-option')).toHaveCount(2);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+
   const selection = await page.evaluate(() => {
     const input = document.getElementById('zone-search-input');
     return {
@@ -121,8 +128,6 @@ test('refocusing the zone search re-selects text and re-shows popular airports',
   expect(selection.active).toBe(true);
   expect(selection.start).toBe(0);
   expect(selection.end).toBe(selection.valueLength);
-  await expect(page.locator('#zone-search')).toHaveClass(/open/);
-  await expect(page.locator('#zone-search-results .dropdown-option')).toHaveCount(2);
   expect(popularCounts.n).toBe(1);
 });
 
