@@ -21,27 +21,21 @@ async function selectAircraft(page, hex, markerMapName) {
 
 function badgeSourcesForLabel(page, label) {
   return page.evaluate((lbl) => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
-    if (!b) return null;
-    const sources = [];
-    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
-      if (node.nodeType === 1 && node.classList.contains('source-badge')) sources.push(node.dataset.source);
-      node = node.nextSibling;
-    }
-    return sources;
+    const labels = [...document.querySelectorAll('#sidebar-details .detail-label')];
+    const labelEl = labels.find((el) =>
+      el.querySelector('b')?.textContent === lbl || el.textContent.trim() === lbl);
+    if (!labelEl) return null;
+    return [...labelEl.closest('.detail-row').querySelectorAll('.detail-value .source-badge')]
+      .map((badge) => badge.dataset.source);
   }, label);
 }
 
 async function clickBadge(page, label, index = 0) {
   await page.evaluate(({ lbl, index }) => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
-    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-    const badges = [];
-    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
-      if (node.nodeType === 1 && node.classList.contains('source-badge')) badges.push(node);
-      node = node.nextSibling;
-    }
+    const labels = [...document.querySelectorAll('#sidebar-details .detail-label')];
+    const labelEl = labels.find((el) =>
+      el.querySelector('b')?.textContent === lbl || el.textContent.trim() === lbl);
+    const badges = [...labelEl.closest('.detail-row').querySelectorAll('.detail-value .source-badge')];
     badges[index].click();
   }, { lbl: label, index });
   await page.waitForTimeout(100);
@@ -73,7 +67,7 @@ test('dev mode off: resolved fields render plain, unresolved render "Unknown", n
   expect(sidebarText).toContain('737-800');
   expect(sidebarText).toContain('Operator?Unknown');
   expect(sidebarText).toContain('Registration Country?Unknown');
-  expect(sidebarText).toContain('Year built Unknown');
+  expect(sidebarText).toContain('Year builtUnknown');
 
   const badgeCount = await page.evaluate(() => document.querySelectorAll('#sidebar-details .source-badge').length);
   expect(badgeCount).toBe(0);
@@ -140,13 +134,7 @@ test('a live-sourced country still gets a flag when the backend recognizes its n
 
   const flagPresent = await page.evaluate(() => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration Country');
-    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-    while (node) {
-      if (node.nodeType === 1 && node.classList.contains('fi')) return node.className;
-      if (node.nodeType === 1 && node.tagName === 'BR') break;
-      node = node.nextSibling;
-    }
-    return null;
+    return b.closest('.detail-row').querySelector('.detail-value .fi')?.className ?? null;
   });
   expect(flagPresent).toBe('fi fi-cz');
 
@@ -172,13 +160,7 @@ test('a Flywme-resolved Operator Country (via callsign_decode) fills in when ads
   function flagClassFor(label) {
     return page.evaluate((lbl) => {
       const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
-      let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-      while (node) {
-        if (node.nodeType === 1 && node.classList.contains('fi')) return node.className;
-        if (node.nodeType === 1 && node.tagName === 'BR') break;
-        node = node.nextSibling;
-      }
-      return null;
+      return b.closest('.detail-row').querySelector('.detail-value .fi')?.className ?? null;
     }, label);
   }
 
@@ -222,11 +204,11 @@ test('Registration is excluded from the Unknown-treatment: it\'s the header now,
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Registration Country? Unknown');
-  expect(sidebarText).toContain('Operator? Unknown');
-  expect(sidebarText).toContain('Manufacturer Unknown');
-  expect(sidebarText).toContain('Model Unknown');
-  expect(sidebarText).toContain('Year built Unknown');
+  expect(sidebarText).toContain('Registration Country?Unknown');
+  expect(sidebarText).toContain('Operator?Unknown');
+  expect(sidebarText).toContain('ManufacturerUnknown');
+  expect(sidebarText).toContain('ModelUnknown');
+  expect(sidebarText).toContain('Year builtUnknown');
   // Registration has a live value here, and lives in #sidebar-header (the
   // masthead title) rather than an identityRow — no "Unknown" treatment
   // applies to it at all any more, by construction.
@@ -368,8 +350,8 @@ test('surface-vehicle aircraft: null enrichment fields render as dashes in dev m
   await selectAircraft(page, '474806', 'adsbfi');
 
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Operator? —');  // Dev mode shows dashes for missing fields
-  expect(sidebarText).toContain('Registration Country? —');
+  expect(sidebarText).toContain('Operator?—');  // Dev mode shows dashes for missing fields
+  expect(sidebarText).toContain('Registration Country?—');
 
   const operatorBadges = await badgeSourcesForLabel(page, 'Operator');
   expect(operatorBadges).toEqual([]);

@@ -42,22 +42,14 @@ test('dev mode shows a dash for missing fields and never hides a group', async (
   expect(sidebarText).toContain('—'); // dash placeholder present somewhere
 });
 
-// Rows aren't individually wrapped elements (just <b>label:</b>
-// value<badge><badge> concatenated with <br> inside one .detail-group div),
-// so this walks nextSibling from the row's own <b> label, collecting every
-// .source-badge up to the row-separating <br> — the same scoping trick the
-// row-badge assertions below rely on.
+// Preline renders every field as a .detail-row with distinct label/value
+// spans, so scope provenance badges to that row's value cell.
 function badgeSourcesForLabel(page, label) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    const sources = [];
-    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
-      if (node.nodeType === 1 && node.classList.contains('source-badge')) sources.push(node.dataset.source);
-      node = node.nextSibling;
-    }
-    return sources;
+    return [...b.closest('.detail-row').querySelectorAll('.detail-value .source-badge')]
+      .map((badge) => badge.dataset.source);
   }, label);
 }
 
@@ -79,9 +71,7 @@ test('a field reported by only one source shows exactly one badge, with a click-
 
   await page.evaluate(() => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration Country');
-    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-    while (node && !(node.nodeType === 1 && node.classList.contains('source-badge'))) node = node.nextSibling;
-    node.click();
+    b.closest('.detail-row').querySelector('.detail-value .source-badge').click();
   });
   await page.waitForTimeout(100);
 

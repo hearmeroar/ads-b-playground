@@ -152,7 +152,7 @@ test.describe('Google sign-in button theming', () => {
 
     const lightBg = await page.evaluate(() =>
       getComputedStyle(document.getElementById('google-signin-btn')).backgroundColor);
-    expect(lightBg).toBe('rgb(255, 255, 255)');
+    expect(lightBg).toBe('rgba(255, 255, 255, 0.96)');
 
     await page.click('#theme-mode-toggle .seg-btn[data-value="dark"]');
     await page.waitForTimeout(300);

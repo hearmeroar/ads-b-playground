@@ -50,8 +50,8 @@ test('rotorcraft: an unconfirmed operator/operator_country renders as "Unknown" 
   await selectOpenSky(page, 'bbbbbb');
 
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Operator? Unknown');
-  expect(sidebarText).toContain('Operator Country? Unknown');
+  expect(sidebarText).toContain('Operator?Unknown');
+  expect(sidebarText).toContain('Operator Country?Unknown');
   expect(sidebarText).not.toContain('Mauritania');
 
   const badgeCount = await page.evaluate(() => document.querySelectorAll('#sidebar-details .source-badge').length);
@@ -105,12 +105,7 @@ test('non-rotorcraft: an unconfirmed operator/operator_country still renders nor
 
   const detailAttr = await page.evaluate(() => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Operator');
-    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
-      if (node.nodeType === 1 && node.classList.contains('source-badge')) return node.dataset.detail;
-      node = node.nextSibling;
-    }
-    return null;
+    return b.closest('.detail-row').querySelector('.detail-value .source-badge')?.dataset.detail ?? null;
   });
   expect(detailAttr).toContain('unconfirmed');
 });

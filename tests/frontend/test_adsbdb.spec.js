@@ -18,13 +18,7 @@ function rowText(page, label) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    let text = '';
-    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
-      if (node.nodeType === 3) text += node.textContent;
-      node = node.nextSibling;
-    }
-    return text.trim();
+    return b.closest('.detail-row')?.querySelector('.detail-value')?.textContent.trim() ?? null;
   }, label);
 }
 
@@ -32,13 +26,7 @@ function flagClassForLabel(page, label) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-    while (node) {
-      if (node.nodeType === 1 && node.classList.contains('fi')) return node.className;
-      if (node.nodeType === 1 && node.tagName === 'BR') break;
-      node = node.nextSibling;
-    }
-    return null;
+    return b.closest('.detail-row')?.querySelector('.detail-value .fi')?.className ?? null;
   }, label);
 }
 
@@ -46,13 +34,8 @@ function badgeSourcesForLabel(page, label) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    const sources = [];
-    let node = (b.closest('.identity-label-wrap') || b).nextSibling;
-    while (node && !(node.nodeType === 1 && node.tagName === 'BR')) {
-      if (node.nodeType === 1 && node.classList.contains('source-badge')) sources.push(node.dataset.source);
-      node = node.nextSibling;
-    }
-    return sources;
+    return [...b.closest('.detail-row').querySelectorAll('.detail-value .source-badge')]
+      .map((badge) => badge.dataset.source);
   }, label);
 }
 
@@ -202,8 +185,7 @@ test('Registered Owner shows literal "Unknown" when adsbdb has nothing, like oth
   await page.waitForSelector('.leaflet-marker-icon');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
-  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Registered Owner? Unknown');
+  expect(await rowText(page, 'Registered Owner')).toBe('Unknown');
 });
 
 // adsbdb's url_photo consistently 404s in practice (verified live against

@@ -27,9 +27,16 @@ async function selectAircraftAndWaitForRoute(page, hex) {
   await page.waitForTimeout(100);
 }
 
+async function isolateTestAircraftOnOpenSky(page) {
+  // aaaaaa also exists in the higher-priority adsb.fi fixture. Remove the
+  // radius-source copy so the OpenSky marker this spec exercises is rendered.
+  await page.route('**/api/adsbfi', (route) => route.fulfill({ json: { ac: [] } }));
+}
+
 test.describe('route card arrow animation (climbing/descending)', () => {
-  test.skip('climbing aircraft animates the arrow with route-arrow-climbing class', async ({ page }) => {
+  test('climbing aircraft animates the arrow with route-arrow-climbing class', async ({ page }) => {
     await mockAllSources(page);
+    await isolateTestAircraftOnOpenSky(page);
     // Override /api/adsbdb to inject the test route with aaaaaa
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: { icao24: 'aaaaaa' },
@@ -38,7 +45,7 @@ test.describe('route card arrow animation (climbing/descending)', () => {
     // Override /api/states to inject a climbing aircraft (vertical_rate = 5.0 m/s at index 11)
     await page.route('**/api/states', (route) => route.fulfill({ json: {
       states: [
-        ['aaaaaa', 'TES100  ', 'Testland', 0, 0, 44.0, 21.0, 10000, false, 230, 90, 5.0, 0, null, 0, false, 0, 2],
+        ['aaaaaa', 'TES100  ', 'Testland', 0, 0, 21.0, 44.0, 10000, false, 230, 90, 5.0, 0, null, 0, false, 0, 2],
       ],
       globallyObservedAc: 1,
     } }));
@@ -60,8 +67,9 @@ test.describe('route card arrow animation (climbing/descending)', () => {
     expect(result.animationName).toBe('route-arrow-climb');
   });
 
-  test.skip('descending aircraft animates the arrow with route-arrow-descending class', async ({ page }) => {
+  test('descending aircraft animates the arrow with route-arrow-descending class', async ({ page }) => {
     await mockAllSources(page);
+    await isolateTestAircraftOnOpenSky(page);
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: { icao24: 'aaaaaa' },
       flightroute: ROUTE_FIXTURE,
@@ -69,7 +77,7 @@ test.describe('route card arrow animation (climbing/descending)', () => {
     // Vertical rate = -5.0 m/s (descending) at index 11
     await page.route('**/api/states', (route) => route.fulfill({ json: {
       states: [
-        ['aaaaaa', 'TES100  ', 'Testland', 0, 0, 44.0, 21.0, 10000, false, 230, 90, -5.0, 0, null, 0, false, 0, 2],
+        ['aaaaaa', 'TES100  ', 'Testland', 0, 0, 21.0, 44.0, 10000, false, 230, 90, -5.0, 0, null, 0, false, 0, 2],
       ],
       globallyObservedAc: 1,
     } }));
@@ -91,8 +99,9 @@ test.describe('route card arrow animation (climbing/descending)', () => {
     expect(result.animationName).toBe('route-arrow-descend');
   });
 
-  test.skip('level aircraft (or no vertical rate) keeps the arrow static at 90°', async ({ page }) => {
+  test('level aircraft (or no vertical rate) keeps the arrow static at 90°', async ({ page }) => {
     await mockAllSources(page);
+    await isolateTestAircraftOnOpenSky(page);
     await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
       aircraft: { icao24: 'aaaaaa' },
       flightroute: ROUTE_FIXTURE,
@@ -100,7 +109,7 @@ test.describe('route card arrow animation (climbing/descending)', () => {
     // Vertical rate = 0 (inside the level band of ±0.5 m/s)
     await page.route('**/api/states', (route) => route.fulfill({ json: {
       states: [
-        ['aaaaaa', 'TES100  ', 'Testland', 0, 0, 44.0, 21.0, 10000, false, 230, 90, 0, 0, null, 0, false, 0, 2],
+        ['aaaaaa', 'TES100  ', 'Testland', 0, 0, 21.0, 44.0, 10000, false, 230, 90, 0, 0, null, 0, false, 0, 2],
       ],
       globallyObservedAc: 1,
     } }));
