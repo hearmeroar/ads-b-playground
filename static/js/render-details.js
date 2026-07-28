@@ -329,15 +329,15 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     const has = value != null && value !== '';
     if (!has && !currentDevMode) return null;
     const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
-    return '<b>' + label + ':</b> ' + (has ? value : dash) + badge;
+    return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + ':</span><span class="detail-value">' + (has ? value : dash) + badge + '</span></div>';
   }
   // Same "always render in dev mode" treatment for the two hardcoded
   // emergency/alert rows, which carry special red styling instead of going
   // through detailRow's generic '<b>label:</b> value' format.
   function specialRow(label, isSet, htmlWhenSet, fieldKey) {
     if (!isSet && !currentDevMode) return null;
-    if (!isSet) return '<b>' + label + ':</b> ' + dash;
-    return htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '');
+    if (!isSet) return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + ':</span><span class="detail-value">' + dash + '</span></div>';
+    return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + ':</span><span class="detail-value detail-value-special">' + htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '') + '</span></div>';
   }
   // A callsign-decoded operator/operator_country whose claimed country
   // conflicts with the aircraft's own ICAO24 hex-block country is withheld
@@ -374,14 +374,14 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     // lighter weight/smaller size than a plain detailRow <b> — four-plus
     // rows of full-bold labels each now carrying their own icon read as too
     // heavy/loud as a block.
-    return '<span class="identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span> ' + (has ? value : (isGroundVehicle && currentDevMode ? dash : 'Unknown')) + badge + unconfirmedTagHtml(fieldKey);
+    return '<div class="detail-row detail-row-identity"><span class="detail-label identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span><span class="detail-value">' + (has ? value : (isGroundVehicle && currentDevMode ? dash : 'Unknown')) + badge + unconfirmedTagHtml(fieldKey) + '</span></div>';
   }
   function renderGroup(title, rows, iconKey) {
     const filtered = rows.filter((r) => r != null);
     if (!filtered.length) return '';
     const icon = iconKey && GROUP_ICONS[iconKey] ? '<span class="detail-group-icon">' + GROUP_ICONS[iconKey] + '</span>' : '';
-    return '<div class="detail-group"><div class="detail-group-title">' + icon + title + '</div>' +
-      filtered.join('<br>') + '</div>';
+    return '<div class="detail-group"><div class="detail-group-title">' + icon + title + '</div><div class="detail-group-body">' +
+      filtered.join('') + '</div></div>';
   }
   // Flag always leads the country name, rendered via flagHtml() from
   // info.countryIso. Only ever present when country was resolved via

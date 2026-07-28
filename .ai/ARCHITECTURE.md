@@ -2,6 +2,12 @@
 
 This is a **map**, not a narrative. Read CLAUDE.md for full detail and rationale.
 
+## UI layer
+
+- The frontend uses the Preline UI framework as the base component layer for static assets.
+- `static/styles/app.css` carries the project-specific overrides and the current card/panel system.
+- `static/style.css` remains as the legacy compatibility layer for older selectors and load-order-sensitive rules.
+
 ## Data sources (eight live feeds plus lazy adsbdb enrichment)
 
 1. **OpenSky Network** (`/api/states`, `/api/track`) — 10s cache, own quota system (daily limit + per-track limit). Shares most fields with radius sources; ICAO24 priority below the free/cheap radius feeds. Falls back to anonymous if auth token unavailable. Circuit-breaker on outage (30s cooldown). (CLAUDE.md § "OpenSky endpoints")

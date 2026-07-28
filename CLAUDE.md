@@ -158,9 +158,13 @@ that per-poll set — it's a lazy, click-only lookup for identity/route
 enrichment with no markers of its own (see "adsbdb.com" further below).
 Backend logic lives in `app.py`; the frontend is
 `static/index.html` (markup) plus `static/js/*.js` (ten plain classic
-`<script src>` files, loaded in a fixed order) and `static/style.css` — no
-framework, no build step, all of it just plain `<link>`/`<script>`-included
-static files. The JS files share one global scope (deliberately NOT ES
+`<script src>` files, loaded in a fixed order) and a Preline-based static
+UI layer (`static/styles/preline/` + `static/js/vendor/preline.js`) that is
+overridden by `static/styles/app.css` — still no build step, all of it just
+plain `<link>`/`<script>`-included static files. The UI migration already
+has the shared card/panel tokens in place, the collection cards are on the
+new surface/radius/shadow scale, and the route/detail/gallery cards now use
+the same visual language. The JS files share one global scope (deliberately NOT ES
 modules: the Playwright tests reach top-level names like `openskyMarkers`
 via `page.evaluate`, and load-time statements rely on the original
 execution order), so their `<script>` order in `index.html` is load-bearing:
@@ -185,9 +189,9 @@ keeps working with no third-party uptime dependency, and the Playwright
 suite no longer needs network access for the page to boot.
 The `enrichment/` package (see Identity enrichment below) is the one
 exception to "`app.py` is the whole backend" — a small set of local static
-lookup modules, still no framework/database, just organized into their own
-directory since they're a genuinely different kind of logic (data lookup,
-not HTTP proxying) from everything else in `app.py`.
+lookup modules, still no framework/database for backend state, just
+organized into their own directory since they're a genuinely different kind
+of logic (data lookup, not HTTP proxying) from everything else in `app.py`.
 
 ## Commands
 
@@ -3677,10 +3681,12 @@ scale ever change again.
 - All UI text and code comments are in English, regardless of the language
   used in conversation.
 - Keep this to a handful of plain files (backend, markup+JS, stylesheet) —
-  no framework, no build step. This is an intentional MVP constraint, not
-  an oversight. `static/style.css` is a `<link>`ed stylesheet, not a build
-  artifact, so it doesn't violate "no build step." Not a hard requirement,
-  though — the project isn't attached to staying build-step-free forever.
+  Preline provides the component foundation for the UI, while the project
+  still keeps a no-build-step frontend. This is an intentional MVP
+  constraint, not an oversight. `static/style.css` is a `<link>`ed
+  stylesheet, not a build artifact, so it doesn't violate "no build step."
+  Not a hard requirement, though — the project isn't attached to staying
+  build-step-free forever.
   If a future need (bundling, minification, TypeScript, whatever) makes a
   build step the better tradeoff, adopt one; this convention just reflects
   that nothing so far has justified it. **"No database" was the same kind

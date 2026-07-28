@@ -1,15 +1,16 @@
 # ADS-B Playground
 
 A single-page live aircraft tracker covering a configurable geographic region.
-No build step — a Flask backend proxies five free ADS-B data sources plus
-FlightAware AeroAPI, and a static Leaflet page polls them and renders
-aircraft as color-coded markers. The no-build-step choice fits the
-project's current size and isn't a hard rule — it's fine to introduce one
-later if a real need for it shows up. Durable state (accounts, saved
-collections, the resolved-identity cache) lives in a single embedded
-SQLite file (`storage.py`) — no separate database server, just Python's
-standard library; every short-lived request cache elsewhere stays a plain
-in-memory dict.
+The frontend uses the Preline UI framework as the shared static component
+layer, with project-specific overrides in `static/styles/app.css`. A Flask
+backend proxies five free ADS-B data sources plus FlightAware AeroAPI, and a
+static Leaflet page polls them and renders aircraft as color-coded markers.
+The no-build-step choice fits the project's current size and isn't a hard
+rule — it's fine to introduce one later if a real need for it shows up.
+Durable state (accounts, saved collections, the resolved-identity cache)
+lives in a single embedded SQLite file (`storage.py`) — no separate database
+server, just Python's standard library; every short-lived request cache
+elsewhere stays a plain in-memory dict.
 
 ## Features
 
@@ -198,18 +199,22 @@ in-memory dict.
   anonymous access.
 - **Aircraft collection** — sign in with Google, then save any aircraft
   you're looking at (a bookmark toggle in the sidebar, filled once saved) as
-  a card: registration, type, category, operator (with its airline logo/
-  country flag), manufacturer/model, and a larger photo — all snapshotted at
-  save time so it stays meaningful long after the aircraft is gone from any
-  live feed — plus when and where it was seen, including the nearest
-  airport at that position (resolved locally against a vendored
+  a card. The collection cards have been moved onto the same mature card
+  language used elsewhere in the app: Preline-driven surfaces, stronger
+  light/dark contrast, unified radii, layered shadows, clearer title/meta
+  hierarchy, and calmer controls. Each saved snapshot still includes
+  registration, type, category, operator (with its airline logo/country
+  flag), manufacturer/model, and a larger photo — all snapshotted at save
+  time so it stays meaningful long after the aircraft is gone from any live
+  feed — plus when and where it was seen, including the nearest airport at
+  that position (resolved locally against a vendored
   [OpenFlights](https://github.com/jpatokal/openflights) airports database,
-  no external API call). One card per aircraft — re-saving just
-  refreshes it. Browse saved cards in a fullscreen "My collection" panel
-  (opened from the HUD), correctly grouped by category (light/small/large/
-  heavy/etc). Removing a card is immediate but forgiving — it dims in place
-  with an Undo action for the rest of the session. Aircraft with no usable
-  category info at all (ADS-B code "C0") can't be saved.
+  no external API call). One card per aircraft — re-saving just refreshes
+  it. Browse saved cards in a fullscreen "My collection" panel (opened from
+  the HUD), correctly grouped by category (light/small/large/heavy/etc).
+  Removing a card is immediate but forgiving — it dims in place with an Undo
+  action for the rest of the session. Aircraft with no usable category info
+  at all (ADS-B code "C0") can't be saved.
 
 ## Quick start
 
@@ -347,8 +352,12 @@ A handful of plain files carry all the logic:
 - `static/js/` — the frontend logic (Leaflet map, polling, marker rendering,
   filters, photo/track features, Google sign-in + the aircraft collection)
   as ten plain classic `<script src>` files loaded in a fixed order — still
-  no framework and no build step.
-- `static/style.css` — the frontend's styling, linked from `index.html`.
+  no JavaScript framework and no build step.
+- `static/style.css` — legacy frontend styling, linked from `index.html` for
+  compatibility with older selectors and load-order-sensitive rules.
+- `static/styles/app.css` — the active app-level override layer that adapts
+  the Preline base UI to this project and carries the current card/panel
+  language, tokens, and collection-card redesign.
 - `static/flag-icons/` — the [flag-icons](https://github.com/lipis/flag-icons)
   SVG library (CSS + `flags/4x3/`), vendored as plain files (via `npm install
   flag-icons` then a one-time copy — no runtime npm dependency, no build step).

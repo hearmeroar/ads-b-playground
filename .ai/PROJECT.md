@@ -2,11 +2,12 @@
 
 ## What this is
 
-A **single-tenant live aircraft tracker** built with no framework, no build step, and no signup/API-key data sources — Flask proxies seven independent data feeds (OpenSky, adsb.fi, adsb.lol, adsb.one, airplanes.live, FlightAware AeroAPI, FlightRadar24, plus adsbdb.com for lazy enrichment) to a static Leaflet map and a vanilla-JS frontend. Users can save favorite aircraft to a personal collection (Google OAuth login, SQLite persistence). All components share one source of truth: `AREA_CENTER` (configurable via zone-search, 220 nm radius), though the Airports layer extends globally.
+A **single-tenant live aircraft tracker** built around the Preline UI framework for its static component layer, with no build step and no signup/API-key data sources — Flask proxies seven independent data feeds (OpenSky, adsb.fi, adsb.lol, adsb.one, airplanes.live, FlightAware AeroAPI, FlightRadar24, plus adsbdb.com for lazy enrichment) to a static Leaflet map and a vanilla-JS frontend. Users can save favorite aircraft to a personal collection (Google OAuth login, SQLite persistence). All components share one source of truth: `AREA_CENTER` (configurable via zone-search, 220 nm radius), though the Airports layer extends globally.
 
 **Goals:**
 - Operate offline (all external data proxied; Leaflet/tiles vendored locally).
-- Scale to multi-user without framework overhead (SQLite + gunicorn workers).
+- Keep the UI consistent through Preline primitives plus local overrides, while preserving the no-build frontend.
+- Scale to multi-user without backend framework overhead (SQLite + gunicorn workers).
 - Demonstrate live data collection from multiple independent services and graceful degradation when any fail.
 - Stay maintainable by a single developer (no complex abstraction, clear data flow, comprehensive inline documentation in CLAUDE.md).
 
@@ -44,7 +45,8 @@ These are lines that must never be crossed without explicit review and documente
 │   └── data/                # Vendored CSVs (opensky_year_built.json, ourairports.json)
 ├── static/
 │   ├── index.html           # Markup (one page, no SPA framework)
-│   ├── style.css            # All styling (no SCSS, no build)
+│   ├── style.css            # Legacy styling layer (compatibility / load-order-sensitive rules)
+│   ├── styles/app.css       # Active app-level overrides on top of the Preline base layer
 │   ├── js/
 │   │   ├── map-init.js      # Leaflet setup, basemaps, weather, scan-radius rings
 │   │   ├── constants.js     # Shared constants (source colors, units, icons)

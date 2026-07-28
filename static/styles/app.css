@@ -1,0 +1,1232 @@
+:root {
+  --app-font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --app-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --app-text-xs: 11px;
+  --app-text-sm: 12px;
+  --app-text-md: 14px;
+  --app-text-lg: 16px;
+  --app-text-xl: 18px;
+  --app-text-2xl: 28px;
+  --app-control-h: 36px;
+  --app-control-h-sm: 32px;
+  --app-control-radius: 12px;
+  --app-control-radius-sm: 10px;
+  --app-panel-radius: 18px;
+  --app-panel-shadow: 0 18px 40px rgba(15, 23, 42, 0.12), 0 4px 10px rgba(15, 23, 42, 0.08);
+  --app-overlay-shadow: 0 18px 34px rgba(15, 23, 42, 0.16);
+  --app-control-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 18px rgba(15, 23, 42, 0.04);
+  --app-divider: rgba(15, 23, 42, 0.10);
+  --app-divider-strong: rgba(15, 23, 42, 0.14);
+  --app-shell: rgba(255, 255, 255, 0.82);
+  --app-shell-strong: rgba(255, 255, 255, 0.96);
+  --app-surface: #ffffff;
+  --app-surface-strong: #ffffff;
+  --app-surface-hover: rgba(15, 23, 42, 0.04);
+  --app-rail: rgba(255, 255, 255, 0.70);
+  --app-title: #0f172a;
+  --app-text: #1e293b;
+  --app-muted: #64748b;
+  --app-primary: #2563eb;
+}
+
+:root[data-theme="dark"] {
+  --app-panel-shadow: 0 20px 44px rgba(0, 0, 0, 0.34), 0 8px 18px rgba(0, 0, 0, 0.20);
+  --app-overlay-shadow: 0 20px 38px rgba(0, 0, 0, 0.36);
+  --app-control-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 18px rgba(0, 0, 0, 0.14);
+  --app-divider: rgba(255, 255, 255, 0.09);
+  --app-divider-strong: rgba(255, 255, 255, 0.14);
+  --app-shell: rgba(15, 23, 42, 0.84);
+  --app-shell-strong: rgba(15, 23, 42, 0.96);
+  --app-surface: rgba(24, 33, 48, 0.96);
+  --app-surface-strong: rgba(17, 24, 39, 0.98);
+  --app-surface-raised: rgba(23, 32, 51, 0.98);
+  --app-surface-hover: rgba(255, 255, 255, 0.05);
+  --app-rail: rgba(15, 23, 42, 0.74);
+  --app-title: #f8fafc;
+  --app-text: #e2e8f0;
+  --app-muted: #94a3b8;
+  --app-primary: #60a5fa;
+}
+
+body {
+  font-family: var(--app-font-sans);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.06), transparent 20%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(241, 245, 249, 0.96));
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.06), transparent 22%),
+    linear-gradient(180deg, #050816 0%, #0f172a 56%, #111827 100%);
+}
+
+#hud,
+#sidebar,
+#dev-aircraft-panel,
+#collection-panel,
+#map-loader,
+#user-menu-dropdown,
+.user-menu-trigger,
+.google-signin-btn {
+  border-radius: var(--app-panel-radius);
+  box-shadow: var(--app-panel-shadow);
+}
+
+#hud,
+#sidebar,
+#dev-aircraft-panel,
+#collection-panel {
+  background: var(--app-shell);
+  border: 1px solid var(--app-divider);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+#hud {
+  width: 232px;
+  padding: 12px 14px;
+  color: var(--app-text);
+}
+
+#sidebar {
+  width: 312px;
+  padding: 12px;
+}
+
+#dev-aircraft-panel {
+  width: 356px;
+  padding: 0;
+}
+
+#collection-panel {
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.05), transparent 26%),
+    var(--app-shell);
+  overflow: hidden;
+}
+
+#sidebar-gallery {
+  background: var(--app-surface);
+  border: 1px solid var(--app-divider-strong);
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+#sidebar-header {
+  margin-top: 34px;
+  padding: 16px 0 10px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+#sidebar-gallery {
+  margin: 10px 0 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+#sidebar-route {
+  margin: 10px 0 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+#sidebar-details {
+  margin: 10px 0 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+#hud .dropdown-trigger,
+#hud .zone-search-input,
+#hud .segmented,
+#collection-view-toggle,
+.user-menu-item,
+.collection-view-btn,
+.google-signin-btn,
+.user-menu-trigger {
+  min-height: var(--app-control-h);
+  border-radius: var(--app-control-radius);
+}
+
+#hud .seg-btn,
+.collection-view-btn {
+  min-height: var(--app-control-h-sm);
+}
+
+#hud .dropdown-trigger,
+#hud .zone-search-input {
+  padding-block: 8px;
+  padding-inline: 12px;
+  font-size: 12px;
+  background: var(--app-surface);
+  border-color: var(--app-divider);
+  color: var(--app-text);
+}
+
+#hud .count {
+  color: var(--app-title);
+}
+
+#hud .label,
+#hud .source-row,
+#hud .status,
+#hud .zone-search-status {
+  color: var(--app-muted);
+}
+
+#hud .source-name {
+  color: var(--app-text);
+}
+
+#hud .segmented,
+#collection-view-toggle {
+  padding: 3px;
+  gap: 3px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-divider);
+}
+
+#hud .seg-btn,
+.collection-view-btn {
+  border-radius: var(--app-control-radius-sm);
+  color: var(--app-muted);
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+#hud .seg-btn.active,
+.collection-view-btn.active {
+  box-shadow: var(--app-control-shadow);
+  color: var(--app-title);
+}
+
+#hud .dropdown-menu,
+.user-menu-dropdown {
+  border-radius: 14px;
+  box-shadow: var(--app-overlay-shadow);
+  border-color: var(--app-divider);
+  background: var(--app-shell-strong);
+}
+
+#hud .dropdown-trigger:hover,
+#hud .zone-search-input:hover {
+  background: var(--app-surface-hover);
+}
+
+#hud .dropdown-trigger:focus-visible,
+#hud .zone-search-input:focus-visible,
+#hud .seg-btn:focus-visible,
+.collection-view-btn:focus-visible,
+.user-menu-trigger:focus-visible,
+.google-signin-btn:focus-visible,
+.user-menu-item:focus-visible,
+#sidebar-close:focus-visible,
+#sidebar-center-map:focus-visible,
+#sidebar-save-collection:focus-visible,
+#collection-panel-close:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--app-primary) 70%, white);
+  outline-offset: 2px;
+}
+
+#hud .filter-block {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top-color: var(--app-divider);
+}
+
+#hud .filter-title,
+#hud .data-quality-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--app-muted);
+  text-transform: uppercase;
+}
+
+#hud .chip-checkbox {
+  border-radius: 999px;
+  min-height: 30px;
+  border-color: var(--app-divider);
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+:root[data-theme="dark"] #hud .chip-checkbox {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#sidebar-close,
+#sidebar-center-map,
+#sidebar-save-collection,
+#collection-panel-close {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  min-width: 30px;
+  border-radius: 50%;
+  box-shadow: var(--app-control-shadow);
+  background: var(--app-surface-strong);
+  border: 1px solid var(--app-divider);
+}
+
+#collection-panel-header,
+#dev-aircraft-panel-header {
+  border-bottom-color: var(--app-divider);
+  background: var(--app-shell-strong);
+  backdrop-filter: blur(16px);
+}
+
+#sidebar-details .detail-group,
+.route-card,
+#sidebar-icon-credit,
+#collection-card,
+.collection-card-footer {
+  border-top-color: var(--app-divider);
+}
+
+#sidebar-details .detail-group {
+  margin-top: 12px;
+  padding: 14px 14px 12px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-divider-strong);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  border-radius: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#sidebar-details .detail-group:first-child {
+  margin-top: 0;
+  padding-top: 16px;
+  box-shadow: inset 0 1px 0 var(--app-divider-strong), 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+#sidebar-details .detail-group-body {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+#sidebar-details .detail-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 14px;
+  align-items: start;
+}
+
+#sidebar-details .detail-label {
+  color: var(--app-muted);
+  font-size: var(--app-text-sm);
+  line-height: 1.35;
+  font-weight: 400;
+}
+
+#sidebar-details .detail-value {
+  color: var(--app-title);
+  font-size: var(--app-text-sm);
+  line-height: 1.45;
+  font-weight: 500;
+  text-align: right;
+}
+
+#sidebar-details .detail-value-special {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+#sidebar-details .detail-row-identity .detail-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  min-width: 0;
+  justify-self: start;
+}
+
+#sidebar-details .detail-row-identity .detail-label .info-tip:has(svg) {
+  margin-left: 0;
+}
+
+#sidebar-details .detail-row-identity .detail-value {
+  overflow-wrap: anywhere;
+}
+
+#sidebar-details .detail-row + .detail-row {
+  margin-top: 2px;
+}
+
+#sidebar-header .sidebar-header-title,
+.route-card-code,
+.collection-card-title,
+.collection-empty-title,
+#collection-panel-title {
+  color: var(--app-title);
+}
+
+#sidebar-header .sidebar-header-title,
+#collection-panel-title,
+.collection-card-title {
+  font-size: var(--app-text-xl);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+.route-card-code {
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
+
+#sidebar-header .sidebar-header-subtitle,
+.route-card-city,
+.route-card-empty-text,
+.collection-card-subtitle,
+.collection-card-meta,
+.collection-card-footer-row,
+.collection-empty-hint {
+  font-size: var(--app-text-sm);
+  line-height: 1.45;
+}
+
+#sidebar-details b {
+  color: var(--app-title);
+  font-weight: 600;
+}
+
+#sidebar-header,
+#sidebar-details,
+#dev-aircraft-panel-header,
+#dev-identity-stats,
+#collection-panel-header,
+#collection-panel-grid,
+.user-menu-item,
+.user-menu-email,
+.collection-card-meta,
+.collection-card-footer-row,
+.route-card-city,
+.route-confidence,
+#hud .zone-search-status,
+#hud .status,
+#hud .source-count,
+.collection-empty-hint {
+  color: var(--app-muted);
+}
+
+#sidebar-header .sidebar-header-subtitle,
+.route-card-city,
+.route-confidence,
+.collection-card-subtitle,
+.collection-card-meta,
+.collection-card-footer-row,
+.collection-empty-hint,
+#hud .zone-search-status,
+#hud .status,
+#hud .source-count,
+#dev-identity-stats,
+.user-menu-email {
+  color: var(--app-muted);
+  font-weight: 500;
+}
+
+.route-card,
+.collection-card,
+#collection-panel-empty,
+.gallery-placeholder,
+#map-loader {
+  background: var(--app-surface);
+  border-radius: 16px;
+}
+
+.route-card {
+  background: var(--app-surface);
+}
+
+.collection-group-header {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 10px 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--app-text-xs);
+  font-weight: 700;
+  color: var(--app-muted);
+}
+
+.collection-card {
+  background: var(--app-surface);
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.collection-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+}
+
+.collection-card-photo-wrap {
+  background: var(--app-surface);
+}
+
+.collection-card-body {
+  padding: 14px 16px 16px;
+}
+
+.collection-card-title {
+  font-size: var(--app-text-lg);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.collection-card-subtitle {
+  color: var(--app-muted);
+}
+
+.collection-card-category {
+  background: color-mix(in srgb, var(--app-primary) 10%, var(--app-surface));
+  color: var(--app-primary);
+}
+
+.collection-card-icon-btn {
+  border: 1px solid var(--app-divider);
+  background: var(--app-surface-strong);
+}
+
+.gallery-image-wrap {
+  background: var(--app-surface);
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.gallery-slider-container {
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.gallery-dots {
+  margin-top: 10px;
+  padding: 0 0 2px;
+  min-height: 6px;
+}
+
+:root[data-theme="dark"] .route-card,
+:root[data-theme="dark"] .collection-card,
+:root[data-theme="dark"] #collection-panel-empty,
+:root[data-theme="dark"] .gallery-placeholder,
+:root[data-theme="dark"] #map-loader {
+  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface-strong));
+  border-color: var(--app-divider-strong);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+#hud .source-help,
+#sidebar-details .info-tip:has(svg),
+#sidebar-details .source-badge,
+#sidebar-header .source-badge,
+#sidebar-route .source-badge {
+  transition: color .15s ease, background .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+#hud .source-help:hover,
+#sidebar-details .info-tip:has(svg):hover,
+#sidebar-details .source-badge:hover,
+#sidebar-header .source-badge:hover,
+#sidebar-route .source-badge:hover {
+  color: var(--app-primary);
+}
+
+#sidebar-details b,
+#sidebar-details b.identity-label,
+.route-card-tag,
+.field-unconfirmed-tag,
+.collection-card-category {
+  font-size: var(--app-text-xs);
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+}
+
+#sidebar-details b {
+  color: var(--app-title);
+}
+
+#sidebar-details b.identity-label {
+  color: var(--app-muted);
+  font-weight: 400;
+}
+
+#sidebar-details .detail-group-title,
+#hud .filter-title,
+#hud .data-quality-group-title {
+  font-size: var(--app-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.route-card-title {
+  font-size: var(--app-text-xs);
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.route-card-city,
+.route-confidence,
+.route-card-empty-text {
+  font-size: var(--app-text-sm);
+  font-weight: 500;
+}
+
+.collection-card-meta,
+.collection-card-footer-row {
+  font-size: var(--app-text-xs);
+  line-height: 1.35;
+}
+
+.user-menu-item {
+  font-size: var(--app-text-sm);
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.user-menu-email {
+  font-size: var(--app-text-sm);
+}
+
+#account-bar {
+  gap: 8px;
+}
+
+.google-signin-btn {
+  padding: 9px 14px 9px 12px;
+  background: var(--app-shell-strong);
+  border: 1px solid var(--app-divider);
+  color: var(--app-text);
+  font-weight: 600;
+}
+
+.google-signin-btn:hover,
+.user-menu-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--app-overlay-shadow);
+}
+
+.user-menu-trigger {
+  padding: 5px 12px 5px 5px;
+  background: var(--app-shell-strong);
+  border: 1px solid var(--app-divider);
+  color: var(--app-text);
+}
+
+.user-menu-dropdown {
+  padding: 8px;
+  background: var(--app-shell-strong);
+  border: 1px solid var(--app-divider);
+}
+
+.user-menu-item {
+  padding: 9px 10px;
+  font-family: var(--app-font-sans);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.user-menu-item:hover {
+  background: var(--app-surface);
+  border-color: var(--app-divider);
+}
+
+#hud .source-row {
+  min-height: 30px;
+}
+
+#hud .switch {
+  width: 32px;
+  height: 18px;
+}
+
+#hud .switch-track::before {
+  width: 14px;
+  height: 14px;
+}
+
+#hud .switch input:checked + .switch-track::before {
+  transform: translateX(14px);
+}
+
+#hud .dropdown-option {
+  border-radius: 10px;
+}
+
+#hud .dropdown-option.active {
+  background: color-mix(in srgb, var(--app-primary) 10%, transparent);
+  color: var(--app-primary);
+}
+
+#hud .dropdown-option:hover {
+  background: var(--app-surface);
+}
+
+#sidebar {
+  width: 312px;
+}
+
+#hud {
+  width: 232px;
+}
+
+#collection-panel-header {
+  padding-block: 18px;
+}
+
+#collection-panel-grid {
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.02));
+  padding-top: 18px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+#collection-panel-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#collection-view-toggle {
+  background: var(--app-surface);
+}
+
+.collection-view-btn {
+  color: var(--app-muted);
+}
+
+.collection-view-btn.active {
+  background: var(--app-surface-strong);
+}
+
+#collection-panel-close {
+  background: var(--app-surface);
+}
+
+#sidebar {
+  color: var(--app-text);
+}
+
+#sidebar-header .sidebar-header-title,
+#collection-panel-title,
+.collection-card-title,
+.route-card-code {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+#sidebar-close,
+#sidebar-center-map,
+#sidebar-save-collection {
+  color: var(--app-text);
+}
+
+#sidebar-save-collection.saved {
+  color: var(--app-primary);
+}
+
+/* Legacy CSS still loads after all static styles in some browser caches
+   during local reloads; these selectors hard-override the original chrome
+   so the new visual system keeps winning even while the old file remains. */
+#hud {
+  width: 232px;
+  top: 64px;
+  right: 14px;
+  padding: 12px 14px;
+  background: var(--app-shell);
+  border-color: var(--app-divider);
+  border-radius: var(--app-panel-radius);
+  box-shadow: var(--app-panel-shadow);
+  color: var(--app-text);
+}
+
+#hud .filter-block {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top-color: var(--app-divider);
+}
+
+#hud .filter-title,
+#hud .data-quality-group-title {
+  color: var(--app-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+#hud .source-count,
+#hud .source-help,
+#hud .zone-search-status,
+#hud .status {
+  color: var(--app-muted);
+}
+
+#hud .source-count {
+  background: color-mix(in srgb, var(--app-primary) 10%, transparent);
+}
+
+#hud .seg-btn.active,
+.collection-view-btn.active {
+  color: var(--app-title);
+  background: var(--app-surface-strong);
+  box-shadow: var(--app-control-shadow);
+}
+
+#hud .dropdown-trigger,
+#hud .zone-search-input {
+  background: var(--app-surface);
+  border-color: var(--app-divider);
+  color: var(--app-text);
+  border-radius: var(--app-control-radius);
+}
+
+#hud .dropdown-menu {
+  background: var(--app-shell-strong);
+  border-color: var(--app-divider);
+  box-shadow: var(--app-overlay-shadow);
+}
+
+#hud .dropdown-option.active {
+  background: color-mix(in srgb, var(--app-primary) 10%, transparent);
+  color: var(--app-primary);
+}
+
+#sidebar {
+  width: 312px;
+  padding: 12px;
+  background: var(--app-shell);
+  border-color: var(--app-divider);
+  border-radius: var(--app-panel-radius);
+  box-shadow: var(--app-panel-shadow);
+  color: var(--app-text);
+}
+
+#sidebar-close,
+#sidebar-center-map,
+#sidebar-save-collection {
+  width: 30px;
+  height: 30px;
+  background: var(--app-surface-strong);
+  border: 1px solid var(--app-divider);
+  box-shadow: var(--app-control-shadow);
+  color: var(--app-text);
+}
+
+#sidebar-gallery {
+  background: var(--app-surface-strong);
+  border: 1px solid var(--app-divider);
+  border-radius: 14px;
+}
+
+#sidebar-header .sidebar-header-title,
+.route-card-code,
+.collection-card-title,
+#collection-panel-title {
+  color: var(--app-title);
+  letter-spacing: -0.02em;
+}
+
+#sidebar-header .sidebar-header-subtitle,
+#sidebar-details b,
+.route-card-title,
+.route-card-city,
+.route-card-empty-text,
+.route-confidence,
+.collection-card-subtitle,
+.collection-card-meta,
+.collection-card-footer-row,
+.collection-empty-hint,
+#collection-panel-grid {
+  color: var(--app-muted);
+}
+
+#sidebar-details .detail-group,
+.route-card-footer:not(:empty),
+#sidebar-icon-credit,
+.collection-card-footer,
+.collection-card-removed-label {
+  border-top-color: var(--app-divider);
+}
+
+.route-card {
+  margin: 0 0 14px;
+  padding: 14px 14px 12px;
+  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+  border-color: var(--app-divider);
+}
+
+.route-card-tag,
+.field-unconfirmed-tag {
+  color: var(--app-primary);
+}
+
+.collection-card {
+  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+  border-color: var(--app-divider);
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.collection-card-photo-wrap {
+  background: var(--app-surface);
+}
+
+.collection-card-body {
+  padding: 16px 16px 18px;
+}
+
+.collection-card-title {
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  color: var(--app-title);
+}
+
+.collection-card-subtitle {
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--app-muted);
+  margin-top: 4px;
+}
+
+.collection-card-category {
+  background: color-mix(in srgb, var(--app-primary) 10%, var(--app-surface));
+  color: var(--app-primary);
+  border: 1px solid color-mix(in srgb, var(--app-primary) 18%, var(--app-divider));
+  border-radius: 999px;
+  font-size: var(--app-text-xs);
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+}
+
+.collection-card-icon-btn {
+  background: var(--app-surface-strong);
+  border: 1px solid var(--app-divider);
+  box-shadow: var(--app-control-shadow);
+}
+
+.collection-card-icon-btn:hover,
+.user-menu-item:hover {
+  background: var(--app-surface);
+  border-color: var(--app-divider);
+}
+
+.collection-card-removed-overlay {
+  background: color-mix(in srgb, var(--app-shell-strong) 92%, white);
+}
+
+.collection-card-removed-label,
+.collection-card-undo-hint {
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+.collection-card-undo-btn {
+  box-shadow: var(--app-control-shadow);
+}
+
+#collection-panel {
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.05), transparent 26%),
+    var(--app-shell);
+  border-color: var(--app-divider);
+  box-shadow: var(--app-panel-shadow);
+}
+
+#collection-panel-header,
+#dev-aircraft-panel-header {
+  background: var(--app-shell-strong);
+  border-bottom-color: var(--app-divider);
+  color: var(--app-text);
+}
+
+#collection-panel-grid {
+  padding: 18px 20px 32px;
+}
+
+#dev-aircraft-panel {
+  width: 356px;
+  background: var(--app-shell);
+  border-color: var(--app-divider);
+  box-shadow: var(--app-panel-shadow);
+}
+
+#dev-aircraft-panel-header,
+#dev-identity-stats,
+#dev-aircraft-table th,
+#dev-aircraft-table td {
+  border-color: var(--app-divider);
+}
+
+#dev-aircraft-table thead th {
+  background: var(--app-shell-strong);
+  color: var(--app-muted);
+}
+
+#dev-aircraft-table tbody tr:hover {
+  background: color-mix(in srgb, var(--app-primary) 6%, transparent);
+}
+
+.google-signin-btn,
+.user-menu-trigger {
+  background: var(--app-shell-strong);
+  border: 1px solid var(--app-divider);
+  color: var(--app-text);
+  box-shadow: var(--app-control-shadow);
+}
+
+.user-menu-dropdown,
+#collection-panel-empty,
+#map-loader,
+.gallery-placeholder,
+.leaflet-popup.airport-popup .leaflet-popup-content-wrapper {
+  background: var(--app-shell-strong);
+  border-color: var(--app-divider);
+  box-shadow: var(--app-overlay-shadow);
+}
+
+#sidebar-close,
+#sidebar-center-map,
+#sidebar-save-collection {
+  top: 12px;
+}
+
+#sidebar-close {
+  right: 12px;
+}
+
+#sidebar-center-map {
+  left: 12px;
+}
+
+#sidebar-save-collection {
+  left: 48px;
+}
+
+#sidebar-header .sidebar-header-title {
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
+
+#sidebar-header .sidebar-header-subtitle {
+  color: var(--app-muted);
+  margin-top: 3px;
+}
+
+#sidebar-details .detail-group-title {
+  color: var(--app-muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+#sidebar-route .route-card {
+  margin: 0;
+  border: 1px solid var(--app-divider);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+#sidebar-route .route-card-footer:not(:empty) {
+  border-top-color: var(--app-divider);
+}
+
+#sidebar-route .route-card-tag {
+  color: var(--app-primary);
+}
+
+#sidebar-route .route-card-title {
+  color: var(--app-muted);
+}
+
+#sidebar-route .route-card-city,
+.route-confidence,
+.route-card-empty-text {
+  color: var(--app-muted);
+}
+
+.route-card-code {
+  color: var(--app-title);
+}
+
+.route-card-arrow {
+  color: var(--app-muted);
+}
+
+.collection-group-grid {
+  gap: 18px;
+}
+
+#collection-panel-header-actions {
+  gap: 10px;
+}
+
+.collection-empty-icon {
+  color: rgba(37, 99, 235, 0.20);
+}
+
+#collection-panel-empty {
+  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+}
+
+#dev-aircraft-panel-header {
+  padding-block: 12px;
+}
+
+#dev-aircraft-panel-header,
+#dev-identity-stats {
+  border-bottom-color: var(--app-divider);
+  background: var(--app-shell-strong);
+}
+
+#dev-aircraft-panel-scroll {
+  padding: 6px 8px 10px;
+}
+
+#dev-aircraft-table thead th {
+  background: var(--app-shell-strong);
+  color: var(--app-muted);
+  font-weight: 700;
+}
+
+#dev-aircraft-table tbody tr:hover {
+  background: color-mix(in srgb, var(--app-primary) 6%, transparent);
+}
+
+#dev-aircraft-table th,
+#dev-aircraft-table td {
+  border-bottom-color: var(--app-divider);
+}
+
+.route-card {
+  padding: 14px 14px 12px;
+}
+
+.route-card-title {
+  color: var(--app-muted);
+  font-size: 10px;
+}
+
+.route-card-footer:not(:empty) {
+  border-top-color: var(--app-divider);
+}
+
+:root[data-theme="dark"] .route-card,
+:root[data-theme="dark"] .collection-card,
+:root[data-theme="dark"] #collection-panel-empty,
+:root[data-theme="dark"] .gallery-placeholder,
+:root[data-theme="dark"] #map-loader {
+  background: linear-gradient(180deg, rgba(23, 32, 51, 0.98), rgba(17, 24, 39, 0.98));
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+}
+
+#sidebar-gallery {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.gallery-dots {
+  border: none;
+  background: transparent;
+}
+
+#collection-panel-header {
+  padding-block: 18px;
+}
+
+#collection-panel-header,
+#dev-aircraft-panel-header,
+#dev-identity-stats {
+  color: var(--app-text);
+}
+
+#collection-panel-header-actions button,
+#collection-view-toggle {
+  box-shadow: none;
+}
+
+.collection-card-meta,
+.collection-card-footer-row {
+  color: var(--app-muted);
+  font-size: var(--app-text-sm);
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+.collection-card-category {
+  border: 1px solid color-mix(in srgb, var(--app-primary) 18%, var(--app-divider));
+  box-shadow: none;
+}
+
+.collection-card-icon-btn {
+  box-shadow: var(--app-control-shadow);
+}
+
+.collection-card-icon-btn:hover {
+  background: var(--app-surface);
+  transform: translateY(-1px);
+}
+
+.collection-card-removed-overlay {
+  background: color-mix(in srgb, var(--app-shell-strong) 92%, white);
+}
+
+.collection-card-removed-label {
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+.collection-card-undo-btn {
+  box-shadow: var(--app-control-shadow);
+}
+
+.collection-card-undo-hint {
+  background: var(--app-surface);
+}
+
+.gallery-placeholder {
+  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+}
+
+.gallery-spinner {
+  border-top-color: var(--app-primary);
+}
+
+.route-card {
+  border-color: var(--app-divider);
+  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+}
+
+.route-card-footer:not(:empty) {
+  border-top-color: var(--app-divider);
+}
