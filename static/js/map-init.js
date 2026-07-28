@@ -215,6 +215,16 @@ const prefersDarkOnLoad = window.matchMedia && window.matchMedia('(prefers-color
 let currentBaseLayerKey = prefersDarkOnLoad ? 'dark' : 'voyager';
 baseLayers[currentBaseLayerKey].addTo(map);
 
+// Leaflet caches the #map container's size at construction time; on a slow
+// first load (CSS/webfonts still applying) that size can be wrong/zero,
+// leaving the map visibly blank even though tiles/markers load fine
+// afterward. Nothing elsewhere in this codebase calls invalidateSize(), so
+// this re-checks the real layout once everything (styles, fonts, images)
+// has definitely finished applying.
+window.addEventListener('load', () => {
+  map.invalidateSize();
+});
+
 function setBaseLayer(key) {
   if (key === currentBaseLayerKey || !baseLayers[key]) return;
   map.removeLayer(baseLayers[currentBaseLayerKey]);

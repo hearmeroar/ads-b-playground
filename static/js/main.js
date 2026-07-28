@@ -735,6 +735,15 @@ fetch('/api/config')
     // poll()'s early/final two-phase render above). Still guaranteed to fire
     // even if every source fails, since renderPoll()'s final pass always runs
     // and poll() always calls markFirstPaint() after it regardless.
-    poll({ onFirstPaint: () => document.getElementById('map-loader').classList.add('hidden') });
+    poll({
+      onFirstPaint: () => {
+        // Second, independent safety net alongside map-init.js's own
+        // window 'load' handler: this fires once real markers exist, in
+        // case 'load' fired before the #map container's layout had fully
+        // settled (see map-init.js for the full rationale).
+        map.invalidateSize();
+        document.getElementById('map-loader').classList.add('hidden');
+      },
+    });
     setInterval(poll, POLL_INTERVAL_MS);
   });
