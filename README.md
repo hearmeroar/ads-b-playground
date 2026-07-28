@@ -1,4 +1,4 @@
-<img width="1167" height="912" alt="Screenshot 2026-07-28 at 18 01 52" src="https://github.com/user-attachments/assets/cee710e3-44f3-4822-93d0-0e02cd679e56" />
+![Uploading Screenshot 2026-07-28 at 20.58.47.png…]()
 
 # ADS-B Playground
 
