@@ -48,7 +48,8 @@ def test_callback_creates_user_and_sets_session(client, monkeypatch):
         MagicMock(return_value=fake_token),
     )
     resp = client.get("/api/login/google/callback")
-    assert resp.status_code in (302, 303)
+    assert resp.status_code == 200  # Popup closes with HTML/JS, not redirect
+    assert b"window.close()" in resp.data
     assert storage.get_user("google-sub-123") is not None
     assert storage.get_user("google-sub-123")["email"] == "pilot@example.com"
 

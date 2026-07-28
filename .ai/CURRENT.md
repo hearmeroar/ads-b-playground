@@ -4,7 +4,7 @@
 
 ## ✅ Seamless Google login with popup (completed 2026-07-28)
 
-Implemented simplified Google Sign-In popup flow (no full-page redirect). Backend accepts ID tokens via `/api/login/google/token`; frontend uses Google Identity Services SDK with callback-based auth. All tests pass. Branch: `feature/seamless-google-login-popup`.
+Implemented Google OAuth popup flow (no full-page redirect). `/login-popup` page opens standard Google OAuth account-selection/consent flow in a separate popup window. After successful auth, popup closes and main window checks auth status without reload. Preserves map position, selected aircraft, and sidebar state. Page title updated to "Live Aircraft Tracker".
 
 ## Blank map on first load in Safari (prod) — still open, root cause unconfirmed
 

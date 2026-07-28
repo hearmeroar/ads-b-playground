@@ -13,16 +13,18 @@ test('shows a "Sign in with Google" button when logged out', async ({ page }) =>
   await expect(page.locator('#user-menu')).toBeHidden();
 });
 
-test('clicking the Google button navigates to the OAuth route', async ({ page }) => {
+test('clicking the Google button opens a popup', async ({ page, context }) => {
   await page.route('**/api/me', (route) => route.fulfill({ json: { user: null } }));
-  // Stub the real route so the test doesn't depend on whether the test
-  // server has real Google credentials configured — only the navigation
-  // target matters here.
-  await page.route('**/api/login/google', (route) => route.fulfill({ json: { stub: true } }));
+  // Stub popup routes
+  await page.route('**/login-popup', (route) => route.fulfill({ body: '<html><body>Popup</body></html>' }));
   await page.goto('/');
 
+  // Listen for popup window open
+  const popupPromise = context.waitForEvent('page');
   await page.click('#google-signin-btn');
-  await page.waitForURL(/\/api\/login\/google$/);
+  const popup = await popupPromise;
+  expect(popup.url()).toContain('/login-popup');
+  await popup.close();
 });
 
 test('shows an avatar pill with the user\'s name when logged in', async ({ page }) => {

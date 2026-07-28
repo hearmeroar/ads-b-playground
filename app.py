@@ -335,7 +335,45 @@ def api_login_google_callback():
         return jsonify({"error": "google_auth_failed"}), 502
     storage.upsert_user(sub, userinfo.get("email"), userinfo.get("name"), userinfo.get("picture"))
     session["user_id"] = sub
-    return redirect("/")
+    # Close popup window instead of redirect (called from popup)
+    return '''<html><head><script>window.close();</script></head><body></body></html>'''
+
+
+@app.route("/login-popup")
+def login_popup():
+    """Popup window for Google Sign-In OAuth flow."""
+    if not GOOGLE_CLIENT_ID:
+        return jsonify({"error": "not_configured"}), 503
+    return f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in</title>
+    <style>
+        body {{
+            margin: 0; padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            background: #1a1d24;
+            color: #f0f1f3;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh;
+        }}
+        #signin-container {{
+            text-align: center;
+        }}
+    </style>
+</head>
+<body>
+    <div id="signin-container">
+        <p>Redirecting to Google Sign-In...</p>
+    </div>
+    <script>
+        // Redirect to Google OAuth flow
+        window.location.href = '/api/login/google';
+    </script>
+</body>
+</html>'''
 
 
 @app.route("/api/logout", methods=["POST"])

@@ -220,36 +220,36 @@ async function checkAuth() {
 // (no full-page redirect). The SDK returns an ID token, which we exchange
 // for a session via /api/login/google/token, then update the UI without reload.
 async function handleGoogleSignInClick() {
-  if (!GOOGLE_CLIENT_ID || typeof google === 'undefined' || !google.accounts) {
-    // Fallback to traditional redirect if SDK isn't available or client ID isn't configured
+  // Open Google login in popup (redirects to /api/login/google OAuth flow)
+  const width = 500;
+  const height = 700;
+  const left = (screen.width - width) / 2;
+  const top = (screen.height - height) / 2;
+
+  const popup = window.open(
+    '/login-popup',
+    'Google Sign-In',
+    `width=${width},height=${height},left=${left},top=${top}`
+  );
+
+  if (!popup) {
+    console.error('Popup blocked. Falling back to full-page redirect.');
     window.location.href = '/api/login/google';
     return;
   }
 
-  // Trigger the Google One Tap/popup flow
-  // The callback will handle the ID token
-  google.accounts.id.prompt((notification) => {
-    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-      // One-tap wasn't shown, try to force the Google Sign-In popup
-      // by simulating a click on a hidden rendered button
-      const hiddenButtonId = '__google_signin_hidden_' + Date.now();
-      const div = document.createElement('div');
-      div.id = hiddenButtonId;
-      div.style.display = 'none';
-      document.body.appendChild(div);
-
-      google.accounts.id.renderButton(div, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large'
-      });
-
-      const button = div.querySelector('button');
-      if (button) button.click();
-
-      setTimeout(() => document.body.removeChild(div), 100);
+  // Poll popup until it closes
+  const checkPopup = setInterval(() => {
+    try {
+      if (popup.closed) {
+        clearInterval(checkPopup);
+        // Popup closed — check auth status
+        checkAuth();
+      }
+    } catch (err) {
+      // Ignore cross-origin errors
     }
-  });
+  }, 500);
 }
 
 googleSigninBtn.addEventListener('click', handleGoogleSignInClick);
