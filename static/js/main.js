@@ -742,6 +742,12 @@ fetch('/api/config')
         // case 'load' fired before the #map container's layout had fully
         // settled (see map-init.js for the full rationale).
         map.invalidateSize();
+        // forceMapRepaint()/checkMapPaintedOrOfferRetry() (map-init.js):
+        // same Safari-blank-map diagnostics/nudge as the window 'load'
+        // handler there, run again here in case first paint lands before
+        // 'load' does.
+        forceMapRepaint();
+        setTimeout(checkMapPaintedOrOfferRetry, 4000);
         document.getElementById('map-loader').classList.add('hidden');
       },
     });

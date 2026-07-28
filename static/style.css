@@ -788,6 +788,35 @@ body .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.s
   border: 3px solid var(--spinner-track); border-top-color: #1a73e8;
   animation: gallery-spin .8s linear infinite;
 }
+
+/* Last-resort recovery control for the still-unconfirmed Safari-only
+   blank-map bug (map-init.js's checkMapPaintedOrOfferRetry()): shown only
+   if no tile has actually painted a few seconds after first load/paint,
+   which should never happen in the normal case — reuses #map-loader's own
+   glass-card look rather than a new visual language. */
+#map-retry {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 901; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 18px 24px;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  color: var(--ink); transition: opacity .3s ease;
+}
+#map-retry.hidden { opacity: 0; pointer-events: none; }
+#map-retry-btn {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+  color: var(--ink); padding: 6px 14px; font: inherit; cursor: pointer;
+}
+#map-retry-btn:hover { background: var(--surface-hover); }
+
+/* Forces WebKit to recomposite #map's layer independently of any size
+   check — see forceMapRepaint() in map-init.js for the full rationale.
+   The transform value is irrelevant (removed again next frame); what
+   matters is that applying/removing it forces a real repaint. */
+#map.force-repaint { transform: translateZ(0); }
 /* Overlaid on the image, vertically centered — but with no background
    shape behind them at all, just the bare chevron glyph plus a subtle
    drop-shadow for legibility over any photo. Two earlier attempts (a

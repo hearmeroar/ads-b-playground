@@ -213,7 +213,64 @@ for (const key of Object.keys(BASE_LAYERS)) {
 // one-line matchMedia check is duplicated rather than reordering scripts.
 const prefersDarkOnLoad = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 let currentBaseLayerKey = prefersDarkOnLoad ? 'dark' : 'voyager';
+
+// Diagnostics for a still-unconfirmed Safari-only blank-map bug (found
+// 2026-07-28): the container-size theory behind the invalidateSize() calls
+// below didn't fully explain reports of the map staying totally blank (no
+// tiles, no markers) in prod Safari. Nothing here previously listened for
+// tile-load failures at all, so a recurrence produced no signal beyond
+// anecdote. `tileerror`/`load` are wired onto whichever base layer is
+// currently active (both at startup and on every `setBaseLayer` switch).
+function wireTileDiagnostics(layer, key) {
+  layer.on('tileerror', (e) => {
+    console.error('[map-diag] tileerror on base layer', key, e && e.error, e && e.tile && e.tile.src);
+  });
+  layer.on('load', () => {
+    console.info('[map-diag] base layer finished loading visible tiles', key);
+  });
+}
+for (const key of Object.keys(baseLayers)) wireTileDiagnostics(baseLayers[key], key);
+
 baseLayers[currentBaseLayerKey].addTo(map);
+
+// A known class of Safari/WebKit bug leaves composited/transformed layers
+// (Leaflet's panes are positioned via CSS transform) unpainted after a cold
+// load — invisible to invalidateSize() below, since that call only
+// repositions panes and fires a resize event when Leaflet's cached size
+// disagrees with the real one; #map is `position: fixed; inset: 0`, so its
+// size is usually already correct and invalidateSize() is a silent no-op
+// that never actually forces WebKit to repaint. This forces a real
+// recomposite independently of any size check, by briefly giving #map its
+// own transformed layer and letting it go again next frame.
+function forceMapRepaint() {
+  const el = map.getContainer();
+  el.classList.add('force-repaint');
+  void el.offsetHeight; // flush layout so the class change is actually applied before removal
+  requestAnimationFrame(() => el.classList.remove('force-repaint'));
+}
+
+// Last-resort recovery: if nothing has actually painted a few seconds after
+// the page's first paint attempt, the blank-map bug is happening right now
+// and there is currently no way for the user to recover short of a manual
+// reload. Surfaces a small retry control (reuses #map-loader's own visual
+// language) whose action re-runs the repaint nudge + invalidateSize().
+function checkMapPaintedOrOfferRetry() {
+  const loadedTiles = document.querySelectorAll('#map .leaflet-tile-loaded').length;
+  if (loadedTiles > 0) return;
+  console.warn('[map-diag] no tiles painted after first-paint grace period; offering manual retry');
+  const retryEl = document.getElementById('map-retry');
+  if (retryEl) retryEl.classList.remove('hidden');
+}
+
+const mapRetryBtn = document.getElementById('map-retry-btn');
+if (mapRetryBtn) {
+  mapRetryBtn.addEventListener('click', () => {
+    forceMapRepaint();
+    map.invalidateSize();
+    const retryEl = document.getElementById('map-retry');
+    if (retryEl) retryEl.classList.add('hidden');
+  });
+}
 
 // Leaflet caches the #map container's size at construction time; on a slow
 // first load (CSS/webfonts still applying) that size can be wrong/zero,
@@ -223,6 +280,8 @@ baseLayers[currentBaseLayerKey].addTo(map);
 // has definitely finished applying.
 window.addEventListener('load', () => {
   map.invalidateSize();
+  forceMapRepaint();
+  setTimeout(checkMapPaintedOrOfferRetry, 4000);
 });
 
 function setBaseLayer(key) {
