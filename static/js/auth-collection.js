@@ -102,6 +102,21 @@ const DEFAULT_AVATAR_SVG = 'data:image/svg+xml,' + encodeURIComponent(
   '<circle cx="12" cy="9.5" r="4" fill="#fff"/>' +
   '<path d="M4 21c1.4-4.2 5-6 8-6s6.6 1.8 8 6" fill="#fff"/></svg>');
 
+// Google Sign-In SDK client ID — needed to initialize the SDK.
+// Fetched from /api/config via GOOGLE_CLIENT_ID env var on the backend.
+let GOOGLE_CLIENT_ID = null;
+
+function initializeGoogleSDK() {
+  // Initialize or reinitialize Google SDK with the callback
+  if (typeof google === 'undefined' || !google.accounts || !GOOGLE_CLIENT_ID) {
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleSignInResponse
+  });
+}
+
 function renderAuthStatus() {
   closeUserMenu();
   if (currentUser) {
@@ -113,6 +128,8 @@ function renderAuthStatus() {
   } else {
     googleSigninBtn.hidden = false;
     userMenuEl.hidden = true;
+    // Reinitialize Google SDK after logout so next login works
+    initializeGoogleSDK();
   }
   updateSaveButtonState();
 }
@@ -133,6 +150,43 @@ async function fetchCollectionCards() {
   }
 }
 
+async function handleGoogleSignInResponse(response) {
+  // This callback is called by Google SDK after successful sign-in
+  const idToken = response.credential;
+  if (!idToken) {
+    console.error('No ID token received from Google');
+    return;
+  }
+
+  try {
+    // Exchange ID token for a session
+    const resp = await fetch('/api/login/google/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_token: idToken })
+    });
+
+    if (!resp.ok) {
+      console.error('Token exchange failed:', resp.status);
+      return;
+    }
+
+    const data = await resp.json();
+    currentUser = data.user || null;
+    renderAuthStatus();
+
+    if (currentUser) {
+      savedCardsByIcao.clear();
+      for (const card of await fetchCollectionCards()) {
+        savedCardsByIcao.set(card.icao24, card);
+      }
+      updateSaveButtonState();
+    }
+  } catch (err) {
+    console.error('Google Sign-In error:', err);
+  }
+}
+
 async function checkAuth() {
   try {
     const resp = await fetch('/api/me');
@@ -147,13 +201,58 @@ async function checkAuth() {
     for (const card of await fetchCollectionCards()) savedCardsByIcao.set(card.icao24, card);
     updateSaveButtonState();
   }
+
+  // Initialize Google Sign-In SDK if available
+  if (typeof google !== 'undefined' && google.accounts) {
+    // Fetch the Google Client ID from /api/config
+    try {
+      const configResp = await fetch('/api/config');
+      const configData = await configResp.json();
+      GOOGLE_CLIENT_ID = configData.google_client_id;
+      initializeGoogleSDK();
+    } catch (err) {
+      console.warn('Could not load Google Client ID from config:', err);
+    }
+  }
 }
 
-// A full-page navigation, not fetch() — OAuth needs a real browser redirect
-// to Google's consent screen, not an XHR.
-googleSigninBtn.addEventListener('click', () => {
-  window.location.href = '/api/login/google';
-});
+// Handle Google Sign-In button click — uses Google Sign-In SDK for popup
+// (no full-page redirect). The SDK returns an ID token, which we exchange
+// for a session via /api/login/google/token, then update the UI without reload.
+async function handleGoogleSignInClick() {
+  if (!GOOGLE_CLIENT_ID || typeof google === 'undefined' || !google.accounts) {
+    // Fallback to traditional redirect if SDK isn't available or client ID isn't configured
+    window.location.href = '/api/login/google';
+    return;
+  }
+
+  // Trigger the Google One Tap/popup flow
+  // The callback will handle the ID token
+  google.accounts.id.prompt((notification) => {
+    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+      // One-tap wasn't shown, try to force the Google Sign-In popup
+      // by simulating a click on a hidden rendered button
+      const hiddenButtonId = '__google_signin_hidden_' + Date.now();
+      const div = document.createElement('div');
+      div.id = hiddenButtonId;
+      div.style.display = 'none';
+      document.body.appendChild(div);
+
+      google.accounts.id.renderButton(div, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large'
+      });
+
+      const button = div.querySelector('button');
+      if (button) button.click();
+
+      setTimeout(() => document.body.removeChild(div), 100);
+    }
+  });
+}
+
+googleSigninBtn.addEventListener('click', handleGoogleSignInClick);
 
 userAvatarEl.addEventListener('error', () => { userAvatarEl.src = DEFAULT_AVATAR_SVG; });
 
@@ -212,7 +311,8 @@ function updateSaveButtonState() {
 async function saveCurrentAircraftToCollection() {
   if (selectedIcao24 == null || sidebarSaveCollectionBtn.hidden) return;
   if (!currentUser) {
-    window.location.href = '/api/login/google';
+    // Trigger Google Sign-In popup instead of full-page redirect
+    await handleGoogleSignInClick();
     return;
   }
   if (savedCardsByIcao.has(selectedIcao24)) {

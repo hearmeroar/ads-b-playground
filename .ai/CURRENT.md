@@ -2,6 +2,10 @@
 
 > **Update rule:** this file holds only what is currently open: unresolved bugs, an in-progress task, or a decision still pending. It is not a changelog or session diary.
 
+## ✅ Seamless Google login with popup (completed 2026-07-28)
+
+Implemented simplified Google Sign-In popup flow (no full-page redirect). Backend accepts ID tokens via `/api/login/google/token`; frontend uses Google Identity Services SDK with callback-based auth. All tests pass. Branch: `feature/seamless-google-login-popup`.
+
 ## Blank map on first load in Safari (prod) — still open, root cause unconfirmed
 
 `invalidateSize()` (commit 648c4cc) did not fix it — user still sees a
