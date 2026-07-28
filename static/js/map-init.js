@@ -284,6 +284,25 @@ window.addEventListener('load', () => {
   setTimeout(checkMapPaintedOrOfferRetry, 4000);
 });
 
+// Safari specifically restores fast repeated reloads/navigations from its
+// back-forward cache (bfcache) rather than running a full load — a bfcache
+// restore does NOT fire 'load' again (the page instance is reused as-is),
+// so none of the nudges above ever run on that path. This app already hit
+// this exact Safari behavior once before, for the favicon (see the
+// pageshow listener at the top of index.html) — the same mechanism most
+// plausibly explains reports of the map staying blank specifically under
+// fast repeated Safari reloads: if the GPU-composited tile/marker panes
+// were left in a bad state when the page was cached, only 'pageshow' (not
+// 'load') gets a chance to fix it on restore. `event.persisted` is true
+// only for an actual bfcache restore; still safe to run unconditionally
+// since these calls are cheap no-ops when nothing was actually wrong.
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) return;
+  map.invalidateSize();
+  forceMapRepaint();
+  setTimeout(checkMapPaintedOrOfferRetry, 4000);
+});
+
 function setBaseLayer(key) {
   if (key === currentBaseLayerKey || !baseLayers[key]) return;
   map.removeLayer(baseLayers[currentBaseLayerKey]);
