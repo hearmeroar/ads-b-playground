@@ -48,6 +48,36 @@
   --app-primary: #60a5fa;
 }
 
+/* Pure-CSS fallback, same mechanism as style.css's own :root/@media/
+   [data-theme] cascade — every <script> in this app is `defer`red, so
+   there's a real window between first paint and state-filters.js actually
+   running (it sets [data-theme] at its own top-level load time, after the
+   full HTML parse). Without this block, a dark-OS visitor briefly saw
+   these tokens' *light* defaults above before JS caught up and flipped
+   [data-theme="dark"] — a visible light-then-dark flash on every load.
+   :not([data-theme="light"]) is what lets an explicit Light choice (once
+   JS has run) keep overriding a dark OS preference, same as style.css. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --app-panel-shadow: 0 20px 44px rgba(0, 0, 0, 0.34), 0 8px 18px rgba(0, 0, 0, 0.20);
+    --app-overlay-shadow: 0 20px 38px rgba(0, 0, 0, 0.36);
+    --app-control-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 18px rgba(0, 0, 0, 0.14);
+    --app-divider: rgba(255, 255, 255, 0.09);
+    --app-divider-strong: rgba(255, 255, 255, 0.14);
+    --app-shell: rgba(15, 23, 42, 0.84);
+    --app-shell-strong: rgba(15, 23, 42, 0.96);
+    --app-surface: rgba(24, 33, 48, 0.96);
+    --app-surface-strong: rgba(17, 24, 39, 0.98);
+    --app-surface-raised: rgba(23, 32, 51, 0.98);
+    --app-surface-hover: rgba(255, 255, 255, 0.05);
+    --app-rail: rgba(15, 23, 42, 0.74);
+    --app-title: #f8fafc;
+    --app-text: #e2e8f0;
+    --app-muted: #94a3b8;
+    --app-primary: #60a5fa;
+  }
+}
+
 body {
   font-family: var(--app-font-sans);
   background:
@@ -61,6 +91,15 @@ body {
     radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 24%),
     radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.06), transparent 22%),
     linear-gradient(180deg, #050816 0%, #0f172a 56%, #111827 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body {
+    background:
+      radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 24%),
+      radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.06), transparent 22%),
+      linear-gradient(180deg, #050816 0%, #0f172a 56%, #111827 100%);
+  }
 }
 
 #hud,
