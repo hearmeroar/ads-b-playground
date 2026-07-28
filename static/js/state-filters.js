@@ -581,13 +581,12 @@ zoneSearchInput.addEventListener('input', () => {
 });
 zoneSearchInput.addEventListener('click', (e) => e.stopPropagation());
 zoneSearchInput.addEventListener('focus', () => {
-  if (zoneSearchInput.value.trim().length === 0) {
-    ensurePopularAirportsLoaded().then((airports) => {
-      if (airports && zoneSearchInput.value.trim().length === 0) {
-        renderZoneSearchResults(airports);
-      }
-    });
-  }
+  zoneSearchInput.select();
+  ensurePopularAirportsLoaded().then((airports) => {
+    if (airports) {
+      renderZoneSearchResults(airports);
+    }
+  });
 });
 zoneSearchInput.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {

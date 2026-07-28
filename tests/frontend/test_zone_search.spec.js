@@ -32,6 +32,13 @@ async function mockAirportSearchMulti(page, counts) {
   });
 }
 
+async function mockPopularAirports(page, counts) {
+  await page.route('**/api/airports/popular**', (route) => {
+    counts.n = (counts.n || 0) + 1;
+    route.fulfill({ json: { region: 'Europe', airports: [HEATHROW, GATWICK] } });
+  });
+}
+
 async function mockZonesActive(page, counts, response) {
   await page.route('**/api/zones/active', (route) => {
     counts.n = (counts.n || 0) + 1;
@@ -82,6 +89,43 @@ test('typing a valid query fetches results and renders them after the debounce',
   expect(resultText).toContain('LHR');
 });
 
+test('refocusing the zone search re-selects text and re-shows popular airports', async ({ page }) => {
+  const popularCounts = {};
+  await mockPopularAirports(page, popularCounts);
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  await page.click('#zone-search-input');
+  await expect(page.locator('#zone-search')).toHaveClass(/open/);
+  await expect(page.locator('#zone-search-results .dropdown-option')).toHaveCount(2);
+  expect(popularCounts.n).toBe(1);
+
+  await page.click('.zone-search-option');
+  await page.waitForTimeout(200);
+  expect(await page.inputValue('#zone-search-input')).toContain('London Heathrow Airport');
+  await expect(page.locator('#zone-search')).not.toHaveClass(/open/);
+
+  await page.locator('body').click({ position: { x: 4, y: 4 } });
+  await page.click('#zone-search-input');
+
+  const selection = await page.evaluate(() => {
+    const input = document.getElementById('zone-search-input');
+    return {
+      active: document.activeElement === input,
+      start: input.selectionStart,
+      end: input.selectionEnd,
+      valueLength: input.value.length,
+    };
+  });
+
+  expect(selection.active).toBe(true);
+  expect(selection.start).toBe(0);
+  expect(selection.end).toBe(selection.valueLength);
+  await expect(page.locator('#zone-search')).toHaveClass(/open/);
+  await expect(page.locator('#zone-search-results .dropdown-option')).toHaveCount(2);
+  expect(popularCounts.n).toBe(1);
+});
+
 test('selecting a result recenters the map and re-polls immediately', async ({ page }) => {
   const searchCounts = {};
   const zoneCounts = {};
@@ -116,9 +160,11 @@ test('selecting a result recenters the map and re-polls immediately', async ({ p
   // poll() fired right away rather than waiting for the next interval tick.
   expect(statesCounts.n).toBeGreaterThan(statesBefore);
 
-  // Selecting a result collapses the dropdown and fills the input.
-  await expect(page.locator('#zone-search')).not.toHaveClass(/open/);
   expect(await page.inputValue('#zone-search-input')).toContain('London Heathrow Airport');
+
+  // Clicking elsewhere still dismisses the dropdown after the selection.
+  await page.locator('body').click({ position: { x: 4, y: 4 } });
+  await expect(page.locator('#zone-search')).not.toHaveClass(/open/);
 });
 
 test('selecting a result rebuilds the scan-radius rings around the new center', async ({ page }) => {
@@ -269,8 +315,12 @@ test('Enter and Arrows do nothing when the dropdown is closed', async ({ page })
   await page.press('#zone-search-input', 'Escape');
   await expect(page.locator('#zone-search')).not.toHaveClass(/open/);
 
-  // Press Enter while dropdown is closed — should do nothing
-  await page.press('#zone-search-input', 'Enter');
+  // Move focus away so we're testing the closed state, not a fresh refocus.
+  await page.locator('body').click({ position: { x: 4, y: 4 } });
+
+  // Press Enter/ArrowDown while dropdown is closed — should do nothing
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(300);
 
   // No zone change request should have been made
