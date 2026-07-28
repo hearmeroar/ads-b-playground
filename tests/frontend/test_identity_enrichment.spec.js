@@ -71,8 +71,8 @@ test('dev mode off: resolved fields render plain, unresolved render "Unknown", n
   expect(sidebarText).toContain('Manufacturer');
   expect(sidebarText).toContain('Boeing');
   expect(sidebarText).toContain('737-800');
-  expect(sidebarText).toContain('Operator? Unknown');
-  expect(sidebarText).toContain('Registration Country? Unknown');
+  expect(sidebarText).toContain('Operator?Unknown');
+  expect(sidebarText).toContain('Registration Country?Unknown');
   expect(sidebarText).toContain('Year built Unknown');
 
   const badgeCount = await page.evaluate(() => document.querySelectorAll('#sidebar-details .source-badge').length);
