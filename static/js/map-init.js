@@ -227,6 +227,15 @@ function wireTileDiagnostics(layer, key) {
   });
   layer.on('load', () => {
     console.info('[map-diag] base layer finished loading visible tiles', key);
+    // Data can arrive and add markers well before the remote base tiles have
+    // finished loading in production. Repainting only at data-render time is
+    // therefore too early for Safari: the tile/marker panes can still become
+    // unpainted when WebKit commits those late tile images. Nudge it again at
+    // Leaflet's authoritative "all visible tiles loaded" point, which is
+    // independent of the aircraft polling pipeline.
+    forceMapRepaint();
+    const retryEl = document.getElementById('map-retry');
+    if (retryEl) retryEl.classList.add('hidden');
   });
 }
 for (const key of Object.keys(baseLayers)) wireTileDiagnostics(baseLayers[key], key);
