@@ -22,6 +22,30 @@ Added in an earlier pass: a forced-repaint nudge independent of size checks
 layer, and a last-resort visible retry control (`#map-retry`) if no tile
 paints within 4s of first load/paint.
 
+**Escalation tried and reverted (2026-07-29)**: a later pass (commit
+7f280f6, after everything below in this section) escalated further —
+set `window.L_DISABLE_3D = true` for Safari before `leaflet.js` loads,
+forcing `L.Browser.any3d = false` to rule out a GPU-compositing paint bug
+in Leaflet's 3D-transformed panes. Undocumented side effect found and
+confirmed live (Playwright + real WebKit) the same day: `any3d` also
+gates `map._zoomAnimated` in Leaflet's own source, so this silently killed
+*all* zoom/pan animation in Safari — every scroll-wheel/trackpad zoom
+became an instant, un-eased `_resetView` jump, and lost the animated
+zoom's natural throttling of overlapping zoom requests (measured: an
+identical wheel burst moved 11 zoom levels in Safari with animation
+disabled vs. 7, smoothly, in Chromium with it enabled). This is exactly
+the "smooth zoom" baseline `map_interaction_requirements` (`.ai/proposals/
+map-interactions-minimal-requirements-2026-07-22.md`) already calls
+non-negotiable, so the trade was rejected — **reverted** (`static/
+index.html`, the `L_DISABLE_3D` script block removed; matching WebKit-only
+regression test removed from `test_rendering.spec.js`). This re-opens the
+blank-map bug (back to "root cause unconfirmed") and adds a second thing
+to verify next time it's touched: confirm in real Safari both that (a) the
+blank-map bug's actual trigger (fast repeated reloads) still needs a fix,
+and (b) zoom/pan are smooth again post-revert. If GPU-compositing is
+revisited as a hypothesis, don't reach for the blanket `any3d` switch
+again without a plan for the zoom-animation side effect this time.
+
 **New lead, follow-up session**: user reports this reproduces "especially
 with fast repeated reloads in Safari." Tried to repro via Playwright+WebKit
 against the real prod URL (fresh contexts, then rapid same-tab

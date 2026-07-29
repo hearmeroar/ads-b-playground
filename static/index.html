@@ -619,20 +619,6 @@
   </div>
  </div>
 
-<!--
-  Leaflet uses GPU-backed 3D transforms for its panes by default. Safari can
-  leave those panes visually blank after fast repeated reloads even while the
-  DOM, tiles, and marker counts are all correct. This must run before
-  leaflet.js so its feature detection selects the stable 2D renderer only in
-  Safari; Chrome/Firefox retain Leaflet's normal accelerated path.
--->
-<script>
-  (function () {
-    const ua = navigator.userAgent;
-    const isSafari = /safari/i.test(ua) && !/(chrome|chromium|android|crios|fxios|edgios)/i.test(ua);
-    if (isSafari) window.L_DISABLE_3D = true;
-  })();
-</script>
 <script src="leaflet/leaflet.js" defer></script>
 <script src="leaflet-markercluster/leaflet.markercluster.js" defer></script>
 <script src="js/map-init.js" defer></script>

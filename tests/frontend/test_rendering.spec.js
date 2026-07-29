@@ -118,12 +118,3 @@ test('fast sources paint before a deliberately slow one resolves (two-phase rend
   const afterFinal = await colorCounts(page);
   expect(afterFinal.green + afterFinal.red + afterFinal.blue).toBeGreaterThan(0);
 });
-
-test('WebKit uses Leaflet\'s non-3D pane renderer to survive rapid reloads', async ({ page, browserName }) => {
-  test.skip(browserName !== 'webkit', 'Safari-specific regression guard');
-
-  // L_DISABLE_3D is set in index.html before leaflet.js executes. This avoids
-  // WebKit leaving Leaflet's GPU-composited panes blank while the same tiles
-  // and marker nodes still exist in the DOM after rapid reloads.
-  expect(await page.evaluate(() => L.Browser.any3d)).toBe(false);
-});

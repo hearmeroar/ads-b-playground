@@ -8,7 +8,14 @@
 // available (every other script here still assumes it's ready synchronously).
 // Zoom control moved to bottom-left: the sidebar (see #sidebar) docks to the
 // top-left corner and would otherwise sit on top of it.
-const map = L.map('map', { zoomControl: false }).setView([44.0, 21.0], 8);
+// wheelPxPerZoomLevel raised well above Leaflet's default (60): that default
+// is tuned for a mouse wheel's discrete "clicks", but a trackpad's smooth
+// scroll reports much larger pixel deltas per gesture, so the default made
+// a single trackpad swipe jump several zoom levels at once. A higher value
+// means more scroll distance is needed per zoom level, taming that to a
+// gentler, more controllable zoom without changing +/- button or
+// double-click zoom behavior (those use zoomDelta, left at its default).
+const map = L.map('map', { zoomControl: false, wheelPxPerZoomLevel: 240 }).setView([44.0, 21.0], 8);
 L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
 // Scan-radius range rings: shows where the four radius sources' shared
