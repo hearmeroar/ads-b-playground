@@ -619,6 +619,25 @@
   </div>
  </div>
 
+<!--
+  Self-healing fallback for the still-unconfirmed Safari blank-map bug (see
+  .ai/CURRENT.md): a prior attempt set window.L_DISABLE_3D unconditionally
+  for every Safari visitor (a UA guess), which silently killed Leaflet's
+  zoom/pan animation for all of them, bug or no bug — reverted. This reads a
+  sessionStorage flag instead, set only by map-init.js's
+  checkMapPaintedOrOfferRetry() after it has actually observed this specific
+  tab fail to paint any tile, then reloaded itself once to retry in 2D mode.
+  Must still run before leaflet.js so its any3d feature detection sees the
+  flag; a tab that never hits the bug never sets it and keeps full 3D/
+  animation.
+-->
+<script>
+  (function () {
+    try {
+      if (sessionStorage.getItem('mapForce2D') === '1') window.L_DISABLE_3D = true;
+    } catch (e) { /* sessionStorage unavailable (e.g. some private-browsing modes) — keep 3D on */ }
+  })();
+</script>
 <script src="leaflet/leaflet.js" defer></script>
 <script src="leaflet-markercluster/leaflet.markercluster.js" defer></script>
 <script src="js/map-init.js" defer></script>

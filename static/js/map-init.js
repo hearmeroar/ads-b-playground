@@ -292,14 +292,44 @@ function forceMapRepaint() {
 }
 
 // Last-resort recovery: if nothing has actually painted a few seconds after
-// the page's first paint attempt, the blank-map bug is happening right now
-// and there is currently no way for the user to recover short of a manual
-// reload. Surfaces a small retry control (reuses #map-loader's own visual
-// language) whose action re-runs the repaint nudge + invalidateSize().
+// the page's first paint attempt, the blank-map bug is happening right now.
+// Leading theory (still unconfirmed — see .ai/CURRENT.md): Safari's
+// compositor can leave Leaflet's transform-positioned tile/marker panes
+// uncomposited. Rather than disabling those transforms (and the
+// zoom/pan animation that depends on them, see the block above leaflet.js
+// in index.html) for every Safari visitor pre-emptively, this only reacts
+// once this specific tab has actually observed the failure: the first time
+// it happens, self-heal by reloading once with 3D transforms turned off
+// (sessionStorage-scoped to this tab, read by the inline script above
+// leaflet.js) rather than leaving the user staring at a blank map with only
+// a manual retry button. Leaflet's own any3d flag is a module-level
+// constant computed once when leaflet.js first parses, so flipping it for
+// an already-running map isn't possible without a real reload.
 function checkMapPaintedOrOfferRetry() {
   const loadedTiles = document.querySelectorAll('#map .leaflet-tile-loaded').length;
   if (loadedTiles > 0) return;
-  console.warn('[map-diag] no tiles painted after first-paint grace period; offering manual retry');
+
+  // Some Safari private-browsing configurations throw on sessionStorage
+  // access rather than just behaving like a no-op store; guarded so that
+  // alone can't stop the manual-retry banner further down from showing.
+  let alreadyAttemptedFallback = false;
+  try {
+    alreadyAttemptedFallback = sessionStorage.getItem('mapForce2DAttempted') === '1';
+  } catch (e) { /* fall through to the manual-retry banner below */ }
+  const alreadyIn2DFallback = !L.Browser.any3d;
+
+  if (L.Browser.safari && !alreadyIn2DFallback && !alreadyAttemptedFallback) {
+    try {
+      console.warn('[map-diag] no tiles painted after first-paint grace period; retrying once with 3D transforms disabled for this tab');
+      sessionStorage.setItem('mapForce2D', '1');
+      sessionStorage.setItem('mapForce2DAttempted', '1');
+      location.reload();
+      return;
+    } catch (e) { /* sessionStorage unavailable — fall through to manual retry */ }
+  }
+
+  console.warn('[map-diag] no tiles painted after first-paint grace period' +
+    (alreadyIn2DFallback ? ' (already in 2D fallback mode)' : '') + '; offering manual retry');
   const retryEl = document.getElementById('map-retry');
   if (retryEl) retryEl.classList.remove('hidden');
 }

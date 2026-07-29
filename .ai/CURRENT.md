@@ -46,6 +46,36 @@ and (b) zoom/pan are smooth again post-revert. If GPU-compositing is
 revisited as a hypothesis, don't reach for the blanket `any3d` switch
 again without a plan for the zoom-animation side effect this time.
 
+**Current approach, replacing the reverted escalation (2026-07-29)**: instead
+of a blanket UA-based `L_DISABLE_3D` guess paid by every Safari visitor, the
+fallback is now **symptom-triggered and tab-scoped**. `index.html`'s inline
+script (right before `leaflet.js`) only sets `window.L_DISABLE_3D` when
+`sessionStorage.mapForce2D === '1'` — nothing sets that flag until
+`checkMapPaintedOrOfferRetry()` (`map-init.js`) has actually observed *this
+tab* fail to paint a single tile within the existing 4s grace period. The
+first time that happens on a Safari tab, it sets `mapForce2D` +
+`mapForce2DAttempted` in sessionStorage and calls `location.reload()` once —
+a real reload is required since `L.Browser.any3d` is a Leaflet-module
+constant computed once at parse time, not something togglable on an
+already-running map. If tiles *still* don't paint after that one retry
+(`mapForce2DAttempted` already set), it falls through to the existing manual
+`#map-retry` banner instead of reloading again, so a non-compositor cause
+(e.g. a genuine network outage) can't loop forever. Net effect: a tab that
+never hits the bug keeps full 3D transforms and zoom/pan animation forever;
+a tab that does hit it self-heals within ~4s with no user action, at the
+cost of one extra reload, instead of either losing animation pre-emptively
+or being stuck on a blank map with only a manual button. Verified locally
+via Playwright+WebKit with all tile requests forced to fail (simulates the
+symptom regardless of its real cause): one reload, `any3d` false afterward,
+no second reload loop, manual retry banner still reachable as a last resort.
+**Still not verified against the real bug** — this is a mechanism, not a
+confirmed fix, since the actual root cause (why Safari's compositor
+supposedly leaves the panes blank) has never been reproduced in *any*
+Safari, real or automated (55 prior attempts against real prod all failed to
+repro). If a real Safari recurrence happens again, check whether
+`sessionStorage.mapForce2D` ends up set and whether the map actually
+recovers — that's the confirmation this fix still needs.
+
 **New lead, follow-up session**: user reports this reproduces "especially
 with fast repeated reloads in Safari." Tried to repro via Playwright+WebKit
 against the real prod URL (fresh contexts, then rapid same-tab
