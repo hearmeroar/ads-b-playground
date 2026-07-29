@@ -482,6 +482,13 @@ async function poll(opts = {}) {
     if (earlyFired) return;
     earlyFired = true;
     renderPoll(partial, { isFinal: false });
+    // The first source can now render before the rest have even answered.
+    // On WebKit that means Leaflet may add panes after the page-level load
+    // repaint already ran; nudge the compositor after the marker DOM exists,
+    // not merely when the document loaded. This is deliberately done for the
+    // final pass too: a later, higher-priority source can replace every early
+    // marker in one synchronous Leaflet update.
+    forceMapRepaint();
     markFirstPaint();
   };
   for (const name of Object.keys(fetches)) {
@@ -495,6 +502,7 @@ async function poll(opts = {}) {
   const settled = await Promise.all(Object.values(fetches));
   const final = Object.fromEntries(Object.keys(fetches).map((name, i) => [name, settled[i]]));
   renderPoll(final, { isFinal: true });
+  forceMapRepaint();
   markFirstPaint();
 }
 

@@ -242,11 +242,23 @@ baseLayers[currentBaseLayerKey].addTo(map);
 // that never actually forces WebKit to repaint. This forces a real
 // recomposite independently of any size check, by briefly giving #map its
 // own transformed layer and letting it go again next frame.
+let mapRepaintFrame = null;
+
 function forceMapRepaint() {
   const el = map.getContainer();
   el.classList.add('force-repaint');
   void el.offsetHeight; // flush layout so the class change is actually applied before removal
-  requestAnimationFrame(() => el.classList.remove('force-repaint'));
+  // Keep the temporary compositing layer alive for a complete rendered frame.
+  // Removing it in the very next rAF can happen before WebKit commits the
+  // layer containing Leaflet's tile and marker panes, which defeats the nudge
+  // precisely on a fast data-first render.
+  if (mapRepaintFrame) cancelAnimationFrame(mapRepaintFrame);
+  mapRepaintFrame = requestAnimationFrame(() => {
+    mapRepaintFrame = requestAnimationFrame(() => {
+      el.classList.remove('force-repaint');
+      mapRepaintFrame = null;
+    });
+  });
 }
 
 // Last-resort recovery: if nothing has actually painted a few seconds after
