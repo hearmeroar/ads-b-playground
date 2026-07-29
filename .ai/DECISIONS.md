@@ -338,3 +338,20 @@ and avoids adding sync machinery nothing needs yet.
 `tests/backend/test_sources_config.py`,
 `tests/frontend/test_sources_config.spec.js`,
 `.ai/proposals/source-visibility-config-2026-07-22.md`.
+
+---
+
+## 2026-07-29 — Safari blank-map fix: symptom-triggered self-heal, not a blanket 3D-disable
+
+**Problem:** An intermittent, never-reliably-reproduced bug (not even across ~55 scripted attempts against real prod) left `#map` fully blank (no tiles, no markers, HUD/data unaffected) for some Safari users in prod, correlated with fast repeated reloads. A same-day escalation (commit 7f280f6) set `window.L_DISABLE_3D = true` for every Safari visitor via UA sniffing, to rule out a WebKit GPU-compositing paint bug in Leaflet's transform-positioned panes. This "worked" (unconfirmed) but had an undocumented side effect: `L.Browser.any3d` also gates `map._zoomAnimated` in Leaflet's own source, so it silently killed *all* zoom/pan animation for every Safari visitor, bug or not — measured live (Playwright+WebKit): an identical wheel burst moved 11 zoom levels un-animated in Safari vs. 7, smoothly, in Chromium. This violated this project's own non-negotiable smooth-zoom baseline (`.ai/proposals/map-interactions-minimal-requirements-2026-07-22.md`), a trade nobody had actually signed off on when 7f280f6 shipped.
+
+**Decision:** Reverted the blanket `L_DISABLE_3D` UA guess. Replaced it with a **symptom-triggered, tab-scoped self-heal**: `index.html`'s inline script only sets `window.L_DISABLE_3D` when `sessionStorage.mapForce2D === '1'`; nothing sets that flag until `checkMapPaintedOrOfferRetry()` (`map-init.js`, already run 4s after first paint and after a bfcache `pageshow` restore) observes *this specific tab* fail to paint a single tile. The first time that happens on Safari, it sets `mapForce2D` + `mapForce2DAttempted` in `sessionStorage` and calls `location.reload()` once (required — `L.Browser.any3d` is a Leaflet-module constant computed once at parse time, not togglable on an already-running map). If tiles still don't paint after that one retry, it falls through to the pre-existing manual `#map-retry` banner rather than reloading again.
+
+**Reason:** Pays the animation cost only for the (apparently rare) tab that actually hits the bug, not for every Safari visitor on a pure guess. User confirmed in real prod Safari that the self-heal fixed the actual recurrence.
+
+**Tradeoffs:**
+- Root cause (why Safari's compositor allegedly leaves the panes blank) is still not confirmed via direct reproduction — this is empirically effective, not mechanistically proven. If a future recurrence resists this fallback, that's real signal the theory is wrong, not just bad luck.
+- Costs one extra full page reload for the affected tab (vs. an instant fix) — accepted since it's automatic and one-time per tab session, not a recurring cost.
+- If the underlying cause is ever something *other* than 3D-transform compositing, this mechanism does nothing and correctly falls through to the manual retry button instead of masking the real issue or looping.
+
+**References:** CLAUDE.md is not yet updated with this section (predates the fix); `.ai/CURRENT.md` § "Blank map on first load in Safari"; `static/index.html`, `static/js/map-init.js`'s `checkMapPaintedOrOfferRetry()`.
