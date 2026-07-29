@@ -213,6 +213,7 @@ for (const key of Object.keys(BASE_LAYERS)) {
 // one-line matchMedia check is duplicated rather than reordering scripts.
 const prefersDarkOnLoad = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 let currentBaseLayerKey = prefersDarkOnLoad ? 'dark' : 'voyager';
+let initialSafariViewportRecoveryDone = false;
 
 // Diagnostics for a still-unconfirmed Safari-only blank-map bug (found
 // 2026-07-28): the container-size theory behind the invalidateSize() calls
@@ -234,6 +235,19 @@ function wireTileDiagnostics(layer, key) {
     // Leaflet's authoritative "all visible tiles loaded" point, which is
     // independent of the aircraft polling pipeline.
     forceMapRepaint();
+    // Safari can retain the tile/marker panes in a visually empty compositor
+    // layer even though the tile images and markers exist in the DOM. A
+    // one-time Leaflet viewport reset rebuilds those panes without changing
+    // the user's center or zoom. Do this only after the first complete tile
+    // load, not per poll or per basemap swap.
+    if (L.Browser.safari && !initialSafariViewportRecoveryDone) {
+      initialSafariViewportRecoveryDone = true;
+      requestAnimationFrame(() => {
+        map.invalidateSize({ pan: false });
+        map.setView(map.getCenter(), map.getZoom(), { animate: false });
+        forceMapRepaint();
+      });
+    }
     const retryEl = document.getElementById('map-retry');
     if (retryEl) retryEl.classList.add('hidden');
   });
