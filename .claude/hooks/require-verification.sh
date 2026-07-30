@@ -21,8 +21,13 @@ deny() {
   exit 0
 }
 
+# Pseudo-flag, not real git syntax — allow() alone would let it reach real
+# git and fail with "unknown option", so strip it via updatedInput instead.
 if echo "$cmd" | grep -q -- '--no-verify-check\|--skip-verification'; then
-  allow
+  cleaned_cmd="$(echo "$cmd" | sed -E 's/[[:space:]]+--no-verify-check//g; s/[[:space:]]+--skip-verification//g')"
+  jq -n --arg cmd "$cleaned_cmd" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {command: $cmd}}}'
+  exit 0
 fi
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"

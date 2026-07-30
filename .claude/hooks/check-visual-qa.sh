@@ -29,8 +29,14 @@ fi
 # Intended for commits with no visible-behavior claim to verify (e.g. a
 # comment-only change) or a genuine emergency — not a routine bypass.
 # Supports both --no-visual-check (legacy) and --skip-verification (unified).
+# These are pseudo-flags real git does not understand, so `allow` alone
+# isn't enough — the command actually reaching git must have them stripped,
+# via updatedInput, or git itself fails with "unknown option".
 if echo "$cmd" | grep -q -- '--no-visual-check\|--skip-verification'; then
-  allow
+  cleaned_cmd="$(echo "$cmd" | sed -E 's/[[:space:]]+--no-visual-check//g; s/[[:space:]]+--skip-verification//g')"
+  jq -n --arg cmd "$cleaned_cmd" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {command: $cmd}}}'
+  exit 0
 fi
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
