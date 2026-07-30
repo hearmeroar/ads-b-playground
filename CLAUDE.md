@@ -2200,6 +2200,68 @@ final pass still hides it, so the empty map and error line remain reachable.
     wrong, not just superfluous. Unchecking it only gates *future*
     `loadAdsbdb()` calls (`adsbdbEnabled`) — it doesn't purge `adsbdbById`,
     same as every other lazy-cache in this app.
+- **ICAOList** (`enrichment/icaolist.py`, `enrichment/data/icaolist_*.json`,
+  2026-07-30): a bottom-tier local-lookup fallback sourced from
+  [rikgale/ICAOList](https://github.com/rikgale/ICAOList) (no LICENSE file
+  in that repo — same "used with attribution, bottom-tier only" posture
+  already accepted for airframesio/airline-images, see Airline logos
+  below), vendored the same one-off-script way as `opensky_year_built.json`.
+  Four generated JSON tables, each a *topup* for an existing enrichment
+  table, consulted only when that table's own tier already came up empty:
+  ICAO type designator → manufacturer/model (2764 entries, vs.
+  `aircraft_database.py`'s ~150 hand-curated `TYPE_CODE_TABLE`), a
+  registration-prefix → country table (219 entries, topping up
+  `registration.py`'s 193), an ICAO24 hex-block → country table (185
+  entries, topping up `icao24_allocation.py`'s 184 — e.g. Taiwan, which has
+  no block in the official ICAO Annex 10 table `icao24_allocation.py` uses
+  since Taiwan isn't an ICAO member state), and an airline-designator table
+  (1890 entries, generated with every code already in `callsign.py`'s own
+  ~5700-entry `AIRLINE_OPERATORS` excluded, so it's a genuine topup, not a
+  duplicate). `icaolist.country_for_registration_prefix()` deliberately
+  duplicates `registration.py`'s short-military-serial guard (a `"ZM337"`-
+  style 2-letter+digits serial is never treated as a civil nationality
+  mark) rather than importing it — a real regression was caught in testing
+  where skipping this guard let a military serial's bare 1-char fallback
+  falsely resolve a country via this table even though `registration.py`'s
+  own table correctly declines to.
+  **Unlike every other local-lookup tier, this one keeps its own distinct
+  `source: "icaolist"` rather than being folded into Flywme's single black
+  badge** — an explicit product decision (2026-07-30) so this broader-but-
+  less-vetted dataset's contribution stays visible/toggleable in its own
+  right, not anonymously mixed into Flywme's always-on guesses. Confidence
+  values sit below the equivalent existing-tier constant each lookup backs
+  up (e.g. 0.8 vs. `aircraft_type_db`'s 1.0), and an ICAOList-sourced
+  operator/operator_country gets the same `needs_corroboration` treatment
+  (suppressed for rotorcraft in normal mode) as a `callsign_decode` one,
+  computed against whichever ICAO24-block country resolved
+  (`icao24_allocation.py`'s own tier, or ICAOList's hex-range tier as a
+  second fallback) — its airline table includes military flight units
+  alongside real carriers, the same collision risk `callsign_decode`
+  already has. Frontend: its own swatch/badge color (`SOURCE_COLORS.icaolist`,
+  indigo `#4338ca`) and dev-mode-only toggle (`#source-icaolist`/
+  `#toggle-icaolist`, `icaolistEnabled` in `sidebar-track.js`), styled and
+  wired exactly like adsbdb's row above — hidden until Dev Mode is on,
+  checked by default. Unlike `adsbdbEnabled` (which gates a future network
+  call), this toggle gates purely at merge time in `buildMergedDetails()`:
+  an icaolist-sourced resolution (including its `country_iso` flag fill) is
+  skipped entirely while off, and toggling re-renders the open sidebar
+  immediately since there's no fetch to wait on — the data already arrived
+  inside the same `/api/identity` response every other local-lookup
+  technique uses. `sourceBadgeHtml()` (`constants.js`) gives it its own
+  tooltip text (`"ICAOList — computed from the rikgale/ICAOList dataset,
+  confidence N"`) via the same `data-detail` mechanism Flywme's badges use,
+  rather than a bespoke tooltip path. Known limitation: ~30 of the source
+  repo's registration-prefix/hex-range rows are UK/French/Dutch overseas
+  territories or Crown dependencies (Bermuda, Gibraltar, Guernsey, Jersey,
+  Kosovo, ...) with no distinct entry in this project's own `countries.py`
+  (scoped to ICAO member states) — dropped at generation time rather than
+  force-mapped to an unrelated parent state, the same "not exhaustive"
+  acceptance `countries.py`'s own docstring already documents. Tests:
+  `tests/backend/test_icaolist.py` (the module's own lookup functions plus
+  orchestrator integration, including the C0 short-circuit and the
+  military-serial-guard regression) and `tests/frontend/test_icaolist.spec.js`
+  (toggle visibility, badge/tooltip distinctness from Flywme, and the
+  toggle-off merge-time gating).
 - **Airline logos** (`static/airline-logos/`, `airlineLogoHtml()` in
   `static/js/render-details.js`): a small logo prefixed to the Operator row,
   looked up from the **3-letter ICAO airline designator that leads a flight

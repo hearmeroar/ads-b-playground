@@ -35,6 +35,16 @@ const enrichmentById = new Map(); // icao24 -> raw /api/identity response
 const adsbdbById = new Map(); // icao24 -> raw /api/adsbdb response
 let adsbdbEnabled = true;
 
+// icaolist-sourced fields live inside the same /api/identity response as
+// every other Flywme-computed field (enrich_identity() returns them
+// side-by-side, tagged source: "icaolist") — there's no separate network
+// call to gate the way adsbdbEnabled gates loadAdsbdb(), so this toggle is
+// applied purely at merge time in buildMergedDetails() below: an
+// icaolist-sourced resolution is skipped entirely (treated as if it were
+// never resolved) while this is false. Dev-mode-only, same idiom as
+// adsbdbEnabled/#toggle-adsbdb (state-filters.js).
+let icaolistEnabled = true;
+
 const ENRICHMENT_FIELD_MAP = {
   country: 'originCountry', operator: 'operator', operator_country: 'operatorCountry',
   registration: 'registration', manufacturer: 'manufacturer', model: 'model',
@@ -148,15 +158,20 @@ function buildMergedDetails(icao24) {
   if (enrichment) {
     for (const [beKey, feKey] of Object.entries(ENRICHMENT_FIELD_MAP)) {
       const resolved = enrichment[beKey];
-      if (beKey === 'country' && resolved && resolved.country_iso && !info.countryIso) {
+      // icaolist-sourced resolutions are gated by their own dev-mode-only
+      // toggle (see icaolistEnabled above) — treated as unresolved (flag
+      // included) while off, same as if enrich_identity() hadn't found
+      // this field at all.
+      const icaolistBlocked = resolved && resolved.source === 'icaolist' && !icaolistEnabled;
+      if (beKey === 'country' && resolved && !icaolistBlocked && resolved.country_iso && !info.countryIso) {
         info.countryIso = resolved.country_iso;
       }
       // Same rule for operator_country: its own dedicated field/flag,
       // never a decoration on Operator's own row (mirrors "country" above).
-      if (beKey === 'operator_country' && resolved && resolved.country_iso && !info.operatorCountryIso) {
+      if (beKey === 'operator_country' && resolved && !icaolistBlocked && resolved.country_iso && !info.operatorCountryIso) {
         info.operatorCountryIso = resolved.country_iso;
       }
-      if (!resolved) continue;
+      if (!resolved || icaolistBlocked) continue;
       const already = info[feKey] != null && info[feKey] !== '';
 
       if ((beKey === 'operator' || beKey === 'operator_country') && resolved.needs_corroboration) {
@@ -170,18 +185,23 @@ function buildMergedDetails(icao24) {
         if (!already && isRotorcraft && !currentDevMode) continue;
       }
 
+      // icaolist gets its own badge (SOURCE_COLORS.icaolist), not folded
+      // into Flywme's single black badge — see enrichment/icaolist.py's
+      // module docstring for why this one local-lookup tier stays visible
+      // in its own right.
+      const badgeSource = resolved.source === 'icaolist' ? 'icaolist' : 'flywme';
       if (already) {
         // Only co-display when enrichment resolved this field via a real
         // locally-computed tier (registration_prefix/icao24_lookup/
-        // callsign_decode/aircraft_type_db) — its own "live" tier just
-        // echoes back the same known_* hint the caller passed in, which
-        // isn't an independent guess worth badging a second time.
+        // callsign_decode/aircraft_type_db/icaolist) — its own "live" tier
+        // just echoes back the same known_* hint the caller passed in,
+        // which isn't an independent guess worth badging a second time.
         if (resolved.source === 'live') continue;
         if (!fieldSources[feKey]) fieldSources[feKey] = [];
-        if (!fieldSources[feKey].includes('flywme')) fieldSources[feKey].push('flywme');
+        if (!fieldSources[feKey].includes(badgeSource)) fieldSources[feKey].push(badgeSource);
       } else {
         info[feKey] = resolved.value;
-        fieldSources[feKey] = ['flywme'];
+        fieldSources[feKey] = [badgeSource];
       }
       fieldConfidence[feKey] = resolved.confidence;
       fieldComputationBasis[feKey] = resolved.source;

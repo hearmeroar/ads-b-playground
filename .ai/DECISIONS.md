@@ -355,3 +355,21 @@ and avoids adding sync machinery nothing needs yet.
 - If the underlying cause is ever something *other* than 3D-transform compositing, this mechanism does nothing and correctly falls through to the manual retry button instead of masking the real issue or looping.
 
 **References:** CLAUDE.md is not yet updated with this section (predates the fix); `.ai/CURRENT.md` § "Blank map on first load in Safari"; `static/index.html`, `static/js/map-init.js`'s `checkMapPaintedOrOfferRetry()`.
+
+---
+
+## 2026-07-30 — rikgale/ICAOList as its own bottom-tier source, not folded into Flywme
+
+**Problem:** `aircraft_database.py`'s hand-curated `TYPE_CODE_TABLE` covers only ~150 common types, and `registration.py`/`icao24_allocation.py`/`callsign.py` each have real, if small, coverage gaps (e.g. Taiwan has no ICAO24 block in the official Annex 10 table `icao24_allocation.py` uses, since Taiwan isn't an ICAO member state). [rikgale/ICAOList](https://github.com/rikgale/ICAOList) is a community-maintained dataset covering all four of these lookups far more broadly (2764 type designators, 219 reg prefixes, 185 hex ranges, 1890 airline codes not already in `callsign.py`'s own ~5700-entry table) — but it's less vetted than this project's existing curated/generated tables (ALL-CAPS source data, includes obscure homebuilt aircraft and military flight units alongside real carriers, no LICENSE file in the source repo).
+
+**Decision:** Vendored as 4 generated JSON files (`enrichment/data/icaolist_*.json`, same one-off-script convention as `opensky_year_built.json`), wired into `enrich_identity()` as a **bottom-tier fallback** for each of the four existing tables — consulted only when the tier above already came up empty. Unlike every other local-lookup technique (`registration_prefix`/`icao24_lookup`/`callsign_decode`/`aircraft_type_db`, all folded into one "Flywme" badge), a field resolved via ICAOList keeps its own distinct `source: "icaolist"`, its own badge color (indigo), and its own dev-mode-only toggle (`#source-icaolist`/`#toggle-icaolist`), mirroring adsbdb.com's row rather than Flywme's always-on black badge.
+
+**Reason:** Explicit product decision (2026-07-30, in response to the user's own request) — this dataset's broader-but-less-vetted coverage should stay visible and independently toggleable, not silently mixed into Flywme's already-trusted local computations. An operator/QA reviewer should be able to tell "this came from ICAOList" apart from "this came from our own curated table" at a glance in dev mode.
+
+**Tradeoffs:**
+- Confidence values for every ICAOList tier sit below the equivalent existing-tier constant it backs up (e.g. 0.8 vs. `aircraft_type_db`'s 1.0) — a deliberate signal that this data is less trustworthy, even though the priority chain already guarantees it's never reached when a more curated tier has an answer.
+- `icaolist.country_for_registration_prefix()` has to duplicate `registration.py`'s short-military-serial guard rather than import it (a real regression was caught in testing: without the guard, a `"ZM337"`-style military serial's 1-char fallback falsely resolved a country via this table).
+- ~30 of the source repo's country names are UK/French/Dutch overseas territories or Crown dependencies with no distinct entry in this project's own `countries.py` (scoped to ICAO member states) — dropped at generation time, not force-mapped to an unrelated parent state; accepted as a "not exhaustive" limitation, same posture `countries.py`'s own docstring already takes for very small territories.
+- No LICENSE file in the source repo — used the same way as `airframesio/airline-images` elsewhere in this project: a small attributed extract, bottom-tier fallback only, not a redistribution.
+
+**References:** CLAUDE.md § "ICAOList", `enrichment/icaolist.py`, `enrichment/aircraft_enrichment.py`, `static/js/constants.js`, `static/js/sidebar-track.js`, `static/js/state-filters.js`, `tests/backend/test_icaolist.py`, `tests/frontend/test_icaolist.spec.js`.

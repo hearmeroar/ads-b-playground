@@ -71,6 +71,12 @@ const SOURCE_COLORS = {
   // actually have their own polled markers. Pink, distinct from every color
   // above and from Flywme's black.
   adsbdb: '#ec4899',
+  // rikgale/ICAOList (enrichment/icaolist.py) — a bottom-tier local lookup
+  // dataset, same "no per-poll marker" category as adsbdb/Flywme, but kept
+  // as its own distinct badge/toggle rather than folded into Flywme's
+  // single black badge (see icaolist.py's module docstring). Indigo,
+  // distinct from every color above.
+  icaolist: '#4338ca',
   // Flywme is a separate synthetic source — "this application" — used for
   // identity fields it computed itself (registration prefix/ICAO24 lookup/
   // callsign decode/aircraft-type db) rather than read from a live feed.
@@ -100,6 +106,7 @@ const SOURCE_DISPLAY_NAMES = {
   adsbone: 'adsb.one', airplaneslive: 'airplanes.live', aircraftscatter: 'Aircraft Scatter', flightaware: 'FlightAware',
   flightradar24: 'FlightRadar24',
   adsbdb: 'adsbdb.com',
+  icaolist: 'ICAOList',
   flywme: 'Flywme',
 };
 // Human labels for the *technique* Flywme used to compute a field — tooltip
@@ -187,15 +194,21 @@ function sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputati
   const sources = [...new Set(keys.flatMap((k) => fieldSources[k] || []))];
   return sources.map((s) => {
     let detailAttr = '';
-    if (s === 'flywme' && !Array.isArray(fieldKey)) {
-      const basis = ENRICHMENT_BASIS_LABELS[fieldComputationBasis[fieldKey]] || 'this application';
+    if ((s === 'flywme' || s === 'icaolist') && !Array.isArray(fieldKey)) {
+      // icaolist's own resolved.source is literally "icaolist" (it's its
+      // own badge, not a Flywme technique) — falls back to the generic
+      // label below rather than an ENRICHMENT_BASIS_LABELS lookup.
+      const basis = s === 'icaolist'
+        ? 'the rikgale/ICAOList dataset'
+        : (ENRICHMENT_BASIS_LABELS[fieldComputationBasis[fieldKey]] || 'this application');
       const conf = fieldConfidence[fieldKey];
       let detail = 'computed from ' + basis + (conf != null ? ', confidence ' + conf.toFixed(1) : '');
-      // Set only for a callsign-decoded operator/operator_country whose
-      // claimed country disagrees with the aircraft's own ICAO24 hex-block
-      // country (see enrich_identity()) — extra debugging context even when
-      // the value itself still displays normally (non-rotorcraft; a
-      // rotorcraft instead gets a visible tag, see renderDetailsHtml).
+      // Set only for a callsign-decoded (or ICAOList-airline-decoded)
+      // operator/operator_country whose claimed country disagrees with the
+      // aircraft's own ICAO24 hex-block country (see enrich_identity()) —
+      // extra debugging context even when the value itself still displays
+      // normally (non-rotorcraft; a rotorcraft instead gets a visible tag,
+      // see renderDetailsHtml).
       if (fieldNeedsCorroboration[fieldKey]) {
         detail += ' — unconfirmed: conflicts with the aircraft’s own ICAO24 hex-address country';
       }

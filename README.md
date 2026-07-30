@@ -195,6 +195,15 @@ elsewhere stays a plain in-memory dict.
   it's treated as a hypothesis: a geometric check compares the aircraft's
   actual position/track/speed/altitude against the claimed route and flags
   (rather than hides) one that doesn't add up.
+- **ICAOList lookup** — a bottom-tier fallback for the identity-enrichment
+  tables above, sourced from [rikgale/ICAOList](https://github.com/rikgale/ICAOList)
+  (aircraft type designators, registration prefixes, ICAO24 hex blocks,
+  airline codes), consulted only when this app's own curated/generated
+  tables have nothing. Broader coverage but less vetted, so it gets its own
+  distinct dev-mode badge/toggle rather than being folded into the
+  "Flywme" dot above — an operator or reviewer can tell at a glance which
+  values came from this app's own curated data versus this community
+  dataset.
 - Optional OAuth2 auth against OpenSky for a much higher daily quota than
   anonymous access.
 - Optional OAuth2 auth against OpenSky for a much higher daily quota than
@@ -405,3 +414,8 @@ David Taylor (Edinburgh) and Jim Mason (Glasgow), and
 — logos remain the property of their respective airlines.
 
 **Airport data** via [OurAirports](https://ourairports.com/data/) (public domain / CC0).
+
+**Aircraft type, registration-prefix, ICAO24 hex-range, and airline-designator
+lookup data** via [rikgale/ICAOList](https://github.com/rikgale/ICAOList) — no
+LICENSE file in that repo; used here as a small attributed extract, a
+bottom-tier fallback only, not a redistribution of the dataset.

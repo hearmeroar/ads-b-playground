@@ -2,8 +2,16 @@
 short-circuiting at the first tier that produces a value. A live-feed value
 (already known to the caller) always wins over every local lookup table —
 enrichment only ever fills a gap the live feeds didn't cover.
+
+Each of registration.py/icao24_allocation.py/callsign.py/aircraft_database.py's
+own tables has a matching bottom-tier fallback in icaolist.py (rikgale/
+ICAOList, see that module's docstring) — consulted only when the tier above
+it came up empty. Unlike every other local-lookup tier, an icaolist-sourced
+field keeps `source: "icaolist"` rather than being folded into "Flywme" on
+the frontend, so its coverage stays visible/toggleable in its own right.
 """
 
+from . import icaolist
 from .aircraft_category import category_for_aircraft
 from .aircraft_database import DEFAULT_AIRCRAFT_DATABASE, normalize_aircraft_type
 from .callsign import decode_callsign
@@ -131,6 +139,19 @@ def enrich_identity(
     # fallback for when no ICAO code was available at all.
     type_normalized = normalize_aircraft_type(icao_type_code) or normalize_aircraft_type(aircraft_type)
 
+    # rikgale/ICAOList (enrichment/icaolist.py) -- a broader but less-vetted
+    # bottom-tier fallback for each of the four lookups above, only ever
+    # consulted when the equivalent hand-curated/generated table already
+    # came up empty (see that module's docstring for why it's its own
+    # source rather than folded into Flywme below).
+    icaolist_type = icaolist.lookup_type(icao_type_code)
+    icaolist_reg_country = icaolist.country_for_registration_prefix(registration)
+    icaolist_hex_country = icaolist.country_for_icao24_hex(icao24)
+    icaolist_airline = icaolist.lookup_airline(callsign)
+    # Used for the corroboration check below: whichever ICAO24-block
+    # country resolved, existing tier preferred over ICAOList's own.
+    icao24_country_effective = icao24_country or icaolist_hex_country
+
     # --- country ---
     country = _live(known_country)
     if country:
@@ -158,6 +179,18 @@ def enrich_identity(
             "confidence": icao24_country["confidence"],
             "country_iso": icao24_country["country_iso"],
         }
+    if not country and icaolist_reg_country:
+        country = {
+            "value": icaolist_reg_country["country"], "source": icaolist_reg_country["source"],
+            "confidence": icaolist_reg_country["confidence"],
+            "country_iso": icaolist_reg_country["country_iso"],
+        }
+    if not country and icaolist_hex_country:
+        country = {
+            "value": icaolist_hex_country["country"], "source": icaolist_hex_country["source"],
+            "confidence": icaolist_hex_country["confidence"],
+            "country_iso": icaolist_hex_country["country_iso"],
+        }
     # Deliberately no callsign_decode tier for country: a callsign only
     # tells you the operator's home country, not the aircraft's country of
     # registration — conflating the two under one "Country" field is what
@@ -171,8 +204,19 @@ def enrich_identity(
     cs_needs_corroboration = bool(
         cs_decoded
         and cs_decoded.get("country_iso")
-        and icao24_country
-        and cs_decoded["country_iso"] != icao24_country["country_iso"]
+        and icao24_country_effective
+        and cs_decoded["country_iso"] != icao24_country_effective["country_iso"]
+    )
+    # Same corroboration signal, for ICAOList's own airline tier -- it's
+    # exactly as exposed to the government/EMS/military callsign-collision
+    # risk decode_callsign() is (see this module's own docstring), if not
+    # more so, since ICAOList's airline table includes military flight
+    # units alongside real carriers.
+    icaolist_airline_needs_corroboration = bool(
+        icaolist_airline
+        and icaolist_airline.get("country_iso")
+        and icao24_country_effective
+        and icaolist_airline["country_iso"] != icao24_country_effective["country_iso"]
     )
 
     # --- operator ---
@@ -189,6 +233,13 @@ def enrich_identity(
         }
         if cs_needs_corroboration:
             operator["needs_corroboration"] = True
+    if not operator and icaolist_airline:
+        operator = {
+            "value": icaolist_airline["operator"], "source": icaolist_airline["source"],
+            "confidence": icaolist_airline["confidence"],
+        }
+        if icaolist_airline_needs_corroboration:
+            operator["needs_corroboration"] = True
 
     # --- operator_country (the operating airline's home country — a
     # distinct concept from "country", which is the aircraft's own
@@ -201,6 +252,14 @@ def enrich_identity(
             "country_iso": cs_decoded["country_iso"],
         }
         if cs_needs_corroboration:
+            operator_country["needs_corroboration"] = True
+    elif icaolist_airline and icaolist_airline.get("country"):
+        operator_country = {
+            "value": icaolist_airline["country"], "source": icaolist_airline["source"],
+            "confidence": icaolist_airline["country_confidence"],
+            "country_iso": icaolist_airline["country_iso"],
+        }
+        if icaolist_airline_needs_corroboration:
             operator_country["needs_corroboration"] = True
 
     # --- registration ---
@@ -235,6 +294,16 @@ def enrich_identity(
         model = {
             "value": type_normalized["model"], "source": type_normalized["source"],
             "confidence": type_normalized["confidence"],
+        }
+    elif icaolist_type:
+        manufacturer = {
+            "value": icaolist_type["manufacturer"], "source": icaolist_type["source"],
+            "confidence": icaolist_type["confidence"],
+        }
+        manufacturer["value"] = normalize_manufacturer(manufacturer["value"])
+        model = {
+            "value": icaolist_type["model"], "source": icaolist_type["source"],
+            "confidence": icaolist_type["confidence"],
         }
 
     # --- year_built ---

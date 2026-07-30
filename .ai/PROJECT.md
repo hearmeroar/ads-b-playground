@@ -42,7 +42,8 @@ These are lines that must never be crossed without explicit review and documente
 │   ├── aircraft_category.py
 │   ├── icao24_allocation.py
 │   ├── airports.py
-│   └── data/                # Vendored CSVs (opensky_year_built.json, ourairports.json)
+│   ├── icaolist.py          # rikgale/ICAOList bottom-tier topup (own "icaolist" source, not folded into Flywme)
+│   └── data/                # Vendored CSVs (opensky_year_built.json, ourairports.json, icaolist_*.json)
 ├── static/
 │   ├── index.html           # Markup (one page, no SPA framework)
 │   ├── style.css            # Legacy styling layer (compatibility / load-order-sensitive rules)

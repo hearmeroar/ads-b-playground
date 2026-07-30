@@ -92,9 +92,16 @@ const devModeToggle = document.getElementById('toggle-dev-mode');
 // #opensky-help's quota-lockout state, just driven by this toggle instead.
 const adsbdbSourceRow = document.getElementById('source-adsbdb');
 const adsbdbToggle = document.getElementById('toggle-adsbdb');
+// Same dev-mode-only reveal as adsbdbSourceRow above, for the ICAOList
+// bottom-tier lookup dataset (enrichment/icaolist.py) — see that module's
+// docstring for why it's a distinct toggle/badge rather than folded into
+// Flywme's own always-on local lookups.
+const icaolistSourceRow = document.getElementById('source-icaolist');
+const icaolistToggle = document.getElementById('toggle-icaolist');
 devModeToggle.addEventListener('change', () => {
   currentDevMode = devModeToggle.checked;
   adsbdbSourceRow.style.display = currentDevMode ? '' : 'none';
+  icaolistSourceRow.style.display = currentDevMode ? '' : 'none';
   devAircraftPanel.style.display = currentDevMode ? '' : 'none';
   // Reveals the whole per-source toggle list (style.css's #hud .sources
   // rule) — a Dev Mode-only feature, same idiom as adsbdbSourceRow above,
@@ -112,6 +119,14 @@ devModeToggle.addEventListener('change', () => {
 });
 adsbdbToggle.addEventListener('change', () => {
   adsbdbEnabled = adsbdbToggle.checked;
+});
+icaolistToggle.addEventListener('change', () => {
+  icaolistEnabled = icaolistToggle.checked;
+  // Unlike adsbdbEnabled (gates a future network call), this only changes
+  // how an already-fetched /api/identity response is merged — re-render
+  // immediately so toggling is visibly instant, same as the dev-mode
+  // toggle itself.
+  if (selectedIcao24 != null) renderSelectedDetails();
 });
 
 let autoCenterOnSelect = true;

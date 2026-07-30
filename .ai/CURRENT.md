@@ -14,3 +14,14 @@ real recurrence in prod Safari, replacing an earlier blanket
 `L_DISABLE_3D` workaround that had silently killed zoom/pan animation for
 every Safari visitor. Full rationale, the mechanism, and the earlier
 escalation-and-revert: `.ai/DECISIONS.md` ("Safari blank-map fix").
+
+## ✅ rikgale/ICAOList bottom-tier enrichment source (completed 2026-07-30)
+
+Added `enrichment/icaolist.py` (4 vendored JSON tables generated from
+github.com/rikgale/ICAOList) as a bottom-tier fallback for identity
+enrichment — consulted only after every existing curated/generated local
+table and adsbdb.com have already come up empty. Kept as its own distinct
+`source: "icaolist"` with its own badge color and dev-mode-only toggle
+(`#source-icaolist`), rather than folded into Flywme's single badge, per
+explicit request. Full rationale: `.ai/DECISIONS.md` ("rikgale/ICAOList as
+its own bottom-tier source").

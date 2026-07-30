@@ -478,6 +478,15 @@
         <span class="switch-track"></span>
       </label>
     </div>
+    <div class="source-row" id="source-icaolist" style="display:none"
+      title="rikgale/ICAOList — a local, bottom-tier fallback dataset (type designators, registration prefixes, ICAO24 blocks, airline codes), consulted only when every higher tier (live feed, adsbdb.com, this app's own curated tables) found nothing. No per-poll fetch — no marker/count of its own. Only shown while dev mode is on.">
+      <span class="swatch" style="background:#4338ca"></span>
+      <span class="source-name">ICAOList</span>
+      <label class="switch" style="--row-color:#4338ca">
+        <input type="checkbox" id="toggle-icaolist" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
 
     <!-- Per-source toggle list — grouped here alongside adsbdb.com rather
          than living up near the search box, since both are dev-mode-only
