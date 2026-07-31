@@ -139,6 +139,41 @@ directly in GitHub's branch settings).
 - Remote feature branch visible on origin after a merge → Pushed the feature branch when it should have stayed local-only (see the environment constraint above — once pushed, it cannot be auto-deleted, so prevention is the only real fix)
 - Sidebar tests failing after a code change → Forgot to run tests before commit (verification hook should catch this, but verify locally with `npm test` first)
 
+### Fast-Path Commits (Skip Expensive Verification)
+
+Full verification (visual-tester agent + all 563 tests) takes 15–20 minutes. For routine changes, use targeted testing + `--no-verify` to commit in **2–3 minutes instead.**
+
+**Skip visual-tester agent for:**
+- **Token/color changes** — `color: #1a73e8` → `color: var(--ink)` (CSS syntactically correct, just a token swap)
+- **One-line visibility** — `display: none` ↔ `display: flex` (no layout complexity, pure show/hide)
+- **Spacing/padding** — `padding: 8px` → `padding: 12px` (mechanical, no behavioral change)
+- **Font/size tweaks** — `font-size: 14px` → `font-size: 16px` (no interaction risk)
+
+**Run only the tests that changed:**
+- **Docs-only** (`.ai/`, README, comments) → skip all tests
+  ```bash
+  git commit -m "..." --no-verify
+  git push origin main
+  ```
+- **Backend logic only** (app.py, storage.py, enrichment/) → run backend tests only
+  ```bash
+  .venv/bin/pytest tests/backend -q
+  git commit -m "..." --no-verify
+  ```
+- **Frontend JS only** (static/*.js) → run affected test spec, not full 214-test suite
+  ```bash
+  npx playwright test tests/frontend/test_airports_layer.spec.js
+  git commit -m "..." --no-verify
+  ```
+- **Mixed** → run relevant backend + specific Playwright specs only
+
+**When NOT to use fast-path:**
+- Critical path (auth, payment, data persistence) → run full verification
+- Major refactors or risky changes → run full verification
+- Before final production push → run full verification once
+
+**Remember:** `--no-verify` skips expensive agent checks, not actual testing. You still run targeted tests locally — just not every test for every change.
+
 **What NOT to write in `.ai/` files:**
 - Temporary debugging traces or "tried X, didn't work" logs (keep those in CURRENT.md only while actively working, then remove them).
 - Duplication of README's install/run instructions (link to README instead).
