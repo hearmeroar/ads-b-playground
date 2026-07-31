@@ -37,6 +37,22 @@ function isSourceEnabled(name) {
   return sourceToggles[name].checked;
 }
 
+// Aircraft Scatter has a ~1000 km fixed coverage radius vs. 220 nm for other
+// sources. When toggled, rebuild the scan-radius rings to optionally show
+// its larger coverage area (if enabled and if it's larger than the base radius).
+sourceToggles.aircraftscatter.addEventListener('change', () => {
+  if (scanRadiusLayer && map.hasLayer(scanRadiusLayer) && currentAreaCenter && currentAreaRadiusNm) {
+    const wasShown = map.hasLayer(scanRadiusLayer);
+    if (wasShown) map.removeLayer(scanRadiusLayer);
+    // Rebuild with or without Aircraft Scatter's optional radius.
+    const optionalRadius = sourceToggles.aircraftscatter.checked && AIRCRAFT_SCATTER_RADIUS_NM > currentAreaRadiusNm
+      ? AIRCRAFT_SCATTER_RADIUS_NM
+      : null;
+    scanRadiusLayer = buildScanRadiusLayer(currentAreaCenter.lat, currentAreaCenter.lon, currentAreaRadiusNm, optionalRadius);
+    if (wasShown) scanRadiusLayer.addTo(map);
+  }
+});
+
 // Motion filter ('all' | 'airborne' | 'ground') is a filter, not a data
 // source. Unlike source toggles, it doesn't gate any fetch — it's applied
 // while each source builds its marker items, using OpenSky's own `on_ground`
@@ -582,13 +598,16 @@ function selectZoneSearchResult(airport) {
     .then((cfg) => {
       map.setView([cfg.center.lat, cfg.center.lon], map.getZoom());
       if (cfg && cfg.center) currentAreaCenter = cfg.center;
+      if (cfg && cfg.active_zone_id) currentActiveZoneId = cfg.active_zone_id;
       // Scan-radius rings are centered where they were built (initial
       // /api/config load) and don't otherwise track the map view — without
       // rebuilding them here they'd keep circling the old zone's center.
       if (cfg && cfg.center && cfg.radius_nm) {
+        currentAreaRadiusNm = cfg.radius_nm;
         const wasShown = map.hasLayer(scanRadiusLayer);
         if (wasShown) map.removeLayer(scanRadiusLayer);
-        scanRadiusLayer = buildScanRadiusLayer(cfg.center.lat, cfg.center.lon, cfg.radius_nm);
+        const optionalRadius = AIRCRAFT_SCATTER_RADIUS_NM > cfg.radius_nm ? AIRCRAFT_SCATTER_RADIUS_NM : null;
+        scanRadiusLayer = buildScanRadiusLayer(cfg.center.lat, cfg.center.lon, cfg.radius_nm, optionalRadius);
         if (wasShown) scanRadiusLayer.addTo(map);
       }
       setZoneSearchStatus(null);

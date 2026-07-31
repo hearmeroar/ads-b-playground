@@ -27,6 +27,20 @@ L.control.zoom({ position: 'bottomleft' }).addTo(map);
 // display-only layer, not added to the map until toggled on.
 const NM_TO_M = 1852;
 
+// Aircraft Scatter has a fixed ~1000 km coverage radius (vs. configurable 220 nm
+// for other sources). Used for optional expanded ring display when enabled.
+const AIRCRAFT_SCATTER_RADIUS_KM = 1000;
+const AIRCRAFT_SCATTER_RADIUS_NM = Math.round(AIRCRAFT_SCATTER_RADIUS_KM / 1.852);
+
+function getEffectiveRadiusNm(baseRadiusNm) {
+  // If Aircraft Scatter is enabled and its radius is larger than the base
+  // radius, return its radius for ring display; otherwise return base radius.
+  // This function is called from map-init.js (before state-filters.js loads),
+  // so we check isSourceEnabled indirectly via a later callback rather than
+  // calling it here.
+  return baseRadiusNm;
+}
+
 // Picks a round ring spacing so the radius divides into a readable ~5 or
 // fewer rings, rather than an arbitrary fraction of the radius (e.g. 3
 // evenly-spaced rings would label "73 nm" — not a distance anyone reads at
@@ -49,7 +63,7 @@ function ringLabelMarker(centerLat, centerLon, distanceNm, text, extraClass) {
   });
 }
 
-function buildScanRadiusLayer(centerLat, centerLon, radiusNm) {
+function buildScanRadiusLayer(centerLat, centerLon, radiusNm, optionalRadiusNm) {
   const layer = L.layerGroup();
   const step = niceRingStepNm(radiusNm);
   for (let d = step; d < radiusNm; d += step) {
@@ -68,6 +82,17 @@ function buildScanRadiusLayer(centerLat, centerLon, radiusNm) {
     fill: false, interactive: false,
   }).addTo(layer);
   ringLabelMarker(centerLat, centerLon, radiusNm, 'Scan radius (' + radiusNm + ' nm)', 'radius-ring-label-edge').addTo(layer);
+
+  // If an optional larger radius is provided (e.g., Aircraft Scatter's
+  // ~540 nm / 1000 km coverage), draw it as a separate outer ring.
+  if (optionalRadiusNm && optionalRadiusNm > radiusNm) {
+    L.circle([centerLat, centerLon], {
+      radius: optionalRadiusNm * NM_TO_M, color: '#8b5cf6', weight: 1.5, dashArray: '3,3',
+      fill: false, interactive: false,
+    }).addTo(layer);
+    ringLabelMarker(centerLat, centerLon, optionalRadiusNm, 'Aircraft Scatter (' + optionalRadiusNm + ' nm)', 'radius-ring-label-edge').addTo(layer);
+  }
+
   return layer;
 }
 
@@ -86,16 +111,23 @@ let scanRadiusLayer = L.layerGroup();
 // distance instead of bare coordinates. null until the first /api/config
 // resolves; a card save that races that window just shows bare coordinates.
 let currentAreaCenter = null;
+let currentActiveZoneId = null;
+let currentAreaRadiusNm = null; // Used to rebuild rings when Aircraft Scatter is toggled
 
 fetch('/api/config')
   .then((resp) => resp.json())
   .then((cfg) => {
     if (cfg && cfg.center) map.setView([cfg.center.lat, cfg.center.lon], cfg.zoom);
     if (cfg && cfg.center) currentAreaCenter = cfg.center;
+    if (cfg && cfg.active_zone_id) currentActiveZoneId = cfg.active_zone_id;
     if (cfg && cfg.center && cfg.radius_nm) {
+      currentAreaRadiusNm = cfg.radius_nm;
       const wasShown = map.hasLayer(scanRadiusLayer);
       if (wasShown) map.removeLayer(scanRadiusLayer);
-      scanRadiusLayer = buildScanRadiusLayer(cfg.center.lat, cfg.center.lon, cfg.radius_nm);
+      // Aircraft Scatter has a much larger ~1000 km coverage radius; include
+      // it as an optional outer ring if it would be wider than the base radius.
+      const optionalRadius = AIRCRAFT_SCATTER_RADIUS_NM > cfg.radius_nm ? AIRCRAFT_SCATTER_RADIUS_NM : null;
+      scanRadiusLayer = buildScanRadiusLayer(cfg.center.lat, cfg.center.lon, cfg.radius_nm, optionalRadius);
       if (wasShown) scanRadiusLayer.addTo(map);
     }
   })
@@ -649,6 +681,10 @@ function airportPopupHtml(airport) {
     .filter(Boolean).join(', ');
   const elevation = airport.elevation_ft != null ? Math.round(airport.elevation_ft * FT_TO_M) + ' m' : null;
 
+  // Check if this is the current airport (zone)
+  const airportId = airport.icao || airport.ident;
+  const isCurrentAirport = airportId && currentActiveZoneId && airportId === currentActiveZoneId;
+
   let html = '<div class="airport-popup-card">';
   html += '<div class="airport-popup-header">';
   html += '<span class="airport-popup-icon">' + airportPopupIconSvg(airport.type) + '</span>';
@@ -666,8 +702,59 @@ function airportPopupHtml(airport) {
   if (elevation) {
     html += '<div class="airport-popup-row airport-popup-row-muted">Elevation: ' + elevation + '</div>';
   }
+  if (isCurrentAirport) {
+    html += '<div class="airport-popup-current">✓ Current airport</div>';
+  } else {
+    html += '<button class="jump-to-airport-btn" style="width: 100%; margin-top: 8px; padding: 8px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">Jump to airport</button>';
+  }
   html += '</div>';
   return html;
+}
+
+function jumpToAirport(airport) {
+  const statusEl = document.getElementById('zone-search-status');
+  if (statusEl) statusEl.textContent = 'Moving to ' + airport.name + '…';
+
+  fetch('/api/zones/active', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      lat: airport.lat,
+      lon: airport.lon,
+      zone_id: airport.icao || airport.ident || undefined,
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error('zone_change_failed');
+      return res.json();
+    })
+    .then((cfg) => {
+      map.setView([cfg.center.lat, cfg.center.lon], map.getZoom());
+      if (cfg && cfg.center) currentAreaCenter = cfg.center;
+      if (cfg && cfg.active_zone_id) currentActiveZoneId = cfg.active_zone_id;
+      // Scan-radius rings are centered where they were built (initial
+      // /api/config load) and don't otherwise track the map view — without
+      // rebuilding them here they'd keep circling the old zone's center.
+      if (cfg && cfg.center && cfg.radius_nm) {
+        currentAreaRadiusNm = cfg.radius_nm;
+        const wasShown = map.hasLayer(scanRadiusLayer);
+        if (wasShown) map.removeLayer(scanRadiusLayer);
+        const optionalRadius = AIRCRAFT_SCATTER_RADIUS_NM > cfg.radius_nm ? AIRCRAFT_SCATTER_RADIUS_NM : null;
+        scanRadiusLayer = buildScanRadiusLayer(cfg.center.lat, cfg.center.lon, cfg.radius_nm, optionalRadius);
+        if (wasShown) scanRadiusLayer.addTo(map);
+      }
+      if (statusEl) statusEl.textContent = '';
+      poll(); // re-fetch aircraft immediately instead of waiting for the next tick
+      // Airports layer re-fetches on its own: setView() fires Leaflet's
+      // moveend, which map-init.js's scheduleAirportsRefresh already
+      // listens on. METAR/SIGMET are timer-only (no moveend listener), so
+      // they need an explicit nudge when enabled.
+      if (weatherMetarState.enabled) refreshMetar();
+      if (weatherSigmetState.enabled) refreshSigmet();
+    })
+    .catch(() => {
+      if (statusEl) statusEl.textContent = 'Could not switch zone — try again.';
+    });
 }
 
 function refreshAirportsInView() {
@@ -691,6 +778,16 @@ function refreshAirportsInView() {
         if (airport.lat == null || airport.lon == null) continue;
         const marker = L.marker([airport.lat, airport.lon], { icon: airportIcon(airport.type), pane: 'airportPane' });
         marker.bindPopup(airportPopupHtml(airport), { className: 'airport-popup', minWidth: 170, maxWidth: 260 });
+        // Wire up the "Jump to airport" button when the popup opens
+        marker.on('popupopen', () => {
+          const btn = document.querySelector('.airport-popup .jump-to-airport-btn');
+          if (btn) {
+            btn.onclick = () => {
+              marker.closePopup();
+              jumpToAirport(airport);
+            };
+          }
+        });
         airportsState.clusterGroup.addLayer(marker);
       }
     })

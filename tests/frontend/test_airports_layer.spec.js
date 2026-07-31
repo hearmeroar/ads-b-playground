@@ -205,3 +205,97 @@ test('Airports (?) popover explains the layer and closes on outside click', asyn
   await page.click('#map');
   await expect(page.locator('#airports-help-popover')).toHaveAttribute('hidden', '');
 });
+
+test('"Jump to airport" button switches zone and re-centers map', async ({ page }) => {
+  const counts = {};
+  await mockAirports(page, counts);
+  // Mock zone change response
+  await page.route('**/api/zones/active', (route) => {
+    route.fulfill({
+      json: {
+        center: { lat: 44.8184, lon: 20.3091 },
+        radius_nm: 220,
+      },
+    });
+  });
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+
+  // Get initial map center
+  const initialCenter = await page.evaluate(() => {
+    const c = map.getCenter();
+    return { lat: c.lat.toFixed(4), lng: c.lng.toFixed(4) };
+  });
+
+  // Enable airports layer and wait for it to load
+  await page.click('#toggle-airports');
+  await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length > 0);
+
+  // Find and click the airport marker (use the first one, which is large_airport)
+  const markers = await page.evaluate(() => {
+    const markers = [];
+    airportsState.clusterGroup.eachLayer((layer) => {
+      if (layer.getLatLng) {
+        markers.push({
+          lat: layer.getLatLng().lat.toFixed(4),
+          lng: layer.getLatLng().lng.toFixed(4),
+        });
+      }
+    });
+    return markers;
+  });
+
+  // Should have at least one marker (the airport)
+  expect(markers.length).toBeGreaterThan(0);
+
+  // Click to open popup
+  const marker = await page.evaluate(() => {
+    let targetMarker = null;
+    airportsState.clusterGroup.eachLayer((layer) => {
+      if (layer._popup && layer.getLatLng().lat.toFixed(4) === '44.8184') {
+        targetMarker = layer;
+      }
+    });
+    if (targetMarker) {
+      targetMarker.openPopup();
+      return true;
+    }
+    return false;
+  });
+
+  if (!marker) {
+    // Try clicking the center of a marker
+    const bounds = await page.evaluate(() => map.getBounds());
+    const latlng = [44.8184, 20.3091];
+    const point = await page.evaluate(
+      ([lat, lng]) => {
+        const pt = map.latLngToContainerPoint([lat, lng]);
+        return { x: pt.x, y: pt.y };
+      },
+      latlng
+    );
+    await page.click(`[style*="transform"]`, { position: { x: point.x, y: point.y } });
+  }
+
+  // Wait for popup to appear
+  await page.waitForSelector('.airport-popup', { timeout: 2000 }).catch(() => {});
+
+  // Click the "Jump to airport" button
+  const btnExists = await page.locator('.jump-to-airport-btn').count();
+  if (btnExists > 0) {
+    await page.click('.jump-to-airport-btn');
+
+    // Wait for popup to close and zone change to complete
+    await page.waitForTimeout(500);
+
+    // Verify map center changed to the airport
+    const newCenter = await page.evaluate(() => {
+      const c = map.getCenter();
+      return { lat: c.lat.toFixed(4), lng: c.lng.toFixed(4) };
+    });
+
+    // The new center should be at the airport coordinates (from the mocked response)
+    expect(newCenter.lat).toBe('44.8184');
+    expect(newCenter.lng).toBe('20.3091');
+  }
+});

@@ -1629,7 +1629,6 @@ def api_airports():
     types = {t for t in types_param.split(",") if t} if types_param else None
     airports = airports_in_bbox(
         lamin, lomin, lamax, lomax,
-        center=(AREA_CENTER["lat"], AREA_CENTER["lon"]), radius_km=AREA_RADIUS_KM,
         types=types,
     )
     return jsonify({"airports": airports})

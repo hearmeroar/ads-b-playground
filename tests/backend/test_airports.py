@@ -125,14 +125,19 @@ def test_api_airports_with_bbox(client):
     assert "EGLL" in icaos
 
 
-def test_api_airports_scoped_to_scan_zone(client):
-    # A bbox around Tokyo is valid and would normally return real airports,
-    # but it's nowhere near this app's own scan zone (AREA_CENTER/
-    # AREA_RADIUS_KM, the Balkans) — the route must scope to that zone
-    # regardless of what the viewport itself is showing.
+def test_api_airports_worldwide_in_viewport_bbox(client):
+    # A bbox around Tokyo returns airports within that viewport bbox,
+    # even though it's nowhere near this app's own scan zone. Airports
+    # are shown globally in whatever viewport is visible, not scoped to
+    # the scan zone.
     resp = client.get("/api/airports", query_string={"bbox": "35.5,139.6,35.8,139.9"})
     assert resp.status_code == 200
-    assert resp.get_json()["airports"] == []
+    airports = resp.get_json()["airports"]
+    assert len(airports) > 0  # Tokyo has many airports
+    # Verify they're actually in the Tokyo bbox
+    for airport in airports:
+        assert 35.5 <= airport["lat"] <= 35.8
+        assert 139.6 <= airport["lon"] <= 139.9
 
 
 def test_api_airports_without_bbox_falls_back_to_home_region(client):

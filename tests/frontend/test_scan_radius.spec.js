@@ -25,7 +25,9 @@ test('scan radius rings are off by default and toggle on/off', async ({ page }) 
   expect(shownAfterToggleOn).toBe(true);
 
   // 4 round-number ticks (50/100/150/200 nm) + 1 distinct edge ring (220 nm)
-  // = 5 circles, each with its own label marker = 5 more layers.
+  // + 1 Aircraft Scatter outer ring (540 nm, shown when enabled)
+  // = 6 circles, each with its own label marker = 6 more layers.
+  // (Aircraft Scatter is enabled by default)
   const layerCounts = await page.evaluate(() => {
     let circles = 0, markers = 0;
     scanRadiusLayer.eachLayer((l) => {
@@ -34,16 +36,16 @@ test('scan radius rings are off by default and toggle on/off', async ({ page }) 
     });
     return { circles, markers };
   });
-  expect(layerCounts.circles).toBe(5);
-  expect(layerCounts.markers).toBe(5);
+  expect(layerCounts.circles).toBe(6);
+  expect(layerCounts.markers).toBe(6);
 
-  // The 4 round-number rings, converted nm -> meters.
+  // The 4 round-number rings + scan edge (220 nm) + Aircraft Scatter (540 nm), converted nm -> meters.
   const radii = await page.evaluate(() => {
     const r = [];
     scanRadiusLayer.eachLayer((l) => { if (l instanceof L.Circle) r.push(Math.round(l.getRadius())); });
     return r.sort((a, b) => a - b);
   });
-  expect(radii).toEqual([50, 100, 150, 200, 220].map((nm) => Math.round(nm * 1852)));
+  expect(radii).toEqual([50, 100, 150, 200, 220, 540].map((nm) => Math.round(nm * 1852)));
 
   const labelTexts = await page.evaluate(() => {
     const texts = [];

@@ -25,3 +25,13 @@ table and adsbdb.com have already come up empty. Kept as its own distinct
 (`#source-icaolist`), rather than folded into Flywme's single badge, per
 explicit request. Full rationale: `.ai/DECISIONS.md` ("rikgale/ICAOList as
 its own bottom-tier source").
+
+## ✅ Airport interactivity & Aircraft Scatter radius rings (completed 2026-07-31)
+
+Implemented four airport-layer enhancements:
+1. **Jump to airport button** — clicking button in airport popup switches active zone (same UX as zone search), triggers immediate data refresh
+2. **Current airport indicator** — shows "✓ Current airport" status instead of button for airport matching active zone_id; uses theme-aware CSS tokens
+3. **Global airport visibility** — removed scan-radius filter from `/api/airports` endpoint, now shows all airports in viewport rather than only within scan zone
+4. **Aircraft Scatter dynamic rings** — added 540 nm outer ring (Aircraft Scatter's fixed coverage) that shows when enabled; ring toggles on/off with source checkbox
+
+All 214 tests passing. Theme-aware styling via CSS tokens.

@@ -1236,3 +1236,7 @@ body .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.s
 }
 .airport-popup-row.airport-popup-row-muted { color: var(--muted); }
 .airport-popup-row .fi { flex: none; border-radius: 2px; }
+.airport-popup-current {
+  margin-top: 8px; padding: 8px; background: var(--surface);
+  border-radius: 6px; color: var(--ink); font-weight: 500; text-align: center;
+}
