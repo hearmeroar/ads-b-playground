@@ -447,6 +447,15 @@ async function fetchFlightRadar24Flights() {
   }
 }
 
+async function fetchOgnBeacons() {
+  try {
+    const data = await fetchJson('/api/ogn');
+    return data.aircraft || [];
+  } catch (e) {
+    return null;
+  }
+}
+
 async function poll(opts = {}) {
   const { onFirstPaint } = opts;
   let firstPaintDone = false;
@@ -465,6 +474,7 @@ async function poll(opts = {}) {
     aircraftscatter: isSourceEnabled('aircraftscatter') ? fetchRadiusSourceAircraft('/api/aircraftscatter') : Promise.resolve(null),
     flightaware: isSourceEnabled('flightaware') ? fetchFlightAwareFlights() : Promise.resolve(null),
     flightradar24: isSourceEnabled('flightradar24') ? fetchFlightRadar24Flights() : Promise.resolve(null),
+    ogn: isSourceEnabled('ogn') ? fetchOgnBeacons() : Promise.resolve(null),
   };
 
   // Opportunistic early paint: fires once, the instant the FASTEST *real,
@@ -518,7 +528,7 @@ function renderPoll(raw, { isFinal }) {
     opensky: openskyStates, adsbfi: adsbfiAircraft, adsblol: adsblolAircraft,
     adsbone: adsboneAircraft, airplaneslive: airplanesliveAircraft,
     aircraftscatter: aircraftscatterAircraft, flightaware: flightawareFlights,
-    flightradar24: flightradar24Flights,
+    flightradar24: flightradar24Flights, ogn: ognBeacons,
   } = raw;
 
   // Each source fetches independently: fetchRadiusSourceAircraft swallows its
@@ -537,6 +547,7 @@ function renderPoll(raw, { isFinal }) {
   const parsedAircraftscatter = aircraftscatterAircraft && aircraftscatterAircraft.map(parseAdsbExchangeAircraft);
   const parsedFlights = flightawareFlights && flightawareFlights.map(parseFlightAware);
   const parsedFlightradar24 = flightradar24Flights && flightradar24Flights.map(parseFlightRadar24Aircraft);
+  const parsedOgn = ognBeacons && ognBeacons.map(parseOgnBeacon);
   const radiusLists = [parsedAdsbfi, parsedAdsblol, parsedAdsbone, parsedAirplaneslive, parsedAircraftscatter, parsedFlightradar24];
   recordLiveTrails(parsedStates, radiusLists);
 
@@ -636,6 +647,18 @@ function renderPoll(raw, { isFinal }) {
     counts.flightaware = updateFlightAwareMarkers(parsedFlights, matchedFlightawareCallsigns);
   } else {
     counts.flightaware = flightawareMarkers.size;
+  }
+
+  // OGN: mostly the same independent-overlay treatment as FlightAware, just
+  // keyed by its own device address instead of a callsign — but its
+  // confirmed-ICAO24 beacons (real Mode-S addresses, typically rebroadcast
+  // ADS-B traffic rather than gliders) do get excluded against the same
+  // excludeIds every ICAO24-keyed source above already built this cycle —
+  // see updateOgnMarkers's own comment for why.
+  if (isSourceEnabled('ogn') && parsedOgn) {
+    counts.ogn = updateOgnMarkers(parsedOgn, excludeIds);
+  } else {
+    counts.ogn = ognMarkers.size;
   }
 
   const pendingSources = new Set();

@@ -12,6 +12,14 @@ fetch_opensky() in app.py), and blocking post_fork for the worst case across
 all 5 default sources risks gunicorn's own --timeout (Dockerfile) deciding
 an unresponsive-looking worker never came up and recycling it before it
 ever serves a request.
+
+Also starts the OGN background thread (app.py's _start_ogn_thread(), see
+ogn_source.py) per worker — unlike the cache warm-up above, this isn't an
+optimization: /api/ogn has no request/response fetch of its own at all, so
+without this connection actually running that route always returns empty.
+Each of the Dockerfile's 2 gunicorn workers gets its own independent
+APRS-IS connection; OGN's public network has no documented per-client rate
+limit this would run afoul of.
 """
 import threading
 
@@ -28,3 +36,5 @@ def post_fork(server, worker):
         daemon=True,
         name="cache-warmup",
     ).start()
+    server.log.info("worker %s: starting OGN background connection", worker.pid)
+    app_module._start_ogn_thread()

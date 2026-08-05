@@ -543,11 +543,22 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   function headerPiece(value, key) {
     return infoTipHtml(value + badgeFor(key), HEADER_FIELD_EXPLANATIONS[key]);
   }
+  // Registration > ICAO24 > callsign > literal "Unknown aircraft" — the third
+  // tier matters for sources with neither of the first two (OGN's gliders/
+  // FLARM-tracked aircraft have no registration and, unless address_type
+  // confirms a real ICAO24, no icao24 either — but almost always still carry
+  // a device identifier as `callsign`, e.g. "FLRDDDEAD" — showing that beats
+  // a bare "Unknown aircraft" with no identifying information at all).
+  const headerTitleUsedCallsign = !info.registration && !info.icao24 && !!info.callsign;
   const headerTitle = info.registration
     ? headerPiece(info.registration, 'registration')
-    : (info.icao24 ? headerPiece(info.icao24.toUpperCase(), 'icao24') : 'Unknown aircraft');
+    : info.icao24
+      ? headerPiece(info.icao24.toUpperCase(), 'icao24')
+      : headerTitleUsedCallsign
+        ? headerPiece(info.callsign, 'callsign')
+        : 'Unknown aircraft';
   const headerSubtitleParts = [];
-  if (info.callsign) headerSubtitleParts.push(headerPiece(info.callsign, 'callsign'));
+  if (info.callsign && !headerTitleUsedCallsign) headerSubtitleParts.push(headerPiece(info.callsign, 'callsign'));
   if (info.aircraftType) headerSubtitleParts.push(headerPiece(info.aircraftType, 'aircraftType'));
   if (info.registration && info.icao24) headerSubtitleParts.push(headerPiece(info.icao24.toUpperCase(), 'icao24'));
   const header = '<div class="sidebar-header-title">' + headerTitle + '</div>'

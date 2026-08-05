@@ -8,7 +8,7 @@ This is a **map**, not a narrative. Read CLAUDE.md for full detail and rationale
 - `static/styles/app.css` carries the project-specific overrides and the current card/panel system.
 - `static/style.css` remains as the legacy compatibility layer for older selectors and load-order-sensitive rules.
 
-## Data sources (eight live feeds plus lazy adsbdb enrichment)
+## Data sources (nine live feeds plus lazy adsbdb enrichment)
 
 1. **OpenSky Network** (`/api/states`, `/api/track`) — 10s cache, own quota system (daily limit + per-track limit). Shares most fields with radius sources; ICAO24 priority below the free/cheap radius feeds. Falls back to anonymous if auth token unavailable. Circuit-breaker on outage (30s cooldown). (CLAUDE.md § "OpenSky endpoints")
 
@@ -26,7 +26,9 @@ This is a **map**, not a narrative. Read CLAUDE.md for full detail and rationale
 
 8. **FlightRadar24** (`/api/flightradar24`) — **Off by default**, uses unofficial SDK (`FlightRadarAPI`, `curl_cffi`, Cloudflare TLS fingerprinting). ICAO24-keyed, sits below Aircraft Scatter in enrichment order. High failure risk; caught generically. (CLAUDE.md § "FlightRadar24, via the unofficial `JeanExtreme002/FlightRadarAPI` SDK")
 
-9. **adsbdb.com** (`/api/adsbdb`) — **Lazy fetch only, not in poll loop**. Enriches identity + route + operator on click. Cached indefinitely. (CLAUDE.md § "adsbdb.com")
+9. **OGN — Open Glider Network** (`/api/ogn`) — **Off by default**. Not an HTTP source: a background daemon thread (`ogn_source.py`) holds a persistent APRS-IS connection (`aprs.glidernet.org:14580`, via the `ogn-client` package) filtered to a range around `AREA_CENTER`, continuously updating an in-memory snapshot; the route just reads it. Covers gliders/tow planes/paragliders/UAVs — a mostly non-overlapping population from the other eight sources. Renders as an independent, non-deduplicated overlay (like FlightAware) since most device addresses are FLARM/OGN-assigned, not real ICAO24.
+
+10. **adsbdb.com** (`/api/adsbdb`) — **Lazy fetch only, not in poll loop**. Enriches identity + route + operator on click. Cached indefinitely. (CLAUDE.md § "adsbdb.com")
 
 ## Backend flow
 
@@ -44,6 +46,10 @@ Flask app.py (gunicorn 2 workers × 8 threads)
 │  └─ FlightAware via cached_flightradar24() with broader Exception catch
 ├─ /api/flightradar24
 │  └─ FlightRadar24 via cached_flightradar24() with broader Exception catch
+├─ /api/ogn
+│  └─ Reads ogn_source's in-memory snapshot — no fetch/cache/TTL here, a
+│     background daemon thread (started from _start_ogn_thread(), both in
+│     dev and gunicorn's post_fork) owns a persistent APRS-IS connection
 ├─ /api/photo/reg/<reg>, /api/photo/hex/<icao24>
 │  └─ Planespotters (User-Agent-gated) → infinite cache
 ├─ /api/photo2/reg/<reg>, /api/photo2/hex/<icao24>
@@ -109,8 +115,9 @@ Enrichment modules (enrichment/*, pure lookups, no I/O)
 └─ aircraft_enrichment.py — enrich_identity() orchestrator (live → registration → icao24 → callsign → aircraft_type → category, each with an icaolist fallback below it)
 
 Background tasks (Flask app, daemon thread)
-├─ Identity backfill (every 5s: grab visible ICAO24s from cache, resolve any unknown ones to adsbdb, log to identity_cache)
-└─ One-shot cache warm-up (per process: the five default-enabled feeds; launched after gunicorn `post_fork` or on Flask dev startup; never blocks serving)
+├─ Identity backfill (every 5s: grab visible ICAO24s from cache, resolve any unknown ones to adsbdb, log to identity_cache) — dev-only, not started under gunicorn
+├─ One-shot cache warm-up (per process: the five default-enabled feeds; launched after gunicorn `post_fork` or on Flask dev startup; never blocks serving)
+└─ OGN APRS-IS connection (ogn_source.py — persistent, not periodic; one per process, started both in dev and via gunicorn's post_fork since the source has no data without it)
 ```
 
 ## Frontend data flow
@@ -185,3 +192,4 @@ Test verifies this order is enforced via `#app > script[src*="..."].src`.
 - **Operator-configurable source visibility, gated behind Dev Mode; restart-only config file, no hot-reload** (2026-07-27) — `config/sources.json` moves per-source `visible`/`enabled_by_default` out of hardcoded `index.html` markup, following `config/zones.json`'s convention, but deliberately skips the mtime-poll/cross-worker-sync machinery zones.json needed — this file is hand-edited by an operator, never mutated via an API, so a plain import-time load is sufficient. The whole per-source toggle list only shows at all once Dev Mode is on (moved next to `#source-adsbdb`); `visible` then curates which specific rows Dev Mode actually reveals.
 - **Safari blank-map fix: symptom-triggered self-heal, not a blanket 3D-disable** (2026-07-29, resolved) — a blanket `window.L_DISABLE_3D` for every Safari visitor silently killed zoom/pan animation project-wide as a side effect (`L.Browser.any3d` also gates Leaflet's `_zoomAnimated`); replaced with a `sessionStorage`-scoped fallback that only disables 3D transforms (and reloads once) for a tab that has actually observed the blank-map symptom, confirmed fixed in real prod Safari.
 - **rikgale/ICAOList as its own bottom-tier source, not folded into Flywme** (2026-07-30) — a broader-but-less-vetted topup dataset (type designators, reg prefixes, hex ranges, airlines) for four existing enrichment tables; kept as a distinct `source: "icaolist"`/badge/dev-mode toggle rather than merged into Flywme's always-on local lookups, so its lower-confidence, less-curated contribution stays visible and independently toggleable.
+- **OGN (Open Glider Network) as a ninth source, over a persistent APRS-IS connection, not an HTTP proxy** (2026-08-05) — no plain HTTP GET API exists for OGN; `ogn_source.py` owns a background daemon thread holding one long-lived APRS-IS connection (`aprs.glidernet.org:14580`) and an in-memory snapshot, started both in dev and via gunicorn's `post_fork` since (unlike every other background thread here) the source has no data at all without it running. Renders as an independent, non-deduplicated overlay (like FlightAware) since most OGN device addresses aren't real ICAO24.

@@ -2,6 +2,45 @@
 
 > **Update rule:** this file holds only what is currently open: unresolved bugs, an in-progress task, or a decision still pending. It is not a changelog or session diary.
 
+## ✅ Open Glider Network (OGN) as a ninth source (completed 2026-08-05)
+
+Added `ogn_source.py` (background APRS-IS connection to `aprs.glidernet.org`,
+via the `ogn-client` package) as a new live source covering gliders/tow
+planes/paragliders/UAVs — a mostly non-overlapping population from the
+other eight sources. New `/api/ogn` route, wired into `_apply_zone()`,
+`config/sources.json` (off by default, visible in Dev Mode), and every
+frontend layer (constants/parsers/state-filters/main.js/index.html) the
+same way the other eight sources are, but rendered as an independent,
+non-deduplicated overlay (most OGN device addresses aren't real ICAO24).
+Started both from `app.py`'s dev entry point and `gunicorn.conf.py`'s
+`post_fork`, since this source has no data without the background thread
+actually running. 11 new backend tests (`tests/backend/test_ogn.py`); full
+backend (360) and Playwright (214) suites pass with no regressions.
+
+**Verified live and working (2026-08-05):** initial testing showed
+`/api/ogn` always empty despite passing mocks — root-caused via extensive
+live-network diagnosis to three stacked connection-layer bugs (a
+misleading read-timeout error, a keepalive that couldn't fire while
+blocked on a read, and — the actual root cause — a too-long default APRS
+login username silently rejected by the server). Fixed by replacing
+`AprsClient.run()` with a small custom read loop (`ogn_source._read_loop()`)
+and shortening `OGN_APRS_USER`. Confirmed receiving 70–270+ live beacons
+within seconds of connecting, over a real network path. Full rationale:
+`.ai/DECISIONS.md` ("Open Glider Network (OGN) as a ninth source" and "OGN
+connection bugs found via live testing").
+
+Also dedupes OGN beacons with a confirmed real ICAO24 (`address_type == 1`)
+against the same ICAO24-keyed sources every other source excludes against
+— verified live via a headless browser test that 0 aircraft are ever
+actually lost, they hand off to whichever higher-priority source also
+covers them. Sidebar header also gains a callsign fallback tier so an
+aircraft with neither registration nor ICAO24 (common for OGN's gliders)
+doesn't show a bare "Unknown aircraft".
+
+**Known gap, not built in this pass:** no live-trail recording integration
+for OGN markers (`recordLiveTrails()` keys by `icao24`, which OGN doesn't
+have) — a selected OGN aircraft's track always falls back to nothing.
+
 ## ✅ Seamless Google login with popup (completed 2026-07-28)
 
 Implemented Google OAuth popup flow (no full-page redirect). `/login-popup` page opens standard Google OAuth account-selection/consent flow in a separate popup window. After successful auth, popup closes and main window checks auth status without reload. Preserves map position, selected aircraft, and sidebar state. Page title updated to "Live Aircraft Tracker".

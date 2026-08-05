@@ -19,3 +19,4 @@ playwright-report/
 PROD_INFRA_NOTES.md
 PLAN_NOTES.md
 .claude/test-runs/
+.claude/.radius-sources-note-seen/

@@ -6,6 +6,7 @@ import pytest
 import requests
 
 import app
+import ogn_source
 import storage
 
 
@@ -60,6 +61,7 @@ def reset_caches(monkeypatch, tmp_path):
     app._metar_cache.update({"data": None, "ts": 0.0})
     app._sigmet_cache.clear()
     app._sigmet_cache.update({"data": None, "ts": 0.0})
+    ogn_source.clear()
     # Zone config (config/zones.json, _apply_zone()): redirect ZONES_FILE to
     # a throwaway file per test, same rationale as TRACK_CACHE_FILE above —
     # a test that calls /api/zones/active must never write the repo's real
@@ -98,6 +100,7 @@ def reset_caches(monkeypatch, tmp_path):
         "aircraftscatter": {"visible": True, "enabled_by_default": True},
         "flightaware": {"visible": True, "enabled_by_default": False},
         "flightradar24": {"visible": True, "enabled_by_default": False},
+        "ogn": {"visible": True, "enabled_by_default": False},
     }
     sources_file = tmp_path / "sources.json"
     sources_file.write_text(json.dumps(default_sources))

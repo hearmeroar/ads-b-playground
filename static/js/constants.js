@@ -65,6 +65,13 @@ const SOURCE_COLORS = {
   // distinct from every color above (avoids adsbone's yellow-orange, which
   // FR24's own brand orange would sit too close to).
   flightradar24: '#6d4c41',
+  // Open Glider Network (gliders/paragliders/tow planes/UAVs via APRS-IS —
+  // see ogn_source.py). Renders independently, not ICAO24-deduped against
+  // any other source (see updateOgnMarkers below), same reason FlightAware
+  // renders independently — most OGN addresses are FLARM-assigned, not real
+  // ICAO24. Lime green, distinct from every color above (airplanes.live's
+  // green is darker/more saturated).
+  ogn: '#9ccc65',
   // adsbdb.com is a lazy-on-click lookup (like Flywme below), not a per-poll
   // marker source — see the CLAUDE.md pitfall about SOURCE_COLORS entries
   // needing to stay out of sourceToggles/markerMapsBySource unless they
@@ -105,6 +112,7 @@ const SOURCE_DISPLAY_NAMES = {
   opensky: 'OpenSky', adsbfi: 'adsb.fi', adsblol: 'adsb.lol',
   adsbone: 'adsb.one', airplaneslive: 'airplanes.live', aircraftscatter: 'Aircraft Scatter', flightaware: 'FlightAware',
   flightradar24: 'FlightRadar24',
+  ogn: 'OGN (gliders)',
   adsbdb: 'adsbdb.com',
   icaolist: 'ICAOList',
   flywme: 'Flywme',

@@ -6,10 +6,11 @@ const airplanesliveMarkers = new Map(); // hex -> L.Marker
 const aircraftscatterMarkers = new Map(); // hex -> L.Marker
 const flightawareMarkers = new Map(); // fa_flight_id -> L.Marker
 const flightradar24Markers = new Map(); // icao24 -> L.Marker
+const ognMarkers = new Map(); // OGN device address -> L.Marker
 const markerMapsBySource = {
   opensky: openskyMarkers, adsbfi: adsbfiMarkers, adsblol: adsblolMarkers,
   adsbone: adsboneMarkers, airplaneslive: airplanesliveMarkers, aircraftscatter: aircraftscatterMarkers, flightaware: flightawareMarkers,
-  flightradar24: flightradar24Markers,
+  flightradar24: flightradar24Markers, ogn: ognMarkers,
 };
 
 // Looks up the L.Marker for a given id across every source's marker map —
@@ -32,6 +33,7 @@ const sourceToggles = {
   aircraftscatter: document.getElementById('toggle-aircraftscatter'),
   flightaware: document.getElementById('toggle-flightaware'),
   flightradar24: document.getElementById('toggle-flightradar24'),
+  ogn: document.getElementById('toggle-ogn'),
 };
 function isSourceEnabled(name) {
   return sourceToggles[name].checked;
@@ -372,6 +374,25 @@ const ADSBEXCHANGE_CATEGORY_GROUP = {
   C0: 'unknown', C1: 'surface_obstacle', C2: 'surface_obstacle', C3: 'surface_obstacle',
   C4: 'surface_obstacle', C5: 'surface_obstacle', C6: 'unknown', C7: 'unknown',
 };
+// OGN's own aircraft_type taxonomy (a 4-bit field in the FLARM/OGN APRS
+// comment — see wiki.glidernet.org/aprs-interaction-examples and
+// ogn.parser's own beacon['aircraft_type']) is a third, independent
+// encoding, disjoint from both DO-260B systems above — mapped straight to
+// this app's shared categoryGroup keys rather than going through
+// categoryGroupFor(). 0 unknown, 1 glider/motorglider, 2 tow plane,
+// 3 helicopter, 4 skydiver/parachute, 5 drop plane, 6 hang glider,
+// 7 paraglider, 8 powered aircraft, 9 jet aircraft, 10 UFO/unknown,
+// 11 balloon, 12 airship, 13 UAV, 14 reserved, 15 static object.
+const OGN_AIRCRAFT_TYPE_GROUP = {
+  0: 'unknown', 1: 'glider', 2: 'light', 3: 'rotorcraft', 4: 'parachutist',
+  5: 'light', 6: 'glider', 7: 'glider', 8: 'light', 9: 'high_performance',
+  10: 'unknown', 11: 'lighter_than_air', 12: 'lighter_than_air', 13: 'uav',
+  14: 'unknown', 15: 'surface_obstacle',
+};
+function ognCategoryGroupFor(aircraftType) {
+  return OGN_AIRCRAFT_TYPE_GROUP[aircraftType] || 'unknown';
+}
+
 // Whether OpenSky's own numeric category is meaningful (not 0/1 = "no
 // info"/"no ADS-B category info"). Single source of truth shared with
 // normalizeOpenSky() (parsers.js), which uses the same check to decide

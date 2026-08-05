@@ -22,6 +22,7 @@ DEFAULT_SOURCES = {
     "aircraftscatter": {"visible": True, "enabled_by_default": True},
     "flightaware": {"visible": True, "enabled_by_default": False},
     "flightradar24": {"visible": True, "enabled_by_default": False},
+    "ogn": {"visible": True, "enabled_by_default": False},
 }
 
 

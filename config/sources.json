@@ -6,5 +6,6 @@
   "airplaneslive":   { "visible": true,  "enabled_by_default": true },
   "aircraftscatter": { "visible": true,  "enabled_by_default": true },
   "flightaware":     { "visible": true,  "enabled_by_default": false },
-  "flightradar24":   { "visible": true,  "enabled_by_default": false }
+  "flightradar24":   { "visible": true,  "enabled_by_default": false },
+  "ogn":             { "visible": true,  "enabled_by_default": false }
 }

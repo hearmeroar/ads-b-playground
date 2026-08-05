@@ -16,9 +16,11 @@ elsewhere stays a plain in-memory dict.
 
 ## Features
 
-- **Seven independent live sources**: six ADS-B sources deduplicated against
-  each other by ICAO24/hex address (each one only shows what the sources above it
-  don't already cover), plus FlightAware AeroAPI deduplicated by callsign.
+- **Nine independent live sources**: seven ADS-B/transponder sources
+  deduplicated against each other by ICAO24/hex address (each one only shows
+  what the sources above it don't already cover), plus FlightAware AeroAPI
+  (deduplicated by callsign) and Open Glider Network (rendered
+  independently, no dedup at all).
   - [OpenSky Network](https://opensky-network.org/) — blue
   - [adsb.fi](https://github.com/adsbfi/opendata) — red
   - [adsb.lol](https://adsb.lol/) — purple *(upstream is occasionally
@@ -38,9 +40,18 @@ elsewhere stays a plain in-memory dict.
   - [FlightAware AeroAPI](https://www.flightaware.com/commercial/aeroapi/) —
     teal *(requires API key, paid/metered so off by default; matched to other
     sources by callsign, when matched its route data enriches the main marker)*
+  - [Open Glider Network](https://www.glidernet.org/) — light green *(gliders,
+    tow planes, paragliders, and small UAVs, tracked via FLARM/OGN trackers
+    over the public APRS-IS network — not an HTTP API, a persistent
+    connection kept by a background thread; see `ogn_source.py`. A mostly
+    non-overlapping aircraft population from the other seven sources, so it
+    renders independently rather than joining the ICAO24 dedup chain. Off by
+    default)*
 
-  Each source has its own toggle, and any of them failing degrades that one
-  source for a cycle rather than breaking the map.
+  Each source has its own toggle (the six ICAO24-keyed ones, FlightAware,
+  and FlightRadar24 are grouped in a Dev Mode-only list; OGN sits alongside
+  them there too), and any of them failing degrades that one source for a
+  cycle rather than breaking the map.
 - **Sidebar enrichment** — clicking a marker opens a details sidebar with
   48 fields grouped into sections (identity, position, speed & heading,
   autopilot, weather, status, signal quality), each section headed by its
@@ -254,6 +265,10 @@ Copy `.env.example` to `.env` to enable:
   FlightAware source on the map; without it, the source shows empty. Optional.
   Note: this is a paid, metered API; each poll costs quota.
 - `RAPIDAPI_KEY` — RapidAPI key for Aircraft Scatter (ADSBexchange). The toggle ships enabled, but without this key the route safely returns no aircraft; the backend caches its fixed-radius result for 60 seconds.
+- `OGN_APRS_USER` — the callsign-shaped identifier the Open Glider Network
+  source logs into APRS-IS with. No signup/registration needed (any
+  identifier works), but the app ships a default; override it if you want
+  your own identifier in OGN's server logs. Optional.
 - `SECRET_KEY` — signs the login session cookie. Without it, a random key is
   generated on every process start, which logs everyone out on every
   restart (including Flask debug's auto-reload on each file save) — set a

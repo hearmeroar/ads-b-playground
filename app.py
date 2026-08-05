@@ -51,6 +51,7 @@ from FlightRadarAPI import FlightRadar24API
 from flask import Flask, jsonify, redirect, request, send_from_directory, session, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+import ogn_source
 import storage
 from enrichment.aircraft_enrichment import enrich_identity
 from enrichment.airports import airports_in_bbox, nearest_airport, search_airports, popular_airports_for_region, region_for_coordinates
@@ -141,11 +142,14 @@ def _apply_zone(center, zoom, radius_nm, zone_id):
     function is the one place all seven derived values move together.
 
     Also clears every location-scoped cache (states, the four radius
-    sources, FlightAware, FlightRadar24, METAR, SIGMET — the same set
+    sources, FlightAware, FlightRadar24, METAR, SIGMET, OGN — the same set
     tests/backend/conftest.py's reset_caches fixture already enumerates)
     so the very next poll after a zone change doesn't re-serve one more
     round of stale-region data before each cache's own TTL would have
-    naturally expired.
+    naturally expired. OGN is the one source here with no per-request
+    fetch/TTL of its own (see ogn_source.py) — its "cache clear" is instead
+    moving its background connection's own range filter and dropping
+    whatever it already collected for the old region.
 
     Does not touch ZONES_FILE itself — see _persist_zone_config() for the
     disk-write half and _maybe_reload_zone_from_disk() for how a *different*
@@ -199,6 +203,8 @@ def _apply_zone(center, zoom, radius_nm, zone_id):
     _metar_cache["ts"] = 0.0
     _sigmet_cache["data"] = None
     _sigmet_cache["ts"] = 0.0
+    ogn_source.set_range(AREA_CENTER["lat"], AREA_CENTER["lon"], AREA_RADIUS_KM)
+    ogn_source.clear()
 
 
 def _persist_zone_config(center, zoom, radius_nm, zone_id):
@@ -549,6 +555,14 @@ _aircraftscatter_cache = RADIUS_SOURCES["aircraftscatter"]["cache"]
 _adsblol_cache = RADIUS_SOURCES["adsblol"]["cache"]
 _adsbone_cache = RADIUS_SOURCES["adsbone"]["cache"]
 
+# Open Glider Network (see ogn_source.py for the full rationale): not an
+# HTTP source, so it isn't a RADIUS_SOURCES entry — its own module owns a
+# background APRS-IS connection instead of a request/response cache. Seed
+# its range filter here at import time, the same point RADIUS_SOURCES'
+# per-entry centers are seeded above; _apply_zone() keeps it in sync with
+# every other location-scoped source on a runtime zone change.
+ogn_source.set_range(AREA_CENTER["lat"], AREA_CENTER["lon"], AREA_RADIUS_KM)
+
 # Operator-configurable source visibility (config/sources.json): which of
 # the eight data sources show a HUD row at all, and whether their checkbox
 # starts checked, used to be hardcoded in static/index.html's markup with
@@ -572,6 +586,11 @@ def _load_sources_config():
         "aircraftscatter": {"visible": True, "enabled_by_default": True},
         "flightaware": {"visible": True, "enabled_by_default": False},
         "flightradar24": {"visible": True, "enabled_by_default": False},
+        # OGN (gliders/paragliders/UAVs via APRS-IS, see ogn_source.py):
+        # same "new, unproven, opt-in" default posture as FlightRadar24 —
+        # ships visible (so a Dev Mode user can discover it) but off by
+        # default, not polled until explicitly enabled.
+        "ogn": {"visible": True, "enabled_by_default": False},
     }
     try:
         with open(SOURCES_FILE, "r") as f:
@@ -1116,6 +1135,20 @@ def api_adsbone():
     return radius_source_response("adsbone")
 
 
+@app.route("/api/ogn")
+def api_ogn():
+    # Unlike every other route here, there is no outbound fetch to make or
+    # cache/TTL to check — ogn_source's background thread already keeps a
+    # live snapshot warm (see ogn_source.py's module docstring for why this
+    # source is a persistent APRS-IS connection, not a request/response
+    # HTTP call). This route just reads that snapshot. _maybe_reload_zone_
+    # from_disk() still matters here (a different worker's zone change
+    # should be picked up before the next request), even though it doesn't
+    # gate a fetch the way it does for the HTTP sources.
+    _maybe_reload_zone_from_disk()
+    return jsonify({"aircraft": ogn_source.snapshot()})
+
+
 @app.route("/api/flightaware")
 def api_flightaware():
     _maybe_reload_zone_from_disk()
@@ -1365,6 +1398,19 @@ def _start_identity_backfill_thread():
             time.sleep(IDENTITY_BACKFILL_INTERVAL)
 
     threading.Thread(target=_loop, daemon=True, name="identity-backfill").start()
+
+
+def _start_ogn_thread():
+    """Unlike the identity-backfill thread above (a nice-to-have background
+    enrichment, currently only started in local dev — see its own guard),
+    OGN has no data at all without its background connection actually
+    running, so this is also called from gunicorn.conf.py's post_fork —
+    every worker process gets its own APRS-IS connection. ogn_source.
+    start_background_thread() is itself idempotent, so calling this more
+    than once (e.g. if a future change also called it from here) is safe."""
+    if not _should_start_background_thread():
+        return
+    ogn_source.start_background_thread()
 
 
 @app.route("/api/identity/stats")
@@ -1669,6 +1715,7 @@ if __name__ == "__main__":
     # same value).
     app.debug = True
     _start_identity_backfill_thread()
+    _start_ogn_thread()
     # Same reloader-double-start guard as the identity-backfill thread above
     # — without it a fresh reloader watcher process would also kick off a
     # useless warm-up of its own. Under gunicorn (production) the equivalent

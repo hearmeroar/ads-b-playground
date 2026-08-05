@@ -4,3 +4,4 @@ python-dotenv
 Authlib
 gunicorn
 FlightRadarAPI
+ogn-client

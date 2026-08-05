@@ -570,3 +570,130 @@ function updateFlightAwareMarkers(flights, excludedCallsigns) {
   }
   return syncMarkers(flightawareMarkers, items, SOURCE_COLORS.flightaware);
 }
+
+// --- Open Glider Network (OGN, via APRS-IS — see ogn_source.py) ---
+// Human labels for OGN's own 4-bit aircraft_type field — see
+// OGN_AIRCRAFT_TYPE_GROUP (state-filters.js) for the matching categoryGroup
+// mapping used by the marker icon/category filter.
+const OGN_AIRCRAFT_TYPE_LABELS = {
+  0: 'Unknown', 1: 'Glider/motor glider', 2: 'Tow plane', 3: 'Helicopter',
+  4: 'Skydiver/parachute', 5: 'Drop plane', 6: 'Hang glider', 7: 'Paraglider',
+  8: 'Powered aircraft', 9: 'Jet aircraft', 10: 'UFO', 11: 'Balloon',
+  12: 'Airship', 13: 'UAV', 14: 'Reserved', 15: 'Static object',
+};
+
+// /api/ogn's raw shape (app.py's ogn_source.snapshot(), field names straight
+// from ogn.parser's own beacon dict — see that module's docstring): address
+// (6-hex device id — mostly FLARM/OGN-assigned, not a real ICAO24, so this
+// never joins the ICAO24 dedup chain, see updateOgnMarkers below),
+// latitude/longitude, altitude (already meters), ground_speed (already
+// km/h), climb_rate (already m/s), track, turn_rate (deg/s), aircraft_type
+// (OGN's own 4-bit taxonomy), receiver_name.
+function parseOgnBeacon(b) {
+  return {
+    address: b.address,
+    addressType: typeof b.address_type === 'number' ? b.address_type : null,
+    name: b.name || null,
+    lat: b.latitude,
+    lon: b.longitude,
+    altitudeM: typeof b.altitude === 'number' ? b.altitude : null,
+    speedKmh: typeof b.ground_speed === 'number' ? b.ground_speed : null,
+    verticalRateMs: typeof b.climb_rate === 'number' ? b.climb_rate : null,
+    track: typeof b.track === 'number' ? b.track : null,
+    turnRateDegPerSec: typeof b.turn_rate === 'number' ? b.turn_rate : null,
+    aircraftType: typeof b.aircraft_type === 'number' ? b.aircraft_type : null,
+    receiverName: b.receiver_name || null,
+  };
+}
+
+// OGN's address_type: 0 random/unknown, 1 ICAO (a real Mode-S transponder
+// address — typically an ordinary ADS-B-equipped aircraft rebroadcast
+// through an OGN receiver's ADS-B gateway, not a glider), 2 FLARM,
+// 3 OGN-tracker-assigned. Only type 1 is a genuine ICAO24 address safe to
+// surface as `info.icao24` and as the id passed to the click-to-enrich
+// pipeline (loadAdsbdb()/loadIdentityEnrichment(), both keyed by the
+// marker's own id — see selectAircraft() — not by this field, so this is a
+// display-only improvement, not what makes that lookup work; confirmed
+// live: /api/adsbdb/<hex> already resolved a real registration for an
+// address_type 1 beacon before this field was ever populated).
+const OGN_ICAO_ADDRESS_TYPE = 1;
+
+// Same unified shape as normalizeOpenSky/normalizeAdsbExchange/
+// normalizeFlightAware — see those for why this is a plain data object.
+// OGN has no ICAO24, callsign, registration, or squawk of its own (it's a
+// FLARM/OGN device address, not a transponder) — those fields stay null,
+// same treatment normalizeFlightAware gives the fields FlightAware doesn't
+// carry either. The device's raw APRS source name (e.g. "FLRDDDEAD") is
+// surfaced as `callsign` purely as a human-visible identifier, not a real
+// aviation callsign.
+function normalizeOgn(a) {
+  return {
+    icao24: a.addressType === OGN_ICAO_ADDRESS_TYPE ? a.address.toLowerCase() : null,
+    callsign: a.name, registration: null,
+    aircraftType: OGN_AIRCRAFT_TYPE_LABELS[a.aircraftType] || null,
+    icaoTypeCode: null,
+    originCountry: null,
+    categoryDisplay: OGN_AIRCRAFT_TYPE_LABELS[a.aircraftType] || null,
+    altitudeM: a.altitudeM, altGeomM: null, speedKmh: a.speedKmh,
+    verticalRateMs: a.verticalRateMs, trackDeg: a.track,
+    iasKt: null, tasKt: null, mach: null,
+    magHeadingDeg: null, trueHeadingDeg: null,
+    turnRateDegPerSec: a.turnRateDegPerSec, rollDeg: null,
+    navAltitudeM: null, navHeadingDeg: null, navQnh: null, navModes: null,
+    windDirDeg: null, windSpeedKt: null, oatC: null, tatC: null,
+    squawk: null, emergency: null, hasAlert: false,
+    positionSource: a.receiverName ? ('FLARM via ' + a.receiverName) : 'FLARM',
+    secondsSinceContact: null,
+    operator: null, manufactureYear: null,
+    dbFlags: null, messageType: null, adsbVersion: null,
+    nic: null, nicBaro: null, nacP: null, nacV: null,
+    sil: null, silType: null, gva: null, sda: null,
+    radiusOfContainmentM: null, messageCount: null,
+    signalStrengthDbm: null, secondsSincePositionUpdate: null,
+    originAirport: null, destinationAirport: null,
+  };
+}
+
+// OGN mostly renders as its own independent, non-deduplicated overlay —
+// most device addresses are FLARM/OGN-assigned, not real ICAO24 Mode-S
+// addresses, so joining the full ICAO24 dedup chain (radiusRecordsByHex,
+// enrichment, etc.) would risk a coincidental collision with an unrelated
+// aircraft elsewhere. The one narrow exception: a beacon whose
+// address_type is confirmed ICAO (OGN_ICAO_ADDRESS_TYPE — see
+// parseOgnBeacon/normalizeOgn) is a real Mode-S address in the exact same
+// namespace every other source uses, typically an ordinary ADS-B aircraft
+// rebroadcast through an OGN receiver's gateway rather than a glider — so
+// *those* records are excluded when a higher-priority ICAO24-keyed source
+// (airplanes.live/adsb.fi/adsb.lol/adsb.one/Aircraft Scatter/OpenSky/
+// FlightRadar24) already claimed that same hex this cycle, the same way
+// FlightRadar24 itself is excluded — otherwise the same real aircraft could
+// render twice (confirmed live: a Vueling A320 briefly showed one marker
+// from adsb.fi and a second from OGN before this exclusion existed). OGN
+// itself is intentionally never added to ICAO24_DEDUP_PRIORITY/
+// radiusRecordsByHex — it only ever *loses* to those sources, never wins or
+// contributes enrichment, since its own per-beacon data is far sparser.
+// No motion filter either — OGN beacons carry no on-ground flag (unlike
+// FlightAware's altitude===0 heuristic, there's no reliable signal here to
+// approximate one from), so the "Show: Ground"/"Show: Air" filter simply
+// doesn't apply to this source.
+function updateOgnMarkers(beacons, excludeIds) {
+  const items = [];
+  for (const a of beacons) { // already parsed by poll() (parseOgnBeacon)
+    if (!isValidCoordinate(a.lat, a.lon)) continue;
+    if (a.addressType === OGN_ICAO_ADDRESS_TYPE && excludeIds && excludeIds.has(a.address.toLowerCase())) continue;
+    const categoryGroup = ognCategoryGroupFor(a.aircraftType);
+    const isGroundVehicle = a.aircraftType === 15; // OGN's own "static object" type
+    if (hideNonAircraft() && isGroundVehicle) continue;
+    if (!passesCategoryFilter(categoryGroup)) continue;
+    const info = normalizeOgn(a);
+    if (!passesDataQualityFilter(info)) continue;
+    const fieldSources = fieldSourcesFor(info, [{ source: 'ogn', data: info }], null);
+    items.push({
+      id: a.address, lat: a.lat, lon: a.lon, heading: a.track,
+      info: info, fieldSources: fieldSources, registration: null,
+      onGround: false,
+      isGroundVehicle: isGroundVehicle, categoryGroup: categoryGroup,
+    });
+  }
+  return syncMarkers(ognMarkers, items, SOURCE_COLORS.ogn);
+}
