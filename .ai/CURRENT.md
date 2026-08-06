@@ -2,6 +2,10 @@
 
 > **Update rule:** this file holds only what is currently open: unresolved bugs, an in-progress task, or a decision still pending. It is not a changelog or session diary.
 
+## ✅ Expanded permission allowlist (completed 2026-08-06)
+
+Added 24 read-only bash patterns to `.claude/settings.json` to eliminate prompts for common development operations (git read-only commands, system utilities like ps/lsof/sqlite3/sed/awk/jq/sort/uniq/tr/cut/paste). Scanned 50 recent session transcripts via `fewer-permission-prompts` skill; only included commands with 3+ occurrences. All patterns are read-only and already auto-allowed by Claude Code — this just makes them explicit to reduce unnecessary permission request overhead. No new arbitrary-code-execution patterns added.
+
 ## ✅ Hide unresolved identity rows in normal mode (completed 2026-08-06)
 
 `identityRow()` (`static/js/render-details.js`) now hides its row entirely
