@@ -74,6 +74,7 @@ function normalizeOpenSky(s, extra) {
     radiusOfContainmentM: (extra && extra.radiusOfContainmentM != null) ? extra.radiusOfContainmentM : null,
     messageCount: (extra && extra.messageCount != null) ? extra.messageCount : null,
     signalStrengthDbm: (extra && extra.signalStrengthDbm != null) ? extra.signalStrengthDbm : null,
+    lastPositionUpdateTimestamp: (extra && extra.lastPositionUpdateTimestamp != null) ? extra.lastPositionUpdateTimestamp : null,
     secondsSincePositionUpdate: (extra && extra.secondsSincePositionUpdate != null) ? extra.secondsSincePositionUpdate : null,
   };
 }
@@ -227,7 +228,7 @@ function normalizeAdsbExchange(a) {
     nic: a.nic, nicBaro: a.nicBaro, nacP: a.nacP, nacV: a.nacV,
     sil: a.sil, silType: a.silType, gva: a.gva, sda: a.sda,
     radiusOfContainmentM: a.radiusOfContainmentM, messageCount: a.messageCount,
-    signalStrengthDbm: a.signalStrengthDbm, secondsSincePositionUpdate: a.secondsSincePositionUpdate,
+    signalStrengthDbm: a.signalStrengthDbm, lastPositionUpdateTimestamp: a.lastPositionUpdateTimestamp, secondsSincePositionUpdate: a.secondsSincePositionUpdate,
   };
 }
 
@@ -321,6 +322,7 @@ function parseAdsbExchangeAircraft(ac) {
     radiusOfContainmentM: typeof ac.rc === 'number' ? ac.rc : null,
     messageCount: typeof ac.messages === 'number' ? ac.messages : null,
     signalStrengthDbm: typeof ac.rssi === 'number' ? ac.rssi : null,
+    lastPositionUpdateTimestamp: typeof ac.seen_pos === 'number' ? Math.floor(Date.now() / 1000) - ac.seen_pos : null,
     secondsSincePositionUpdate: typeof ac.seen_pos === 'number' ? ac.seen_pos : null,
   };
 }

@@ -2,17 +2,27 @@
 
 > **Update rule:** this file holds only what is currently open: unresolved bugs, an in-progress task, or a decision still pending. It is not a changelog or session diary.
 
-## ✅ Live counter for "Last update" timestamp (completed 2026-08-06)
+## ✅ Live counters for timestamp fields (completed 2026-08-06)
 
-Fixed the "Last update" field in aircraft sidebar to show a **live counter** 
-that updates every second (0 s ago → 1 s ago → 2 s ago... 3 s ago) instead 
-of a static snapshot that never changes. Resets when the marker updates with 
-new data.
+Fixed **two** timestamp fields to show live counters that update every 
+second instead of staying frozen at render-time values:
 
-**Implementation:** Added `lastContactTimestamp` (unix seconds) to all 
-aircraft data sources; sidebar runs a 1-second `setInterval` while open 
-that updates only the DOM element, preserving source badges and not 
-re-rendering the whole sidebar. Timer stops on close/deselect.
+1. **"Last update"** (`secondsSinceContact`) — seconds since *any* message
+2. **"Last position update"** (`secondsSincePositionUpdate`, dev-mode-only) 
+   — seconds since the last message containing a position specifically
+
+These can legitimately show different values (an aircraft might receive a 
+squawk update but no position update), which is correct behavior, not a bug.
+
+**Implementation:** Generalized the single-field timer from the previous fix 
+into a config-driven loop that handles both fields from one `setInterval`. 
+Added `lastPositionUpdateTimestamp` (unix seconds) to adsb.fi/airplanes.live 
+parsing, threaded through normalizers alongside the existing 
+`secondsSincePositionUpdate` field. Sidebar runs a 1-second interval that 
+iterates the fields list and updates only the DOM elements whose timestamps 
+are non-null, preserving source badges. Timer stops on close/deselect. 
+Fixed rounding: both fields now use `Math.floor()` for seconds (no 
+fractional 6.09999... display).
 
 All 574 tests pass (360 backend + 214 frontend).
 

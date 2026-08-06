@@ -290,8 +290,8 @@ test('category fallback: Flywme fills the Category row when no live source repor
   expect(sidebarText).toContain('Large');
 
   await page.click('#toggle-dev-mode');
-  expect(await badgeSourcesForLabel(page, 'Category:')).toEqual(['flywme']);
-  await clickBadge(page, 'Category:');
+  expect(await badgeSourcesForLabel(page, 'Category')).toEqual(['flywme']);
+  await clickBadge(page, 'Category');
   expect(await page.textContent('#source-tooltip'))
     .toBe('Flywme — computed from aircraft category database, confidence 0.9');
 });
@@ -317,7 +317,7 @@ test('category fallback: a live-sourced category is never overwritten, but Flywm
 
   // dddddd is isolated to OpenSky above; Flywme's lower-priority category
   // remains visible only as an additional provenance badge.
-  const catSources = await badgeSourcesForLabel(page, 'Category:');
+  const catSources = await badgeSourcesForLabel(page, 'Category');
   expect(catSources[catSources.length - 1]).toBe('flywme');
   expect(catSources).toContain('opensky');
 });

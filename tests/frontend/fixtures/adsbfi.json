@@ -8,7 +8,9 @@
     {
       "hex": "eeeeee", "flight": "UNIQ1   ", "r": "F-UNIQ", "t": "B738", "desc": "BOEING 737-800",
       "alt_baro": 9000, "gs": 97, "track": 10, "category": "A3", "squawk": "4000",
-      "lat": 44.3, "lon": 21.3, "dbFlags": 1, "type": "adsb_icao"
+      "lat": 44.3, "lon": 21.3, "dbFlags": 1, "type": "adsb_icao",
+      "nic": 8, "nic_baro": 1, "nac_p": 9, "nac_v": 1, "sil": 3, "sil_type": "perhour",
+      "gva": 2, "sda": 2, "rc": 186, "messages": 1234, "rssi": -12.5, "seen_pos": 1.2
     },
     {
       "hex": "474806", "flight": null, "r": "TWR", "t": "TWR", "desc": null,

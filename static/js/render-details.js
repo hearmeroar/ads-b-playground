@@ -98,7 +98,7 @@ function formatVerticalRateUnit(rateMs) {
 }
 function formatRelativeSeconds(sec) {
   if (sec == null) return null;
-  if (sec < 60) return Math.round(sec) + ' s ago';
+  if (sec < 60) return Math.floor(sec) + ' s ago';
   if (sec < 3600) return Math.round(sec / 60) + ' min ago';
   return Math.round(sec / 3600) + ' h ago';
 }
@@ -192,7 +192,9 @@ const GROUP_ICONS = {
   autopilot: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M13,19.92C14.8,19.7 16.35,18.95 17.65,17.65C18.95,16.35 19.7,14.8 19.92,13H16.92C16.7,14 16.24,14.84 15.54,15.54C14.84,16.24 14,16.7 13,16.92V19.92M10,8H14L17,11H19.92C19.67,9.05 18.79,7.38 17.27,6C15.76,4.66 14,4 12,4C10,4 8.24,4.66 6.73,6C5.21,7.38 4.33,9.05 4.08,11H7L10,8M11,19.92V16.92C10,16.7 9.16,16.24 8.46,15.54C7.76,14.84 7.3,14 7.08,13H4.08C4.3,14.77 5.05,16.3 6.35,17.6C7.65,18.9 9.2,19.67 11,19.92M12,2C14.75,2 17.1,3 19.05,4.95C21,6.9 22,9.25 22,12C22,14.75 21,17.1 19.05,19.05C17.1,21 14.75,22 12,22C9.25,22 6.9,21 4.95,19.05C3,17.1 2,14.75 2,12C2,9.25 3,6.9 4.95,4.95C6.9,3 9.25,2 12,2Z"/></svg>',
   weather: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12.74,5.47C15.1,6.5 16.35,9.03 15.92,11.46C17.19,12.56 18,14.19 18,16V16.17C18.31,16.06 18.65,16 19,16A3,3 0 0,1 22,19A3,3 0 0,1 19,22H6A4,4 0 0,1 2,18A4,4 0 0,1 6,14H6.27C5,12.45 4.6,10.24 5.5,8.26C6.72,5.5 9.97,4.24 12.74,5.47M11.93,7.3C10.16,6.5 8.09,7.31 7.31,9.07C6.85,10.09 6.93,11.22 7.41,12.13C8.5,10.83 10.16,10 12,10C12.7,10 13.38,10.12 14,10.34C13.94,9.06 13.18,7.86 11.93,7.3M13.55,3.64C13,3.4 12.45,3.23 11.88,3.12L14.37,1.82L15.27,4.71C14.76,4.29 14.19,3.93 13.55,3.64M6.09,4.44C5.6,4.79 5.17,5.19 4.8,5.63L4.91,2.82L7.87,3.5C7.25,3.71 6.65,4.03 6.09,4.44M18,9.71C17.91,9.12 17.78,8.55 17.59,8L19.97,9.5L17.92,11.73C18.03,11.08 18.05,10.4 18,9.71M3.04,11.3C3.11,11.9 3.24,12.47 3.43,13L1.06,11.5L3.1,9.28C3,9.93 2.97,10.61 3.04,11.3M19,18H16V16A4,4 0 0,0 12,12A4,4 0 0,0 8,16H6A2,2 0 0,0 4,18A2,2 0 0,0 6,20H19A1,1 0 0,0 20,19A1,1 0 0,0 19,18Z"/></svg>',
   status: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M11,15H13V17H11V15M11,7H13V13H11V7M12,2C6.47,2 2,6.5 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20Z"/></svg>',
-  signalQuality: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M4,6V4H4.1C12.9,4 20,11.1 20,19.9V20H18V19.9C18,12.2 11.8,6 4,6M4,10V8A12,12 0 0,1 16,20H14A10,10 0 0,0 4,10M4,14V12A8,8 0 0,1 12,20H10A6,6 0 0,0 4,14M4,16A4,4 0 0,1 8,20H4V16Z"/></svg>',
+  messageInfo: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 10C10.9 10 10 10.9 10 12S10.9 14 12 14 14 13.1 14 12 13.1 10 12 10M18 12C18 8.7 15.3 6 12 6S6 8.7 6 12C6 14.2 7.2 16.1 9 17.2L10 15.5C8.8 14.8 8 13.5 8 12.1C8 9.9 9.8 8.1 12 8.1S16 9.9 16 12.1C16 13.6 15.2 14.9 14 15.5L15 17.2C16.8 16.2 18 14.2 18 12M12 2C6.5 2 2 6.5 2 12C2 15.7 4 18.9 7 20.6L8 18.9C5.6 17.5 4 14.9 4 12C4 7.6 7.6 4 12 4S20 7.6 20 12C20 15 18.4 17.5 16 18.9L17 20.6C20 18.9 22 15.7 22 12C22 6.5 17.5 2 12 2Z"/></svg>',
+  positionAccuracy: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13M12,5A7,7 0 0,0 5,12A7,7 0 0,0 12,19A7,7 0 0,0 19,12A7,7 0 0,0 12,5Z"/></svg>',
+  signalQuality: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M3,22V8H7V22H3M10,22V2H14V22H10M17,22V14H21V22H17Z"/></svg>',
 };
 
 // Splits a pre-joined categoryDisplay string ("A1 — Light (<15,500 lbs)",
@@ -325,20 +327,22 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // In normal mode, a row disappears when its value is empty (today's exact
   // behavior). In dev mode every row always renders — a dash placeholder
   // when empty, plus a colored per-source dot when populated.
-  function detailRow(label, value, fieldKey) {
+  // helpHtml (optional) is rendered after the label — used
+  // for (?) help-icon triggers that open the shared #source-tooltip popover.
+  function detailRow(label, value, fieldKey, helpHtml) {
     const has = value != null && value !== '';
     if (!has && !currentDevMode) return null;
     const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
     const dataAttr = fieldKey ? ' data-field="' + fieldKey + '"' : '';
-    return '<div class="detail-row detail-row-basic"' + dataAttr + '><span class="detail-label">' + label + ':</span><span class="detail-value">' + (has ? value : dash) + badge + '</span></div>';
+    return '<div class="detail-row detail-row-basic"' + dataAttr + '><span class="detail-label">' + label + (helpHtml || '') + '</span><span class="detail-value">' + (has ? value : dash) + badge + '</span></div>';
   }
   // Same "always render in dev mode" treatment for the two hardcoded
   // emergency/alert rows, which carry special red styling instead of going
   // through detailRow's generic '<b>label:</b> value' format.
   function specialRow(label, isSet, htmlWhenSet, fieldKey) {
     if (!isSet && !currentDevMode) return null;
-    if (!isSet) return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + ':</span><span class="detail-value">' + dash + '</span></div>';
-    return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + ':</span><span class="detail-value detail-value-special">' + htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '') + '</span></div>';
+    if (!isSet) return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + '</span><span class="detail-value">' + dash + '</span></div>';
+    return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + '</span><span class="detail-value detail-value-special">' + htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '') + '</span></div>';
   }
   // A callsign-decoded operator/operator_country whose claimed country
   // conflicts with the aircraft's own ICAO24 hex-block country is withheld
@@ -506,19 +510,23 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // adsb.fi/airplanes.live only — no OpenSky equivalent for any of these
   // (DO-260B navigation accuracy/integrity categories, receiver-relative
   // signal metadata). Absent entirely for an OpenSky-only aircraft, same as
-  // Autopilot/Weather above.
-  const signalQuality = renderGroup('Signal & Data Quality', [
+  // Autopilot/Weather above. Split into three groups for clarity.
+  const messageInfo = renderGroup('Message Info', [
     detailRow('Data source flags', formatDbFlags(info.dbFlags), 'dbFlags'),
     detailRow('Message type', info.messageType, 'messageType'),
     detailRow('ADS-B version', info.adsbVersion != null ? 'v' + info.adsbVersion : null, 'adsbVersion'),
-    detailRow('NIC', info.nic, 'nic'),
+  ], 'messageInfo');
+  const positionAccuracy = renderGroup('Position Accuracy', [
+    detailRow('NIC', info.nic, 'nic', infoTipHtml(HELP_ICON_SVG, 'Navigation Integrity Category — how tightly the reported position is guaranteed to fall within the stated Radius of Containment. Higher value = tighter guarantee.')),
     detailRow('NIC (baro)', info.nicBaro, 'nicBaro'),
-    detailRow('NACp', info.nacP, 'nacP'),
-    detailRow('NACv', info.nacV, 'nacV'),
-    detailRow('SIL', info.sil != null ? info.sil + (info.silType ? ' (' + info.silType + ')' : '') : null, 'sil'),
-    detailRow('GVA', info.gva, 'gva'),
-    detailRow('SDA', info.sda, 'sda'),
+    detailRow('NACp', info.nacP, 'nacP', infoTipHtml(HELP_ICON_SVG, 'Navigation Accuracy Category, position — the current estimated accuracy of the reported position. Higher value = better estimate, but not a guaranteed containment radius like NIC.')),
+    detailRow('NACv', info.nacV, 'nacV', infoTipHtml(HELP_ICON_SVG, 'Navigation Accuracy Category, velocity — the current estimated accuracy of the reported ground speed and track. The velocity equivalent of NACp.')),
+    detailRow('SIL', info.sil != null ? info.sil + (info.silType ? ' (' + info.silType + ')' : '') : null, 'sil', infoTipHtml(HELP_ICON_SVG, 'Source Integrity Level — the probability that the true position error exceeds the NIC containment radius without an alert, expressed per flight-hour or per sample.')),
+    detailRow('GVA', info.gva, 'gva', infoTipHtml(HELP_ICON_SVG, 'Geometric Vertical Accuracy — the accuracy of the GPS-derived (geometric) altitude, distinct from the barometric altitude shown elsewhere in the panel.')),
+    detailRow('SDA', info.sda, 'sda', infoTipHtml(HELP_ICON_SVG, 'System Design Assurance — how failure-resistant the aircraft\'s onboard ADS-B avionics are certified to be, independent of what they\'re currently reporting.')),
     detailRow('Radius of containment', info.radiusOfContainmentM != null ? Math.round(info.radiusOfContainmentM) + ' m' : null, 'radiusOfContainmentM'),
+  ], 'positionAccuracy');
+  const signalReception = renderGroup('Signal & Reception', [
     detailRow('Messages received', info.messageCount, 'messageCount'),
     detailRow('Signal strength', info.signalStrengthDbm != null ? info.signalStrengthDbm.toFixed(1) + ' dBm' : null, 'signalStrengthDbm'),
     detailRow('Last position update', formatRelativeSeconds(info.secondsSincePositionUpdate), 'secondsSincePositionUpdate'),
@@ -632,6 +640,6 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   return {
     header,
     route,
-    body: identity + position + speedHeading + autopilot + weather + status + signalQuality,
+    body: identity + position + speedHeading + autopilot + weather + status + messageInfo + positionAccuracy + signalReception,
   };
 }

@@ -197,54 +197,12 @@ Implementation plan (phased):
 Estimate: 2–3 dev days for schema + prototype + validation; extra time if an
 automated sync pipeline is required for the chosen source.
 
- Find and integrate a UI component / CSS framework
 
- Goal: evaluate and adopt a lightweight, accessible UI component or CSS
- framework that fits the project's no-build, static-asset constraints, to
- standardize component styling, reduce ad-hoc CSS, and speed future UI work.
-
- Motivation: the codebase has accumulated many small, bespoke UI styles and a
- light framework would provide consistent utilities (spacing, grids, buttons),
- accessible components (modals, tooltips), and theming tokens without forcing
- a full frontend build step.
-
- Acceptance criteria:
- - Candidate list with pros/cons (size, license, accessibility, no-build path).
- - Pick one framework that can be integrated by adding static CSS/JS files
-	 (CDN or vendored assets) without a build step, and demonstrate a small
-	 proof-of-concept in `static/index.html` (e.g. upgrade a button + HUD pill).
- - Ensure chosen solution is permissively licensed for redistribution (MIT,
-	 Apache-2.0, or similarly permissive) or document any constraints in
-	 `.ai/DECISIONS.md`.
- - Add a short migration checklist: replace color/spacing tokens, update
-	 `static/style.css` to reuse tokens where appropriate, and mark components to
-	 migrate (buttons, badges, dropdowns, modals, forms).
-
- Candidate frameworks to evaluate (no-build-friendly):
- - Bulma (pure CSS, MIT) — good grid/utility set, no JS required.
- - Bootstrap (CSS + optional JS, MIT) — comprehensive components, larger size.
- - Spectre.css / Milligram / Picnic CSS (small, pure CSS) — lightweight choices.
- - Shoelace (Web Components, MIT) — ready-made components, works without build
-	 where web components are acceptable; polyfills for older browsers.
- - Tailwind CSS (utility-first) — excellent, but ideal usage requires a build
-	 step; CDN usage possible with caveats (larger payload, runtime classes).
- - Primer CSS (GitHub's CSS, MIT) — solid tokens and components, also no-build.
- - edbnme/ui (https://github.com/edbnme/ui) — candidate to evaluate for
-	 lightweight components and CSS utilities; check license, bundle size,
-	 component coverage, and whether it fits the project's no-build static
-	 asset constraint.
-
- Implementation notes:
- 1. Run a light evaluation: pick 2–3 candidates (Bulma, Bootstrap, Shoelace)
-		and implement a tiny POC replacing one HUD element (e.g., `#hud .source-row`
-		toggle or sidebar save button) to see integration friction.
- 2. Prefer a pure-CSS solution (Bulma/Spectre) if avoiding JS polyfills; choose
-		Shoelace if web-component-based API fits the project's direction and browser
-		support is acceptable.
- 3. Document the decision and migration checklist in `.ai/DECISIONS.md`.
-
- Estimate: 0.5–1 developer day for evaluation + POC; migration effort depends on
- scope and can be broken into smaller PRs.
+Superseded: the project adopted Preline as its UI component framework (see
+CLAUDE.md's "UI layer" / `.ai/ARCHITECTURE.md`'s "UI layer" section) —
+the goal this item described. "No build step" is no longer a project
+constraint either way (see `.ai/DECISIONS.md` if that context is needed),
+so it's not a criterion for future UI-framework decisions.
 
 
 
