@@ -2,6 +2,12 @@
 
 > **Update rule:** this file holds only what is currently open: unresolved bugs, an in-progress task, or a decision still pending. It is not a changelog or session diary.
 
+## ✅ "No build step" softened from hard constraint to current state (2026-08-06)
+
+Removed from `.ai/PROJECT.md`'s Hard Constraints list; reworded CLAUDE.md/
+README.md language accordingly. Docs-only wording fix, no task status
+change.
+
 ## ✅ Live counters for timestamp fields (completed 2026-08-06)
 
 Fixed **two** timestamp fields to show live counters that update every 

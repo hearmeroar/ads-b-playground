@@ -3804,15 +3804,14 @@ scale ever change again.
 - All UI text and code comments are in English, regardless of the language
   used in conversation.
 - Keep this to a handful of plain files (backend, markup+JS, stylesheet) —
-  Preline provides the component foundation for the UI, while the project
-  still keeps a no-build-step frontend. This is an intentional MVP
-  constraint, not an oversight. `static/style.css` is a `<link>`ed
-  stylesheet, not a build artifact, so it doesn't violate "no build step."
-  Not a hard requirement, though — the project isn't attached to staying
-  build-step-free forever.
-  If a future need (bundling, minification, TypeScript, whatever) makes a
-  build step the better tradeoff, adopt one; this convention just reflects
-  that nothing so far has justified it. **"No database" was the same kind
+  Preline provides the component foundation for the UI. The frontend
+  currently has no build step (classic `<script>` tags, no bundler/
+  minifier/transpiler), but this is **not a constraint or a rule to
+  preserve** — just the current state, kept only because nothing so far
+  has justified the switch. If a future need (bundling, minification,
+  TypeScript, whatever) makes a build step the better tradeoff, adopt one
+  freely, no special review or justification required beyond the normal
+  bar for any other change. **"No database" was the same kind
   of soft convention, and was retired 2026-07-20** for the state that
   actually needed a database's guarantees: `storage.py`'s SQLite file
   (accounts, saved collections, the identity cache/history log) — see the

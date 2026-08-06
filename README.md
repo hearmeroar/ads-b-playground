@@ -7,8 +7,9 @@ The frontend uses the Preline UI framework as the shared static component
 layer, with project-specific overrides in `static/styles/app.css`. A Flask
 backend proxies five free ADS-B data sources plus FlightAware AeroAPI, and a
 static Leaflet page polls them and renders aircraft as color-coded markers.
-The no-build-step choice fits the project's current size and isn't a hard
-rule — it's fine to introduce one later if a real need for it shows up.
+There's currently no build step; that's just the current state, not a
+constraint — a build step can be introduced anytime a real need for it
+shows up.
 Durable state (accounts, saved collections, the resolved-identity cache)
 lives in a single embedded SQLite file (`storage.py`) — no separate database
 server, just Python's standard library; every short-lived request cache

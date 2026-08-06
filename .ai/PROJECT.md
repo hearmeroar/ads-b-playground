@@ -2,11 +2,11 @@
 
 ## What this is
 
-A **single-tenant live aircraft tracker** built around the Preline UI framework for its static component layer, with no build step and no signup/API-key data sources — Flask proxies seven independent data feeds (OpenSky, adsb.fi, adsb.lol, adsb.one, airplanes.live, FlightAware AeroAPI, FlightRadar24, plus adsbdb.com for lazy enrichment) to a static Leaflet map and a vanilla-JS frontend. Users can save favorite aircraft to a personal collection (Google OAuth login, SQLite persistence). All components share one source of truth: `AREA_CENTER` (configurable via zone-search, 220 nm radius), though the Airports layer extends globally.
+A **single-tenant live aircraft tracker** built around the Preline UI framework for its static component layer, with no signup/API-key data sources — Flask proxies seven independent data feeds (OpenSky, adsb.fi, adsb.lol, adsb.one, airplanes.live, FlightAware AeroAPI, FlightRadar24, plus adsbdb.com for lazy enrichment) to a static Leaflet map and a vanilla-JS frontend. Users can save favorite aircraft to a personal collection (Google OAuth login, SQLite persistence). All components share one source of truth: `AREA_CENTER` (configurable via zone-search, 220 nm radius), though the Airports layer extends globally.
 
 **Goals:**
 - Operate offline (all external data proxied; Leaflet/tiles vendored locally).
-- Keep the UI consistent through Preline primitives plus local overrides, while preserving the no-build frontend.
+- Keep the UI consistent through Preline primitives plus local overrides.
 - Scale to multi-user without backend framework overhead (SQLite + gunicorn workers).
 - Demonstrate live data collection from multiple independent services and graceful degradation when any fail.
 - Stay maintainable by a single developer (no complex abstraction, clear data flow, comprehensive inline documentation in CLAUDE.md).
@@ -21,7 +21,6 @@ A **single-tenant live aircraft tracker** built around the Preline UI framework 
 These are lines that must never be crossed without explicit review and documented reasoning:
 
 - **Ports 5051/5050 only:** OAuth client is hardcoded to these ports. Running on any other port breaks Google login. (See CLAUDE.md § "Commands")
-- **No build step:** All frontend is classic `<script>` tags in load order; tests verify order-dependent behavior. No bundler, minifier, or transpiler. (See CLAUDE.md § "Conventions")
 - **No signup/API-key data sources:** All seven live feed sources are anonymous-access only (OpenSky + four radius sources + FlightAware + FlightRadar24), or they're lazy-fetched enrichment (adsbdb). No paywalls or authentication tokens for map data. (See CLAUDE.md § "Architecture")
 - **Single `AREA_CENTER` derivation:** All scan-radius values, bbox queries, and Airports layer filtering derive from one constant. Moving the coverage area requires updating one line, not six. (See CLAUDE.md § "Area coupling")
 - **Classic-script load order is significant:** Frontend JS files are not ES modules; they share one global scope, and their `<script>` order in index.html is load-bearing. Tests verify this. (See CLAUDE.md § "What this is")
