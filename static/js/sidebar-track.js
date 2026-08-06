@@ -243,6 +243,43 @@ function buildMergedDetails(icao24) {
 // every render path (initial select, poll resync, unit/dev-mode toggles,
 // and the enrichment fetch landing) so none of them can drift out of sync
 // with each other.
+function updateLastContactDisplay() {
+  if (!selectedIcao24 || !detailsById.has(selectedIcao24)) return;
+  const details = detailsById.get(selectedIcao24);
+  if (details.info.lastContactTimestamp == null) return;
+
+  const now = Math.floor(Date.now() / 1000);
+  const secondsSince = Math.max(0, now - details.info.lastContactTimestamp);
+
+  // Find and update only the "Last update" row in the DOM via data-field attribute
+  const row = sidebarDetailsEl.querySelector('[data-field="secondsSinceContact"]');
+  if (row) {
+    const valueSpan = row.querySelector('.detail-value');
+    if (valueSpan) {
+      let text;
+      if (secondsSince < 60) text = secondsSince + ' s ago';
+      else if (secondsSince < 3600) text = Math.round(secondsSince / 60) + ' min ago';
+      else text = Math.round(secondsSince / 3600) + ' h ago';
+      // Update only the text node, preserve any source badges (child elements)
+      if (valueSpan.firstChild && valueSpan.firstChild.nodeType === 3) { // Node.TEXT_NODE
+        valueSpan.firstChild.textContent = text;
+      }
+    }
+  }
+}
+
+function startLastContactUpdateTimer() {
+  stopLastContactUpdateTimer();
+  lastContactUpdateTimer = setInterval(updateLastContactDisplay, 1000);
+}
+
+function stopLastContactUpdateTimer() {
+  if (lastContactUpdateTimer) {
+    clearInterval(lastContactUpdateTimer);
+    lastContactUpdateTimer = null;
+  }
+}
+
 function renderSelectedDetails() {
   if (selectedIcao24 == null || !detailsById.has(selectedIcao24)) return;
   const m = buildMergedDetails(selectedIcao24);
@@ -250,12 +287,14 @@ function renderSelectedDetails() {
   sidebarHeaderEl.innerHTML = rendered.header;
   sidebarRouteEl.innerHTML = rendered.route;
   sidebarDetailsEl.innerHTML = rendered.body;
+  startLastContactUpdateTimer();
 }
 
 let selectedIcao24 = null;
 let trackLayerGroup = null;
 let trackFetchToken = 0; // guards against a stale response overwriting a newer selection
 let trackUsesLiveFallback = false;
+let lastContactUpdateTimer = null; // live counter for "Last update" field
 
 // OpenSky is the only source that provides a full historical track, but its
 // track endpoint is quota-limited. Keep a small, in-browser trail from the
@@ -673,6 +712,7 @@ function deselectAircraft() {
   selectedIcao24 = null;
   trackUsesLiveFallback = false;
   stopTrackRetryTimer();
+  stopLastContactUpdateTimer();
   drawTrack(null);
   sidebarEl.classList.remove('open');
   setTrackStatus('');

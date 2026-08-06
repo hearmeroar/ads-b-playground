@@ -329,7 +329,8 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     const has = value != null && value !== '';
     if (!has && !currentDevMode) return null;
     const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
-    return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + ':</span><span class="detail-value">' + (has ? value : dash) + badge + '</span></div>';
+    const dataAttr = fieldKey ? ' data-field="' + fieldKey + '"' : '';
+    return '<div class="detail-row detail-row-basic"' + dataAttr + '><span class="detail-label">' + label + ':</span><span class="detail-value">' + (has ? value : dash) + badge + '</span></div>';
   }
   // Same "always render in dev mode" treatment for the two hardcoded
   // emergency/alert rows, which carry special red styling instead of going

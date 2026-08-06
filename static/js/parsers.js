@@ -53,6 +53,7 @@ function normalizeOpenSky(s, extra) {
     emergency: (extra && extra.emergency) || null,
     hasAlert: !!s.spi,
     positionSource: OPENSKY_POSITION_SOURCE_LABELS[s.position_source] || null,
+    lastContactTimestamp: s.last_contact, // unix timestamp (seconds), for live sidebar counter
     secondsSinceContact: s.last_contact != null
       ? Math.max(0, Math.floor(Date.now() / 1000) - s.last_contact) : null,
     // No OpenSky equivalent for any of these — extra-derived only, same as
@@ -219,6 +220,7 @@ function normalizeAdsbExchange(a) {
     emergency: a.emergency || null,
     hasAlert: !!a.hasAlert,
     positionSource: a.positionSource || null,
+    lastContactTimestamp: a.lastContactTimestamp,
     secondsSinceContact: a.secondsSinceContact,
     operator: a.operator, manufactureYear: a.manufactureYear,
     dbFlags: a.dbFlags, messageType: a.messageType, adsbVersion: a.adsbVersion,
@@ -296,6 +298,7 @@ function parseAdsbExchangeAircraft(ac) {
     tatC: typeof ac.tat === 'number' ? ac.tat : null,
     hasAlert: !!ac.alert || !!ac.spi,
     positionSource: positionSource,
+    lastContactTimestamp: typeof ac.seen === 'number' ? Math.floor(Date.now() / 1000) - ac.seen : null,
     secondsSinceContact: typeof ac.seen === 'number' ? ac.seen : null,
     // The fields below have no OpenSky equivalent at all (confirmed against
     // the official 18-field state vector) — enrichment-only, same as ias/

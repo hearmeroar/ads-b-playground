@@ -2,6 +2,20 @@
 
 > **Update rule:** this file holds only what is currently open: unresolved bugs, an in-progress task, or a decision still pending. It is not a changelog or session diary.
 
+## ✅ Live counter for "Last update" timestamp (completed 2026-08-06)
+
+Fixed the "Last update" field in aircraft sidebar to show a **live counter** 
+that updates every second (0 s ago → 1 s ago → 2 s ago... 3 s ago) instead 
+of a static snapshot that never changes. Resets when the marker updates with 
+new data.
+
+**Implementation:** Added `lastContactTimestamp` (unix seconds) to all 
+aircraft data sources; sidebar runs a 1-second `setInterval` while open 
+that updates only the DOM element, preserving source badges and not 
+re-rendering the whole sidebar. Timer stops on close/deselect.
+
+All 574 tests pass (360 backend + 214 frontend).
+
 ## ✅ Expanded permission allowlist (completed 2026-08-06)
 
 Added 24 read-only bash patterns to `.claude/settings.json` to eliminate prompts for common development operations (git read-only commands, system utilities like ps/lsof/sqlite3/sed/awk/jq/sort/uniq/tr/cut/paste). Scanned 50 recent session transcripts via `fewer-permission-prompts` skill; only included commands with 3+ occurrences. All patterns are read-only and already auto-allowed by Claude Code — this just makes them explicit to reduce unnecessary permission request overhead. No new arbitrary-code-execution patterns added.
