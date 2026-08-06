@@ -351,20 +351,15 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     return ' <span class="field-unconfirmed-tag">⚠ Unconfirmed</span>';
   }
   // Identity fields the enrichment pipeline can fill (Country/Operator/
-  // Manufacturer/Model/Year built): for most aircraft, always renders — a
-  // missing value shows the literal word "Unknown" rather than hiding the
-  // row or falling back to dev-mode's dash, since these fields are
-  // specifically meant to always resolve to *something* meaningful.
-  // For C-category ground vehicles (isGroundVehicle true), use detailRow-like
-  // behavior instead: hide empty fields in normal mode (show only as dash in
-  // dev mode), since malformed registrations/callsigns shouldn't produce
-  // misleading "Unknown" display.
+  // Manufacturer/Model/Year built): in normal mode this now behaves exactly
+  // like detailRow — an unresolved field hides its row entirely rather than
+  // showing the literal word "Unknown". Dev mode is unchanged: every row
+  // still always renders, with a dash placeholder for ground vehicles (which
+  // skip heuristic enrichment tiers entirely, so "Unknown" would falsely
+  // suggest enrichment was attempted) or "Unknown" for everything else.
   function identityRow(label, value, fieldKey, helpHtml) {
     const has = value != null && value !== '';
-    // C-category ground vehicles skip heuristic enrichment tiers (registration_prefix,
-    // icao24_block, callsign_decode) and rely only on live/adsbdb data. Showing
-    // "Unknown" for empty fields would falsely suggest enrichment was attempted.
-    if (isGroundVehicle && !has && !currentDevMode) return null;
+    if (!has && !currentDevMode) return null;
     const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
     // Label + "(?)" icon are wrapped together in .identity-label-wrap, which
     // carries the min-width column-alignment that plain <b> used to have on
@@ -374,7 +369,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     // lighter weight/smaller size than a plain detailRow <b> — four-plus
     // rows of full-bold labels each now carrying their own icon read as too
     // heavy/loud as a block.
-    return '<div class="detail-row detail-row-identity"><span class="detail-label identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span><span class="detail-value">' + (has ? value : (isGroundVehicle && currentDevMode ? dash : 'Unknown')) + badge + unconfirmedTagHtml(fieldKey) + '</span></div>';
+    return '<div class="detail-row detail-row-identity"><span class="detail-label identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span><span class="detail-value">' + (has ? value : (isGroundVehicle ? dash : 'Unknown')) + badge + unconfirmedTagHtml(fieldKey) + '</span></div>';
   }
   function renderGroup(title, rows, iconKey) {
     const filtered = rows.filter((r) => r != null);
@@ -401,14 +396,18 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // concept per row" pattern as Registered Owner having its own flag
   // rather than decorating Operator). The logo can resolve even when the
   // name itself didn't (no live/adsbdb/Flywme tier had an answer, but the
-  // callsign prefix still matches a vendored logo) — falls back to the
-  // literal "Unknown" text next to the logo rather than suppressing it,
-  // same as every other identityRow field's unresolved state.
+  // callsign prefix still matches a vendored logo) — in dev mode this still
+  // falls back to the literal "Unknown" text next to the logo, same as
+  // every other identityRow field's unresolved state. In normal mode a logo
+  // alone with no real operator name no longer synthesizes that fallback
+  // text — the row still renders (the logo itself is real, known data), just
+  // without a fake "Unknown" caption; the row only hides entirely when
+  // neither a name nor a logo resolved at all.
   const operatorLogoHtml = airlineLogoHtml(info.callsign);
-  const operatorText = info.operator || (operatorLogoHtml ? 'Unknown' : null);
+  const operatorText = info.operator || (operatorLogoHtml && currentDevMode ? 'Unknown' : null);
   const operatorValue = operatorText
     ? (operatorLogoHtml ? operatorLogoHtml + ' ' + operatorText : operatorText)
-    : null;
+    : (operatorLogoHtml || null);
   // Operator Country: adsbdb's flightroute.airline (name + ISO together) as
   // the primary tier, falling back to our own callsign-prefix enrichment
   // (enrichment/callsign.py's AIRLINE_OPERATORS table) when adsbdb has

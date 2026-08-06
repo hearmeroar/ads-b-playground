@@ -50,7 +50,7 @@ async function isolateDddOnOpenSky(page) {
   await page.route('**/api/airplaneslive', (route) => route.fulfill({ json: { ac: [] } }));
 }
 
-test('dev mode off: resolved fields render plain, unresolved render "Unknown", no badges', async ({ page }) => {
+test('dev mode off: resolved fields render plain, unresolved identity rows hide entirely, no badges', async ({ page }) => {
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
     country: null, operator: null, registration: null,
     manufacturer: { value: 'Boeing', source: 'aircraft_type_db', confidence: 1.0 },
@@ -65,9 +65,11 @@ test('dev mode off: resolved fields render plain, unresolved render "Unknown", n
   expect(sidebarText).toContain('Manufacturer');
   expect(sidebarText).toContain('Boeing');
   expect(sidebarText).toContain('737-800');
-  expect(sidebarText).toContain('Operator?Unknown');
-  expect(sidebarText).toContain('Registration Country?Unknown');
-  expect(sidebarText).toContain('Year builtUnknown');
+  // Unresolved identity fields now hide their row entirely in normal mode
+  // (like every other field) rather than showing the literal word "Unknown".
+  expect(sidebarText).not.toContain('Operator');
+  expect(sidebarText).not.toContain('Registration Country');
+  expect(sidebarText).not.toContain('Year built');
 
   const badgeCount = await page.evaluate(() => document.querySelectorAll('#sidebar-details .source-badge').length);
   expect(badgeCount).toBe(0);
@@ -168,12 +170,14 @@ test('a Flywme-resolved Operator Country (via callsign_decode) fills in when ads
   expect(await flagClassFor('Operator Country')).toBe('fi fi-ie');
 });
 
-test('each of the four identity-row labels has a click-to-toggle tooltip disambiguating it from the other three, visible with dev mode off', async ({ page }) => {
-  // Default all-null identity mock — the tooltip explains the *concept*,
-  // so it must work regardless of whether the row resolved to a value or
-  // "Unknown", and regardless of dev mode (unlike per-source badges).
+test('each of the four identity-row labels has a click-to-toggle tooltip disambiguating it from the other three', async ({ page }) => {
+  // Default all-null identity mock. In normal mode an unresolved identity
+  // row now hides entirely (see the "hide unresolved identity rows" change),
+  // so this needs dev mode on to guarantee every one of the four rows (and
+  // its tooltip trigger) actually renders regardless of resolution state.
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
+  await page.click('#toggle-dev-mode');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
   async function tooltipTextFor(label) {
@@ -197,10 +201,14 @@ test('each of the four identity-row labels has a click-to-toggle tooltip disambi
   expect(await tooltipTextFor('Registration Country')).toContain('not who operates or owns it');
 });
 
-test('Registration is excluded from the Unknown-treatment: it\'s the header now, not an identityRow', async ({ page }) => {
-  // Default all-null identity mock from beforeEach/mockAllSources.
+test('Registration is excluded from the identityRow treatment: it\'s the header now, not an identityRow', async ({ page }) => {
+  // Default all-null identity mock from beforeEach/mockAllSources. In dev
+  // mode every identityRow always renders (dash/"Unknown" placeholder),
+  // which is the one reliable way to confirm all four fields still go
+  // through identityRow rather than some other rendering path.
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
+  await page.click('#toggle-dev-mode');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
@@ -339,7 +347,7 @@ test('surface-vehicle aircraft: category_code parameter is passed to enrichment 
 
 test('surface-vehicle aircraft: null enrichment fields render as dashes in dev mode', async ({ page }) => {
   // Backend returns null for heuristic tiers (suppressed). Frontend renders null as dashes in dev mode.
-  // Non-dev rendering is tested via the main "dev mode off" test above (all-null → "Unknown").
+  // Non-dev rendering is tested via the main "dev mode off" test above (all-null → row hidden entirely).
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
     country: null, operator: null, operator_country: null, registration: null,
     manufacturer: null, model: null, year_built: null,

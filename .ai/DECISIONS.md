@@ -412,3 +412,17 @@ and avoids adding sync machinery nothing needs yet.
 - No test in `tests/backend/test_ogn.py` exercises `_read_loop()`/`_worker()` directly against a real or mocked socket (they test `_process_line()` and the route in isolation) — the bugs here were all in the connection-management layer *below* `_process_line()`, which is why full mock coverage didn't catch them; live testing remains the only way to verify this layer.
 
 **References:** `ogn_source.py` (`_read_loop()`, `_worker()`, `_ogn_settings`, `OGN_APRS_USER`), the "Open Glider Network (OGN) as a ninth source" decision above.
+
+## 2026-08-06 — Unresolved identity rows hide entirely in normal mode (dev mode unchanged)
+
+**Problem:** `identityRow()` (`static/js/render-details.js`, used for Country/Operator/Operator Country/Registered Owner/Manufacturer/Model/Year built) originally always rendered its row, showing the literal word "Unknown" when nothing resolved — a deliberate 2026-07 decision at the time, since these fields were "meant to always resolve to something meaningful." In practice this meant a sidebar in normal mode could show a wall of "Unknown" rows for an aircraft with sparse enrichment, unlike every other field (`detailRow`), which simply hides when empty.
+
+**Decision:** In normal mode, `identityRow()` now behaves exactly like `detailRow()` — an unresolved field's row is omitted entirely rather than showing "Unknown". Dev mode is explicitly unchanged: every identity row still always renders, with a dash for ground-vehicle fields (which skip heuristic enrichment on purpose) or "Unknown" otherwise, exactly as before. The Operator row's airline-logo special case (a logo can resolve from the callsign even with no operator name) was adjusted to match: in normal mode a logo-only row now renders with just the logo and no synthesized "Unknown" caption, hiding entirely only when neither a name nor a logo resolved; dev mode keeps the old logo+"Unknown" fallback text unchanged.
+
+**Reason:** Explicit user request (2026-08-06) — normal mode should hide fields with no value or an unknown value, consistent with every other field group in the sidebar; dev mode should stay exactly as-is (always show every field, dev-only source badges).
+
+**Tradeoffs:**
+- The four identity-row labels' click-to-toggle `.info-tip` tooltips (`IDENTITY_FIELD_EXPLANATIONS`) are no longer reachable in normal mode for an unresolved field, since the row (and its label) no longer renders at all — previously documented as "always visible regardless of dev mode." This is an accepted consequence, not a separate bug: there's no label to attach a tooltip to once the row is gone.
+- Several Playwright tests that asserted literal "Unknown" text in normal mode (`test_identity_enrichment.spec.js`, `test_adsbdb.spec.js`, `test_operator_corroboration.spec.js`) were rewritten to assert the row is absent instead, or moved into dev mode where the concept-explanation tooltip test still needs every row to render regardless of resolution state.
+
+**References:** CLAUDE.md § "New Identity rows" / "Registered Owner is a brand new field" / "Airline logos", `static/js/render-details.js`'s `identityRow()`, `tests/frontend/test_identity_enrichment.spec.js`, `tests/frontend/test_adsbdb.spec.js`, `tests/frontend/test_operator_corroboration.spec.js`.

@@ -179,13 +179,13 @@ test('a live registration is never overwritten by adsbdb, even a contradicting o
   expect(sources.length).toBeGreaterThan(0);
 });
 
-test('Registered Owner shows literal "Unknown" when adsbdb has nothing, like other identity fields', async ({ page }) => {
+test('Registered Owner hides its row entirely when adsbdb has nothing, like other identity fields in normal mode', async ({ page }) => {
   // Default all-null adsbdb mock from beforeEach/mockAllSources.
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
-  expect(await rowText(page, 'Registered Owner')).toBe('Unknown');
+  expect(await rowText(page, 'Registered Owner')).toBe(null);
 });
 
 // adsbdb's url_photo consistently 404s in practice (verified live against

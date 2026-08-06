@@ -10,7 +10,10 @@ const { mockAllSources, fixture } = require('./helpers');
 // category still shows the value (cross-border leasing legitimately
 // produces this same kind of mismatch constantly), just with extra
 // dev-mode tooltip detail. "bbbbbb" (states.json) already carries OpenSky
-// category 8 (rotorcraft); "dddddd" carries category 4 (large).
+// category 8 (rotorcraft); "dddddd" carries category 4 (large). Since
+// unresolved identity rows now hide entirely in normal mode (rather than
+// showing "Unknown"), a withheld value here means the Operator/Operator
+// Country rows don't render at all, not just that their text is blank.
 async function selectOpenSky(page, hex) {
   await page.evaluate((hex) => {
     const marker = openskyMarkers.get(hex);
@@ -42,7 +45,7 @@ test.beforeEach(async ({ page }) => {
   await mockAllSources(page); // default /api/identity/** -> all-null
 });
 
-test('rotorcraft: an unconfirmed operator/operator_country renders as "Unknown" in normal mode', async ({ page }) => {
+test('rotorcraft: an unconfirmed operator/operator_country hides its row entirely in normal mode', async ({ page }) => {
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: needsCorroborationIdentityResponse() }));
   await isolateOnOpenSky(page, 'bbbbbb');
   await page.goto('/');
@@ -50,9 +53,11 @@ test('rotorcraft: an unconfirmed operator/operator_country renders as "Unknown" 
   await selectOpenSky(page, 'bbbbbb');
 
   const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Operator?Unknown');
-  expect(sidebarText).toContain('Operator Country?Unknown');
   expect(sidebarText).not.toContain('Mauritania');
+  const rowLabels = await page.evaluate(() =>
+    [...document.querySelectorAll('#sidebar-details b')].map((el) => el.textContent));
+  expect(rowLabels).not.toContain('Operator');
+  expect(rowLabels).not.toContain('Operator Country');
 
   const badgeCount = await page.evaluate(() => document.querySelectorAll('#sidebar-details .source-badge').length);
   expect(badgeCount).toBe(0);

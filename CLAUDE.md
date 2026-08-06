@@ -1860,8 +1860,9 @@ final pass still hides it, so the empty map and error line remain reachable.
     `country_for_icao24(icao24)`. The flag suppresses the mismatched value
     entirely in normal mode *for rotorcraft specifically* (where a genuine
     cross-border "airline" flight is rare, unlike fixed-wing leasing where
-    it's routine) — the field renders "Unknown" instead. Dev mode shows the
-    suppressed value anyway, tagged with `⚠ Unconfirmed`, and the badge
+    it's routine) — the row hides entirely instead (per `identityRow()`'s
+    normal-mode behavior). Dev mode shows the suppressed value anyway,
+    tagged with `⚠ Unconfirmed`, and the badge
     tooltip carries the extra conflict detail. Non-rotorcraft always display
     the value plainly (cross-border is normal for them), just with the
     tooltip flag for context. Tests verify the behavior across both aircraft
@@ -1923,13 +1924,18 @@ final pass still hides it, so the empty map and error line remain reachable.
     field). `Country`/`Operator`/`Year built` already existed and just gain
     Flywme as an additional possible `fieldSources` entry. All five (plus
     Country's own upgrade) use a new `identityRow()` closure inside
-    `renderDetailsHtml()` instead of `detailRow()` — unlike every other
-    field in this app, they show the literal word **"Unknown"** instead of
-    hiding the row (or, in dev mode, a dash) when nothing resolved,
-    regardless of `currentDevMode`. Registration is deliberately excluded
-    from this treatment (stays on plain `detailRow`) — the spec's
-    "Unknown" list names Country/Operator/Manufacturer/Model/Year built
-    only. Country's flag leads the country name, rendered by `flagHtml(iso2)`
+    `renderDetailsHtml()` instead of `detailRow()`. **Behavior changed
+    2026-08-06** (explicit request): in normal mode `identityRow()` now
+    behaves exactly like `detailRow()` — an unresolved field hides its row
+    entirely rather than showing the literal word "Unknown". Dev mode is
+    unchanged: every row still always renders, with a dash placeholder for
+    ground-vehicle fields (which skip heuristic enrichment tiers entirely,
+    so "Unknown" would falsely suggest enrichment was attempted) or
+    "Unknown" for everything else, regardless of resolution state.
+    Registration is deliberately excluded from this treatment (stays on
+    plain `detailRow`) — the spec's identity-row list names Country/
+    Operator/Manufacturer/Model/Year built/Registered Owner only. Country's
+    flag leads the country name, rendered by `flagHtml(iso2)`
     (`static/index.html`) from `info.countryIso` — a small SVG via the
     [flag-icons](https://github.com/lipis/flag-icons) library
     (`<span class="fi fi-cz">`), vendored at `static/flag-icons/` (`css/` +
@@ -2154,8 +2160,9 @@ final pass still hides it, so the empty map and error line remain reachable.
     package never had (it only ever models an operating *airline*, via
     `Operator`). adsbdb is its only possible tier — no live feed or Flywme
     fallback exists for it — so it renders via `identityRow()` like
-    Country/Operator/etc. (literal "Unknown" when unresolved, not a hidden
-    row). **`Registration Country`, `Operator Country`, and `Registered
+    Country/Operator/etc. (hidden row when unresolved in normal mode, dash
+    or "Unknown" in dev mode — see the identityRow behavior change above).
+    **`Registration Country`, `Operator Country`, and `Registered
     Owner` are three deliberately distinct concepts, never conflated, each
     with its own row and its own flag** — `Operator` itself stays plain
     text with no flag at all: Registration Country means the aircraft's
@@ -2182,8 +2189,9 @@ final pass still hides it, so the empty map and error line remain reachable.
     lookup, never smuggling the country onto `operator` itself. Only a
     *live-sourced* Operator has no possible Operator Country at all (no
     live feed reports an operator's home country), which just means that
-    row shows "Unknown" — the same known limitation as Registration
-    Country's own flag on a live value with no `countries.py` name match.
+    row hides entirely in normal mode (dev mode: shows "Unknown") — the
+    same known limitation as Registration Country's own flag on a live
+    value with no `countries.py` name match.
     **Each of the four rows' labels** (Operator/Operator Country/
     Registered Owner/Registration Country) **carries a click-to-toggle
     `.info-tip`** (`IDENTITY_FIELD_EXPLANATIONS`, `static/js/
@@ -2191,11 +2199,12 @@ final pass still hides it, so the empty map and error line remain reachable.
     Category/header pieces/route confidence — see "Unified tooltip
     mechanism" below) whose text explicitly cross-references the other
     three, so the four concepts read as one disambiguated set rather than
-    four isolated labels. Wraps the row's *label*, not its value — unlike
-    Category, these rows show "Unknown" as often as a real value
-    (`identityRow()`'s whole point), and the explanation needs to work
-    either way; always visible regardless of dev mode, same as every other
-    `.info-tip`, since knowing what a field means isn't a dev-only concern.
+    four isolated labels. Wraps the row's *label*, not its value — in dev
+    mode these rows show "Unknown" as often as a real value
+    (`identityRow()`'s dev-mode behavior), and the explanation needs to work
+    either way there; in normal mode the tooltip is naturally only reachable
+    when the row itself is showing (a resolved value), since an unresolved
+    row no longer renders at all.
   - **Photo (`url_photo`/`url_photo_thumbnail`), last-resort only**: live
     checks against api.adsbdb.com (4+ real aircraft) found `url_photo` —
     the field that in theory points at a full-size image — **consistently
@@ -2302,10 +2311,13 @@ final pass still hides it, so the empty map and error line remain reachable.
   looked up from the **3-letter ICAO airline designator that leads a flight
   callsign** (e.g. `"RYR1234"` → `"RYR"`) — deliberately *not* derived from
   however the Operator *name* itself resolved (live/adsbdb/Flywme), so a
-  logo can render even when the name didn't (falls back to the literal
-  "Unknown" text next to the logo, same as every other `identityRow` field).
-  No new backend field was needed for this — the callsign is already on
-  `info` for the click-scoped selected aircraft.
+  logo can render even when the name didn't — in dev mode this falls back
+  to the literal "Unknown" text next to the logo, same as every other
+  `identityRow` field's dev-mode behavior; in normal mode the row still
+  renders with just the logo and no synthesized "Unknown" caption (the logo
+  itself is real, known data), and only hides entirely when neither a name
+  nor a logo resolved at all. No new backend field was needed for this — the
+  callsign is already on `info` for the click-scoped selected aircraft.
   Unlike `flag-icons`/the MDI icon set (properly OFL/Apache-licensed generic
   glyphs), there is no single clean, fully-licensed source of *real* airline
   logos — these are corporate trademarks, not generic icons — so this uses

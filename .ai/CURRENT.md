@@ -2,6 +2,20 @@
 
 > **Update rule:** this file holds only what is currently open: unresolved bugs, an in-progress task, or a decision still pending. It is not a changelog or session diary.
 
+## ✅ Hide unresolved identity rows in normal mode (completed 2026-08-06)
+
+`identityRow()` (`static/js/render-details.js`) now hides its row entirely
+in normal mode when the field is unresolved, instead of showing the
+literal word "Unknown" — matching every other field group's hide-when-empty
+behavior. Dev mode is unchanged: every identity row still always renders
+(dash for ground-vehicle fields, "Unknown" otherwise). The Operator row's
+airline-logo fallback was adjusted to match (logo-only rows no longer
+synthesize an "Unknown" caption in normal mode). Updated three Playwright
+spec files (`test_identity_enrichment.spec.js`, `test_adsbdb.spec.js`,
+`test_operator_corroboration.spec.js`) accordingly. Full rationale:
+`.ai/DECISIONS.md` ("Unresolved identity rows hide entirely in normal
+mode"). All 360 backend + 214 frontend tests pass.
+
 ## ✅ Open Glider Network (OGN) as a ninth source (completed 2026-08-05)
 
 Added `ogn_source.py` (background APRS-IS connection to `aprs.glidernet.org`,
