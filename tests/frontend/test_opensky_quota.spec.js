@@ -85,3 +85,32 @@ test('the source auto-restores once the retry window elapses', async ({ page }) 
   expect(restored.helpShown).toBe(false);
   expect(restored.hasMarkers).toBe(true); // polling resumed and rendered OpenSky
 });
+
+test('OpenSky unreachable keeps the last rendered markers and shows a warning', async ({ page }) => {
+  await mockAllSources(page);
+  let calls = 0;
+  await page.route('**/api/states', (route) => {
+    calls += 1;
+    if (calls === 1) {
+      route.fulfill({ json: fixture('states.json') });
+      return;
+    }
+    route.fulfill({ json: { states: [], error: 'opensky_unreachable' } });
+  });
+
+  await page.goto('/');
+  await page.waitForFunction(() => openskyMarkers.size > 0);
+  const before = await page.evaluate(() => openskyMarkers.size);
+
+  await page.evaluate(() => poll());
+
+  const after = await page.evaluate(() => ({
+    markers: openskyMarkers.size,
+    status: document.getElementById('status').textContent,
+    quota: document.getElementById('quota').textContent,
+  }));
+
+  expect(after.markers).toBe(before);
+  expect(after.status).toContain('OpenSky: unreachable');
+  expect(after.quota).toBe('');
+});

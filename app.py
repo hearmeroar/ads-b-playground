@@ -413,23 +413,26 @@ _token = {"value": None, "expires_at": 0.0, "retry_at": 0.0}
 # If the OAuth2 token endpoint is unreachable (observed in production:
 # auth.opensky-network.org connect-timing-out from some hosting networks
 # while opensky-network.org itself stays reachable), don't retry it on every
-# single request — each attempt costs a full connect-timeout (10s) and would
+# single request — each attempt costs a full connect-timeout and would
 # otherwise stall every poll. Back off for this long before trying again.
 TOKEN_RETRY_COOLDOWN = 60
+OPENSKY_TOKEN_TIMEOUT = 5
 
 # Same circuit-breaker idea, one level up: if opensky-network.org itself
 # (not just the auth subdomain) is unreachable, /api/states and /api/track
 # share this cooldown so neither keeps re-attempting the network call (and
-# eating its own 10s connect-timeout) on every single incoming request while
+# eating a long connect-timeout) on every single incoming request while
 # it's down. Observed in production (2026-07-19): with the cache never
 # updating on failure, every poll from every open tab kept retrying in
-# parallel, each blocking a gunicorn thread for up to 10s — enough
+# parallel, each blocking a gunicorn thread long enough to exhaust the
+# thread pool — enough
 # concurrent stuck requests exhausted the thread pool and made the whole
 # app (including the unrelated radius sources) unresponsive, not just the
 # OpenSky-backed endpoints. Shared between states and track since they're
 # the same host/network path — an outage on one means the other will fail
 # the same way.
 OPENSKY_OUTAGE_COOLDOWN = 30
+OPENSKY_REQUEST_TIMEOUT = 5
 _opensky_outage = {"until": 0.0}
 
 
@@ -827,7 +830,7 @@ def get_access_token():
                 "client_id": CLIENT_ID,
                 "client_secret": CLIENT_SECRET,
             },
-            timeout=10,
+            timeout=OPENSKY_TOKEN_TIMEOUT,
         )
         resp.raise_for_status()
         payload = resp.json()
@@ -843,14 +846,14 @@ def get_access_token():
 def fetch_opensky(url, params):
     token = get_access_token()
     headers = {"Authorization": f"Bearer {token}"} if token else {}
-    resp = requests.get(url, params=params, headers=headers, timeout=10)
+    resp = requests.get(url, params=params, headers=headers, timeout=OPENSKY_REQUEST_TIMEOUT)
 
     if resp.status_code == 401 and token:
         # Token expired earlier than expected — drop it and retry once.
         _token["value"] = None
         token = get_access_token()
         headers = {"Authorization": f"Bearer {token}"} if token else {}
-        resp = requests.get(url, params=params, headers=headers, timeout=10)
+        resp = requests.get(url, params=params, headers=headers, timeout=OPENSKY_REQUEST_TIMEOUT)
 
     return resp
 

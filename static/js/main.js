@@ -409,6 +409,8 @@ async function fetchOpenSkyStates() {
 
     if (data.stale) {
       openskyStatusMessage = 'OpenSky: unreachable, showing stale data';
+    } else if (data.error === 'opensky_unreachable') {
+      openskyStatusMessage = 'OpenSky: unreachable';
     } else {
       openskyStatusMessage = null;
     }
@@ -419,6 +421,7 @@ async function fetchOpenSkyStates() {
       ? 'requests left: ' + data.rate_limit_remaining
       : '';
 
+    if (data.error === 'opensky_unreachable' && !data.stale) return null;
     return data.states || [];
   } catch (e) {
     openskyStatusMessage = 'OpenSky: failed to load data';
