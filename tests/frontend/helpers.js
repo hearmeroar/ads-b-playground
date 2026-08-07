@@ -88,6 +88,9 @@ async function mockAllSources(page, { skipHealth = false } = {}) {
       flightradar24: { visible: true, enabled_by_default: false },
     },
     ui: {
+      map: {
+        altitude_color: { visible: true, enabled_by_default: true },
+      },
       sidebar: {
         tile_layout: { visible: true, enabled_by_default: true },
         accordion: { default_collapsed: false, groups: {} },

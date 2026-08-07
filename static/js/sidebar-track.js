@@ -10,6 +10,7 @@ const sidebarHeaderEl = document.getElementById('sidebar-header');
 const sidebarDetailsEl = document.getElementById('sidebar-details');
 const sidebarGalleryEl = document.getElementById('sidebar-gallery');
 const sidebarRouteEl = document.getElementById('sidebar-route');
+const sidebarTrackProfileEl = document.getElementById('sidebar-track-profile');
 const sidebarCloseBtn = document.getElementById('sidebar-close');
 const sidebarCenterMapBtn = document.getElementById('sidebar-center-map');
 
@@ -17,7 +18,7 @@ const sidebarCenterMapBtn = document.getElementById('sidebar-center-map');
 // live aircraft updates, so a section does not spring open again every poll.
 const detailGroupCollapsedOverrides = new Map();
 
-sidebarDetailsEl.addEventListener('click', (event) => {
+sidebarEl.addEventListener('click', (event) => {
   const toggle = event.target.closest('.detail-group-toggle');
   if (!toggle) return;
   const group = toggle.closest('.detail-group');
@@ -120,7 +121,12 @@ function buildMergedDetails(icao24) {
     }
   }
   if (airline) {
-    fillIfEmpty('operator', airline.name, 'adsbdb');
+    const filledOperator = fillIfEmpty('operator', airline.name, 'adsbdb');
+    const operatorMatchesAirline = info.operator && airline.name
+      && String(info.operator).trim().toLowerCase() === String(airline.name).trim().toLowerCase();
+    if (airline.icao && (filledOperator || operatorMatchesAirline)) {
+      info.operatorLogoCode = airline.icao;
+    }
     // Operator Country is its own field (not a flag riding on Operator's
     // own row) — same "dedicated row per concept" pattern as Registered
     // Owner. adsbdb gives the country name directly, no reverse lookup
@@ -206,6 +212,14 @@ function buildMergedDetails(icao24) {
         // it already would for any other unresolved field. Dev mode still
         // falls through below and fills it normally, tagged, for debugging.
         if (!already && isRotorcraft && !currentDevMode) continue;
+      }
+
+      const displayedOperatorValue = already ? info.operator : resolved.value;
+      const logoMatchesDisplayedOperator = beKey === 'operator' && resolved.logo_icao
+        && displayedOperatorValue
+        && String(displayedOperatorValue).trim().toLowerCase() === String(resolved.value).trim().toLowerCase();
+      if (logoMatchesDisplayedOperator && !info.operatorLogoCode) {
+        info.operatorLogoCode = resolved.logo_icao;
       }
 
       // icaolist gets its own badge (SOURCE_COLORS.icaolist), not folded
@@ -300,11 +314,13 @@ function renderSelectedDetails() {
   sidebarHeaderEl.innerHTML = rendered.header;
   sidebarRouteEl.innerHTML = rendered.route;
   sidebarDetailsEl.innerHTML = rendered.body;
+  renderSelectedTrackProfile();
   startLiveTimestampTimer();
 }
 
 let selectedIcao24 = null;
 let trackLayerGroup = null;
+let selectedTrackWaypoints = [];
 let trackFetchToken = 0; // guards against a stale response overwriting a newer selection
 let trackUsesLiveFallback = false;
 let liveTimestampUpdateTimer = null; // live counter for "Last update" and "Last position update" fields
@@ -352,19 +368,31 @@ function recordLiveTrails(parsedStates, parsedRadiusLists) {
   }
 }
 
-// Altitude legend for the track, in the spirit of OpenSky's own web map: grey
-// for unknown altitude, green near the ground, up through yellow/orange to
-// red at cruise altitude and above. Stops are in meters; colors interpolate
-// linearly between them and clamp at the ends.
+// Shared altitude scale for tracks, markers, and the map legend. The
+// cyan/brand-blue/amber/rose palette is owned by the app design system and
+// has separate light/dark values; stops are in meters and interpolate.
 const ALTITUDE_COLOR_STOPS = [
-  { alt: 0, rgb: [46, 204, 113] },    // green
-  { alt: 3000, rgb: [241, 196, 15] }, // yellow
-  { alt: 6000, rgb: [230, 126, 34] }, // orange
-  { alt: 9000, rgb: [231, 76, 60] },  // red
+  { alt: 0, token: '--app-altitude-low', fallback: [8, 145, 178] },
+  { alt: 3000, token: '--app-altitude-mid', fallback: [37, 99, 235] },
+  { alt: 6000, token: '--app-altitude-high', fallback: [217, 119, 6] },
+  { alt: 9000, token: '--app-altitude-max', fallback: [225, 29, 72] },
 ];
+function cssColorTokenRgb(token, fallback) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+  const hex = value.match(/^#([0-9a-f]{6})$/i);
+  if (hex) return [0, 2, 4].map((index) => parseInt(hex[1].slice(index, index + 2), 16));
+  const rgb = value.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : fallback;
+}
+function altitudeColorStops() {
+  return ALTITUDE_COLOR_STOPS.map((stop) => ({
+    alt: stop.alt,
+    rgb: cssColorTokenRgb(stop.token, stop.fallback),
+  }));
+}
 function altitudeColor(meters) {
   if (meters == null) return '#9aa1ab'; // unknown altitude
-  const stops = ALTITUDE_COLOR_STOPS;
+  const stops = altitudeColorStops();
   if (meters <= stops[0].alt) return rgbToHex(stops[0].rgb);
   for (let i = 1; i < stops.length; i++) {
     if (meters <= stops[i].alt) {
@@ -389,6 +417,8 @@ function drawTrack(waypoints) {
     map.removeLayer(trackLayerGroup);
     trackLayerGroup = null;
   }
+  selectedTrackWaypoints = Array.isArray(waypoints) ? waypoints : [];
+  renderSelectedTrackProfile();
   if (!waypoints || waypoints.length < 2) return;
 
   const segments = [];
@@ -403,6 +433,17 @@ function drawTrack(waypoints) {
     }));
   }
   trackLayerGroup = L.featureGroup(segments).addTo(map);
+}
+
+function renderSelectedTrackProfile() {
+  if (!sidebarTrackProfileEl || typeof renderVerticalProfileHtml !== 'function') return;
+  const merged = selectedIcao24 != null && detailsById.has(selectedIcao24)
+    ? buildMergedDetails(selectedIcao24)
+    : null;
+  sidebarTrackProfileEl.innerHTML = renderVerticalProfileHtml(
+    selectedTrackWaypoints,
+    merged ? merged.info : null,
+  );
 }
 
 // Format retry time in human-readable format (hours, minutes, seconds)
@@ -695,6 +736,7 @@ function selectAircraft(icao24) {
   } else {
     sidebarHeaderEl.innerHTML = '';
     sidebarRouteEl.innerHTML = '';
+    sidebarTrackProfileEl.innerHTML = '';
     sidebarDetailsEl.innerHTML = '';
   }
 

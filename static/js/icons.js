@@ -90,10 +90,14 @@ const CATEGORY_GLYPHS = {
 // The CSS class is exactly what the old per-category builders used
 // ("light-icon", "high-vortex-large-icon", ...) — style.css and the tests
 // key off these names, so the underscore→hyphen derivation must not change.
-function categoryIcon(group, headingDeg, color, isSelected, isOnGround) {
+function categoryIcon(group, headingDeg, color, isSelected, isOnGround, altitudeM) {
   const cssClass = group.replace(/_/g, '-') + '-icon' + (isOnGround ? ' on-ground' : '');
-  const fillColor = isUniformColorEnabled() ? uniformMarkerColors().fill : color;
-  const strokeColor = isUniformColorEnabled() ? uniformMarkerColors().stroke : '#fff';
+  const fillColor = isAltitudeColorEnabled()
+    ? altitudeColor(altitudeM)
+    : (isUniformColorEnabled() ? uniformMarkerColors().fill : color);
+  const strokeColor = isAltitudeColorEnabled()
+    ? '#fff'
+    : (isUniformColorEnabled() ? uniformMarkerColors().stroke : '#fff');
   const svg = CATEGORY_GLYPHS[group].replace(/COLOR/g, fillColor).replace(/STROKE/g, strokeColor);
   return rotatedDivIcon(cssClass, 20, 10, headingDeg, color, svg, '0 0 200 200', isSelected);
 }
@@ -142,8 +146,8 @@ function airportIcon(type) {
 
 const ICON_BUILDERS = {};
 for (const group of Object.keys(CATEGORY_GLYPHS)) {
-  ICON_BUILDERS[group] = (headingDeg, color, isSelected, isOnGround) =>
-    categoryIcon(group, headingDeg, color, isSelected, isOnGround);
+  ICON_BUILDERS[group] = (headingDeg, color, isSelected, isOnGround, altitudeM) =>
+    categoryIcon(group, headingDeg, color, isSelected, isOnGround, altitudeM);
 }
 
 // Ground vehicles (either flagged by looksLikeGroundVehicle()'s heuristics,
@@ -158,9 +162,10 @@ function iconFor(item, color) {
     return towerIcon(color, isSelected);
   }
   const builder = ICON_BUILDERS[item.categoryGroup];
+  const altitudeM = item.info && item.info.altitudeM;
   return builder
-    ? builder(item.heading, color, isSelected, item.onGround)
-    : categoryIcon('unknown', item.heading, color, isSelected, item.onGround);
+    ? builder(item.heading, color, isSelected, item.onGround, altitudeM)
+    : categoryIcon('unknown', item.heading, color, isSelected, item.onGround, altitudeM);
 }
 
 // One-time DOM patch for instant selection feedback only. syncMarkers()

@@ -2308,16 +2308,21 @@ final pass still hides it, so the empty map and error line remain reachable.
   toggle-off merge-time gating).
 - **Airline logos** (`static/airline-logos/`, `airlineLogoHtml()` in
   `static/js/render-details.js`): a small logo prefixed to the Operator row,
-  looked up from the **3-letter ICAO airline designator that leads a flight
-  callsign** (e.g. `"RYR1234"` → `"RYR"`) — deliberately *not* derived from
-  however the Operator *name* itself resolved (live/adsbdb/Flywme), so a
+  looked up first from an explicit operator ICAO code and then from the
+  **3-letter ICAO airline designator that leads a flight callsign** (e.g.
+  `"RYR1234"` → `"RYR"`). adsbdb supplies its `airline.icao` directly;
+  Flywme enrichment can derive a code from an exact, unique normalized
+  Operator-name match in `AIRLINE_OPERATORS` (ambiguous names deliberately
+  yield no code). The resolved code still has to exist in the vendored
+  manifest before anything renders, so no guessed or random logo appears. A
   logo can render even when the name didn't — in dev mode this falls back
   to the literal "Unknown" text next to the logo, same as every other
   `identityRow` field's dev-mode behavior; in normal mode the row still
   renders with just the logo and no synthesized "Unknown" caption (the logo
   itself is real, known data), and only hides entirely when neither a name
-  nor a logo resolved at all. No new backend field was needed for this — the
-  callsign is already on `info` for the click-scoped selected aircraft.
+  nor a logo resolved at all. The enrichment response carries this optional
+  code as `operator.logo_icao`; the frontend keeps it only when the resolved
+  Operator name matches the displayed value.
   Unlike `flag-icons`/the MDI icon set (properly OFL/Apache-licensed generic
   glyphs), there is no single clean, fully-licensed source of *real* airline
   logos — these are corporate trademarks, not generic icons — so this uses
@@ -2704,15 +2709,26 @@ final pass still hides it, so the empty map and error line remain reachable.
   covers the handoff scenario (3-poll sequence: aircraft appears in adsb.fi
   only, then OpenSky joins, then both disappear; sidebar must stay open for
   step 2 and close only for step 3).
-- **Track is colored by altitude**, like OpenSky's own web map:
+- **Track and aircraft markers are colored by altitude**:
   `drawTrack(waypoints)` builds a `trackLayerGroup` — an `L.featureGroup` of
   short two-point polyline segments, one per consecutive waypoint pair,
-  each colored via `altitudeColor(avgAltitude)` (a small hand-picked
-  gradient: grey when unknown, green at 0m, up through yellow/orange to red
-  by ~9000m, linearly interpolated between stops and clamped past the ends)
+  each colored via `altitudeColor(avgAltitude)` (grey when unknown; the
+  app-owned cyan → brand blue → amber → rose scale from
+  `--app-altitude-low/mid/high/max` otherwise, with independent light/dark
+  values, linearly interpolated and clamped past the ends). The same scale
+  paints aircraft markers when `ui.map.altitude_color` is enabled and builds
+  the unit-aware floating legend, so there is no duplicated hardcoded palette
   — rather than the single flat-colored polyline used before. Waypoints keep
   their per-point `altitude` (meters, from `/api/track`'s `baro_altitude`)
   all the way from `loadTrack()` through to this coloring step.
+- **Vertical Profile sidebar section**: `renderVerticalProfileHtml()` uses
+  the same selected historical track or `liveTrailById` fallback to render a
+  responsive SVG of altitude over cumulative great-circle distance. It uses
+  the active metric/imperial unit mode, displays selected autopilot altitude
+  when available, and shares the normal detail-group accordion state via the
+  `verticalProfile` key in `config/ui.json`. Fewer than two altitude-bearing
+  points hide the section completely in normal mode; Dev Mode keeps an empty
+  diagnostic section visible.
 - **Quota states are told through a shared "(?)" popover.** OpenSky has two
   independent quotas that fail in similar ways, so both are surfaced with the
   same affordance: a small `(?)` button that click-toggles a popover

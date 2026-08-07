@@ -14,10 +14,12 @@ test('uniform aircraft color toggle ships on by default', async ({ page }) => {
   expect(isChecked).toBe(true);
 });
 
-test('uniform mode renders markers in bright yellow with dark outline', async ({ page }) => {
-  // With toggle ON (default), all markers exist and data-color still records the true per-source color.
-  // This proves the decoupling: the marker renders in uniform yellow (visually), but data-color
-  // stays as the true source color, which is what colorCounts() depends on.
+test('uniform preference remains enabled beneath the higher-priority altitude mode', async ({ page }) => {
+  await expect(page.locator('#toggle-altitude-color')).toBeChecked();
+  await expect(page.locator('body')).toHaveClass(/altitude-color-mode/);
+  await expect(page.locator('body')).toHaveClass(/uniform-color-mode/);
+
+  // Source metadata remains intact even while altitude paint wins.
   const marker = await page.$('.plane-icon[data-color="#1a73e8"]'); // OpenSky blue in data-color
   expect(marker).not.toBeNull();
 
@@ -42,7 +44,8 @@ test('uniform mode keeps surface objects theme-aware neutral grey', async ({ pag
 });
 
 test('toggling off restores per-source colors', async ({ page }) => {
-  // Start with uniform mode ON (default)
+  // Isolate the legacy uniform/source priority beneath altitude mode.
+  await page.click('#toggle-altitude-color');
   const toggle = await page.$('#toggle-uniform-color');
   expect(await toggle.isChecked()).toBe(true);
 

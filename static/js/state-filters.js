@@ -93,6 +93,7 @@ unitToggleButtons.forEach((btn) => {
     unitToggleButtons.forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     currentUnitSystem = btn.dataset.value;
+    refreshAltitudeLegend();
     if (selectedIcao24 != null) renderSelectedDetails();
   });
 });
@@ -205,6 +206,44 @@ function syncUniformColorBodyClass() {
 }
 syncUniformColorBodyClass();
 
+const altitudeColorToggle = document.getElementById('toggle-altitude-color');
+function isAltitudeColorEnabled() {
+  return altitudeColorToggle.checked;
+}
+function syncAltitudeColorBodyClass() {
+  document.body.classList.toggle('altitude-color-mode', isAltitudeColorEnabled());
+}
+function formatLegendAltitude(meters) {
+  const value = currentUnitSystem === 'imperial' ? meters * 3.28084 : meters;
+  const unit = currentUnitSystem === 'imperial' ? 'ft' : 'm';
+  return Math.round(value).toLocaleString('en-US') + ' ' + unit;
+}
+function refreshAltitudeLegend() {
+  const legend = document.getElementById('altitude-legend');
+  const enabled = isAltitudeColorEnabled();
+  legend.hidden = !enabled;
+  if (!enabled || typeof altitudeColorStops !== 'function') return;
+
+  const stops = altitudeColorStops();
+  const maxAltitude = stops[stops.length - 1].alt;
+  legend.querySelector('.altitude-legend-gradient').style.background = 'linear-gradient(to top, '
+    + stops.map((stop) => rgbToHex(stop.rgb) + ' ' + ((stop.alt / maxAltitude) * 100) + '%').join(', ')
+    + ')';
+  legend.querySelector('.altitude-legend-labels').innerHTML = stops.slice().reverse().map((stop, index) =>
+    '<span class="altitude-legend-label">' + formatLegendAltitude(stop.alt)
+      + (index === 0 ? '+' : '') + '</span>'
+  ).join('');
+}
+function applyAltitudeColorConfig(config) {
+  if (!config || typeof config.visible !== 'boolean' || typeof config.enabled_by_default !== 'boolean') return;
+  const control = document.getElementById('altitude-color-control');
+  if (control) control.style.display = config.visible ? '' : 'none';
+  altitudeColorToggle.checked = config.enabled_by_default;
+  syncAltitudeColorBodyClass();
+  refreshAltitudeLegend();
+}
+syncAltitudeColorBodyClass();
+
 // Theme mode ('light' | 'dark') — a genuine two-way mode selector (segmented
 // control, like Units above), not a plain on/off .switch: it drives four
 // things together, not just CSS chrome — see CLAUDE.md's Theme toggle
@@ -248,6 +287,7 @@ function applyThemeChrome(mode) {
   // it regardless of which one is hardcoded, so this is what actually makes
   // the stroke color theme-aware.
   document.body.style.setProperty('--marker-stroke-color', uniformMarkerColors().stroke);
+  refreshAltitudeLegend();
 }
 
 // The toggle-click path: applies the chrome above, THEN forces the paired

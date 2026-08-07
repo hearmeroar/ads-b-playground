@@ -14,7 +14,7 @@ the frontend, so its coverage stays visible/toggleable in its own right.
 from . import icaolist
 from .aircraft_category import category_for_aircraft
 from .aircraft_database import DEFAULT_AIRCRAFT_DATABASE, normalize_aircraft_type
-from .callsign import decode_callsign
+from .callsign import decode_callsign, logo_code_for_operator
 from .countries import country_iso_for_name
 from .icao24_allocation import country_for_icao24
 from .registration import lookup_country_by_registration
@@ -240,6 +240,10 @@ def enrich_identity(
         }
         if icaolist_airline_needs_corroboration:
             operator["needs_corroboration"] = True
+    if operator:
+        logo_code = logo_code_for_operator(operator.get("value"))
+        if logo_code:
+            operator["logo_icao"] = logo_code
 
     # --- operator_country (the operating airline's home country — a
     # distinct concept from "country", which is the aircraft's own

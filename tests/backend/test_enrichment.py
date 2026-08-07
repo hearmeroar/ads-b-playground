@@ -395,6 +395,12 @@ def test_enrich_identity_operator_live_wins():
     assert result["operator"]["source"] == "live"
 
 
+def test_enrich_identity_known_operator_gets_unambiguous_logo_code():
+    result = enrich_identity("ffffff", known_operator="Ryanair")
+    assert result["operator"]["value"] == "Ryanair"
+    assert result["operator"]["logo_icao"] == "RYR"
+
+
 def test_enrich_identity_operator_icao24_tier():
     result = enrich_identity("49d3d3")
     assert result["operator"]["value"] == "Smartwings"

@@ -612,6 +612,12 @@ UI_CONFIG_FILE = os.environ.get("UI_CONFIG_FILE", "config/ui.json")
 
 def _default_ui_config():
     return {
+        "map": {
+            "altitude_color": {
+                "visible": True,
+                "enabled_by_default": True,
+            },
+        },
         "sidebar": {
             "tile_layout": {
                 "visible": True,
@@ -642,12 +648,15 @@ def _load_ui_config():
             cfg = json.load(f)
         accordion = cfg["sidebar"]["accordion"]
         tile_layout = cfg["sidebar"]["tile_layout"]
+        altitude_color = cfg["map"]["altitude_color"]
         groups = accordion["groups"]
         if not isinstance(accordion["default_collapsed"], bool) or not isinstance(groups, dict):
             return default
         if not all(isinstance(value, bool) for value in groups.values()):
             return default
         if not isinstance(tile_layout["visible"], bool) or not isinstance(tile_layout["enabled_by_default"], bool):
+            return default
+        if not isinstance(altitude_color["visible"], bool) or not isinstance(altitude_color["enabled_by_default"], bool):
             return default
         return cfg
     except (KeyError, OSError, TypeError, ValueError):

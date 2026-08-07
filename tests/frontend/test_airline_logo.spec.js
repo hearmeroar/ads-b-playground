@@ -67,3 +67,20 @@ test('callsign with no matching airline renders no logo', async ({ page }) => {
   const count = await page.evaluate(() => document.querySelectorAll('#sidebar-details .airline-logo').length);
   expect(count).toBe(0);
 });
+
+test('known operator name renders its manifest logo without a callsign', async ({ page }) => {
+  await page.route('**/api/airplaneslive', (route) => route.fulfill({ json: airplanesLiveWithCallsign(null) }));
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: null,
+    operator: { value: 'Ryanair', source: 'live', confidence: 1, logo_icao: 'RYR' },
+    operator_country: null, registration: null, manufacturer: null,
+    model: null, year_built: null, category: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await page.waitForFunction(() => Object.keys(AIRLINE_LOGO_MANIFEST).length > 0);
+  await page.evaluate(() => airplanesliveMarkers.get('dddddd')._icon.click());
+
+  const logo = page.locator('#sidebar-details .identity-logo-row:has-text("Ryanair") .airline-logo');
+  await expect(logo).toHaveAttribute('src', 'airline-logos/soaring/RYR.svg');
+});

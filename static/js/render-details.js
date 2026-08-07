@@ -47,12 +47,18 @@ function flagHtml(iso2) {
 // soaring-symbols (MIT, curated) first, airframesio/airline-images
 // (broader but unlicensed, scraped from other trackers) as a fallback.
 // Missing/invalid input degrades to no logo, same as flagHtml().
-function airlineLogoHtml(callsign) {
-  if (!callsign || typeof callsign !== 'string') return '';
-  const code = callsign.trim().toUpperCase().slice(0, 3);
-  if (!/^[A-Z]{3}$/.test(code)) return '';
+function airlineLogoHtml(callsign, operatorLogoCode) {
+  const codes = [];
+  if (operatorLogoCode && typeof operatorLogoCode === 'string') {
+    codes.push(operatorLogoCode.trim().toUpperCase());
+  }
+  if (callsign && typeof callsign === 'string') {
+    codes.push(callsign.trim().toUpperCase().slice(0, 3));
+  }
+  const code = codes.find((candidate, index) => /^[A-Z0-9]{3}$/.test(candidate)
+    && codes.indexOf(candidate) === index && AIRLINE_LOGO_MANIFEST[candidate]);
+  if (!code) return '';
   const entry = AIRLINE_LOGO_MANIFEST[code];
-  if (!entry) return '';
   const src = entry.soaring
     ? 'airline-logos/soaring/' + entry.soaring
     : 'airline-logos/airframes/' + entry.airframes;
@@ -204,7 +210,127 @@ const GROUP_ICONS = {
   messageInfo: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 10C10.9 10 10 10.9 10 12S10.9 14 12 14 14 13.1 14 12 13.1 10 12 10M18 12C18 8.7 15.3 6 12 6S6 8.7 6 12C6 14.2 7.2 16.1 9 17.2L10 15.5C8.8 14.8 8 13.5 8 12.1C8 9.9 9.8 8.1 12 8.1S16 9.9 16 12.1C16 13.6 15.2 14.9 14 15.5L15 17.2C16.8 16.2 18 14.2 18 12M12 2C6.5 2 2 6.5 2 12C2 15.7 4 18.9 7 20.6L8 18.9C5.6 17.5 4 14.9 4 12C4 7.6 7.6 4 12 4S20 7.6 20 12C20 15 18.4 17.5 16 18.9L17 20.6C20 18.9 22 15.7 22 12C22 6.5 17.5 2 12 2Z"/></svg>',
   positionAccuracy: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13M12,5A7,7 0 0,0 5,12A7,7 0 0,0 12,19A7,7 0 0,0 19,12A7,7 0 0,0 12,5Z"/></svg>',
   signalQuality: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M3,22V8H7V22H3M10,22V2H14V22H10M17,22V14H21V22H17Z"/></svg>',
+  verticalProfile: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M3,17L8.5,11.5L12.5,15.5L19,9V13H21V5H13V7H17.5L12.5,12L8.5,8L3,13.5V17Z"/></svg>',
 };
+
+function profileDistanceKm(a, b) {
+  const toRad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * toRad;
+  const dLon = (b.lon - a.lon) * toRad;
+  const lat1 = a.lat * toRad;
+  const lat2 = b.lat * toRad;
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function niceProfileCeiling(value) {
+  if (!Number.isFinite(value) || value <= 0) return 1000;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+  const step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return step * magnitude;
+}
+
+function renderVerticalProfileHtml(waypoints, info) {
+  const points = [];
+  let distanceKm = 0;
+  let previous = null;
+  for (const waypoint of Array.isArray(waypoints) ? waypoints : []) {
+    if (!waypoint || !Number.isFinite(waypoint.lat) || !Number.isFinite(waypoint.lon)) continue;
+    if (previous) distanceKm += profileDistanceKm(previous, waypoint);
+    if (Number.isFinite(waypoint.altitude)) {
+      points.push({ distanceKm, altitudeM: Math.max(0, waypoint.altitude) });
+    }
+    previous = waypoint;
+  }
+
+  const hasProfile = points.length >= 2 && distanceKm > 0;
+  if (!hasProfile && !currentDevMode) return '';
+
+  const key = 'verticalProfile';
+  const configuredCollapsed = Object.prototype.hasOwnProperty.call(sidebarAccordionConfig.groups, key)
+    ? sidebarAccordionConfig.groups[key]
+    : sidebarAccordionConfig.default_collapsed;
+  const collapsed = detailGroupCollapsedOverrides.has(key)
+    ? detailGroupCollapsedOverrides.get(key)
+    : configuredCollapsed;
+  const icon = '<span class="detail-group-icon">' + GROUP_ICONS.verticalProfile + '</span>';
+  const chevron = '<svg class="detail-group-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/></svg>';
+  const title = '<button class="detail-group-title detail-group-toggle" type="button" data-group-key="' + key
+    + '" aria-expanded="' + String(!collapsed) + '"><span class="detail-group-title-main">'
+    + icon + '<span>Vertical Profile</span></span>' + chevron + '</button>';
+
+  let content = '<div class="vertical-profile-empty">No track altitude data</div>';
+  if (hasProfile) {
+    const imperial = currentUnitSystem === 'imperial';
+    const altitudeFactor = imperial ? 3.28084 : 1;
+    const distanceFactor = imperial ? 0.539957 : 1;
+    const distanceUnit = imperial ? 'nm' : 'km';
+    const selectedAltitudeM = info && Number.isFinite(info.navAltitudeM) ? info.navAltitudeM : null;
+    const maxAltitudeM = Math.max(...points.map((point) => point.altitudeM), selectedAltitudeM || 0);
+    const maxAltitude = niceProfileCeiling(maxAltitudeM * altitudeFactor);
+    const maxDistance = distanceKm * distanceFactor;
+    const width = 288;
+    const height = 158;
+    const plot = { left: 42, right: 8, top: 28, bottom: 25 };
+    const plotWidth = width - plot.left - plot.right;
+    const plotHeight = height - plot.top - plot.bottom;
+    const x = (km) => plot.left + ((km * distanceFactor) / maxDistance) * plotWidth;
+    const y = (meters) => plot.top + plotHeight - ((meters * altitudeFactor) / maxAltitude) * plotHeight;
+    const linePath = points.map((point, index) => (index ? 'L' : 'M')
+      + x(point.distanceKm).toFixed(1) + ' ' + y(point.altitudeM).toFixed(1)).join(' ');
+    const areaPath = linePath + ' L ' + x(points[points.length - 1].distanceKm).toFixed(1)
+      + ' ' + (plot.top + plotHeight) + ' L ' + x(points[0].distanceKm).toFixed(1)
+      + ' ' + (plot.top + plotHeight) + ' Z';
+    const yTicks = [maxAltitude, maxAltitude / 2, 0];
+    const xTicks = [0, maxDistance / 3, maxDistance * 2 / 3, maxDistance];
+    const grid = yTicks.map((tick) => {
+      const tickY = plot.top + plotHeight - (tick / maxAltitude) * plotHeight;
+      const label = Math.round(tick).toLocaleString('en-US') + (tick === 0 ? ' ' + (imperial ? 'ft' : 'm') : '');
+      return '<line class="vertical-profile-grid" x1="' + plot.left + '" y1="' + tickY
+        + '" x2="' + (width - plot.right) + '" y2="' + tickY + '"/>'
+        + '<text class="vertical-profile-axis-label" x="' + (plot.left - 7) + '" y="' + (tickY + 4)
+        + '" text-anchor="end">' + label + '</text>';
+    }).join('');
+    const distanceLabels = xTicks.map((tick, index) => {
+      const tickX = plot.left + (tick / maxDistance) * plotWidth;
+      const anchor = index === 0 ? 'start' : index === xTicks.length - 1 ? 'end' : 'middle';
+      return '<text class="vertical-profile-axis-label" x="' + tickX + '" y="' + (height - 4)
+        + '" text-anchor="' + anchor + '">' + Math.round(tick) + ' ' + distanceUnit + '</text>';
+    }).join('');
+    let selectedLine = '';
+    if (selectedAltitudeM != null) {
+      const selectedY = y(selectedAltitudeM);
+      const selectedLabel = imperial
+        ? 'SEL FL' + String(Math.round(selectedAltitudeM * 3.28084 / 100)).padStart(3, '0')
+        : 'SEL ' + Math.round(selectedAltitudeM).toLocaleString('en-US') + ' m';
+      selectedLine = '<line class="vertical-profile-selected" x1="' + plot.left + '" y1="' + selectedY
+        + '" x2="' + (width - plot.right) + '" y2="' + selectedY + '"/>'
+        + '<text class="vertical-profile-selected-label" x="' + (width - plot.right - 4) + '" y="'
+        + (selectedY + 14) + '" text-anchor="end">' + selectedLabel + '</text>';
+    }
+    const latestAltitudeM = points[points.length - 1].altitudeM;
+    const currentLabel = imperial
+      ? 'FL' + String(Math.round(latestAltitudeM * 3.28084 / 100)).padStart(3, '0')
+      : Math.round(latestAltitudeM).toLocaleString('en-US') + ' m';
+    content = '<svg class="vertical-profile-chart" viewBox="0 0 ' + width + ' ' + height
+      + '" role="img" aria-label="Altitude by track distance">'
+      + '<defs><linearGradient id="vertical-profile-area-gradient" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0" stop-color="currentColor" stop-opacity="0.22"/>'
+      + '<stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>'
+      + '<text class="vertical-profile-eyebrow" x="0" y="12">VERTICAL PROFILE</text>'
+      + '<text class="vertical-profile-current" x="' + width + '" y="12" text-anchor="end">' + currentLabel + '</text>'
+      + grid + selectedLine
+      + '<path class="vertical-profile-area" d="' + areaPath + '"/>'
+      + '<path class="vertical-profile-line" d="' + linePath + '"/>'
+      + distanceLabels + '</svg>';
+  }
+
+  return '<div class="detail-group vertical-profile-group' + (collapsed ? ' is-collapsed' : '') + '">'
+    + title + '<div class="detail-group-body vertical-profile-body"' + (collapsed ? ' hidden' : '') + '>'
+    + content + '</div></div>';
+}
 
 // Per-field icons use the same vendored Material Design Icons set as the
 // group headings. A compact semantic set is intentionally reused for
@@ -633,7 +759,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // text — the row still renders (the logo itself is real, known data), just
   // without a fake "Unknown" caption; the row only hides entirely when
   // neither a name nor a logo resolved at all.
-  const operatorLogoHtml = airlineLogoHtml(info.callsign);
+  const operatorLogoHtml = airlineLogoHtml(info.callsign, info.operatorLogoCode);
   const operatorText = info.operator || (operatorLogoHtml && currentDevMode ? 'Unknown' : null);
   // Operator Country: adsbdb's flightroute.airline (name + ISO together) as
   // the primary tier, falling back to our own callsign-prefix enrichment

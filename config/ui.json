@@ -1,4 +1,10 @@
 {
+  "map": {
+    "altitude_color": {
+      "visible": true,
+      "enabled_by_default": true
+    }
+  },
   "sidebar": {
     "tile_layout": {
       "visible": true,
@@ -15,7 +21,8 @@
         "status": false,
         "messageInfo": false,
         "positionAccuracy": false,
-        "signalQuality": false
+        "signalQuality": false,
+        "verticalProfile": false
       }
     }
   }

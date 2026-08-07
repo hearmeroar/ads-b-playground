@@ -115,6 +115,12 @@ uniformColorToggle.addEventListener('change', () => {
   poll();
 });
 
+altitudeColorToggle.addEventListener('change', () => {
+  syncAltitudeColorBodyClass();
+  refreshAltitudeLegend();
+  poll();
+});
+
 // Shown from the moment a source is enabled until the poll it triggers lands.
 // No "pending" state is tracked: updateCounts() runs at the end of every poll
 // and rewrites the slot, which is what clears the spinner — including when the
@@ -742,6 +748,8 @@ fetch('/api/config')
     }
     const tileLayout = cfg && cfg.ui && cfg.ui.sidebar && cfg.ui.sidebar.tile_layout;
     applyTileLayoutConfig(tileLayout);
+    const altitudeColor = cfg && cfg.ui && cfg.ui.map && cfg.ui.map.altitude_color;
+    applyAltitudeColorConfig(altitudeColor);
     for (const [name, s] of Object.entries((cfg && cfg.sources) || {})) {
       const checkbox = sourceToggles[name];
       if (!checkbox) continue; // config lists a source this build doesn't have
@@ -753,6 +761,8 @@ fetch('/api/config')
   .catch(() => {})
   .finally(() => {
     document.getElementById('tile-layout-control').classList.remove('ui-config-pending');
+    document.getElementById('altitude-color-control').classList.remove('ui-config-pending');
+    refreshAltitudeLegend();
     // Reveal the sources list only now that its final visible/checked state
     // is settled — success or failure alike — so nothing ever flashes the
     // HTML's hardcoded defaults and then jumps to the configured state a

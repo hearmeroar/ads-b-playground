@@ -84,6 +84,8 @@ test('a TWR callsign without registration or type is classified as a ground obje
 });
 
 test('a real aircraft turns grey on the ground and restores its marker color after takeoff', async ({ page }) => {
+  // Isolate ground/source paint beneath the higher-priority altitude mode.
+  await page.click('#toggle-altitude-color');
   let onGround = true;
   await page.route('**/api/adsbfi', (route) => route.fulfill({ json: { ac: [{
     hex: '3b7ba7', flight: 'DRAG76', r: 'F-ZAJB', t: 'EC45',

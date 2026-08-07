@@ -126,6 +126,9 @@ test.describe('theme mode — toggle interaction', () => {
       route.fulfill({ json: require('./fixtures/states.json') });
     });
 
+    // This test isolates the legacy uniform theme repaint beneath the
+    // higher-priority altitude paint mode.
+    await page.click('#toggle-altitude-color');
     await page.click('#theme-mode-toggle .seg-btn[data-value="dark"]');
 
     const marker = '.plane-icon[data-color="#1a73e8"] svg path';
@@ -152,7 +155,7 @@ test.describe('Google sign-in button theming', () => {
 
     const lightBg = await page.evaluate(() =>
       getComputedStyle(document.getElementById('google-signin-btn')).backgroundColor);
-    expect(lightBg).toBe('rgba(255, 255, 255, 0.96)');
+    expect(lightBg).toBe('rgba(255, 255, 255, 0.78)');
 
     await page.click('#theme-mode-toggle .seg-btn[data-value="dark"]');
     await page.waitForTimeout(300);

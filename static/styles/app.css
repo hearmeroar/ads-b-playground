@@ -25,6 +25,12 @@
   --app-group-tile-gap: 5px;
   --app-group-tile-padding-y: 8px;
   --app-group-tile-padding-x: 10px;
+  --app-map-edge: 14px;
+  --app-hud-width: 262px;
+  --app-floating-panel-gap: 16px;
+  --app-altitude-legend-width: 124px;
+  --app-altitude-legend-height: 148px;
+  --app-altitude-gradient-width: 12px;
   --app-panel-shadow: 0 18px 40px rgba(15, 23, 42, 0.12), 0 4px 10px rgba(15, 23, 42, 0.08);
   --app-overlay-shadow: 0 18px 34px rgba(15, 23, 42, 0.16);
   --app-control-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 18px rgba(15, 23, 42, 0.04);
@@ -39,7 +45,20 @@
   --app-title: #0f172a;
   --app-text: #1e293b;
   --app-muted: #64748b;
+  --app-accent-primary: #2563eb;
+  --app-accent-success: #16a34a;
+  --app-accent-warning: #ca8a04;
+  --app-accent-orange: #ea580c;
+  --app-accent-danger: #dc2626;
+  --app-accent-spotlight: #c026d3;
+  --app-altitude-low: #0891b2;
+  --app-altitude-mid: #2563eb;
+  --app-altitude-high: #d97706;
+  --app-altitude-max: #e11d48;
+  --app-identity-logo-surface: color-mix(in srgb, var(--app-primary) 10%, var(--app-surface));
   --app-primary: #2563eb;
+  --app-chart-line: var(--app-accent-primary);
+  --app-chart-target: var(--app-accent-spotlight);
 }
 
 :root[data-theme="dark"] {
@@ -58,11 +77,112 @@
   --app-title: #fafafa;
   --app-text: #e5e5e5;
   --app-muted: #a3a3a3;
+  --app-accent-primary: #60a5fa;
+  --app-accent-success: #4ade80;
+  --app-accent-warning: #facc15;
+  --app-accent-orange: #fb923c;
+  --app-accent-danger: #f87171;
+  --app-accent-spotlight: #e879f9;
+  --app-altitude-low: #22d3ee;
+  --app-altitude-mid: #60a5fa;
+  --app-altitude-high: #fbbf24;
+  --app-altitude-max: #fb7185;
+  --app-identity-logo-surface: rgba(255, 255, 255, 0.12);
   --app-primary: #60a5fa;
+  --app-chart-line: var(--app-accent-primary);
+  --app-chart-target: var(--app-accent-spotlight);
 }
 
 .ui-config-pending {
   visibility: hidden;
+}
+
+.altitude-color-swatch {
+  background: linear-gradient(135deg,
+    var(--app-altitude-low) 0%,
+    var(--app-altitude-mid) 38%,
+    var(--app-altitude-high) 68%,
+    var(--app-altitude-max) 100%);
+}
+
+.altitude-legend {
+  position: fixed;
+  right: calc(var(--app-map-edge) + var(--app-hud-width) + var(--app-floating-panel-gap));
+  bottom: var(--app-map-edge);
+  z-index: 999;
+  box-sizing: border-box;
+  width: var(--app-altitude-legend-width);
+  padding: 12px;
+  color: var(--app-text);
+  background: var(--app-shell);
+  border: 1px solid var(--app-divider);
+  border-radius: var(--app-panel-radius);
+  box-shadow: var(--app-panel-shadow);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+
+.altitude-legend[hidden] {
+  display: none;
+}
+
+.altitude-legend-title {
+  margin-bottom: 9px;
+  color: var(--app-title);
+  font-size: var(--app-text-xs);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.altitude-legend-body {
+  display: flex;
+  align-items: stretch;
+  gap: 9px;
+  height: var(--app-altitude-legend-height);
+}
+
+.altitude-legend-gradient {
+  width: var(--app-altitude-gradient-width);
+  flex: none;
+  border: 1px solid color-mix(in srgb, var(--app-divider-strong) 80%, transparent);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
+}
+
+.altitude-legend-labels {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.altitude-legend-label {
+  position: relative;
+  color: var(--app-muted);
+  font-size: var(--app-text-xs);
+  line-height: 1;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.altitude-legend-label::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -9px;
+  width: 5px;
+  height: 1px;
+  background: var(--app-divider-strong);
+}
+
+@media (max-width: 560px) {
+  .altitude-legend {
+    right: auto;
+    left: var(--app-map-edge);
+  }
 }
 
 /* Pure-CSS fallback, same mechanism as style.css's own :root/@media/
@@ -91,6 +211,17 @@
     --app-title: #fafafa;
     --app-text: #e5e5e5;
     --app-muted: #a3a3a3;
+    --app-accent-primary: #60a5fa;
+    --app-accent-success: #4ade80;
+    --app-accent-warning: #facc15;
+    --app-accent-orange: #fb923c;
+    --app-accent-danger: #f87171;
+    --app-accent-spotlight: #e879f9;
+    --app-altitude-low: #22d3ee;
+    --app-altitude-mid: #60a5fa;
+    --app-altitude-high: #fbbf24;
+    --app-altitude-max: #fb7185;
+    --app-identity-logo-surface: rgba(255, 255, 255, 0.12);
     --app-primary: #60a5fa;
   }
 }
@@ -142,7 +273,8 @@ body {
 }
 
 #hud {
-  width: 232px;
+  box-sizing: border-box;
+  width: var(--app-hud-width);
   padding: 12px 14px;
   color: var(--app-text);
 }
@@ -441,6 +573,157 @@ body {
   transform: rotate(-90deg);
 }
 
+#sidebar-track-profile:empty {
+  display: none;
+}
+
+#sidebar-track-profile .vertical-profile-group {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--app-surface);
+  border-radius: var(--app-panel-radius);
+  box-shadow: var(--app-control-shadow);
+}
+
+#sidebar-track-profile .detail-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 0;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--app-title);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: left;
+  cursor: pointer;
+}
+
+#sidebar-track-profile .detail-group-title-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#sidebar-track-profile .detail-group-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  color: var(--app-title);
+  background: var(--app-surface-hover);
+  border: 1px solid var(--app-divider);
+  border-radius: 8px;
+}
+
+#sidebar-track-profile .detail-group-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+#sidebar-track-profile .detail-group-chevron {
+  display: block;
+  flex: none;
+  color: var(--app-muted);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+#sidebar-track-profile .detail-group.is-collapsed .detail-group-title {
+  margin-bottom: 0;
+}
+
+#sidebar-track-profile .detail-group.is-collapsed .detail-group-chevron {
+  transform: rotate(-90deg);
+}
+
+#sidebar-track-profile .detail-group-body[hidden] {
+  display: none !important;
+}
+
+.vertical-profile-body {
+  display: block;
+  padding: 4px 2px 0;
+}
+
+.vertical-profile-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  color: var(--app-chart-line);
+}
+
+.vertical-profile-grid {
+  stroke: var(--app-divider-strong);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.vertical-profile-axis-label,
+.vertical-profile-current,
+.vertical-profile-eyebrow,
+.vertical-profile-selected-label {
+  font-family: var(--app-font-sans);
+}
+
+.vertical-profile-axis-label,
+.vertical-profile-current {
+  fill: var(--app-muted);
+  font-size: 9px;
+}
+
+.vertical-profile-eyebrow {
+  fill: var(--app-muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.vertical-profile-area {
+  fill: url(#vertical-profile-area-gradient);
+  stroke: none;
+}
+
+.vertical-profile-line {
+  fill: none;
+  stroke: var(--app-chart-line);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.vertical-profile-selected {
+  stroke: var(--app-chart-target);
+  stroke-width: 1.5;
+  stroke-dasharray: 1 5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.vertical-profile-selected-label {
+  fill: var(--app-chart-target);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.vertical-profile-empty {
+  padding: 18px 8px 16px;
+  color: var(--app-muted);
+  font-size: var(--app-text-xs);
+  text-align: center;
+}
+
 #sidebar-details .detail-group-toggle:hover,
 #sidebar-details .detail-group-toggle:focus-visible {
   color: var(--app-title);
@@ -676,7 +959,7 @@ body {
   padding: var(--app-identity-logo-inset);
   overflow: hidden;
   border-radius: var(--app-identity-logo-radius);
-  background: color-mix(in srgb, var(--app-primary) 10%, var(--app-surface));
+  background: var(--app-identity-logo-surface);
   border: 1px solid var(--app-divider-strong);
   box-shadow: var(--app-control-shadow);
 }
@@ -1140,7 +1423,7 @@ body {
 }
 
 #hud {
-  width: 232px;
+  width: var(--app-hud-width);
 }
 
 #collection-panel-header {
@@ -1202,7 +1485,7 @@ body {
    during local reloads; these selectors hard-override the original chrome
    so the new visual system keeps winning even while the old file remains. */
 #hud {
-  width: 232px;
+  width: var(--app-hud-width);
   top: 64px;
   right: 14px;
   padding: 12px 14px;

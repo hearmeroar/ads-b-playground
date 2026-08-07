@@ -18,6 +18,7 @@
   --scrollbar-thumb: #cbd5e1;
   --marker-fill-color: #1c2128;
   --marker-stroke-color: #ffffff;
+  --aircraft-marker-outline: rgba(255, 255, 255, 0.9);
   --marker-selected-color: #be185d;
   --surface-obstacle-color: #64748b;
 }
@@ -43,6 +44,7 @@
     --scrollbar-thumb: #4a525c;
     --marker-fill-color: #ffd400;
     --marker-stroke-color: #1a1a1a;
+    --aircraft-marker-outline: rgba(255, 255, 255, 0.28);
     --marker-selected-color: #f472b6;
     --surface-obstacle-color: #9ca3af;
   }
@@ -66,12 +68,14 @@
   --scrollbar-thumb: #4a525c;
   --marker-fill-color: #ffd400;
   --marker-stroke-color: #1a1a1a;
+  --aircraft-marker-outline: rgba(255, 255, 255, 0.28);
   --marker-selected-color: #f472b6;
   --surface-obstacle-color: #9ca3af;
 }
 :root[data-theme="light"] {
   --marker-fill-color: #1c2128;
   --marker-stroke-color: #ffffff;
+  --aircraft-marker-outline: rgba(255, 255, 255, 0.9);
   --marker-selected-color: #be185d;
   --surface-obstacle-color: #64748b;
 }
@@ -357,7 +361,7 @@ body.dev-mode-on #hud .sources:not(.sources-pending) { display: flex; }
 .plane-icon svg path,
 .plane-icon svg ellipse,
 .plane-icon svg circle {
-  stroke: #fff;
+  stroke: var(--aircraft-marker-outline, rgba(255, 255, 255, 0.9));
   stroke-width: 0.5px;
   vector-effect: non-scaling-stroke;
 }
@@ -403,14 +407,14 @@ body.dev-mode-on #hud .sources:not(.sources-pending) { display: flex; }
    their SVGs. :not(.selected) lets the selected-marker highlight above
    keep winning — the two fill rules would otherwise have equal
    specificity. */
-body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon) svg path,
-body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon) svg ellipse,
-body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon) svg circle {
+body.uniform-color-mode:not(.altitude-color-mode) .plane-icon:not(.surface-obstacle-icon):not(.airport-icon) svg path,
+body.uniform-color-mode:not(.altitude-color-mode) .plane-icon:not(.surface-obstacle-icon):not(.airport-icon) svg ellipse,
+body.uniform-color-mode:not(.altitude-color-mode) .plane-icon:not(.surface-obstacle-icon):not(.airport-icon) svg circle {
   stroke: var(--marker-stroke-color, #1a1a1a);
 }
-body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg path,
-body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg ellipse,
-body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg circle {
+body.uniform-color-mode:not(.altitude-color-mode) .plane-icon:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg path,
+body.uniform-color-mode:not(.altitude-color-mode) .plane-icon:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg ellipse,
+body.uniform-color-mode:not(.altitude-color-mode) .plane-icon:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg circle {
   fill: var(--marker-fill-color, #ffd400);
 }
 /* A real aircraft keeps its category glyph and remains collectible while
@@ -420,6 +424,11 @@ body.uniform-color-mode .plane-icon:not(.surface-obstacle-icon):not(.airport-ico
 body .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg path,
 body .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg ellipse,
 body .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg circle {
+  fill: var(--surface-obstacle-color, #64748b);
+}
+body.uniform-color-mode:not(.altitude-color-mode) .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg path,
+body.uniform-color-mode:not(.altitude-color-mode) .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg ellipse,
+body.uniform-color-mode:not(.altitude-color-mode) .plane-icon.on-ground:not(.surface-obstacle-icon):not(.airport-icon):not(.selected) svg circle {
   fill: var(--surface-obstacle-color, #64748b);
 }
 

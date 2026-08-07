@@ -49,6 +49,35 @@ test('clicking a marker draws its flight-history track and it stays visible', as
   expect(await trackSegmentCount(page)).toBe(2);
 });
 
+test('historical track renders a responsive vertical profile accordion', async ({ page }) => {
+  await clickMarker(page, 'adsbfiMarkers', 'eeeeee');
+  const profile = page.locator('#sidebar-track-profile .vertical-profile-group');
+  await expect(profile).toBeVisible();
+  await expect(profile.locator('.vertical-profile-line')).toHaveAttribute('d', /^M.+L.+L/);
+  await expect(profile.locator('.vertical-profile-current')).toHaveText('10,000 m');
+  await expect(profile.locator('.vertical-profile-axis-label').last()).toContainText('km');
+
+  await profile.locator('.detail-group-toggle').click();
+  await expect(profile).toHaveClass(/is-collapsed/);
+  await expect(profile.locator('.vertical-profile-body')).toBeHidden();
+
+  await page.click('#unit-toggle .seg-btn[data-value="imperial"]');
+  await profile.locator('.detail-group-toggle').click();
+  await expect(profile.locator('.vertical-profile-current')).toHaveText('FL328');
+  await expect(profile.locator('.vertical-profile-axis-label').last()).toContainText('nm');
+});
+
+test('vertical profile hides without track data in normal mode and appears diagnostically in dev mode', async ({ page }) => {
+  await clickMarker(page, 'airplanesliveMarkers', 'ffffff');
+  await page.waitForTimeout(300);
+  await expect(page.locator('#sidebar-track-profile .vertical-profile-group')).toHaveCount(0);
+
+  await page.click('#toggle-dev-mode');
+  const profile = page.locator('#sidebar-track-profile .vertical-profile-group');
+  await expect(profile).toBeVisible();
+  await expect(profile.locator('.vertical-profile-empty')).toHaveText('No track altitude data');
+});
+
 test('clicking empty map area clears the track', async ({ page }) => {
   await clickMarker(page, 'adsbfiMarkers', 'eeeeee');
   await waitForTrackSegments(page, 2);

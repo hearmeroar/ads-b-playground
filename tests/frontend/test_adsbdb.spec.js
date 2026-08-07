@@ -18,7 +18,9 @@ function rowText(page, label) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    return b.closest('.detail-row')?.querySelector('.detail-value')?.textContent.trim() ?? null;
+    const row = b.closest('.detail-row');
+    return (row?.querySelector('.identity-logo-name') || row?.querySelector('.detail-value'))
+      ?.textContent.trim() ?? null;
   }, label);
 }
 
@@ -26,7 +28,9 @@ function flagClassForLabel(page, label) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    return b.closest('.detail-row')?.querySelector('.detail-value .fi')?.className ?? null;
+    const row = b.closest('.detail-row');
+    const primary = row?.querySelector('.identity-logo-name') || row?.querySelector('.detail-value');
+    return primary?.querySelector('.fi')?.className ?? null;
   }, label);
 }
 
@@ -34,7 +38,9 @@ function badgeSourcesForLabel(page, label) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    return [...b.closest('.detail-row').querySelectorAll('.detail-value .source-badge')]
+    const row = b.closest('.detail-row');
+    const primary = row?.querySelector('.identity-logo-name') || row?.querySelector('.detail-value');
+    return [...primary.querySelectorAll('.source-badge')]
       .map((badge) => badge.dataset.source);
   }, label);
 }
@@ -47,7 +53,9 @@ function secondaryRowText(page, primaryLabel) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    return b.closest('.detail-row')?.querySelector('.detail-value-secondary')?.textContent.trim() ?? null;
+    const row = b.closest('.detail-row');
+    return (row?.querySelector('.identity-logo-country') || row?.querySelector('.detail-value-secondary'))
+      ?.textContent.trim() ?? null;
   }, primaryLabel);
 }
 
@@ -55,7 +63,9 @@ function secondaryFlagClassForLabel(page, primaryLabel) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    return b.closest('.detail-row')?.querySelector('.detail-value-secondary .fi')?.className ?? null;
+    const row = b.closest('.detail-row');
+    const secondary = row?.querySelector('.identity-logo-country') || row?.querySelector('.detail-value-secondary');
+    return secondary?.querySelector('.fi')?.className ?? null;
   }, primaryLabel);
 }
 
@@ -63,7 +73,9 @@ function secondaryBadgeSourcesForLabel(page, primaryLabel) {
   return page.evaluate((lbl) => {
     const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
     if (!b) return null;
-    return [...b.closest('.detail-row').querySelectorAll('.detail-value-secondary .source-badge')]
+    const row = b.closest('.detail-row');
+    const secondary = row?.querySelector('.identity-logo-country') || row?.querySelector('.detail-value-secondary');
+    return [...secondary.querySelectorAll('.source-badge')]
       .map((badge) => badge.dataset.source);
   }, primaryLabel);
 }

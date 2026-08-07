@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="leaflet-markercluster/MarkerCluster.Default.css">
 <link rel="stylesheet" href="flag-icons/css/flag-icons.min.css">
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="styles/app.css?v=20260807-sidebar-ui-25">
+<link rel="stylesheet" href="styles/app.css?v=20260807-vertical-profile-1">
 </head>
 <body>
 <div id="map"></div>
@@ -58,6 +58,7 @@
   <div id="sidebar-header"></div>
   <div id="sidebar-gallery"></div>
   <div id="sidebar-route"></div>
+  <div id="sidebar-track-profile"></div>
   <div id="sidebar-details"></div>
 </div>
 
@@ -315,6 +316,16 @@
       <span class="source-name">Uniform aircraft color</span>
       <label class="switch" style="--row-color:#ffd400">
         <input type="checkbox" id="toggle-uniform-color" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <div class="source-row ui-config-pending" id="altitude-color-control"
+         title="Colors aircraft markers by current altitude. Overrides Uniform aircraft color while enabled.">
+      <span class="swatch altitude-color-swatch" aria-hidden="true"></span>
+      <span class="source-name">Color by altitude</span>
+      <label class="switch" style="--row-color:#e67e22">
+        <input type="checkbox" id="toggle-altitude-color" checked>
         <span class="switch-track"></span>
       </label>
     </div>
@@ -647,6 +658,14 @@
   </div>
  </div>
 
+<aside id="altitude-legend" class="altitude-legend" aria-label="Aircraft altitude color scale" hidden>
+  <div class="altitude-legend-title">Altitude</div>
+  <div class="altitude-legend-body">
+    <div class="altitude-legend-gradient" aria-hidden="true"></div>
+    <div class="altitude-legend-labels"></div>
+  </div>
+</aside>
+
 <!--
   Self-healing fallback for the still-unconfirmed Safari blank-map bug (see
   .ai/CURRENT.md): a prior attempt set window.L_DISABLE_3D unconditionally
@@ -671,13 +690,13 @@
 <script src="js/map-init.js?v=20260807-sidebar-ui-4" defer></script>
 <script src="js/constants.js?v=20260807-sidebar-ui-3" defer></script>
 <script src="js/route-validation.js" defer></script>
-<script src="js/state-filters.js?v=20260807-sidebar-ui-4" defer></script>
-<script src="js/sidebar-track.js?v=20260807-sidebar-ui-3" defer></script>
+<script src="js/state-filters.js?v=20260807-altitude-color-1" defer></script>
+<script src="js/sidebar-track.js?v=20260807-vertical-profile-1" defer></script>
 <script src="js/auth-collection.js" defer></script>
-<script src="js/icons.js" defer></script>
-<script src="js/render-details.js?v=20260807-sidebar-ui-10" defer></script>
+<script src="js/icons.js?v=20260807-altitude-color-1" defer></script>
+<script src="js/render-details.js?v=20260807-vertical-profile-1" defer></script>
 <script src="js/parsers.js" defer></script>
-<script src="js/main.js?v=20260807-sidebar-ui-4" defer></script>
+<script src="js/main.js?v=20260807-altitude-color-1" defer></script>
 <script src="js/vendor/preline.js" defer></script>
 </body>
 </html>

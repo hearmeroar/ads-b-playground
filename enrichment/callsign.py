@@ -5913,6 +5913,23 @@ _GENERATED_AIRLINE_OPERATORS = {
 # never a correction to a hand-verified recent entry (see module docstring).
 AIRLINE_OPERATORS = {**_GENERATED_AIRLINE_OPERATORS, **_CURATED_AIRLINE_OPERATORS}
 
+
+def _normalize_operator_name(value):
+    return " ".join(str(value or "").casefold().split())
+
+
+_OPERATOR_CODES_BY_NAME = {}
+for _code, _entry in AIRLINE_OPERATORS.items():
+    _name = _normalize_operator_name(_entry.get("operator"))
+    if _name:
+        _OPERATOR_CODES_BY_NAME.setdefault(_name, set()).add(_code)
+
+
+def logo_code_for_operator(operator):
+    """Return an unambiguous ICAO designator for an exact operator name."""
+    codes = _OPERATOR_CODES_BY_NAME.get(_normalize_operator_name(operator), set())
+    return next(iter(codes)) if len(codes) == 1 else None
+
 # Two independently-confidenced facts from one lookup: an operator name and
 # that operator's home country. Kept separate (not two calls into two
 # tables) since they come from the same designator and the orchestrator
@@ -5937,6 +5954,7 @@ def decode_callsign(callsign):
 
     result = {
         "operator": entry["operator"],
+        "icao_code": code,
         "source": "callsign_decode",
         "confidence": OPERATOR_CONFIDENCE,
     }
