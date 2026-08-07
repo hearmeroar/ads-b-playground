@@ -30,6 +30,39 @@ function badgeSourcesForLabel(page, label) {
   }, label);
 }
 
+// Operator Country and Registration Country no longer have their own
+// identityRow — they're the "Country ..." secondary line inside the
+// Operator/Owner tile (see identityTileRow() in
+// render-details.js), found via the *primary* label's <b> instead.
+function secondaryFlagClassFor(page, primaryLabel) {
+  return page.evaluate((lbl) => {
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
+    const row = b?.closest('.detail-row');
+    return row?.querySelector('.identity-logo-country .fi, .detail-value-secondary .fi')?.className ?? null;
+  }, primaryLabel);
+}
+
+function secondaryBadgeSourcesForLabel(page, primaryLabel) {
+  return page.evaluate((lbl) => {
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
+    if (!b) return null;
+    return [...b.closest('.detail-row').querySelectorAll('.detail-value-secondary .source-badge')]
+      .map((badge) => badge.dataset.source);
+  }, primaryLabel);
+}
+
+function tileValuesForLabel(page, primaryLabel) {
+  return page.evaluate((lbl) => {
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
+    if (!b) return null;
+    const row = b.closest('.detail-row');
+    return {
+      primary: (row.querySelector('.identity-logo-name') || row.querySelector('.detail-value'))?.textContent.trim() ?? null,
+      secondary: (row.querySelector('.identity-logo-country') || row.querySelector('.detail-value-secondary'))?.textContent.trim() ?? null,
+    };
+  }, primaryLabel);
+}
+
 async function clickBadge(page, label, index = 0) {
   await page.evaluate(({ lbl, index }) => {
     const labels = [...document.querySelectorAll('#sidebar-details .detail-label')];
@@ -92,6 +125,33 @@ test('dev mode on: a Flywme badge shows the computation technique and confidence
   expect(await page.textContent('#source-tooltip')).toBe('Flywme — computed from callsign decode, confidence 0.8');
 });
 
+test('dev mode off: Operator hides when it exactly duplicates Owner and country', async ({ page }) => {
+  await page.route('**/api/adsbdb/**', (route) => route.fulfill({ json: {
+    aircraft: {
+      registration: 'N123ZZ',
+      manufacturer: 'Boeing',
+      type: '737-800',
+      registered_owner: 'Ryanair',
+      registered_owner_country_iso_name: 'IE',
+    },
+    flightroute: null,
+  } }));
+  await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
+    country: { value: 'Ireland', source: 'callsign_decode', confidence: 0.6, country_iso: 'IE' },
+    operator: { value: 'Ryanair', source: 'callsign_decode', confidence: 0.8 },
+    operator_country: { value: 'Ireland', source: 'callsign_decode', confidence: 0.6, country_iso: 'IE' },
+    registration: null, manufacturer: null, model: null, year_built: null,
+  } }));
+  await page.goto('/');
+  await page.waitForSelector('.leaflet-marker-icon');
+  await selectAircraft(page, 'eeeeee', 'adsbfi');
+
+  const labels = await page.evaluate(() =>
+    [...document.querySelectorAll('#sidebar-details b')].map((el) => el.textContent));
+  expect(labels).not.toContain('Operator');
+  expect(labels).toContain('Owner');
+});
+
 test('a live registration is never overwritten by enrichment, but Flywme\'s own guess still co-displays for transparency', async ({ page }) => {
   await page.route('**/api/identity/**', (route) => route.fulfill({ json: {
     country: null,
@@ -119,7 +179,7 @@ test('a live registration is never overwritten by enrichment, but Flywme\'s own 
 
 });
 
-test('a live-sourced country still gets a flag when the backend recognizes its name, without becoming a Flywme field', async ({ page }) => {
+test('a live-sourced aircraft country does not get repurposed as Owner country', async ({ page }) => {
   // "dddddd"'s live country is fixture-only ("Testland", not a real
   // country), so this simulates what the real backend computes when a
   // live country's name *does* match countries.py: country_iso present
@@ -134,15 +194,11 @@ test('a live-sourced country still gets a flag when the backend recognizes its n
   await page.click('#toggle-dev-mode');
   await selectAircraft(page, 'dddddd', 'opensky');
 
-  const flagPresent = await page.evaluate(() => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration Country');
-    return b.closest('.detail-row').querySelector('.detail-value .fi')?.className ?? null;
-  });
-  expect(flagPresent).toBe('fi fi-cz');
-
-  // Still attributed to OpenSky, not Flywme — the flag is a presentation
-  // add-on, not a sign the value itself was enriched.
-  expect(await badgeSourcesForLabel(page, 'Registration Country')).toEqual(['opensky']);
+  // Owner now carries the owner's own country only, not the
+  // aircraft's registration country. A live aircraft country therefore
+  // must not appear as the owner tile's secondary line.
+  expect(await secondaryFlagClassFor(page, 'Owner')).toBe(null);
+  expect(await secondaryBadgeSourcesForLabel(page, 'Owner')).toEqual([]);
 });
 
 test('a Flywme-resolved Operator Country (via callsign_decode) fills in when adsbdb has nothing', async ({ page }) => {
@@ -159,18 +215,12 @@ test('a Flywme-resolved Operator Country (via callsign_decode) fills in when ads
   await page.waitForSelector('.leaflet-marker-icon');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
-  function flagClassFor(label) {
-    return page.evaluate((lbl) => {
-      const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
-      return b.closest('.detail-row').querySelector('.detail-value .fi')?.className ?? null;
-    }, label);
-  }
-
-  expect(await flagClassFor('Operator')).toBe(null);
-  expect(await flagClassFor('Operator Country')).toBe('fi fi-ie');
+  // Country is nested directly under the Operator name, not rendered as a
+  // separate identity row.
+  expect(await secondaryFlagClassFor(page, 'Operator')).toBe('fi fi-ie');
 });
 
-test('each of the four identity-row labels has a click-to-toggle tooltip disambiguating it from the other three', async ({ page }) => {
+test('Operator and Owner labels have a click-to-toggle tooltip disambiguating them from their own merged Country secondary line', async ({ page }) => {
   // Default all-null identity mock. In normal mode an unresolved identity
   // row now hides entirely (see the "hide unresolved identity rows" change),
   // so this needs dev mode on to guarantee every one of the four rows (and
@@ -186,19 +236,18 @@ test('each of the four identity-row labels has a click-to-toggle tooltip disambi
     // labels (see main.js's shared click handler).
     await page.evaluate((lbl) => {
       const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
-      // The "(?)" trigger sits right after </b>, inside the same
-      // .identity-label-wrap span (not a sibling of the wrapper itself).
-      let node = b.nextSibling;
-      while (node && !(node.nodeType === 1 && node.classList.contains('info-tip'))) node = node.nextSibling;
-      node.click();
+      b.closest('.identity-label-wrap').querySelector('.info-tip').click();
     }, label);
     return page.textContent('#source-tooltip');
   }
 
+  // Operator Country and Registration Country no longer have their own
+  // label/tooltip trigger — they're the "Country ..." secondary line inside
+  // the Operator/Owner tile, and the primary label's tooltip
+  // text already cross-references all four concepts (see
+  // IDENTITY_FIELD_EXPLANATIONS in render-details.js).
   expect(await tooltipTextFor('Operator')).toContain('Not necessarily who owns it');
-  expect(await tooltipTextFor('Operator Country')).toContain('Not the aircraft’s own country of registration');
-  expect(await tooltipTextFor('Registered Owner')).toContain('can differ from the airline actually flying it');
-  expect(await tooltipTextFor('Registration Country')).toContain('not who operates or owns it');
+  expect(await tooltipTextFor('Owner')).toContain('can differ from the airline actually flying it');
 });
 
 test('Registration is excluded from the identityRow treatment: it\'s the header now, not an identityRow', async ({ page }) => {
@@ -211,12 +260,11 @@ test('Registration is excluded from the identityRow treatment: it\'s the header 
   await page.click('#toggle-dev-mode');
   await selectAircraft(page, 'eeeeee', 'adsbfi');
 
-  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Registration Country?Unknown');
-  expect(sidebarText).toContain('Operator?Unknown');
-  expect(sidebarText).toContain('ManufacturerUnknown');
-  expect(sidebarText).toContain('ModelUnknown');
-  expect(sidebarText).toContain('Year builtUnknown');
+  expect(await tileValuesForLabel(page, 'Operator')).toEqual({ primary: 'Unknown', secondary: 'Unknown' });
+  expect(await tileValuesForLabel(page, 'Owner')).toEqual({ primary: 'Unknown', secondary: 'Unknown' });
+  expect(await tileValuesForLabel(page, 'Manufacturer')).toEqual({ primary: 'Unknown', secondary: null });
+  expect(await tileValuesForLabel(page, 'Model')).toEqual({ primary: 'Unknown', secondary: null });
+  expect(await tileValuesForLabel(page, 'Year built')).toEqual({ primary: 'Unknown', secondary: null });
   // Registration has a live value here, and lives in #sidebar-header (the
   // masthead title) rather than an identityRow — no "Unknown" treatment
   // applies to it at all any more, by construction.
@@ -357,9 +405,8 @@ test('surface-vehicle aircraft: null enrichment fields render as dashes in dev m
   await page.click('#toggle-dev-mode');
   await selectAircraft(page, '474806', 'adsbfi');
 
-  const sidebarText = await page.evaluate(() => document.querySelector('#sidebar-details').textContent);
-  expect(sidebarText).toContain('Operator?—');  // Dev mode shows dashes for missing fields
-  expect(sidebarText).toContain('Registration Country?—');
+  expect(await tileValuesForLabel(page, 'Operator')).toEqual({ primary: '—', secondary: '—' });
+  expect(await tileValuesForLabel(page, 'Owner')).toEqual({ primary: '—', secondary: '—' });
 
   const operatorBadges = await badgeSourcesForLabel(page, 'Operator');
   expect(operatorBadges).toEqual([]);

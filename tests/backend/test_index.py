@@ -8,6 +8,7 @@ def test_api_config(client):
     resp = client.get("/api/config")
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data["center"] == {"lat": 51.470748, "lon": -0.459909}
+    assert data["center"] == {"lat": 37.619806, "lon": -122.374821}
     assert data["zoom"] == 8
     assert data["radius_nm"] == 220
+    assert data["ui"]["sidebar"]["accordion"]["default_collapsed"] is False

@@ -736,6 +736,12 @@ document.getElementById('aircraft-search').addEventListener('keydown', (e) => {
 fetch('/api/config')
   .then((resp) => resp.json())
   .then((cfg) => {
+    const accordion = cfg && cfg.ui && cfg.ui.sidebar && cfg.ui.sidebar.accordion;
+    if (accordion && typeof accordion.default_collapsed === 'boolean' && accordion.groups) {
+      sidebarAccordionConfig = accordion;
+    }
+    const tileLayout = cfg && cfg.ui && cfg.ui.sidebar && cfg.ui.sidebar.tile_layout;
+    applyTileLayoutConfig(tileLayout);
     for (const [name, s] of Object.entries((cfg && cfg.sources) || {})) {
       const checkbox = sourceToggles[name];
       if (!checkbox) continue; // config lists a source this build doesn't have
@@ -746,6 +752,7 @@ fetch('/api/config')
   })
   .catch(() => {})
   .finally(() => {
+    document.getElementById('tile-layout-control').classList.remove('ui-config-pending');
     // Reveal the sources list only now that its final visible/checked state
     // is settled — success or failure alike — so nothing ever flashes the
     // HTML's hardcoded defaults and then jumps to the configured state a

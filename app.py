@@ -604,6 +604,58 @@ def _load_sources_config():
 
 SOURCES_CONFIG = _load_sources_config()
 
+# Operator-editable frontend defaults live beside sources.json/zones.json,
+# not in the JS bundle. Like source visibility, these are read at startup and
+# exposed through /api/config before the frontend performs its first poll.
+UI_CONFIG_FILE = os.environ.get("UI_CONFIG_FILE", "config/ui.json")
+
+
+def _default_ui_config():
+    return {
+        "sidebar": {
+            "tile_layout": {
+                "visible": True,
+                "enabled_by_default": True,
+            },
+            "accordion": {
+                "default_collapsed": False,
+                "groups": {
+                    "identity": False,
+                    "position": False,
+                    "speedHeading": False,
+                    "autopilot": False,
+                    "weather": False,
+                    "status": False,
+                    "messageInfo": False,
+                    "positionAccuracy": False,
+                    "signalQuality": False,
+                },
+            },
+        },
+    }
+
+
+def _load_ui_config():
+    default = _default_ui_config()
+    try:
+        with open(UI_CONFIG_FILE, "r") as f:
+            cfg = json.load(f)
+        accordion = cfg["sidebar"]["accordion"]
+        tile_layout = cfg["sidebar"]["tile_layout"]
+        groups = accordion["groups"]
+        if not isinstance(accordion["default_collapsed"], bool) or not isinstance(groups, dict):
+            return default
+        if not all(isinstance(value, bool) for value in groups.values()):
+            return default
+        if not isinstance(tile_layout["visible"], bool) or not isinstance(tile_layout["enabled_by_default"], bool):
+            return default
+        return cfg
+    except (KeyError, OSError, TypeError, ValueError):
+        return default
+
+
+UI_CONFIG = _load_ui_config()
+
 # FlightAware AeroAPI (https://www.flightaware.com/commercial/aeroapi/):
 # unlike the four radius sources above, this is a paid/metered, API-key-
 # authenticated API with a flight-centric shape (one object per flight leg,
@@ -859,6 +911,7 @@ def api_config():
         "bbox": BBOX,
         "active_zone_id": _active_zone_id,
         "sources": SOURCES_CONFIG,
+        "ui": UI_CONFIG,
     })
 
 
@@ -1460,7 +1513,7 @@ def api_identity(icao24):
 SNAPSHOT_FIELDS = (
     "registration", "aircraftType", "manufacturer", "model", "manufactureYear",
     "operator", "operatorCountry", "operatorCountryIso", "originCountry", "countryIso",
-    "registeredOwner", "registeredOwnerCountryIso", "categoryDisplay", "callsign",
+    "registeredOwner", "registeredOwnerCountry", "registeredOwnerCountryIso", "categoryDisplay", "callsign",
     "categoryGroup",
 )
 

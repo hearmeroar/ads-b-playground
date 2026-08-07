@@ -97,6 +97,29 @@ unitToggleButtons.forEach((btn) => {
   });
 });
 
+// Sidebar detail-group layout switches between the compact 2-column stat-tile
+// grid and the single-column list layout. Like currentUnitSystem, it only
+// changes how renderDetailsHtml() renders already-normalized data, so toggling
+// re-renders the open sidebar immediately. isTileLayoutEnabled() is read
+// directly by renderGroup() (render-details.js), the same "closure reads a
+// state-filters.js global" pattern currentDevMode/currentUnitSystem already use.
+let currentTileLayout = true;
+const tileLayoutToggle = document.getElementById('toggle-tile-layout');
+function isTileLayoutEnabled() {
+  return currentTileLayout;
+}
+function applyTileLayoutConfig(config) {
+  if (!config || typeof config.visible !== 'boolean' || typeof config.enabled_by_default !== 'boolean') return;
+  const control = document.getElementById('tile-layout-control');
+  if (control) control.style.display = config.visible ? '' : 'none';
+  tileLayoutToggle.checked = config.enabled_by_default;
+  currentTileLayout = config.enabled_by_default;
+}
+tileLayoutToggle.addEventListener('change', () => {
+  currentTileLayout = tileLayoutToggle.checked;
+  if (selectedIcao24 != null) renderSelectedDetails();
+});
+
 // Dev mode only changes how renderDetailsHtml() renders an already-
 // normalized info/fieldSources pair (shows every field with a dash
 // placeholder when missing, plus a colored per-source dot when present) —

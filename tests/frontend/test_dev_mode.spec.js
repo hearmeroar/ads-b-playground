@@ -46,11 +46,25 @@ test('dev mode shows a dash for missing fields and never hides a group', async (
 // spans, so scope provenance badges to that row's value cell.
 function badgeSourcesForLabel(page, label) {
   return page.evaluate((lbl) => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
-    if (!b) return null;
-    return [...b.closest('.detail-row').querySelectorAll('.detail-value .source-badge')]
+    const labels = [...document.querySelectorAll('#sidebar-details .detail-label')];
+    const labelEl = labels.find((el) => el.querySelector('b')?.textContent === lbl
+      || el.querySelector('.detail-label-main > span:last-child')?.textContent === lbl);
+    if (!labelEl) return null;
+    return [...labelEl.closest('.detail-row').querySelectorAll('.detail-value .source-badge')]
       .map((badge) => badge.dataset.source);
   }, label);
+}
+
+// Registration Country no longer has its own identityRow — it's the
+// "Country ..." secondary line inside the Owner tile (see
+// identityTileRow() in render-details.js), found via the *primary* label.
+function secondaryBadgeSourcesForLabel(page, primaryLabel) {
+  return page.evaluate((lbl) => {
+    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === lbl);
+    if (!b) return null;
+    return [...b.closest('.detail-row').querySelectorAll('.detail-value-secondary .source-badge')]
+      .map((badge) => badge.dataset.source);
+  }, primaryLabel);
 }
 
 test('a field reported by only one source shows exactly one badge, with a click-to-toggle tooltip', async ({ page }) => {
@@ -61,17 +75,18 @@ test('a field reported by only one source shows exactly one badge, with a click-
   });
   await page.waitForTimeout(300);
 
-  // Country (originCountry) has no equivalent field on adsb.fi/airplanes.live's
-  // own parsed record at all (normalizeAdsbExchange always sets it null) —
-  // OpenSky is the only possible source for it, a clean single-badge case.
-  expect(await badgeSourcesForLabel(page, 'Registration Country')).toEqual(['opensky']);
+  // Position source is a clean single-badge case here: OpenSky is the only
+  // source for it on this selected aircraft.
+  expect(await badgeSourcesForLabel(page, 'Position source')).toEqual(['opensky']);
 
   // Tooltip hidden until clicked.
   expect(await page.getAttribute('#source-tooltip', 'hidden')).not.toBeNull();
 
   await page.evaluate(() => {
-    const b = [...document.querySelectorAll('#sidebar-details b')].find((el) => el.textContent === 'Registration Country');
-    b.closest('.detail-row').querySelector('.detail-value .source-badge').click();
+    const labels = [...document.querySelectorAll('#sidebar-details .detail-label')];
+    const labelEl = labels.find((el) =>
+      el.querySelector('.detail-label-main > span:last-child')?.textContent === 'Position source');
+    labelEl.closest('.detail-row').querySelector('.detail-value .source-badge').click();
   });
   await page.waitForTimeout(100);
 

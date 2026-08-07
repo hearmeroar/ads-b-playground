@@ -12,17 +12,30 @@
   --app-control-radius: 12px;
   --app-control-radius-sm: 10px;
   --app-panel-radius: 18px;
+  --app-identity-logo-size: 52px;
+  --app-identity-logo-inset: 8px;
+  --app-identity-logo-radius: 16px;
+  --app-identity-logo-gap: 12px;
+  --app-identity-logo-row-gap: 8px;
+  --app-identity-logo-copy-gap: 3px;
+  --app-identity-logo-list-size: 32px;
+  --app-identity-logo-list-inset: 5px;
+  --app-identity-logo-list-radius: 9px;
+  --app-identity-logo-list-gap: 8px;
+  --app-group-tile-gap: 5px;
+  --app-group-tile-padding-y: 8px;
+  --app-group-tile-padding-x: 10px;
   --app-panel-shadow: 0 18px 40px rgba(15, 23, 42, 0.12), 0 4px 10px rgba(15, 23, 42, 0.08);
   --app-overlay-shadow: 0 18px 34px rgba(15, 23, 42, 0.16);
   --app-control-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 18px rgba(15, 23, 42, 0.04);
   --app-divider: rgba(15, 23, 42, 0.10);
   --app-divider-strong: rgba(15, 23, 42, 0.14);
-  --app-shell: rgba(255, 255, 255, 0.82);
-  --app-shell-strong: rgba(255, 255, 255, 0.96);
-  --app-surface: #ffffff;
-  --app-surface-strong: #ffffff;
+  --app-shell: rgba(255, 255, 255, 0.56);
+  --app-shell-strong: rgba(255, 255, 255, 0.78);
+  --app-surface: rgba(255, 255, 255, 0.36);
+  --app-surface-strong: rgba(255, 255, 255, 0.56);
   --app-surface-hover: rgba(15, 23, 42, 0.04);
-  --app-rail: rgba(255, 255, 255, 0.70);
+  --app-rail: rgba(255, 255, 255, 0.38);
   --app-title: #0f172a;
   --app-text: #1e293b;
   --app-muted: #64748b;
@@ -35,17 +48,21 @@
   --app-control-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 18px rgba(0, 0, 0, 0.14);
   --app-divider: rgba(255, 255, 255, 0.09);
   --app-divider-strong: rgba(255, 255, 255, 0.14);
-  --app-shell: rgba(15, 23, 42, 0.84);
-  --app-shell-strong: rgba(15, 23, 42, 0.96);
-  --app-surface: rgba(24, 33, 48, 0.96);
-  --app-surface-strong: rgba(17, 24, 39, 0.98);
-  --app-surface-raised: rgba(23, 32, 51, 0.98);
+  --app-shell: rgba(23, 23, 23, 0.56);
+  --app-shell-strong: rgba(23, 23, 23, 0.78);
+  --app-surface: rgba(32, 32, 32, 0.40);
+  --app-surface-strong: rgba(24, 24, 24, 0.60);
+  --app-surface-raised: rgba(38, 38, 38, 0.50);
   --app-surface-hover: rgba(255, 255, 255, 0.05);
-  --app-rail: rgba(15, 23, 42, 0.74);
-  --app-title: #f8fafc;
-  --app-text: #e2e8f0;
-  --app-muted: #94a3b8;
+  --app-rail: rgba(20, 20, 20, 0.46);
+  --app-title: #fafafa;
+  --app-text: #e5e5e5;
+  --app-muted: #a3a3a3;
   --app-primary: #60a5fa;
+}
+
+.ui-config-pending {
+  visibility: hidden;
 }
 
 /* Pure-CSS fallback, same mechanism as style.css's own :root/@media/
@@ -64,16 +81,16 @@
     --app-control-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 18px rgba(0, 0, 0, 0.14);
     --app-divider: rgba(255, 255, 255, 0.09);
     --app-divider-strong: rgba(255, 255, 255, 0.14);
-    --app-shell: rgba(15, 23, 42, 0.84);
-    --app-shell-strong: rgba(15, 23, 42, 0.96);
-    --app-surface: rgba(24, 33, 48, 0.96);
-    --app-surface-strong: rgba(17, 24, 39, 0.98);
-    --app-surface-raised: rgba(23, 32, 51, 0.98);
+    --app-shell: rgba(23, 23, 23, 0.56);
+    --app-shell-strong: rgba(23, 23, 23, 0.78);
+    --app-surface: rgba(32, 32, 32, 0.40);
+    --app-surface-strong: rgba(24, 24, 24, 0.60);
+    --app-surface-raised: rgba(38, 38, 38, 0.50);
     --app-surface-hover: rgba(255, 255, 255, 0.05);
-    --app-rail: rgba(15, 23, 42, 0.74);
-    --app-title: #f8fafc;
-    --app-text: #e2e8f0;
-    --app-muted: #94a3b8;
+    --app-rail: rgba(20, 20, 20, 0.46);
+    --app-title: #fafafa;
+    --app-text: #e5e5e5;
+    --app-muted: #a3a3a3;
     --app-primary: #60a5fa;
   }
 }
@@ -90,7 +107,7 @@ body {
   background:
     radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 24%),
     radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.06), transparent 22%),
-    linear-gradient(180deg, #050816 0%, #0f172a 56%, #111827 100%);
+    linear-gradient(180deg, #090909 0%, #171717 56%, #1c1917 100%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -98,7 +115,7 @@ body {
     background:
       radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 24%),
       radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.06), transparent 22%),
-      linear-gradient(180deg, #050816 0%, #0f172a 56%, #111827 100%);
+      linear-gradient(180deg, #090909 0%, #171717 56%, #1c1917 100%);
   }
 }
 
@@ -326,7 +343,6 @@ body {
   backdrop-filter: blur(16px);
 }
 
-#sidebar-details .detail-group,
 .route-card,
 #sidebar-icon-credit,
 #collection-card,
@@ -334,27 +350,106 @@ body {
   border-top-color: var(--app-divider);
 }
 
+/* The card itself is deliberately the weak element in the hierarchy — no
+   border, just background + a soft shadow for separation — so the tiles
+   inside (.detail-group-body.tiles .detail-row, which keep their own
+   border) read as the stronger, more defined structure. A group border at
+   similar intensity to the tile borders flattened that hierarchy: card and
+   tile read as the same kind of "boxed" element instead of container vs.
+   content. border-top: none is load-bearing, not decorative — static/
+   style.css (the legacy pre-tile-grid stylesheet, still loaded) has its own
+   older `#sidebar-details .detail-group { border-top: 1px solid
+   var(--border); }` rule of equal selector specificity; without an explicit
+   reset here, that shorthand's style/width channels survive the cascade
+   even though a later app.css rule recolors border-top-color, producing a
+   real but easy-to-miss 1px top line on every group after the first. */
 #sidebar-details .detail-group {
-  margin-top: 12px;
-  padding: 14px 14px 12px;
+  margin-top: 8px;
+  padding: 8px;
   background: var(--app-surface);
-  border: 1px solid var(--app-divider-strong);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-  border-radius: 16px;
+  box-shadow: var(--app-control-shadow);
+  border-radius: var(--app-panel-radius);
+  border-top: none;
   width: 100%;
   box-sizing: border-box;
 }
 
 #sidebar-details .detail-group:first-child {
   margin-top: 0;
-  padding-top: 16px;
-  box-shadow: inset 0 1px 0 var(--app-divider-strong), 0 10px 24px rgba(15, 23, 42, 0.06);
+  padding-top: 8px;
+  box-shadow: var(--app-control-shadow);
 }
 
 #sidebar-details .detail-group-body {
   display: grid;
   gap: 8px;
   padding-top: 2px;
+}
+
+#sidebar-details .detail-group-body[hidden] {
+  display: none !important;
+}
+
+#sidebar-details .detail-group-title.detail-group-toggle {
+  appearance: none;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--app-title);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  justify-content: space-between;
+}
+
+#sidebar-details .detail-group-title-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+#sidebar-details .detail-group-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 8px;
+  color: var(--app-title);
+  background: var(--app-surface-hover);
+  border: 1px solid var(--app-divider);
+  opacity: 1;
+}
+
+#sidebar-details .detail-group-icon svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+#sidebar-details .detail-group-chevron {
+  display: block;
+  flex: none;
+  color: var(--app-muted);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+#sidebar-details .detail-group.is-collapsed .detail-group-chevron {
+  transform: rotate(-90deg);
+}
+
+#sidebar-details .detail-group-toggle:hover,
+#sidebar-details .detail-group-toggle:focus-visible {
+  color: var(--app-title);
+}
+
+#sidebar-details .detail-group-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--app-primary) 45%, transparent);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 #sidebar-details .detail-row {
@@ -364,11 +459,142 @@ body {
   align-items: start;
 }
 
+/* Dense "stat tile" layout for every measurement group except Identity
+   (which keeps flags/logos/long text as a plain list, see renderGroup()'s
+   `tiled` param in render-details.js). Tiles auto-pack 2-per-row and
+   reflow around whichever fields are actually present, since renderGroup()
+   already drops null rows before this ever renders. Kept deliberately
+   light-touch (no border, a barely-there fill, modest weight) so a full
+   grid of them reads as one quiet texture rather than a grid of boxes. */
+#sidebar-details .detail-group-body.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--app-group-tile-gap);
+}
+
+#sidebar-details .detail-group-body.tiles .detail-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  background: var(--app-surface-hover);
+  /* Half-strength var(--app-divider) — a full-intensity border here was
+     competing with the (still fairly bold) value text for attention;
+     the background fill alone already reads as a distinct tile, the
+     border just needs to be a faint edge, not a second visual signal. */
+  border: 1px solid color-mix(in srgb, var(--app-divider) 55%, transparent);
+  border-radius: var(--app-control-radius);
+  padding: var(--app-group-tile-padding-y) var(--app-group-tile-padding-x);
+}
+
+/* A trailing half-width tile with no pair (either right before the next
+   full-width tile, or at the very end of a group) gets this class injected
+   by renderGroup() (render-details.js) so it stretches to fill the row
+   instead of leaving dead space beside it — computed in JS, since only
+   that function knows where each run of half-width tiles actually ends. */
+#sidebar-details .detail-group-body.tiles .detail-row.detail-row-wide {
+  grid-column: 1 / -1;
+}
+
+/* Label and value are pushed to opposite ends of the type scale on purpose
+   (9px/400 vs. 13px/550) — a stat tile only works as a "glanceable" block if
+   the value reads instantly as data and the label recedes to a caption, not
+   two similarly-weighted lines of text. Toned down from an earlier 14.5px/650
+   pass, which read as shouty/too heavy for a tile this small — 550 is enough
+   contrast against the label's 400 without every value competing for
+   attention like a headline. */
+#sidebar-details .detail-group-body.tiles .detail-label {
+  font-size: 9px;
+  line-height: 1.3;
+  color: var(--app-muted);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  width: 100%;
+}
+
+#sidebar-details .detail-group-body.tiles .detail-label .info-tip:has(svg) {
+  margin-left: auto;
+}
+
+#sidebar-details .detail-group-body.tiles .detail-value {
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+#sidebar-details .detail-group-body.tiles .detail-value-special {
+  justify-content: flex-start;
+}
+
+/* Not scoped to .tiles: with the tile-layout toggle off, a composite
+   tileRow() (Altitude+GPS, Track+compass, Temp/TAT) still needs its
+   secondary value to read as a distinct, smaller second line rather than
+   running into the primary value with no separation — grid-column: 2
+   lines it up under the value column in list mode; harmless in tile mode,
+   where the parent is flex and grid-column has no effect. */
+#sidebar-details .detail-value-secondary {
+  display: block;
+  grid-column: 2;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--app-muted);
+}
+
+/* The Operator/Registered Owner tiles' country secondary (flag + name)
+   shrinks further than a plain text secondary (GPS altitude, compass
+   suffix) — the country is context, not the headline fact of the tile, and
+   at full size the flag in particular was pulling as much visual weight as
+   the Operator/Owner name itself above it. Scoped via :has(.fi) so this
+   only ever affects a flag-bearing secondary, not Altitude's "GPS ..." or
+   Track's compass-direction secondary lines, which have no flag. */
+#sidebar-details .detail-value-secondary:has(.fi) {
+  font-size: 10px;
+}
+
+#sidebar-details .detail-value-secondary .fi {
+  width: 14px;
+  height: 10px;
+}
+
+#sidebar-details .detail-group-body:not(.tiles) > .detail-row + .detail-row {
+  margin-top: 2px;
+}
+
 #sidebar-details .detail-label {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
   color: var(--app-muted);
   font-size: var(--app-text-sm);
   line-height: 1.35;
   font-weight: 400;
+}
+
+#sidebar-details .detail-label-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+#sidebar-details .detail-field-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--app-muted);
+}
+
+#sidebar-details .detail-field-icon svg {
+  display: block;
+  width: 15px;
+  height: 15px;
 }
 
 #sidebar-details .detail-value {
@@ -387,24 +613,152 @@ body {
 }
 
 #sidebar-details .detail-row-identity .detail-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  width: fit-content;
-  min-width: 0;
-  justify-self: start;
+  align-items: flex-start;
+  width: 100%;
+  justify-self: stretch;
 }
 
 #sidebar-details .detail-row-identity .detail-label .info-tip:has(svg) {
   margin-left: 0;
 }
 
+#sidebar-details .detail-label .info-tip:has(svg) {
+  margin-left: auto;
+  flex: none;
+  color: var(--app-muted);
+}
+
+/* In list mode the help action belongs to the label, while secondary text
+   belongs to the value column. Tile mode keeps its top-right help action. */
+#sidebar-details .detail-group-body:not(.tiles) .detail-label {
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+#sidebar-details .detail-group-body:not(.tiles) .detail-label .info-tip:has(svg) {
+  margin-left: 0;
+}
+
+#sidebar-details .detail-group-body:not(.tiles) .detail-value-secondary {
+  justify-self: end;
+  text-align: right;
+}
+
+#sidebar-details .help-icon-serif {
+  display: block;
+  overflow: visible;
+}
+
 #sidebar-details .detail-row-identity .detail-value {
   overflow-wrap: anywhere;
 }
 
-#sidebar-details .detail-row + .detail-row {
-  margin-top: 2px;
+#sidebar-details .identity-logo-row {
+  gap: var(--app-identity-logo-row-gap);
+}
+
+#sidebar-details .identity-logo-value {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: var(--app-identity-logo-gap);
+  min-width: 0;
+}
+
+#sidebar-details .identity-logo-square {
+  box-sizing: border-box;
+  width: var(--app-identity-logo-size);
+  height: var(--app-identity-logo-size);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--app-identity-logo-inset);
+  overflow: hidden;
+  border-radius: var(--app-identity-logo-radius);
+  background: color-mix(in srgb, var(--app-primary) 10%, var(--app-surface));
+  border: 1px solid var(--app-divider-strong);
+  box-shadow: var(--app-control-shadow);
+}
+
+#sidebar-details .identity-logo-square-empty {
+  background: color-mix(in srgb, var(--app-primary) 6%, var(--app-surface));
+}
+
+#sidebar-details .identity-logo-square .airline-logo {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+#sidebar-details .identity-logo-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-identity-logo-copy-gap);
+  padding-top: 0;
+}
+
+#sidebar-details .identity-logo-name {
+  color: var(--app-title);
+  font-size: var(--app-text-sm);
+  line-height: 1.35;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+#sidebar-details .identity-logo-country {
+  color: var(--app-muted);
+  font-size: var(--app-text-xs);
+  line-height: 1.35;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#sidebar-details .identity-logo-country .fi {
+  flex: none;
+}
+
+/* Identity rows are full-width tiles: their content needs a stable, explicit
+   horizontal layout instead of inheriting the generic compact-tile spacing. */
+#sidebar-details .detail-group-body.tiles .identity-logo-row {
+  gap: var(--app-identity-logo-row-gap);
+  padding: var(--app-group-tile-padding-y) var(--app-group-tile-padding-x);
+}
+
+#sidebar-details .detail-group-body.tiles .identity-logo-row .identity-logo-value {
+  width: 100%;
+  align-items: flex-start;
+}
+
+/* List mode follows the geometry of the surrounding key/value rows. The
+   branded tile treatment is intentionally scaled down and kept entirely in
+   the value column so it cannot stretch or displace the label column. */
+#sidebar-details .detail-group-body:not(.tiles) .identity-logo-row {
+  align-items: start;
+}
+
+#sidebar-details .detail-group-body:not(.tiles) .identity-logo-value {
+  width: 100%;
+  justify-content: flex-end;
+  gap: var(--app-identity-logo-list-gap);
+}
+
+#sidebar-details .detail-group-body:not(.tiles) .identity-logo-square {
+  width: var(--app-identity-logo-list-size);
+  height: var(--app-identity-logo-list-size);
+  padding: var(--app-identity-logo-list-inset);
+  border-radius: var(--app-identity-logo-list-radius);
+}
+
+#sidebar-details .detail-group-body:not(.tiles) .identity-logo-copy {
+  align-items: flex-start;
+  text-align: left;
 }
 
 #sidebar-header .sidebar-header-title,
@@ -428,7 +782,7 @@ body {
   font-size: 28px;
   line-height: 1;
   letter-spacing: -0.04em;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 #sidebar-header .sidebar-header-subtitle,
@@ -444,7 +798,7 @@ body {
 
 #sidebar-details b {
   color: var(--app-title);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 #sidebar-header,
@@ -607,7 +961,7 @@ body {
 :root[data-theme="dark"] #collection-panel-empty,
 :root[data-theme="dark"] .gallery-placeholder,
 :root[data-theme="dark"] #map-loader {
-  background: linear-gradient(180deg, var(--app-surface-raised), var(--app-surface-strong));
+  background: var(--app-surface);
   border-color: var(--app-divider-strong);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
@@ -655,13 +1009,25 @@ body {
   font-weight: 400;
 }
 
+/* Inside a stat tile, the identity label should read exactly like every
+   other tile label (small, muted, not bold) — b.identity-label's own
+   font-weight rule above still wins by specificity otherwise. */
+#sidebar-details .detail-group-body.tiles b.identity-label {
+  font-size: 9px;
+}
+
 #sidebar-details .detail-group-title,
 #hud .filter-title,
 #hud .data-quality-group-title {
   font-size: var(--app-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+#sidebar-details .detail-group-title {
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .route-card-title {
@@ -669,14 +1035,14 @@ body {
   line-height: 1.2;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .route-card-city,
 .route-confidence,
 .route-card-empty-text {
   font-size: var(--app-text-sm);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .collection-card-meta,
@@ -944,7 +1310,6 @@ body {
   color: var(--app-muted);
 }
 
-#sidebar-details .detail-group,
 .route-card-footer:not(:empty),
 #sidebar-icon-credit,
 .collection-card-footer,
@@ -955,7 +1320,7 @@ body {
 .route-card {
   margin: 0 0 14px;
   padding: 14px 14px 12px;
-  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+  background: var(--app-surface);
   border-color: var(--app-divider);
 }
 
@@ -965,7 +1330,7 @@ body {
 }
 
 .collection-card {
-  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+  background: var(--app-surface);
   border-color: var(--app-divider);
   border-radius: 16px;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04);
@@ -1120,7 +1485,7 @@ body {
   font-size: 28px;
   line-height: 1;
   letter-spacing: -0.04em;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 #sidebar-header .sidebar-header-subtitle {
@@ -1129,18 +1494,33 @@ body {
 }
 
 #sidebar-details .detail-group-title {
-  color: var(--app-muted);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  margin-bottom: 10px;
+  color: var(--app-title);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  margin-bottom: 6px;
 }
 
+#sidebar-details .detail-group.is-collapsed .detail-group-title {
+  margin-bottom: 0;
+}
+
+/* border: none is load-bearing, not decorative — same pitfall as
+   .detail-group above, hit twice in a row: static/style.css's own
+   `.route-card { border: 1px solid var(--border); }` (plus two more
+   app.css `.route-card { border-color: ... }` color-only overrides
+   further down) all still contribute their style/width channels unless
+   something explicitly resets the whole `border` shorthand. Deleting the
+   old `border: 1px solid var(--app-divider)` line here (rather than
+   overwriting it with `border: none`) looked like a fix but wasn't — the
+   underlying legacy border just kept showing through, confirmed via
+   getComputedStyle on a real `.route-card.route-card-unconfirmed` element
+   after the "fix" had already shipped. */
 #sidebar-route .route-card {
   margin: 0;
-  border: 1px solid var(--app-divider);
+  border: none;
   border-radius: 16px;
-  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  background: var(--app-surface);
+  box-shadow: var(--app-control-shadow);
 }
 
 #sidebar-route .route-card-footer:not(:empty) {
@@ -1152,7 +1532,7 @@ body {
 }
 
 #sidebar-route .route-card-title {
-  color: var(--app-muted);
+  color: var(--app-title);
 }
 
 #sidebar-route .route-card-city,
@@ -1244,7 +1624,7 @@ body {
 :root[data-theme="dark"] #collection-panel-empty,
 :root[data-theme="dark"] .gallery-placeholder,
 :root[data-theme="dark"] #map-loader {
-  background: linear-gradient(180deg, rgba(23, 32, 51, 0.98), rgba(17, 24, 39, 0.98));
+  background: var(--app-surface);
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
 }
@@ -1383,7 +1763,7 @@ body {
 
 .route-card {
   border-color: var(--app-divider);
-  background: linear-gradient(180deg, var(--app-surface-strong), var(--app-surface));
+  background: var(--app-surface);
 }
 
 .route-card-footer:not(:empty) {

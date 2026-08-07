@@ -87,6 +87,12 @@ async function mockAllSources(page, { skipHealth = false } = {}) {
       flightaware: { visible: true, enabled_by_default: false },
       flightradar24: { visible: true, enabled_by_default: false },
     },
+    ui: {
+      sidebar: {
+        tile_layout: { visible: true, enabled_by_default: true },
+        accordion: { default_collapsed: false, groups: {} },
+      },
+    },
   } }));
   // Mock /api/me (auth check)
   await page.route('**/api/me', (route) => route.fulfill({ json: { user: null } }));

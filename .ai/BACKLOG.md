@@ -51,6 +51,7 @@ requires.
 
 | Item | Effort | Value | Category | Status | Read |
 |---|---|---|---|---|---|
+| **Altitude legend + color-by-altitude markers** | M | Medium | Frontend UX | | Detailed plan at `/Users/alex/.claude/plans/parallel-wondering-aho.md`—add altitude-gradient coloring for aircraft markers (green→yellow→orange→red), floating legend card bottom-right showing altitude scale with unit-aware labels, and HUD toggle defaulting to ON. Implementation across 3 files: index.html (markup + legend card), icons.js (color priority chain: altitude > uniform > source), state-filters.js (toggle wiring + label refresh), style.css (CSS rule scoping), config/sources.json (default). |
 | **[CRITICAL BUG]** Track stops updating after aircraft select | S | High | Frontend UX / Bug | 🚨 | **BLOCKER:** Track renders & updates *before* selection (live polling). Clicking marker → track stops updating, becomes stale. Historical track fetch may interfere with live trail. See Bugs section. |
 | Zone-search: preserve selection after refocus | XS | Medium | Frontend UX | | Follow-up to `5d7ec95`: pointer-click default handling immediately collapses the refocus selection; defer selection until the click finishes. |
 | Track continuity and smoothing | M | Med–High | Frontend UX / Backend | | Merge the local live-trail, reselect persistence, polling cadence and interpolation follow-ups into one scoped task; the critical post-selection freeze remains a separate blocker above. |
@@ -103,6 +104,8 @@ Category: A1 · Light
 | Metrics export (`/metrics`, Prometheus) | M | Low–Med | DevOps | | Ops/observability value, no urgency for a single-tenant app |
 | Collection panel bulk operations | M | Low | Frontend UX | | Speculative — no evidence the collection is big enough to need bulk actions yet |
 | **[BUG]** Test suite audit: fix 2 CI failures + reduce redundant/brittle coverage | M | Medium–High | Testing | 🐛 | CI has been silently red for 6 commits (2026-07-21/22). Two failing tests encode effects instead of rules (`test_dev_aircraft_table.spec.js:89` hardcodes row count, `test_identity_enrichment.spec.js:263` expects exact category). Also: redundant C0–C5 parametrization in `test_enrichment.py` (6 clones), frontend re-testing backend logic, three-layer redundancy in `test_aircraft_category.py`. Full audit in `.ai/audits/test-suite-audit-2026-07-22.md`. Recommendations: fix the 2 failures, parametrize C0–C5 tests, trim frontend duplication. |
+| **Aircraft identity restructure** | L | High | Backend | | Design note in `.ai/proposals/aircraft-identity-restructure.md` — rethink the main aircraft table so it can keep provenance, competing observations, and conflict state instead of only a single flat best guess. |
+| **Server volume data audit** | M | High | Backend | | Design note in `.ai/proposals/server-volume-data-discrepancy.md` — compare the deployed `/data` volume against local state, verify which files are authoritative at runtime, and document why the server schema/data diverge from the local checkout. |
 | Adaptive polling intervals | M | Low | Backend | | Defer until an actual quota-pressure incident, not before |
 | Load testing | M | Low | Testing | | Only relevant if traffic ever exceeds single-user hobby scale |
 | Live network tests (CI-gated) | M | Low | Testing | | Low ROI unless upstreams start breaking often (not observed so far) |
