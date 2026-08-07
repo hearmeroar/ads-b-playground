@@ -1,0 +1,22 @@
+{
+  "sidebar": {
+    "tile_layout": {
+      "visible": true,
+      "enabled_by_default": true
+    },
+    "accordion": {
+      "default_collapsed": false,
+      "groups": {
+        "identity": false,
+        "position": false,
+        "speedHeading": false,
+        "autopilot": false,
+        "weather": false,
+        "status": false,
+        "messageInfo": false,
+        "positionAccuracy": false,
+        "signalQuality": false
+      }
+    }
+  }
+}

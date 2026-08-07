@@ -144,7 +144,13 @@ fetch('/api/config')
 let AIRLINE_LOGO_MANIFEST = {};
 fetch('airline-logos/manifest.json')
   .then((resp) => resp.json())
-  .then((manifest) => { AIRLINE_LOGO_MANIFEST = manifest; })
+  .then((manifest) => {
+    AIRLINE_LOGO_MANIFEST = manifest;
+    // A sidebar can be opened before this small static manifest finishes
+    // loading. Refresh the active panel so a valid logo does not stay
+    // missing until the user selects another aircraft.
+    if (typeof renderSelectedDetails === 'function') renderSelectedDetails();
+  })
   .catch(() => {});
 
 // Ground/tower markers render on a lower pane so aircraft always appear above them

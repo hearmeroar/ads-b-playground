@@ -33,6 +33,23 @@ test('known airline callsign shows the vendored logo next to Operator', async ({
 
   const src = await page.evaluate(() => document.querySelector('#sidebar-details .airline-logo').getAttribute('src'));
   expect(src).toBe('airline-logos/soaring/RYR.svg');
+
+  await page.click('#toggle-tile-layout');
+  const listRow = page.locator('#sidebar-details .detail-group-body:not(.tiles) .identity-logo-row:has(.airline-logo)').first();
+  const listLogo = listRow.locator('.identity-logo-square');
+  await expect(listLogo).toHaveCSS('width', '32px');
+  await expect(listLogo).toHaveCSS('height', '32px');
+  const listGeometry = await listRow.evaluate((row) => {
+    const rowRect = row.getBoundingClientRect();
+    const valueRect = row.querySelector('.identity-logo-value').getBoundingClientRect();
+    const logoRect = row.querySelector('.identity-logo-square').getBoundingClientRect();
+    const copyRect = row.querySelector('.identity-logo-copy').getBoundingClientRect();
+    return {
+      contained: valueRect.left >= rowRect.left && valueRect.right <= rowRect.right + 1,
+      topAligned: Math.abs(logoRect.top - copyRect.top) <= 1,
+    };
+  });
+  expect(listGeometry).toEqual({ contained: true, topAligned: true });
 });
 
 test('callsign with no matching airline renders no logo', async ({ page }) => {

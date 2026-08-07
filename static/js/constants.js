@@ -1,6 +1,12 @@
 const POLL_INTERVAL_MS = 12000; // 12s — stays within OpenSky's rate limits
 const AUTO_CENTER_ANIMATION_DURATION_MS = 400; // ms — duration of map.flyTo() when selecting an aircraft
 
+// Runtime fallback for config/ui.json's sidebar accordion settings. main.js
+// replaces this from /api/config before the first poll/render; keeping a
+// small local fallback means a failed config request still leaves the UI
+// usable with every group expanded.
+let sidebarAccordionConfig = { default_collapsed: false, groups: {} };
+
 // Shared by render-details.js's formatVerticalRateUnit (sidebar text) and
 // icons.js's climb/descent marker-icon check, so "what counts as climbing"
 // can't silently drift between the two — a vertical rate whose magnitude

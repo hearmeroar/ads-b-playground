@@ -13,6 +13,25 @@ const sidebarRouteEl = document.getElementById('sidebar-route');
 const sidebarCloseBtn = document.getElementById('sidebar-close');
 const sidebarCenterMapBtn = document.getElementById('sidebar-center-map');
 
+// Group collapse state survives the frequent sidebar re-renders caused by
+// live aircraft updates, so a section does not spring open again every poll.
+const detailGroupCollapsedOverrides = new Map();
+
+sidebarDetailsEl.addEventListener('click', (event) => {
+  const toggle = event.target.closest('.detail-group-toggle');
+  if (!toggle) return;
+  const group = toggle.closest('.detail-group');
+  const body = group && group.querySelector('.detail-group-body');
+  const key = toggle.dataset.groupKey;
+  if (!group || !body || !key) return;
+
+  const collapsed = !group.classList.contains('is-collapsed');
+  group.classList.toggle('is-collapsed', collapsed);
+  body.hidden = collapsed;
+  toggle.setAttribute('aria-expanded', String(!collapsed));
+  detailGroupCollapsedOverrides.set(key, collapsed);
+});
+
 // detailsById holds every currently-visible aircraft's latest details HTML +
 // registration (for the photo lookup), refreshed every poll regardless of
 // selection — so opening the sidebar (or refreshing it while open) never has
@@ -92,6 +111,10 @@ function buildMergedDetails(icao24) {
     // private/corporate registrant, only an operating airline), so this is
     // its only tier.
     fillIfEmpty('registeredOwner', aircraft.registered_owner, 'adsbdb');
+    if (aircraft.registered_owner_country_name && !info.registeredOwnerCountry) {
+      info.registeredOwnerCountry = aircraft.registered_owner_country_name;
+      fieldSources.registeredOwnerCountry = ['adsbdb'];
+    }
     if (aircraft.registered_owner_country_iso_name && !info.registeredOwnerCountryIso) {
       info.registeredOwnerCountryIso = aircraft.registered_owner_country_iso_name;
     }

@@ -96,6 +96,15 @@ function formatVerticalRateUnit(rateMs) {
     : (rateMs > 0 ? '+' : '') + rateMs.toFixed(1) + ' m/s';
   return value + ' (' + word + ')';
 }
+// 8-point compass abbreviation for a track/heading tile's secondary line
+// (e.g. "133°" -> "SE"), matching the reference stat-tile layout's own
+// "133° SE" heading tile.
+const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+function degToCompass(deg) {
+  if (deg == null) return null;
+  const idx = Math.round(((deg % 360) + 360) % 360 / 45) % 8;
+  return COMPASS_POINTS[idx];
+}
 function formatRelativeSeconds(sec) {
   if (sec == null) return null;
   if (sec < 60) return Math.floor(sec) + ' s ago';
@@ -197,6 +206,75 @@ const GROUP_ICONS = {
   signalQuality: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M3,22V8H7V22H3M10,22V2H14V22H10M17,22V14H21V22H17Z"/></svg>',
 };
 
+// Per-field icons use the same vendored Material Design Icons set as the
+// group headings. A compact semantic set is intentionally reused for
+// related readings (for example IAS/TAS/Mach) so the labels stay scannable
+// without turning the grid into a collection of unrelated pictograms.
+const FIELD_ICON_PATHS = {
+  aircraft: 'M21,16V14L13,9V3.5C13,2.67 12.33,2 11.5,2S10,2.67 10,3.5V9L2,14V16L10,13.5V19L7,21V22L11.5,21L16,22V21L13,19V13.5L21,16Z',
+  building: 'M22,21H2V10L12,3L22,10V21M12,5.5L4,11V19H20V11L12,5.5M6,12H18V14H6V12M6,16H18V18H6V16Z',
+  calendar: 'M19,4H18V2H16V4H8V2H6V4H5C3.9,4 3,4.9 3,6V20C3,21.1 3.9,22 5,22H19C20.1,22 21,21.1 21,20V6C21,4.9 20.1,4 19,4M19,20H5V9H19V20M7,11H12V16H7V11Z',
+  account: 'M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z',
+  tag: 'M17.63,5.84C17.27,5.33 16.67,5 16,5L5,5C3.9,5 3,5.9 3,7V17C3,18.1 3.9,19 5,19H16C16.67,19 17.27,18.67 17.63,18.16L22,12L17.63,5.84M7.5,13.5A1.5,1.5 0 1,1 7.5,10.5A1.5,1.5 0 0,1 7.5,13.5Z',
+  altitude: 'M12,2L7,7H10V17H7L12,22L17,17H14V7H17L12,2Z',
+  location: 'M12,2C15.31,2 18,4.69 18,8C18,12.5 12,19 12,19S6,12.5 6,8C6,4.69 8.69,2 12,2M12,6A2,2 0 1,0 12,10A2,2 0 0,0 12,6M5,20H19V22H5V20Z',
+  speed: 'M7,2V13H10V22L17,10H13L17,2H7Z',
+  compass: 'M12,2A10,10 0 1,0 12,22A10,10 0 0,0 12,2M15.5,8.5L13,14L8.5,15.5L11,10L15.5,8.5Z',
+  rotate: 'M12,6V9L16,5L12,1V4C7.58,4 4,7.58 4,12C4,13.57 4.46,15.03 5.24,16.26L6.7,14.8C6.25,13.97 6,13.02 6,12C6,8.69 8.69,6 12,6M18.76,7.74L17.3,9.2C17.75,10.03 18,10.98 18,12C18,15.31 15.31,18 12,18V15L8,19L12,23V20C16.42,20 20,16.42 20,12C20,10.43 19.54,8.97 18.76,7.74Z',
+  tune: 'M3,7H13V9H3V7M17,7H21V9H17V7M15,5H17V11H15V5M3,15H7V17H3V15M11,15H21V17H11V15M7,13H9V19H7V13Z',
+  weather: 'M3,7H14C15.1,7 16,6.1 16,5S15.1,3 14,3C13.45,3 12.95,3.22 12.59,3.59L11.17,2.17C11.9,1.45 12.9,1 14,1C16.21,1 18,2.79 18,5S16.21,9 14,9H3V7M3,11H19C21.21,11 23,12.79 23,15S21.21,19 19,19C17.9,19 16.9,18.55 16.17,17.83L17.59,16.41C17.95,16.78 18.45,17 19,17C20.1,17 21,16.1 21,15S20.1,13 19,13H3V11M3,15H13V17H3V15Z',
+  thermometer: 'M15,13V5A3,3 0 0,0 9,5V13A5,5 0 1,0 15,13M12,3A1,1 0 0,1 13,4V14.17A3,3 0 1,1 11,14.17V4A1,1 0 0,1 12,3Z',
+  alert: 'M13,14H11V10H13V14M13,18H11V16H13V18M1,21H23L12,2L1,21Z',
+  clock: 'M12,2A10,10 0 1,0 12,22A10,10 0 0,0 12,2M13,7V11.59L16.21,14.79L14.79,16.21L11,12.41V7H13Z',
+  radio: 'M4,4H20C21.1,4 22,4.9 22,6V18C22,19.1 21.1,20 20,20H4C2.9,20 2,19.1 2,18V6C2,4.9 2.9,4 4,4M5,8V10H19V8H5M5,12V16H13V12H5M17,12A2,2 0 1,0 17,16A2,2 0 0,0 17,12Z',
+  target: 'M12,8A4,4 0 1,0 12,16A4,4 0 0,0 12,8M12,2A10,10 0 1,0 12,22A10,10 0 0,0 12,2M12,20A8,8 0 1,1 12,4A8,8 0 0,1 12,20Z',
+  signal: 'M3,22V16H7V22H3M10,22V10H14V22H10M17,22V2H21V22H17Z',
+  shield: 'M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z',
+  shieldCheck: 'M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M10,17L6,13L7.41,11.59L10,14.17L16.59,7.58L18,9L10,17Z',
+  barometer: 'M12,2A10,10 0 1,0 12,22A10,10 0 0,0 12,2M7.76,7.76L9.17,9.17C8.44,9.9 8,10.9 8,12H6C6,10.34 6.67,8.84 7.76,7.76M12,18A6,6 0 0,1 10.35,6.23L11.2,8.06C11.46,8.02 11.73,8 12,8C14.21,8 16,9.79 16,12S14.21,16 12,16V18M12,10A2,2 0 1,0 12,14A2,2 0 0,0 12,10Z',
+  velocity: 'M4,5H14V2L21,9L14,16V13H4V5M4,17H16V19H4V17M4,21H12V23H4V21Z',
+  checkCircle: 'M12,2A10,10 0 1,0 12,22A10,10 0 0,0 12,2M10,17L5,12L6.41,10.59L10,14.17L17.59,6.58L19,8L10,17Z',
+  radius: 'M12,2A10,10 0 1,0 12,22A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12H17L21,16L23,12H22A10,10 0 0,0 12,2M12,20A8,8 0 0,1 4,12H7L3,8L1,12H2A10,10 0 0,0 12,22V20Z',
+  rocket: 'M13.13,22.19L11.5,18.36C13.07,17.78 14.54,17 15.9,16L13.13,22.19M5.64,12.5L1.81,10.87L8,8.1C7,9.46 6.22,10.93 5.64,12.5M21.61,2.39C21.61,2.39 16.66,1.42 11,7.07C8.81,9.26 7.5,11.7 7,14L10,17C12.3,16.5 14.74,15.19 16.93,13C22.58,7.34 21.61,2.39 21.61,2.39M15,9A2,2 0 1,1 15,5A2,2 0 0,1 15,9Z',
+  magnet: 'M3,7V13A9,9 0 0,0 21,13V7H16V13A4,4 0 0,1 8,13V7H3M3,3V5H8V3H3M16,3V5H21V3H16Z',
+  navigation: 'M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z',
+  vertical: 'M7,10L12,5L17,10H14V14H17L12,19L7,14H10V10H7Z',
+  briefcase: 'M20,6H16V4C16,2.9 15.1,2 14,2H10C8.9,2 8,2.9 8,4V6H4C2.9,6 2,6.9 2,8V19C2,20.1 2.9,21 4,21H20C21.1,21 22,20.1 22,19V8C22,6.9 21.1,6 20,6M10,4H14V6H10V4M20,19H4V13H10V15H14V13H20V19M12,13A1,1 0 1,1 12,11A1,1 0 0,1 12,13Z',
+  info: 'M11,17H13V11H11V17M12,2A10,10 0 1,0 12,22A10,10 0 0,0 12,2M11,7V9H13V7H11Z',
+  chip: 'M15,9H9V15H15V9M13,13H11V11H13V13M21,11V9H19V7C19,5.9 18.1,5 17,5H15V3H13V5H11V3H9V5H7C5.9,5 5,5.9 5,7V9H3V11H5V13H3V15H5V17C5,18.1 5.9,19 7,19H9V21H11V19H13V21H15V19H17C18.1,19 19,18.1 19,17V15H21V13H19V11H21M17,17H7V7H17V17Z',
+  shieldAirplaneOutline: 'M21,11C21,16.55 17.16,21.74 12,23C6.84,21.74 3,16.55 3,11V5L12,1L21,5V11M12,21C15.75,20 19,15.54 19,11.22V6.3L12,3.18L5,6.3V11.22C5,15.54 8.25,20 12,21M12,5.68C12.5,5.68 12.95,6.11 12.95,6.63V10.11L18,13.26V14.53L12.95,12.95V16.42L14.21,17.37V18.32L12,17.68L9.79,18.32V17.37L11.05,16.42V12.95L6,14.53V13.26L11.05,10.11V6.63C11.05,6.11 11.5,5.68 12,5.68Z',
+  gauge: 'M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12C20,14.4 19,16.5 17.3,18C15.9,16.7 14,16 12,16C10,16 8.2,16.7 6.7,18C5,16.5 4,14.4 4,12A8,8 0 0,1 12,4M14,5.89C13.62,5.9 13.26,6.15 13.1,6.54L11.81,9.77L11.71,10C11,10.13 10.41,10.6 10.14,11.26C9.73,12.29 10.23,13.45 11.26,13.86C12.29,14.27 13.45,13.77 13.86,12.74C14.12,12.08 14,11.32 13.57,10.76L13.67,10.5L14.96,7.29L14.97,7.26C15.17,6.75 14.92,6.17 14.41,5.96C14.28,5.91 14.15,5.89 14,5.89M10,6A1,1 0 0,0 9,7A1,1 0 0,0 10,8A1,1 0 0,0 11,7A1,1 0 0,0 10,6M7,9A1,1 0 0,0 6,10A1,1 0 0,0 7,11A1,1 0 0,0 8,10A1,1 0 0,0 7,9M17,9A1,1 0 0,0 16,10A1,1 0 0,0 17,11A1,1 0 0,0 18,10A1,1 0 0,0 17,9Z',
+  crosshairsGps: 'M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13M12,5A7,7 0 0,0 5,12A7,7 0 0,0 12,19A7,7 0 0,0 19,12A7,7 0 0,0 12,5Z',
+  speedometer: 'M12,16A3,3 0 0,1 9,13C9,11.88 9.61,10.9 10.5,10.39L20.21,4.77L14.68,14.35C14.18,15.33 13.17,16 12,16M12,3C13.81,3 15.5,3.5 16.97,4.32L14.87,5.53C14,5.19 13,5 12,5A8,8 0 0,0 4,13C4,15.21 4.89,17.21 6.34,18.65H6.35C6.74,19.04 6.74,19.67 6.35,20.06C5.96,20.45 5.32,20.45 4.93,20.07V20.07C3.12,18.26 2,15.76 2,13A10,10 0 0,1 12,3M22,13C22,15.76 20.88,18.26 19.07,20.07V20.07C18.68,20.45 18.05,20.45 17.66,20.06C17.27,19.67 17.27,19.04 17.66,18.65V18.65C19.11,17.2 20,15.21 20,13C20,12 19.81,11 19.46,10.1L20.67,8C21.5,9.5 22,11.18 22,13Z',
+  shieldAlertOutline: 'M21,11C21,16.55 17.16,21.74 12,23C6.84,21.74 3,16.55 3,11V5L12,1L21,5V11M12,21C15.75,20 19,15.54 19,11.22V6.3L12,3.18L5,6.3V11.22C5,15.54 8.25,20 12,21M11,7H13V13H11V7M11,15H13V17H11V15Z',
+  arrowExpandVertical: 'M13,9V15H16L12,19L8,15H11V9H8L12,5L16,9H13M4,2H20V4H4V2M4,20H20V22H4V20Z',
+  certificateOutline: 'M13 21L15 20L17 21V14H13M17 9V7L15 8L13 7V9L11 10L13 11V13L15 12L17 13V11L19 10M20 3H4A2 2 0 0 0 2 5V15A2 2 0 0 0 4 17H11V15H4V5H20V15H19V17H20A2 2 0 0 0 22 15V5A2 2 0 0 0 20 3M11 8H5V6H11M9 11H5V9H9M11 14H5V12H11Z',
+  mapMarkerRadiusOutline: 'M12 4C14.2 4 16 5.8 16 8C16 10.1 13.9 13.5 12 15.9C10.1 13.4 8 10.1 8 8C8 5.8 9.8 4 12 4M12 2C8.7 2 6 4.7 6 8C6 12.5 12 19 12 19S18 12.4 18 8C18 4.7 15.3 2 12 2M12 6C10.9 6 10 6.9 10 8S10.9 10 12 10 14 9.1 14 8 13.1 6 12 6M20 19C20 21.2 16.4 23 12 23S4 21.2 4 19C4 17.7 5.2 16.6 7.1 15.8L7.7 16.7C6.7 17.2 6 17.8 6 18.5C6 19.9 8.7 21 12 21S18 19.9 18 18.5C18 17.8 17.3 17.2 16.2 16.7L16.8 15.8C18.8 16.6 20 17.7 20 19Z',
+};
+
+const FIELD_ICONS = {
+  manufacturer: 'building', model: 'aircraft', manufactureYear: 'calendar',
+  operator: 'briefcase', registeredOwner: 'account', categoryDisplay: 'tag',
+  altitudeM: 'altitude', verticalRateMs: 'vertical', positionSource: 'location',
+  speedKmh: 'speed', iasKt: 'aircraft', tasKt: 'weather', mach: 'rocket',
+  trackDeg: 'compass', magHeadingDeg: 'magnet', trueHeadingDeg: 'navigation',
+  turnRateDegPerSec: 'rotate', rollDeg: 'rotate', navAltitudeM: 'altitude',
+  navHeadingDeg: 'compass', navQnh: 'tune', navModes: 'tune',
+  windDirDeg: 'weather', oatC: 'thermometer', squawk: 'radio',
+  emergency: 'alert', hasAlert: 'alert', secondsSinceContact: 'clock',
+  dbFlags: 'tag', messageType: 'radio', adsbVersion: 'chip',
+  nic: 'shieldAirplaneOutline', nicBaro: 'gauge', nacP: 'crosshairsGps', nacV: 'speedometer', sil: 'shieldAlertOutline',
+  gva: 'arrowExpandVertical', sda: 'certificateOutline', radiusOfContainmentM: 'mapMarkerRadiusOutline',
+  messageCount: 'radio', signalStrengthDbm: 'signal', secondsSincePositionUpdate: 'clock',
+};
+
+function fieldIconHtml(fieldKey) {
+  const key = Array.isArray(fieldKey) ? fieldKey[0] : fieldKey;
+  const iconName = FIELD_ICONS[key] || 'tag';
+  const path = FIELD_ICON_PATHS[iconName];
+  return '<span class="detail-field-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="' + path + '"/></svg></span>';
+}
+
 // Splits a pre-joined categoryDisplay string ("A1 — Light (<15,500 lbs)",
 // adsb.fi/airplanes.live; or just "Light (<15,500 lbs)", OpenSky — it has
 // no short code of its own) into a compact "code · label" pair for the
@@ -248,13 +326,11 @@ function infoTipHtml(triggerHtml, detailText) {
   return '<span class="info-tip" data-detail="' + detailText.replace(/"/g, '&quot;') + '">' + triggerHtml + '</span>';
 }
 
-// Same circled-"?" glyph as the HUD's own (?) help buttons (static/index.html,
-// #opensky-help/#track-help/#dev-mode-help — see the .source-help SVG there),
-// reused inline here so the identity rows' tooltip trigger reads as the same
-// "there's more info here" affordance rather than a differently-styled one.
-const HELP_ICON_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">' +
-  '<circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"></circle>' +
-  '<text x="8" y="11.6" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor">?</text>' +
+// A serif italic "i" with a visibly curved stem and top/bottom terminals,
+// drawn as paths so it keeps the same shape everywhere and doesn't collapse
+// into a straight slash-like stroke.
+const HELP_ICON_SVG = '<svg class="help-icon-serif" viewBox="0 0 18 22" width="11" height="14" aria-hidden="true">' +
+  '<text x="2" y="18" fill="currentColor" font-family="Georgia, Times New Roman, serif" font-size="21" font-style="italic" font-weight="700">i</text>' +
   '</svg>';
 
 // Renders one normalized info object (see normalizeOpenSky/
@@ -329,20 +405,54 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // when empty, plus a colored per-source dot when populated.
   // helpHtml (optional) is rendered after the label — used
   // for (?) help-icon triggers that open the shared #source-tooltip popover.
-  function detailRow(label, value, fieldKey, helpHtml) {
+  function detailRow(label, value, fieldKey, helpHtml, wide) {
     const has = value != null && value !== '';
     if (!has && !currentDevMode) return null;
     const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
     const dataAttr = fieldKey ? ' data-field="' + fieldKey + '"' : '';
-    return '<div class="detail-row detail-row-basic"' + dataAttr + '><span class="detail-label">' + label + (helpHtml || '') + '</span><span class="detail-value">' + (has ? value : dash) + badge + '</span></div>';
+    const wideClass = wide ? ' detail-row-wide' : '';
+    return '<div class="detail-row detail-row-basic' + wideClass + '"' + dataAttr + '><span class="detail-label"><span class="detail-label-main">' + fieldIconHtml(fieldKey) + '<span>' + label + '</span></span>' + (helpHtml || '') + '</span><span class="detail-value">' + (has ? value : dash) + badge + '</span></div>';
   }
   // Same "always render in dev mode" treatment for the two hardcoded
   // emergency/alert rows, which carry special red styling instead of going
-  // through detailRow's generic '<b>label:</b> value' format.
+  // through detailRow's generic '<b>label:</b> value' format. Always wide —
+  // in tile mode these read as prominent full-width banners, matching the
+  // visual weight the red text already carries.
   function specialRow(label, isSet, htmlWhenSet, fieldKey) {
     if (!isSet && !currentDevMode) return null;
-    if (!isSet) return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + '</span><span class="detail-value">' + dash + '</span></div>';
-    return '<div class="detail-row detail-row-basic"><span class="detail-label">' + label + '</span><span class="detail-value detail-value-special">' + htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '') + '</span></div>';
+    // Only wide when actually populated (a real emergency/alert reads as a
+    // prominent full-width banner) — the empty dev-mode dash is a plain
+    // half-width tile like everything else, so it can pair normally instead
+    // of wasting a whole row on a "—" placeholder.
+    const labelHtml = '<span class="detail-label"><span class="detail-label-main">' + fieldIconHtml(fieldKey) + '<span>' + label + '</span></span></span>';
+    if (!isSet) return '<div class="detail-row detail-row-basic">' + labelHtml + '<span class="detail-value">' + dash + '</span></div>';
+    return '<div class="detail-row detail-row-basic detail-row-wide">' + labelHtml + '<span class="detail-value detail-value-special">' + htmlWhenSet + (currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '') + '</span></div>';
+  }
+  // A tile that pairs a primary value with an optional secondary, smaller
+  // related value in the same tile (e.g. Altitude + "GPS 13,700 ft").
+  // Gating is on the primary alone: if the primary is empty the whole tile
+  // is skipped (matches every other row's hide-when-empty rule) even if a
+  // secondary value happens to be present — accepted simplification, since
+  // the paired fields in practice arrive together or not at all. The
+  // secondary line only renders when it also has a value; dev mode badges
+  // each of the primary/secondary values independently.
+  function tileRow(label, value, fieldKey, opts) {
+    opts = opts || {};
+    const has = value != null && value !== '';
+    if (!has && !currentDevMode) return null;
+    const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
+    const dataAttr = fieldKey ? ' data-field="' + fieldKey + '"' : '';
+    const wideClass = opts.wide ? ' detail-row-wide' : '';
+    let secondaryHtml = '';
+    if (opts.secondary) {
+      const sec = opts.secondary;
+      const secHas = sec.value != null && sec.value !== '';
+      if (secHas) {
+        const secBadge = currentDevMode ? sourceBadgeHtml(sec.fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
+        secondaryHtml = '<span class="detail-value-secondary">' + sec.label + ' ' + sec.value + secBadge + '</span>';
+      }
+    }
+    return '<div class="detail-row detail-row-basic' + wideClass + '"' + dataAttr + '><span class="detail-label"><span class="detail-label-main">' + fieldIconHtml(fieldKey) + '<span>' + label + '</span></span></span><span class="detail-value">' + (has ? value : dash) + badge + '</span>' + secondaryHtml + '</div>';
   }
   // A callsign-decoded operator/operator_country whose claimed country
   // conflicts with the aircraft's own ICAO24 hex-block country is withheld
@@ -362,10 +472,15 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // still always renders, with a dash placeholder for ground vehicles (which
   // skip heuristic enrichment tiers entirely, so "Unknown" would falsely
   // suggest enrichment was attempted) or "Unknown" for everything else.
-  function identityRow(label, value, fieldKey, helpHtml) {
+  // wide (optional) spans both grid columns — used for fields whose value
+  // tends to run long (full country names, company names, an airline logo
+  // + name pairing) so they get room to sit on one line instead of
+  // wrapping awkwardly inside a half-width tile.
+  function identityRow(label, value, fieldKey, helpHtml, wide) {
     const has = value != null && value !== '';
     if (!has && !currentDevMode) return null;
     const badge = currentDevMode ? sourceBadgeHtml(fieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
+    const wideClass = wide ? ' detail-row-wide' : '';
     // Label + "(?)" icon are wrapped together in .identity-label-wrap, which
     // carries the min-width column-alignment that plain <b> used to have on
     // its own (static/style.css) — keeps the icon flush against the label
@@ -374,13 +489,119 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     // lighter weight/smaller size than a plain detailRow <b> — four-plus
     // rows of full-bold labels each now carrying their own icon read as too
     // heavy/loud as a block.
-    return '<div class="detail-row detail-row-identity"><span class="detail-label identity-label-wrap"><b class="identity-label">' + label + '</b>' + (helpHtml || '') + '</span><span class="detail-value">' + (has ? value : (isGroundVehicle ? dash : 'Unknown')) + badge + unconfirmedTagHtml(fieldKey) + '</span></div>';
+    return '<div class="detail-row detail-row-identity' + wideClass + '"><span class="detail-label identity-label-wrap"><span class="detail-label-main">' + fieldIconHtml(fieldKey) + '<b class="identity-label">' + label + '</b></span>' + (helpHtml || '') + '</span><span class="detail-value">' + (has ? value : (isGroundVehicle ? dash : 'Unknown')) + badge + unconfirmedTagHtml(fieldKey) + '</span></div>';
   }
+  // Operator/Operator Country and Registered Owner/Registration Country
+  // used to be four separate full-width identityRow tiles stacked on top of
+  // each other — reads as sprawling, since each pair is really one fact
+  // ("who's flying it, and where they're from") split across two rows. This
+  // folds each pair into a single wide tile: the company/owner as the
+  // primary value (same has/dev-mode/Unknown treatment as identityRow), the
+  // country as a smaller secondary line beneath it (same idiom as
+  // tileRow's Altitude+GPS/Track+compass pairing) — but unlike tileRow's
+  // secondary, this one still follows identityRow's own dev-mode contract
+  // (every row always renders, with a dash/"Unknown" placeholder for a
+  // missing value) rather than tileRow's "just omit it" rule, since dev
+  // mode's whole point is showing exactly what's missing, not just what's
+  // present.
+  function identityTileRow(label, primaryValue, primaryFieldKey, primaryHelp, secondaryValue, secondaryFieldKey) {
+    const hasPrimary = primaryValue != null && primaryValue !== '';
+    const hasSecondary = secondaryValue != null && secondaryValue !== '';
+    if (!hasPrimary && !hasSecondary && !currentDevMode) return null;
+    // Normal mode never shows the literal word "Unknown" (matches every
+    // other identity row) — if only the secondary resolved (e.g. Flywme
+    // resolves Registration Country from a registration prefix far more
+    // often than adsbdb resolves Registered Owner), the primary value is
+    // simply omitted rather than growing a fake "Unknown" placeholder next
+    // to real data. Dev mode still always shows both, dash or "Unknown",
+    // for full-visibility debugging.
+    let primaryHtml = '';
+    if (hasPrimary || currentDevMode) {
+      const primaryBadge = currentDevMode ? sourceBadgeHtml(primaryFieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
+      const primaryDisplay = hasPrimary ? primaryValue : (isGroundVehicle ? dash : 'Unknown');
+      primaryHtml = '<span class="detail-value">' + primaryDisplay + primaryBadge + unconfirmedTagHtml(primaryFieldKey) + '</span>';
+    }
+    let secondaryHtml = '';
+    if (hasSecondary || currentDevMode) {
+      // No text label here (e.g. "Country") — the flag already carries that
+      // meaning (flagHtml() is baked into secondaryValue itself), so a
+      // literal word next to it would just be a redundant, noisy repeat.
+      const secondaryBadge = currentDevMode ? sourceBadgeHtml(secondaryFieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
+      const secondaryDisplay = hasSecondary ? secondaryValue : (isGroundVehicle ? dash : 'Unknown');
+      secondaryHtml = '<span class="detail-value-secondary">' + secondaryDisplay + secondaryBadge + unconfirmedTagHtml(secondaryFieldKey) + '</span>';
+    }
+    return '<div class="detail-row detail-row-identity detail-row-wide"><span class="detail-label identity-label-wrap"><span class="detail-label-main">' + fieldIconHtml(primaryFieldKey) + '<b class="identity-label">' + label + '</b></span>' + (primaryHelp || '') + '</span>' + primaryHtml + secondaryHtml + '</div>';
+  }
+  function identityLogoRow(label, logoHtml, nameValue, nameFieldKey, helpHtml, countryValue, countryFieldKey) {
+    const hasLogo = logoHtml != null && logoHtml !== '';
+    const hasName = nameValue != null && nameValue !== '';
+    const hasCountry = countryValue != null && countryValue !== '';
+    if (!hasLogo && !hasName && !hasCountry && !currentDevMode) return null;
+    const badge = currentDevMode ? sourceBadgeHtml(nameFieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
+    const countryBadge = currentDevMode ? sourceBadgeHtml(countryFieldKey, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
+    const nameDisplay = hasName ? nameValue : (isGroundVehicle ? dash : 'Unknown');
+    const countryDisplay = hasCountry ? countryValue : (isGroundVehicle ? dash : 'Unknown');
+    return '<div class="detail-row detail-row-identity detail-row-wide identity-logo-row">'
+      + '<span class="detail-label identity-label-wrap"><span class="detail-label-main">' + fieldIconHtml(nameFieldKey) + '<b class="identity-label">' + label + '</b></span>' + (helpHtml || '') + '</span>'
+      + '<span class="detail-value identity-logo-value">'
+      + (hasLogo ? '<span class="identity-logo-square" aria-hidden="true">' + logoHtml + '</span>' : '')
+      + '<span class="identity-logo-copy">'
+      + '<span class="identity-logo-name">' + nameDisplay + badge + unconfirmedTagHtml(nameFieldKey) + '</span>'
+      + '<span class="identity-logo-country">' + countryDisplay + countryBadge + unconfirmedTagHtml(countryFieldKey) + '</span>'
+      + '</span>'
+      + '</span>'
+      + '</div>';
+  }
+  // Every group, Identity included, renders as the 2-column stat-tile grid
+  // (see .detail-group-body.tiles in app.css) — long-running values
+  // (Operator, Operator Country, Registered Owner, Registration Country)
+  // opt into a full-width tile via identityRow's own `wide` flag instead of
+  // opting the whole group out of tiling. Gated on isTileLayoutEnabled()
+  // (state-filters.js) so the HUD toggle can fall back to the plain
+  // single-column list — the .tiles CSS modifier is additive, so simply
+  // omitting it is enough to get the pre-tile layout back with no separate
+  // markup path.
   function renderGroup(title, rows, iconKey) {
     const filtered = rows.filter((r) => r != null);
     if (!filtered.length) return '';
+    const tiled = typeof isTileLayoutEnabled === 'function' ? isTileLayoutEnabled() : true;
+    if (tiled) {
+      // A trailing half-width tile with no pair — either right before the
+      // next full-width tile, or at the very end of the group — would
+      // otherwise leave dead space beside it (CSS grid's default sparse
+      // auto-placement can't backfill a half-filled row from a later
+      // full-width item, which needs both columns at once). Computed here,
+      // not via a blunt CSS nth-child rule, since only this function
+      // actually knows which rows are wide and where each run of
+      // half-width rows starts/ends.
+      const isWide = (r) => r.indexOf('detail-row-wide') !== -1;
+      const stretchLastOfRun = (r) => r.replace(/^(<div class="detail-row [^"]+)"/, '$1 detail-row-wide"');
+      let runStart = -1;
+      for (let i = 0; i < filtered.length; i++) {
+        if (isWide(filtered[i])) {
+          if (runStart !== -1 && (i - runStart) % 2 === 1) {
+            filtered[i - 1] = stretchLastOfRun(filtered[i - 1]);
+          }
+          runStart = -1;
+        } else if (runStart === -1) {
+          runStart = i;
+        }
+      }
+      if (runStart !== -1 && (filtered.length - runStart) % 2 === 1) {
+        filtered[filtered.length - 1] = stretchLastOfRun(filtered[filtered.length - 1]);
+      }
+    }
+    const groupKey = iconKey || title.replace(/&amp;/g, 'and').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    const configuredCollapsed = Object.prototype.hasOwnProperty.call(sidebarAccordionConfig.groups, groupKey)
+      ? sidebarAccordionConfig.groups[groupKey]
+      : sidebarAccordionConfig.default_collapsed;
+    const collapsed = detailGroupCollapsedOverrides.has(groupKey)
+      ? detailGroupCollapsedOverrides.get(groupKey)
+      : configuredCollapsed;
     const icon = iconKey && GROUP_ICONS[iconKey] ? '<span class="detail-group-icon">' + GROUP_ICONS[iconKey] + '</span>' : '';
-    return '<div class="detail-group"><div class="detail-group-title">' + icon + title + '</div><div class="detail-group-body">' +
+    const chevron = '<svg class="detail-group-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/></svg>';
+    const bodyClass = tiled ? 'detail-group-body tiles' : 'detail-group-body';
+    return '<div class="detail-group' + (collapsed ? ' is-collapsed' : '') + '"><button class="detail-group-title detail-group-toggle" type="button" data-group-key="' + groupKey + '" aria-expanded="' + String(!collapsed) + '"><span class="detail-group-title-main">' + icon + '<span>' + title + '</span></span>' + chevron + '</button><div class="' + bodyClass + '"' + (collapsed ? ' hidden' : '') + '>' +
       filtered.join('') + '</div></div>';
   }
   // Flag always leads the country name, rendered via flagHtml() from
@@ -393,6 +614,10 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const countryFlagHtml = flagHtml(info.countryIso);
   const countryValue = info.originCountry
     ? (countryFlagHtml ? countryFlagHtml + ' ' + info.originCountry : info.originCountry)
+    : null;
+  const registeredOwnerCountryFlagHtml = flagHtml(info.registeredOwnerCountryIso);
+  const registeredOwnerCountryValue = info.registeredOwnerCountry
+    ? (registeredOwnerCountryFlagHtml ? registeredOwnerCountryFlagHtml + ' ' + info.registeredOwnerCountry : info.registeredOwnerCountry)
     : null;
   // Operator is plain text plus a leading airline logo (looked up from the
   // callsign, not from however the operator name itself was resolved — see
@@ -410,9 +635,6 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // neither a name nor a logo resolved at all.
   const operatorLogoHtml = airlineLogoHtml(info.callsign);
   const operatorText = info.operator || (operatorLogoHtml && currentDevMode ? 'Unknown' : null);
-  const operatorValue = operatorText
-    ? (operatorLogoHtml ? operatorLogoHtml + ' ' + operatorText : operatorText)
-    : (operatorLogoHtml || null);
   // Operator Country: adsbdb's flightroute.airline (name + ISO together) as
   // the primary tier, falling back to our own callsign-prefix enrichment
   // (enrichment/callsign.py's AIRLINE_OPERATORS table) when adsbdb has
@@ -421,13 +643,29 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const operatorCountryValue = info.operatorCountry
     ? (operatorCountryFlagHtml ? operatorCountryFlagHtml + ' ' + info.operatorCountry : info.operatorCountry)
     : null;
-  // Registered Owner only ever comes from adsbdb (no live/Flywme tier exists
-  // for it), which always gives the ISO directly alongside the name, so this
-  // one always has a flag when it has a value at all.
-  const registeredOwnerFlagHtml = flagHtml(info.registeredOwnerCountryIso);
-  const registeredOwnerValue = info.registeredOwner
-    ? (registeredOwnerFlagHtml ? registeredOwnerFlagHtml + ' ' + info.registeredOwner : info.registeredOwner)
-    : null;
+  const registeredOwnerValue = info.registeredOwner || null;
+  // In normal mode, Operator is hidden when it adds no information beyond
+  // Registered Owner: same resolved name and same resolved country. Any
+  // difference in either field (or an unresolved owner-side field) keeps the
+  // Operator tile visible. Dev mode always keeps both tiles for debugging.
+  function normalizedIdentityText(value) {
+    return value == null ? null : String(value).trim().toLowerCase();
+  }
+  const sameOperatorNameAsOwner = normalizedIdentityText(info.operator) != null
+    && normalizedIdentityText(info.operator) === normalizedIdentityText(info.registeredOwner);
+  const sameOperatorCountryNameAsOwner = normalizedIdentityText(info.operatorCountry) != null
+    && normalizedIdentityText(info.operatorCountry) === normalizedIdentityText(info.registeredOwnerCountry);
+  const sameOperatorCountryIsoAsOwner = normalizedIdentityText(info.operatorCountryIso) != null
+    && normalizedIdentityText(info.operatorCountryIso) === normalizedIdentityText(info.registeredOwnerCountryIso);
+  const sameOperatorCountryAsOwner = sameOperatorCountryNameAsOwner || sameOperatorCountryIsoAsOwner;
+  const hideOperatorAsDuplicate = !currentDevMode
+    && sameOperatorNameAsOwner
+    && sameOperatorCountryAsOwner;
+  // A callsign-derived mark is an operator mark. When the operator card is
+  // intentionally suppressed because it is the same legal entity as Owner,
+  // keep that mark on the one remaining Owner card. For distinct entities,
+  // never mislabel the operator's mark as an owner logo.
+  const ownerLogoHtml = hideOperatorAsDuplicate ? operatorLogoHtml : '';
   // Operator/Operator Country/Registered Owner/Registration Country are
   // four easily-confused concepts (found the hard way — a user kept
   // getting them mixed up across a whole session). Each explanation
@@ -439,10 +677,10 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // "Unknown" as often as a real value, and the icon needs to be there
   // either way.
   const IDENTITY_FIELD_EXPLANATIONS = {
-    operator: 'Operator — the airline or company flying this aircraft. Not necessarily who owns it (see Registered Owner).',
+    operator: 'Operator — the airline or company flying this aircraft. Not necessarily who owns it (see Owner).',
     operatorCountry: 'Operator Country — the operating airline’s home country. Not the aircraft’s own country of registration (see Registration Country).',
-    registeredOwner: 'Registered Owner — the private or corporate entity the aircraft is registered to, which can differ from the airline actually flying it (e.g. leasing).',
-    registrationCountry: 'Registration Country — the country the aircraft itself is registered in (its ICAO nationality mark), not who operates or owns it (see Operator Country / Registered Owner).',
+    registeredOwner: 'Owner — the private or corporate entity the aircraft is registered to, which can differ from the airline actually flying it (e.g. leasing).',
+    registrationCountry: 'Registration Country — the country the aircraft itself is registered in (its ICAO nationality mark), not who operates or owns it (see Operator Country / Owner).',
   };
   function identityHelp(key) {
     return infoTipHtml(HELP_ICON_SVG, IDENTITY_FIELD_EXPLANATIONS[key]);
@@ -454,36 +692,57 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // what that category actually means (CATEGORY_DESCRIPTIONS).
   const categoryParts = splitCategoryDisplay(info.categoryDisplay);
   let categoryValue = null;
+  let categoryHelp = null;
+  let categoryRow = null;
   if (categoryParts) {
-    const trigger = categoryParts.code ? categoryParts.code + ' · ' + categoryParts.label : categoryParts.label;
     const description = CATEGORY_DESCRIPTIONS[categoryParts.label];
     const detail = description
       ? (categoryParts.code ? categoryParts.code + ' (' + categoryParts.label + ')' : categoryParts.label) + ' — ' + description
       : null;
-    categoryValue = infoTipHtml(trigger, detail);
+    categoryValue = categoryParts.code ? categoryParts.code + ' · ' + categoryParts.label : categoryParts.label;
+    categoryHelp = detail ? infoTipHtml(HELP_ICON_SVG, detail) : null;
+  }
+  if (categoryValue != null || currentDevMode) {
+    const categoryBadge = currentDevMode ? sourceBadgeHtml('categoryDisplay', fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
+    const categoryDisplay = categoryValue != null ? categoryValue : (isGroundVehicle ? dash : 'Unknown');
+    categoryRow = '<div class="detail-row detail-row-basic" data-field="categoryDisplay">'
+      + '<span class="detail-label"><span class="detail-label-main">' + fieldIconHtml('categoryDisplay') + '<b>Category</b></span>' + (categoryHelp || '') + '</span>'
+      + '<span class="detail-value">' + categoryDisplay + categoryBadge + '</span>'
+      + '</div>';
   }
   const identity = renderGroup('Identity', [
+    // Legal/operating identity is the primary fact in this group. Aircraft
+    // make/model/category follow as supporting identification details.
+    hideOperatorAsDuplicate
+      ? null
+      : identityLogoRow('Operator', operatorLogoHtml, operatorText, 'operator', identityHelp('operator'), operatorCountryValue, 'operatorCountry'),
+    identityLogoRow('Owner', ownerLogoHtml, registeredOwnerValue, 'registeredOwner', identityHelp('registeredOwner'), registeredOwnerCountryValue, 'registeredOwnerCountry'),
     identityRow('Manufacturer', info.manufacturer, 'manufacturer'),
     identityRow('Model', info.model, 'model'),
     identityRow('Year built', info.manufactureYear, 'manufactureYear'),
-    identityRow('Operator', operatorValue, 'operator', identityHelp('operator')),
-    identityRow('Operator Country', operatorCountryValue, 'operatorCountry', identityHelp('operatorCountry')),
-    identityRow('Registered Owner', registeredOwnerValue, 'registeredOwner', identityHelp('registeredOwner')),
-    identityRow('Registration Country', countryValue, 'originCountry', identityHelp('registrationCountry')),
-    detailRow('Category', categoryValue, 'categoryDisplay'),
+    categoryRow,
   ], 'identity');
+  // Altitude + Geo altitude pair into one tile (primary + a "GPS ..."
+  // secondary line) rather than two separate tiles — they're the same
+  // underlying fact (how high) reported two ways, read together the same
+  // way the reference layout's own Altitude tile does.
   const position = renderGroup('Position', [
-    detailRow('Altitude', formatAltitude(info.altitudeM), 'altitudeM'),
-    detailRow('Geo altitude', formatAltitude(info.altGeomM), 'altGeomM'),
+    tileRow('Altitude', formatAltitude(info.altitudeM), 'altitudeM', {
+      secondary: { label: 'GPS', value: formatAltitude(info.altGeomM), fieldKey: 'altGeomM' },
+    }),
     detailRow('Vertical rate', formatVerticalRateUnit(info.verticalRateMs), 'verticalRateMs'),
     detailRow('Position source', info.positionSource, 'positionSource'),
   ], 'position');
+  // Track gets a computed 8-point compass secondary line ("133°" -> "SE"),
+  // mirroring the reference layout's own heading tile.
   const speedHeading = renderGroup('Speed &amp; Heading', [
     detailRow('Speed', formatSpeedKmh(info.speedKmh), 'speedKmh'),
     detailRow('IAS', formatSpeedKt(info.iasKt), 'iasKt'),
     detailRow('TAS', formatSpeedKt(info.tasKt), 'tasKt'),
     detailRow('Mach', info.mach != null ? info.mach.toFixed(2) : null, 'mach'),
-    detailRow('Track', info.trackDeg != null ? Math.round(info.trackDeg) + '°' : null, 'trackDeg'),
+    detailRow('Track', info.trackDeg != null
+      ? Math.round(info.trackDeg) + '° ' + degToCompass(info.trackDeg)
+      : null, 'trackDeg'),
     detailRow('Heading (mag)', info.magHeadingDeg != null ? Math.round(info.magHeadingDeg) + '°' : null, 'magHeadingDeg'),
     detailRow('Heading (true)', info.trueHeadingDeg != null ? Math.round(info.trueHeadingDeg) + '°' : null, 'trueHeadingDeg'),
     detailRow('Turn rate', info.turnRateDegPerSec != null ? info.turnRateDegPerSec.toFixed(1) + '°/s' : null, 'turnRateDegPerSec'),
@@ -493,13 +752,21 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
     detailRow('Selected altitude', formatAltitude(info.navAltitudeM), 'navAltitudeM'),
     detailRow('Selected heading', info.navHeadingDeg != null ? Math.round(info.navHeadingDeg) + '°' : null, 'navHeadingDeg'),
     detailRow('QNH', info.navQnh != null ? Math.round(info.navQnh) + ' hPa' : null, 'navQnh'),
-    detailRow('Modes', info.navModes ? info.navModes.join(', ') : null, 'navModes'),
+    detailRow('Modes', info.navModes ? info.navModes.join(', ') : null, 'navModes', null, true),
   ], 'autopilot');
+  // Outside air temp + Total air temp combine into one slash-separated
+  // tile ("Temp / TAT"), mirroring the reference layout's own "TEMP / DEW"
+  // tile — two related readings shown together instead of two tiles. Gated
+  // on either being present (not both), with a dash standing in for
+  // whichever side is missing, so one populated reading doesn't disappear
+  // just because its sibling isn't reported by this source.
+  const oatText = info.oatC != null ? Math.round(info.oatC) + ' °C' : null;
+  const tatText = info.tatC != null ? Math.round(info.tatC) + ' °C' : null;
+  const tempTatValue = (oatText || tatText) ? (oatText || dash) + ' / ' + (tatText || dash) : null;
   const weather = renderGroup('Weather', [
     detailRow('Wind', (info.windDirDeg != null && info.windSpeedKt != null)
       ? Math.round(info.windDirDeg) + '° / ' + formatSpeedKt(info.windSpeedKt) : null, ['windDirDeg', 'windSpeedKt']),
-    detailRow('Outside air temp', info.oatC != null ? Math.round(info.oatC) + ' °C' : null, 'oatC'),
-    detailRow('Total air temp', info.tatC != null ? Math.round(info.tatC) + ' °C' : null, 'tatC'),
+    detailRow('Temp / TAT', tempTatValue, ['oatC', 'tatC']),
   ], 'weather');
   const status = renderGroup('Status', [
     detailRow('Squawk', formatSquawk(info.squawk), 'squawk'),
@@ -512,7 +779,7 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // signal metadata). Absent entirely for an OpenSky-only aircraft, same as
   // Autopilot/Weather above. Split into three groups for clarity.
   const messageInfo = renderGroup('Message Info', [
-    detailRow('Data source flags', formatDbFlags(info.dbFlags), 'dbFlags'),
+    detailRow('Data source flags', formatDbFlags(info.dbFlags), 'dbFlags', null, true),
     detailRow('Message type', info.messageType, 'messageType'),
     detailRow('ADS-B version', info.adsbVersion != null ? 'v' + info.adsbVersion : null, 'adsbVersion'),
   ], 'messageInfo');
@@ -529,7 +796,6 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   const signalReception = renderGroup('Signal & Reception', [
     detailRow('Messages received', info.messageCount, 'messageCount'),
     detailRow('Signal strength', info.signalStrengthDbm != null ? info.signalStrengthDbm.toFixed(1) + ' dBm' : null, 'signalStrengthDbm'),
-    detailRow('Last position update', formatRelativeSeconds(info.secondsSincePositionUpdate), 'secondsSincePositionUpdate'),
   ], 'signalQuality');
   function badgeFor(key) {
     return currentDevMode ? sourceBadgeHtml(key, fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration) : '';
@@ -577,14 +843,12 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
   // --- Route card: its own visual block (see #sidebar-route in
   // sidebar-track.js) rather than a text row inside Identity — big airport
   // codes, small city names, a direction arrow between them, and (for an
-  // adsbdb-sourced route) the Layer 2 confidence badge. Reject-band routes
-  // (~a quarter of adsbdb's routes on live research — a wrong historical
-  // callsign match, not just a slightly-off one) don't name specific,
-  // likely-wrong airports at all; "Low" still shows the real airports with
-  // a warning tag, since it's plausibly right, just imperfect.
+  // adsbdb-sourced route) the Layer 2 confidence badge. In normal mode only
+  // High/Very High confidence routes render; Medium/Low/Reject are dev-only.
   const routeHas = info.originAirport && info.destinationAirport;
   const isReject = routeValidation && routeValidation.band === 'reject';
   const isLow = routeValidation && routeValidation.band === 'low';
+  const isMedium = routeValidation && routeValidation.band === 'medium';
   const routeDevBadge = currentDevMode
     ? sourceBadgeHtml(['originAirport', 'destinationAirport'], fieldSources, fieldConfidence, fieldComputationBasis, fieldNeedsCorroboration)
     : '';
@@ -612,6 +876,22 @@ function renderDetailsHtml(info, fieldSources, fieldConfidence, fieldComputation
         const dest = splitAirportString(info.destinationAirport);
         route = '<div class="route-card route-card-low">'
           + '<div class="route-card-title">Route <span class="route-card-tag">⚠ Unverified</span></div>'
+          + '<div class="route-card-endpoints">'
+          + '<div class="route-card-endpoint"><div class="route-card-code">' + (origin.code || '—') + '</div><div class="route-card-city">' + origin.name + '</div></div>'
+          + '<div class="route-card-arrow">' + routeArrowIconHtml(routeCategoryGroup, info.verticalRateMs) + '</div>'
+          + '<div class="route-card-endpoint"><div class="route-card-code">' + (dest.code || '—') + '</div><div class="route-card-city">' + dest.name + '</div></div>'
+          + '</div>'
+          + '<div class="route-card-footer">' + routeConfidenceBadge + routeDevBadge + '</div>'
+          + '</div>';
+      }
+    } else if (isMedium) {
+      // Medium-band routes are now dev-only too — still too uncertain to
+      // name specific airports in normal mode, but useful for debugging.
+      if (currentDevMode) {
+        const origin = splitAirportString(info.originAirport);
+        const dest = splitAirportString(info.destinationAirport);
+        route = '<div class="route-card route-card-medium">'
+          + '<div class="route-card-title">Route <span class="route-card-tag">~ Review</span></div>'
           + '<div class="route-card-endpoints">'
           + '<div class="route-card-endpoint"><div class="route-card-code">' + (origin.code || '—') + '</div><div class="route-card-city">' + origin.name + '</div></div>'
           + '<div class="route-card-arrow">' + routeArrowIconHtml(routeCategoryGroup, info.verticalRateMs) + '</div>'

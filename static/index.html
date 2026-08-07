@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="leaflet-markercluster/MarkerCluster.Default.css">
 <link rel="stylesheet" href="flag-icons/css/flag-icons.min.css">
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="styles/app.css">
+<link rel="stylesheet" href="styles/app.css?v=20260807-sidebar-ui-25">
 </head>
 <body>
 <div id="map"></div>
@@ -186,6 +186,16 @@
     <div class="segmented" id="unit-toggle">
       <button type="button" class="seg-btn active" data-value="metric">m / km/h</button>
       <button type="button" class="seg-btn" data-value="imperial">ft / kn</button>
+    </div>
+  </div>
+
+  <div class="filter-block ui-config-pending" id="tile-layout-control">
+    <div class="source-row" title="Toggle between the compact two-column tile sidebar layout and the single-column list layout">
+      <span class="source-name">Compact tile layout</span>
+      <label class="switch" style="--row-color:#6b7280">
+        <input type="checkbox" id="toggle-tile-layout" checked>
+        <span class="switch-track"></span>
+      </label>
     </div>
   </div>
 
@@ -658,16 +668,16 @@
 </script>
 <script src="leaflet/leaflet.js" defer></script>
 <script src="leaflet-markercluster/leaflet.markercluster.js" defer></script>
-<script src="js/map-init.js" defer></script>
-<script src="js/constants.js" defer></script>
+<script src="js/map-init.js?v=20260807-sidebar-ui-4" defer></script>
+<script src="js/constants.js?v=20260807-sidebar-ui-3" defer></script>
 <script src="js/route-validation.js" defer></script>
-<script src="js/state-filters.js" defer></script>
-<script src="js/sidebar-track.js" defer></script>
+<script src="js/state-filters.js?v=20260807-sidebar-ui-4" defer></script>
+<script src="js/sidebar-track.js?v=20260807-sidebar-ui-3" defer></script>
 <script src="js/auth-collection.js" defer></script>
 <script src="js/icons.js" defer></script>
-<script src="js/render-details.js" defer></script>
+<script src="js/render-details.js?v=20260807-sidebar-ui-10" defer></script>
 <script src="js/parsers.js" defer></script>
-<script src="js/main.js" defer></script>
+<script src="js/main.js?v=20260807-sidebar-ui-4" defer></script>
 <script src="js/vendor/preline.js" defer></script>
 </body>
 </html>

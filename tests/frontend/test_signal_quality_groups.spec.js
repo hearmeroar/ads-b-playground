@@ -40,6 +40,165 @@ test('Signal & Data Quality splits into three groups', async ({ page }) => {
   expect(titles.some(t => t.includes('Signal & Reception'))).toBeTruthy();
 });
 
+test('detail groups are accessible accordions and every field has an icon', async ({ page }) => {
+  await page.goto('http://127.0.0.1:5050/');
+  await page.waitForLoadState('networkidle');
+
+  await page.click('#toggle-dev-mode');
+  await selectAircraft(page, 'eeeeee', 'adsbfi');
+
+  const firstGroup = page.locator('#sidebar-details .detail-group').first();
+  const toggle = firstGroup.locator('.detail-group-toggle');
+  const body = firstGroup.locator('.detail-group-body');
+
+  await expect(toggle.locator('.detail-group-chevron')).toBeVisible();
+  await expect(toggle).toHaveCSS('text-transform', 'none');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(body).toBeVisible();
+
+  const secondGroup = page.locator('#sidebar-details .detail-group').nth(1);
+  await expect(secondGroup).toHaveCSS('margin-top', '8px');
+  await expect(secondGroup).toHaveCSS('padding', '8px');
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(body).toBeHidden();
+
+  await page.evaluate(() => renderSelectedDetails());
+  const rerenderedFirstGroup = page.locator('#sidebar-details .detail-group').first();
+  await expect(rerenderedFirstGroup.locator('.detail-group-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(rerenderedFirstGroup.locator('.detail-group-body')).toBeHidden();
+
+  await rerenderedFirstGroup.locator('.detail-group-toggle').click();
+  await expect(rerenderedFirstGroup.locator('.detail-group-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(rerenderedFirstGroup.locator('.detail-group-body')).toBeVisible();
+
+  await page.evaluate(() => {
+    detailGroupCollapsedOverrides.clear();
+    sidebarAccordionConfig.groups.position = true;
+    renderSelectedDetails();
+  });
+  const configuredCollapsedGroup = page.locator('[data-group-key="position"]').locator('..');
+  await expect(configuredCollapsedGroup.locator('.detail-group-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(configuredCollapsedGroup.locator('.detail-group-body')).toBeHidden();
+  await page.evaluate(() => {
+    sidebarAccordionConfig.groups.position = false;
+    detailGroupCollapsedOverrides.clear();
+    renderSelectedDetails();
+  });
+
+  const rows = page.locator('#sidebar-details .detail-row');
+  await expect(rows.first()).toBeVisible();
+  expect(await rows.count()).toBeGreaterThan(0);
+  expect(await page.locator('#sidebar-details .detail-row .detail-field-icon').count()).toBe(await rows.count());
+  await expect(rows.first().locator('.detail-field-icon')).toHaveCSS('width', '15px');
+  await expect(firstGroup.locator('.detail-group-icon')).toHaveCSS('width', '26px');
+
+  const themedHierarchy = await firstGroup.evaluate((group) => {
+    const root = document.documentElement;
+    const originalTheme = root.dataset.theme;
+    const results = ['light', 'dark'].map((theme) => {
+      root.dataset.theme = theme;
+      const title = group.querySelector('.detail-group-toggle');
+      const groupIcon = group.querySelector('.detail-group-icon');
+      const fieldLabel = group.querySelector('.detail-label');
+      const fieldIcon = group.querySelector('.detail-field-icon');
+      const tile = group.querySelector('.detail-row');
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = 'var(--app-surface)';
+      document.body.appendChild(probe);
+      const surface = getComputedStyle(probe).backgroundColor;
+      probe.style.backgroundColor = 'var(--app-surface-hover)';
+      const surfaceHover = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return {
+        theme,
+        title: getComputedStyle(title).color,
+        groupIcon: getComputedStyle(groupIcon).color,
+        fieldLabel: getComputedStyle(fieldLabel).color,
+        fieldIcon: getComputedStyle(fieldIcon).color,
+        groupBackground: getComputedStyle(group).backgroundColor,
+        tileBackground: getComputedStyle(tile).backgroundColor,
+        shellBackground: getComputedStyle(document.querySelector('#sidebar')).backgroundColor,
+        surface,
+        surfaceHover,
+      };
+    });
+    if (originalTheme) root.dataset.theme = originalTheme;
+    else delete root.dataset.theme;
+    return results;
+  });
+  const colorAlpha = (color) => {
+    const channels = color.match(/[\d.]+/g)?.map(Number) ?? [];
+    return channels.length === 4 ? channels[3] : 1;
+  };
+  for (const hierarchy of themedHierarchy) {
+    expect(hierarchy.groupIcon).toBe(hierarchy.title);
+    expect(hierarchy.fieldIcon).toBe(hierarchy.fieldLabel);
+    expect(hierarchy.title).not.toBe(hierarchy.fieldLabel);
+    expect(hierarchy.groupBackground).toBe(hierarchy.surface);
+    expect(hierarchy.tileBackground).toBe(hierarchy.surfaceHover);
+    expect(colorAlpha(hierarchy.surface)).toBeLessThan(0.9);
+    expect(colorAlpha(hierarchy.shellBackground)).toBeLessThan(0.9);
+  }
+
+  const tileHelp = page.locator('#sidebar-details .detail-group-body.tiles .detail-label .info-tip').first();
+  const helpAlignment = await tileHelp.evaluate((tip) => {
+    const labelRect = tip.closest('.detail-label').getBoundingClientRect();
+    const tipRect = tip.getBoundingClientRect();
+    return Math.abs(labelRect.right - tipRect.right);
+  });
+  expect(helpAlignment).toBeLessThanOrEqual(1);
+
+  await page.click('#toggle-tile-layout');
+  const listBody = page.locator('#sidebar-details .detail-group-body:not(.tiles)').first();
+  await expect(listBody).toBeVisible();
+
+  const listNicRow = page.locator('#sidebar-details [data-field="nic"]').first();
+  const listHelpGap = await listNicRow.evaluate((row) => {
+    const labelMain = row.querySelector('.detail-label-main').getBoundingClientRect();
+    const tip = row.querySelector('.info-tip').getBoundingClientRect();
+    return tip.left - labelMain.right;
+  });
+  expect(listHelpGap).toBeGreaterThanOrEqual(0);
+  expect(listHelpGap).toBeLessThanOrEqual(5);
+
+  const rowWithSecondary = page.locator(
+    '#sidebar-details .detail-group-body:not(.tiles) .detail-row:has(.identity-logo-country)'
+  ).first();
+  await expect(rowWithSecondary).toBeVisible();
+  const secondaryAlignment = await rowWithSecondary.evaluate((row) => {
+    const primary = row.querySelector('.identity-logo-name').getBoundingClientRect();
+    const secondary = row.querySelector('.identity-logo-country').getBoundingClientRect();
+    return Math.abs(primary.left - secondary.left);
+  });
+  expect(secondaryAlignment).toBeLessThanOrEqual(1);
+
+  await page.click('#toggle-tile-layout');
+  const restoredTileHelp = page.locator(
+    '#sidebar-details .detail-group-body.tiles .detail-label .info-tip'
+  ).first();
+  const restoredTileAlignment = await restoredTileHelp.evaluate((tip) => {
+    const labelRect = tip.closest('.detail-label').getBoundingClientRect();
+    const tipRect = tip.getBoundingClientRect();
+    return Math.abs(labelRect.right - tipRect.right);
+  });
+  expect(restoredTileAlignment).toBeLessThanOrEqual(1);
+
+  const accuracyIcons = await page.locator(
+    '[data-field="nic"] .detail-field-icon path, '
+    + '[data-field="nicBaro"] .detail-field-icon path, '
+    + '[data-field="nacP"] .detail-field-icon path, '
+    + '[data-field="nacV"] .detail-field-icon path, '
+    + '[data-field="sil"] .detail-field-icon path, '
+    + '[data-field="gva"] .detail-field-icon path, '
+    + '[data-field="sda"] .detail-field-icon path, '
+    + '[data-field="radiusOfContainmentM"] .detail-field-icon path'
+  ).evaluateAll((paths) => paths.map((path) => path.getAttribute('d')));
+  expect(accuracyIcons).toHaveLength(8);
+  expect(new Set(accuracyIcons).size).toBe(8);
+});
+
 test('DO-260B fields have (?) help icons with tooltips', async ({ page }) => {
   await page.goto('http://127.0.0.1:5050/');
   await page.waitForLoadState('networkidle');

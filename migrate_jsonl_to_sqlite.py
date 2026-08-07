@@ -105,7 +105,7 @@ def migrate_identity_cache_and_history():
             continue
         conn.execute(
             """
-            INSERT INTO identity_cache (icao24, registration, manufacturer, type, registered_owner, updated_ts)
+            INSERT INTO aircrafts (icao24, registration, manufacturer, type, registered_owner, updated_ts)
             VALUES (:icao24, :registration, :manufacturer, :type, :registered_owner, :updated_ts)
             ON CONFLICT(icao24) DO UPDATE SET
                 registration=excluded.registration, manufacturer=excluded.manufacturer,
@@ -118,7 +118,7 @@ def migrate_identity_cache_and_history():
                 "manufacturer": entry.get("manufacturer"),
                 "type": entry.get("type"),
                 "registered_owner": entry.get("registered_owner"),
-                "updated_ts": entry.get("updated_ts", 0.0),
+                "updated_ts": int(entry.get("updated_ts", 0)),
             },
         )
         n_identity += 1
@@ -145,7 +145,7 @@ def main():
     print(f"Migrated into {storage.DB_FILE}:")
     print(f"  users:            {n_users}")
     print(f"  collections:      {n_collections}")
-    print(f"  identity_cache:   {n_identity}")
+    print(f"  aircrafts:        {n_identity}")
     print(f"  identity_history: {n_history}")
 
 

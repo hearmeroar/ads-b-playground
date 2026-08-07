@@ -108,13 +108,13 @@ def init_db():
         CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_user_icao
             ON collections(user_id, icao24);
 
-        CREATE TABLE IF NOT EXISTS identity_cache (
+        CREATE TABLE IF NOT EXISTS aircrafts (
             icao24 TEXT PRIMARY KEY,
             registration TEXT,
             manufacturer TEXT,
             type TEXT,
             registered_owner TEXT,
-            updated_ts REAL NOT NULL
+            updated_ts INTEGER NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS identity_history (
@@ -127,6 +127,12 @@ def init_db():
         );
         """
     )
+    # Backward-compatible migration for pre-rename databases.
+    tables = {
+        r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    if "identity_cache" in tables and "aircrafts" not in tables:
+        conn.execute("ALTER TABLE identity_cache RENAME TO aircrafts")
     conn.commit()
 
 
@@ -241,18 +247,18 @@ def delete_collection(card_id, user_id):
 
 def get_identity(icao24):
     row = get_connection().execute(
-        "SELECT * FROM identity_cache WHERE icao24 = ?", (icao24,)
+        "SELECT * FROM aircrafts WHERE icao24 = ?", (icao24,)
     ).fetchone()
     return dict(row) if row else None
 
 
 def identity_known_icaos():
-    rows = get_connection().execute("SELECT icao24 FROM identity_cache").fetchall()
+    rows = get_connection().execute("SELECT icao24 FROM aircrafts").fetchall()
     return {r["icao24"] for r in rows}
 
 
 def identity_count():
-    return get_connection().execute("SELECT COUNT(*) AS n FROM identity_cache").fetchone()["n"]
+    return get_connection().execute("SELECT COUNT(*) AS n FROM aircrafts").fetchone()["n"]
 
 
 def identity_history_count():
@@ -262,7 +268,7 @@ def identity_history_count():
 def update_identity(icao24, aircraft):
     conn = get_connection()
     existing = get_identity(icao24) or {}
-    now = time.time()
+    now = int(time.time())
     changes = []
     updated = dict(existing)
     for field in IDENTITY_TRACKED_FIELDS:
@@ -277,7 +283,7 @@ def update_identity(icao24, aircraft):
 
     conn.execute(
         """
-        INSERT INTO identity_cache (icao24, registration, manufacturer, type, registered_owner, updated_ts)
+        INSERT INTO aircrafts (icao24, registration, manufacturer, type, registered_owner, updated_ts)
         VALUES (:icao24, :registration, :manufacturer, :type, :registered_owner, :updated_ts)
         ON CONFLICT(icao24) DO UPDATE SET
             registration=excluded.registration,
