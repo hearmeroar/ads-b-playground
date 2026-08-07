@@ -40,6 +40,19 @@ def test_load_ui_config_applies_altitude_color_defaults(monkeypatch, tmp_path):
     assert app._load_ui_config() == custom
 
 
+def test_load_ui_config_applies_airports_defaults(monkeypatch, tmp_path):
+    custom = app._default_ui_config()
+    custom["map"]["airports"] = {
+        "enabled_by_default": False,
+        "min_zoom": 12,
+    }
+    config_file = tmp_path / "ui.json"
+    config_file.write_text(json.dumps(custom))
+    monkeypatch.setattr(app, "UI_CONFIG_FILE", str(config_file))
+
+    assert app._load_ui_config() == custom
+
+
 def test_load_ui_config_falls_back_for_invalid_group_state(monkeypatch, tmp_path):
     config_file = tmp_path / "ui.json"
     config_file.write_text(json.dumps({

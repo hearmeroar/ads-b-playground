@@ -18,4 +18,8 @@ def test_api_config(client):
         "visible": True,
         "enabled_by_default": True,
     }
+    assert data["ui"]["map"]["airports"] == {
+        "enabled_by_default": True,
+        "min_zoom": 10,
+    }
     assert data["ui"]["sidebar"]["accordion"]["default_collapsed"] is False

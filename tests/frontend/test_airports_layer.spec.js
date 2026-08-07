@@ -31,17 +31,17 @@ test.beforeEach(async ({ page }) => {
   await mockAllSources(page);
 });
 
-test('airports layer is off by default and fetches nothing', async ({ page }) => {
+test('airports layer is on by default but waits for a close zoom before fetching', async ({ page }) => {
   const counts = {};
   await mockAirports(page, counts);
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
   await page.waitForTimeout(300);
 
+  expect(await page.isChecked('#toggle-airports')).toBe(true);
+  expect(await page.evaluate(() => map.hasLayer(airportsState.clusterGroup))).toBe(true);
   expect(counts.n).toBeUndefined();
-  expect(await page.evaluate(() => map.hasLayer(airportsState.clusterGroup))).toBe(false);
-  // Toggle is now a native checkbox inside a label.switch (same pattern as other source toggles)
-  expect(await page.isChecked('#toggle-airports')).toBe(false);
+  expect(await page.evaluate(() => airportsState.clusterGroup.getLayers().length)).toBe(0);
   // The label.switch wrapper provides the visual toggle styling via .switch-track
   expect(await page.locator('label.switch:has(#toggle-airports)').count()).toBe(1);
   expect(await page.evaluate(() => {
@@ -49,15 +49,20 @@ test('airports layer is off by default and fetches nothing', async ({ page }) =>
     const track = label.querySelector('.switch-track');
     return getComputedStyle(track).borderRadius;
   })).toBe('999px'); // visual toggle styling applied
+
+  await page.evaluate(() => map.setView(map.getCenter(), 10, { animate: false }));
+  await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length === 2);
+  expect(counts.n).toBe(1);
+  expect(counts.lastUrl).toContain('bbox=');
 });
 
-test('enabling Airports fetches the current viewport bbox and renders both airports', async ({ page }) => {
+test('zooming in fetches the current viewport bbox and renders both airports', async ({ page }) => {
   const counts = {};
   await mockAirports(page, counts);
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
 
-  await page.click('#toggle-airports');
+  await page.evaluate(() => map.setView(map.getCenter(), 10, { animate: false }));
   await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length === 2);
 
   expect(counts.n).toBe(1);
@@ -71,7 +76,7 @@ test('panning the map re-fetches airports for the new viewport (debounced)', asy
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
 
-  await page.click('#toggle-airports');
+  await page.evaluate(() => map.setView(map.getCenter(), 10, { animate: false }));
   await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length === 2);
   expect(counts.n).toBe(1);
 
@@ -86,7 +91,7 @@ test('disabling Airports removes the layer and stops further fetches on pan', as
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
 
-  await page.click('#toggle-airports');
+  await page.evaluate(() => map.setView(map.getCenter(), 10, { animate: false }));
   await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length === 2);
   expect(counts.n).toBe(1);
 
@@ -105,7 +110,7 @@ test('airport marker popup shows name, codes, and elevation; heliport gets its o
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
 
-  await page.click('#toggle-airports');
+  await page.evaluate(() => map.setView(map.getCenter(), 10, { animate: false }));
   await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length === 2);
 
   const airportPopup = await page.evaluate(() => {
@@ -142,16 +147,15 @@ test('airport marker popup shows name, codes, and elevation; heliport gets its o
   expect(popupClassName).toBe('airport-popup');
 });
 
-test('the per-size checklist is hidden until Airports is enabled, and defaults to Large + Medium only', async ({ page }) => {
+test('the per-size checklist starts visible, and defaults to Large + Medium only', async ({ page }) => {
   const counts = {};
   await mockAirports(page, counts);
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
 
-  await expect(page.locator('#airports-type-list')).toHaveAttribute('hidden', '');
-
-  await page.click('#toggle-airports');
   await expect(page.locator('#airports-type-list')).not.toHaveAttribute('hidden', '');
+
+  await page.evaluate(() => map.setView(map.getCenter(), 10, { animate: false }));
   await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length === 2);
 
   expect(counts.lastUrl).toContain('types=large_airport%2Cmedium_airport');
@@ -173,7 +177,7 @@ test('checking/unchecking a size in the checklist re-fetches with the updated ty
   await page.goto('/');
   await page.waitForSelector('.leaflet-marker-icon');
 
-  await page.click('#toggle-airports');
+  await page.evaluate(() => map.setView(map.getCenter(), 10, { animate: false }));
   await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length === 2);
   expect(counts.n).toBe(1);
 
@@ -227,8 +231,8 @@ test('"Jump to airport" button switches zone and re-centers map', async ({ page 
     return { lat: c.lat.toFixed(4), lng: c.lng.toFixed(4) };
   });
 
-  // Enable airports layer and wait for it to load
-  await page.click('#toggle-airports');
+  // Zoom in enough for airport markers to appear, then wait for the layer.
+  await page.evaluate(() => map.setView(map.getCenter(), 10, { animate: false }));
   await page.waitForFunction(() => airportsState.clusterGroup.getLayers().length > 0);
 
   // Find and click the airport marker (use the first one, which is large_airport)

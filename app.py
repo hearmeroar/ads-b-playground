@@ -620,6 +620,10 @@ def _default_ui_config():
                 "visible": True,
                 "enabled_by_default": True,
             },
+            "airports": {
+                "enabled_by_default": True,
+                "min_zoom": 10,
+            },
         },
         "sidebar": {
             "tile_layout": {
@@ -652,6 +656,7 @@ def _load_ui_config():
         accordion = cfg["sidebar"]["accordion"]
         tile_layout = cfg["sidebar"]["tile_layout"]
         altitude_color = cfg["map"]["altitude_color"]
+        airports = cfg["map"]["airports"]
         groups = accordion["groups"]
         if not isinstance(accordion["default_collapsed"], bool) or not isinstance(groups, dict):
             return default
@@ -660,6 +665,10 @@ def _load_ui_config():
         if not isinstance(tile_layout["visible"], bool) or not isinstance(tile_layout["enabled_by_default"], bool):
             return default
         if not isinstance(altitude_color["visible"], bool) or not isinstance(altitude_color["enabled_by_default"], bool):
+            return default
+        if not isinstance(airports["enabled_by_default"], bool) or not isinstance(airports["min_zoom"], int):
+            return default
+        if airports["min_zoom"] < 0:
             return default
         return cfg
     except (KeyError, OSError, TypeError, ValueError):

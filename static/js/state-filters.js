@@ -365,6 +365,7 @@ airportsToggleButton.addEventListener('change', () => {
   airportsTypeListEl.hidden = !enabled;
   setAirportsEnabled(enabled);
 });
+airportsTypeListEl.hidden = !airportsToggleButton.checked;
 
 // Per-size checklist nested under the toggle above — each checkbox just
 // flips its own type in/out of airportsState.enabledTypes and triggers an

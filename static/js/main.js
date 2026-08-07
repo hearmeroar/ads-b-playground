@@ -266,8 +266,9 @@ function refreshAirportsHelp() {
   document.getElementById('airports-help-popover').textContent =
     'Every airport worldwide (large/medium/small airports, heliports, seaplane bases), '
     + 'from OurAirports (public domain, updated nightly). Closed airports are hidden. '
-    + 'Only airports in the current map view are loaded — pan or zoom to see a different '
-    + 'area\'s airports. Nearby markers cluster into a numbered bubble at low zoom; click '
+    + 'Only airports in the current map view are loaded, and only once you are zoomed in '
+    + 'close enough to make them useful — pan or zoom to see a different area\'s airports. '
+    + 'Nearby markers cluster into a numbered bubble at low zoom; click '
     + 'a marker for its name, codes, and elevation.';
 }
 
@@ -753,6 +754,17 @@ fetch('/api/config')
     applyTileLayoutConfig(tileLayout);
     const altitudeColor = cfg && cfg.ui && cfg.ui.map && cfg.ui.map.altitude_color;
     applyAltitudeColorConfig(altitudeColor);
+    const airports = cfg && cfg.ui && cfg.ui.map && cfg.ui.map.airports;
+    if (airports && typeof airports.min_zoom === 'number') {
+      setAirportsMinVisibleZoom(airports.min_zoom);
+    }
+    if (airports && typeof airports.enabled_by_default === 'boolean') {
+      airportsToggleButton.checked = airports.enabled_by_default;
+      airportsTypeListEl.hidden = !airports.enabled_by_default;
+      if (airportsState.enabled !== airports.enabled_by_default) {
+        setAirportsEnabled(airports.enabled_by_default);
+      }
+    }
     for (const [name, s] of Object.entries((cfg && cfg.sources) || {})) {
       const checkbox = sourceToggles[name];
       if (!checkbox) continue; // config lists a source this build doesn't have

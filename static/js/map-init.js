@@ -637,6 +637,14 @@ map.getPane('airportPane').style.zIndex = 460;
 // ever being placed on the map unclustered. clusterPane matches the pane
 // above so cluster bubbles layer the same way individual airport markers do.
 const AIRPORTS_FETCH_DEBOUNCE_MS = 500;
+const AIRPORTS_MIN_VISIBLE_ZOOM = 10;
+let currentAirportsMinVisibleZoom = AIRPORTS_MIN_VISIBLE_ZOOM;
+
+function setAirportsMinVisibleZoom(minZoom) {
+  if (typeof minZoom === 'number' && Number.isFinite(minZoom) && minZoom >= 0) {
+    currentAirportsMinVisibleZoom = minZoom;
+  }
+}
 
 const airportsState = {
   clusterGroup: L.markerClusterGroup({ clusterPane: 'airportPane', maxClusterRadius: 60 }),
@@ -765,6 +773,10 @@ function jumpToAirport(airport) {
 
 function refreshAirportsInView() {
   if (!airportsState.enabled) return;
+  if (map.getZoom() < currentAirportsMinVisibleZoom) {
+    airportsState.clusterGroup.clearLayers();
+    return;
+  }
   // An empty checklist means "show nothing" — not "no types param", which
   // the backend would instead read as "no filter, show every type".
   if (airportsState.enabledTypes.size === 0) {
@@ -802,6 +814,10 @@ function refreshAirportsInView() {
 
 function scheduleAirportsRefresh() {
   clearTimeout(airportsState.debounceTimer);
+  if (airportsState.enabled && map.getZoom() < currentAirportsMinVisibleZoom) {
+    airportsState.clusterGroup.clearLayers();
+    return;
+  }
   airportsState.debounceTimer = setTimeout(refreshAirportsInView, AIRPORTS_FETCH_DEBOUNCE_MS);
 }
 
@@ -828,3 +844,5 @@ function setAirportsTypeEnabled(type, enabled) {
   else airportsState.enabledTypes.delete(type);
   refreshAirportsInView();
 }
+
+setAirportsEnabled(true);

@@ -90,6 +90,7 @@ async function mockAllSources(page, { skipHealth = false } = {}) {
     ui: {
       map: {
         altitude_color: { visible: true, enabled_by_default: true },
+        airports: { enabled_by_default: true, min_zoom: 10 },
       },
       sidebar: {
         tile_layout: { visible: true, enabled_by_default: true },
